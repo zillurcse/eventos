@@ -203,6 +203,8 @@ Route::prefix('v1')->group(function () {
             Route::middleware('perm:partners.manage')->group(function () {
                 Route::get('/partner-packages', [PartnerPackageController::class, 'index']);
                 Route::post('/partner-packages', [PartnerPackageController::class, 'store']);
+                Route::match(['put', 'patch'], '/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'update']);
+                Route::delete('/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'destroy']);
                 Route::get('/partners', [PartnerController::class, 'index']);
                 Route::post('/partners', [PartnerController::class, 'store']);
                 Route::get('/partners/{uuid}', [PartnerController::class, 'show']);

@@ -9,6 +9,7 @@ use App\Models\PartnerPackage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class PartnerPackageController extends Controller
 {
@@ -49,5 +50,28 @@ class PartnerPackageController extends Controller
         ]);
 
         return response()->json(['data' => new PartnerPackageResource($package)], 201);
+    }
+
+    public function update(Request $request, PartnerPackage $partnerPackage): JsonResponse
+    {
+        $data = $request->validate([
+            'name'         => ['sometimes', 'required', 'string', 'max:120'],
+            'kind'         => ['nullable', 'in:exhibitor,sponsor,both'],
+            'price_cents'  => ['nullable', 'integer', 'min:0'],
+            'currency'     => ['nullable', 'string', 'size:3'],
+            'entitlements' => ['nullable', 'array'],
+            'rank'         => ['nullable', 'integer'],
+        ]);
+
+        $partnerPackage->update($data);
+
+        return response()->json(['data' => new PartnerPackageResource($partnerPackage)]);
+    }
+
+    public function destroy(PartnerPackage $partnerPackage): Response
+    {
+        $partnerPackage->delete();
+
+        return response()->noContent();
     }
 }
