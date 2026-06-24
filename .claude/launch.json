@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "eventos-api",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "api", "nginx"],
+      "port": 8088
+    },
+    {
+      "name": "eventos-admin",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "admin"],
+      "port": 3000
+    },
+    {
+      "name": "eventos-event",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "event"],
+      "port": 3001
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/zillu/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c982a6d6-ac4d-4c55-94eb-db033ef3c5bc/f6227f52-aa2c-4514-a9d2-a922279a7a00/skills/docx/**)",
+      "Bash(extract-text \"C:\\\\Users\\\\zillu\\\\Downloads\\\\EventOS_Architecture.docx\")",
+      "Bash(python -c ' *)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(php --version)",
+      "Bash(composer --version)"
+    ]
+  }
+}

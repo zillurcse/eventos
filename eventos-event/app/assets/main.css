@@ -1,0 +1,33 @@
+:root {
+  --bg: #f1f5f9; --card: #fff; --ink: #0f172a; --muted: #64748b;
+  --brand: #047857; --brand-dark: #065f46; --line: #e2e8f0;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); }
+a { color: var(--brand); text-decoration: none; }
+.container { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+nav.topbar { background: #064e3b; color: #fff; padding: 12px 0; }
+nav.topbar .container { display: flex; align-items: center; gap: 18px; }
+nav.topbar a { color: #d1fae5; font-weight: 500; }
+nav.topbar a:hover { color: #fff; }
+nav.topbar .brand { color: #fff; font-weight: 700; font-size: 1.1rem; margin-right: auto; }
+main.container { padding-top: 8px; padding-bottom: 48px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 16px 0; }
+.btn { display: inline-block; padding: 10px 16px; background: var(--brand); color: #fff; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font: inherit; }
+.btn:hover { background: var(--brand-dark); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; margin: 6px 0; }
+.muted { color: var(--muted); }
+.badge { display: inline-block; font-size: .72rem; background: #d1fae5; color: #065f46; padding: 2px 9px; border-radius: 999px; }
+.error { color: #b91c1c; }
+h1 { font-size: 1.6rem; margin: 18px 0 6px; }
+h2 { font-size: 1.05rem; margin: 0 0 10px; }
+.row { display: flex; gap: 14px; flex-wrap: wrap; }
+.stat { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; flex: 1; min-width: 120px; }
+.stat .n { font-size: 1.8rem; font-weight: 700; }
+.feed-post { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+.feed-post .by { font-size: .8rem; color: var(--muted); }
+.feed-post.live { animation: flash 1.4s ease-out; }
+@keyframes flash { from { background: #ecfdf5; } to { background: #fff; } }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 6px; }

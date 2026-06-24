@@ -1,0 +1,15 @@
+# Local-only overrides. Copy to docker-compose.override.yml (gitignored) to enable.
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+# docker compose auto-merges docker-compose.override.yml on top of docker-compose.yml.
+services:
+  # Example: enable Xdebug in the API container
+  # api:
+  #   environment:
+  #     XDEBUG_MODE: debug
+  #     XDEBUG_CONFIG: "client_host=host.docker.internal"
+
+  # Example: expose Postgres on the default host port instead of 5433
+  # postgres:
+  #   ports:
+  #     - "5432:5432"
+  {}
