@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\ServiceCategoryController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\SessionController;
+use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TicketTypeController;
 use App\Http\Controllers\Api\V1\TrackController;
@@ -183,15 +184,31 @@ Route::prefix('v1')->group(function () {
 
             // Tracks
             Route::get('/tracks', [TrackController::class, 'index'])->middleware('perm:events.view');
-            Route::post('/tracks', [TrackController::class, 'store'])->middleware('perm:sessions.manage');
+            Route::middleware('perm:sessions.manage')->group(function () {
+                Route::post('/tracks', [TrackController::class, 'store']);
+                Route::match(['put', 'patch'], '/tracks/{id}', [TrackController::class, 'update']);
+                Route::delete('/tracks/{id}', [TrackController::class, 'destroy']);
+            });
 
             // Sessions & speakers
             Route::get('/sessions', [SessionController::class, 'index'])->middleware('perm:events.view');
             Route::get('/sessions/{uuid}', [SessionController::class, 'show'])->middleware('perm:events.view');
-            Route::post('/sessions', [SessionController::class, 'store'])->middleware('perm:sessions.manage');
-            Route::match(['put', 'patch'], '/sessions/{uuid}', [SessionController::class, 'update'])->middleware('perm:sessions.manage');
+            Route::middleware('perm:sessions.manage')->group(function () {
+                Route::post('/sessions', [SessionController::class, 'store']);
+                Route::match(['put', 'patch'], '/sessions/{uuid}', [SessionController::class, 'update']);
+                Route::match(['put', 'patch'], '/sessions/{uuid}/stream', [SessionController::class, 'updateStream']);
+                Route::delete('/sessions/{uuid}', [SessionController::class, 'destroy']);
+            });
             Route::post('/sessions/{uuid}/speakers', [SessionController::class, 'addSpeaker'])->middleware('perm:speakers.manage');
             Route::delete('/sessions/{uuid}/speakers/{participation}', [SessionController::class, 'removeSpeaker'])->middleware('perm:speakers.manage');
+
+            // Showcase speakers (event-level, not tied to a session)
+            Route::middleware('perm:speakers.manage')->group(function () {
+                Route::get('/events/{uuid}/speakers', [SpeakerController::class, 'index']);
+                Route::post('/events/{uuid}/speakers', [SpeakerController::class, 'store']);
+                Route::match(['put', 'patch'], '/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'update']);
+                Route::delete('/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'destroy']);
+            });
 
             // ── Ticketing & check-in (§6.4) ──
             Route::get('/ticket-types', [TicketTypeController::class, 'index'])->middleware('perm:events.view');

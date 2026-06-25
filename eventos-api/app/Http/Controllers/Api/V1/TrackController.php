@@ -27,21 +27,44 @@ class TrackController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'event' => ['required', 'string'], // event uuid
-            'name' => ['required', 'string', 'max:180'],
-            'color' => ['nullable', 'string', 'max:20'],
+            'event'      => ['required', 'string'],
+            'name'       => ['required', 'string', 'max:180'],
+            'color'      => ['nullable', 'string', 'max:20'],
             'sort_order' => ['nullable', 'integer'],
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
 
         $track = Track::create([
-            'event_id' => $event->id,
-            'name' => $data['name'],
-            'color' => $data['color'] ?? null,
+            'event_id'   => $event->id,
+            'name'       => $data['name'],
+            'color'      => $data['color'] ?? null,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
 
         return response()->json(['data' => new TrackResource($track)], 201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $track = Track::findOrFail($id);
+
+        $data = $request->validate([
+            'name'       => ['sometimes', 'string', 'max:180'],
+            'color'      => ['nullable', 'string', 'max:20'],
+            'sort_order' => ['nullable', 'integer'],
+        ]);
+
+        $track->update($data);
+
+        return response()->json(['data' => new TrackResource($track->fresh())]);
+    }
+
+    public function destroy(string $id): JsonResponse
+    {
+        $track = Track::findOrFail($id);
+        $track->delete();
+
+        return response()->json(null, 204);
     }
 }

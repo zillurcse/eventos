@@ -40,33 +40,47 @@ class SessionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'event' => ['required', 'string'],
-            'title' => ['required', 'string', 'max:250'],
-            'description' => ['nullable', 'string'],
-            'track_id' => ['nullable', 'integer', 'exists:tracks,id'],
-            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
-            'starts_at' => ['nullable', 'date'],   // ISO-8601 w/ offset → stored UTC
-            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-            'timezone' => ['nullable', 'string', 'max:64'], // IANA override
-            'capacity' => ['nullable', 'integer', 'min:0'],
-            'stream_url' => ['nullable', 'url', 'max:500'],
+            'event'              => ['required', 'string'],
+            'title'              => ['required', 'string', 'max:250'],
+            'description'        => ['nullable', 'string'],
+            'track_id'           => ['nullable', 'integer', 'exists:tracks,id'],
+            'room_id'            => ['nullable', 'integer', 'exists:rooms,id'],
+            'starts_at'          => ['nullable', 'date'],
+            'ends_at'            => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'timezone'           => ['nullable', 'string', 'max:64'],
+            'capacity'           => ['nullable', 'integer', 'min:0'],
+            'stream_url'         => ['nullable', 'url', 'max:500'],
+            // Extra fields stored in meta
+            'session_place'      => ['nullable', 'string', 'max:250'],
+            'logo_url'           => ['nullable', 'string', 'max:2000'],
+            'tags'               => ['nullable', 'array'],
+            'tags.*'             => ['string', 'max:100'],
+            'is_featured'        => ['nullable', 'boolean'],
+            'is_allowed_to_rate' => ['nullable', 'boolean'],
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
-        $data = $this->utcDates($data, ['starts_at', 'ends_at']);
+        $data  = $this->utcDates($data, ['starts_at', 'ends_at']);
 
         $session = Session::create([
-            'event_id' => $event->id,
-            'title' => $data['title'],
+            'event_id'   => $event->id,
+            'title'      => $data['title'],
             'description' => $data['description'] ?? null,
-            'track_id' => $data['track_id'] ?? null,
-            'room_id' => $data['room_id'] ?? null,
-            'starts_at' => $data['starts_at'] ?? null,
-            'ends_at' => $data['ends_at'] ?? null,
-            'timezone' => $data['timezone'] ?? null,
-            'capacity' => $data['capacity'] ?? null,
+            'track_id'   => $data['track_id'] ?? null,
+            'room_id'    => $data['room_id'] ?? null,
+            'starts_at'  => $data['starts_at'] ?? null,
+            'ends_at'    => $data['ends_at'] ?? null,
+            'timezone'   => $data['timezone'] ?? null,
+            'capacity'   => $data['capacity'] ?? null,
             'stream_url' => $data['stream_url'] ?? null,
-            'status' => 'scheduled',
+            'status'     => 'scheduled',
+            'meta'       => [
+                'session_place'      => $data['session_place'] ?? null,
+                'logo_url'           => $data['logo_url'] ?? null,
+                'tags'               => $data['tags'] ?? [],
+                'is_featured'        => $data['is_featured'] ?? false,
+                'is_allowed_to_rate' => $data['is_allowed_to_rate'] ?? false,
+            ],
         ]);
 
         return response()->json(['data' => new SessionResource($session->load('event'))], 201);
@@ -77,21 +91,77 @@ class SessionController extends Controller
         $session = Session::where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'title' => ['sometimes', 'string', 'max:250'],
-            'description' => ['nullable', 'string'],
-            'track_id' => ['nullable', 'integer', 'exists:tracks,id'],
-            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
-            'starts_at' => ['nullable', 'date'],
-            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-            'timezone' => ['nullable', 'string', 'max:64'],
-            'capacity' => ['nullable', 'integer', 'min:0'],
-            'stream_url' => ['nullable', 'url', 'max:500'],
-            'status' => ['sometimes', 'in:scheduled,live,ended,canceled'],
+            'title'              => ['sometimes', 'string', 'max:250'],
+            'description'        => ['nullable', 'string'],
+            'track_id'           => ['nullable', 'integer', 'exists:tracks,id'],
+            'room_id'            => ['nullable', 'integer', 'exists:rooms,id'],
+            'starts_at'          => ['nullable', 'date'],
+            'ends_at'            => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'timezone'           => ['nullable', 'string', 'max:64'],
+            'capacity'           => ['nullable', 'integer', 'min:0'],
+            'stream_url'         => ['nullable', 'url', 'max:500'],
+            'status'             => ['sometimes', 'in:scheduled,live,ended,canceled'],
+            // Extra meta fields
+            'session_place'      => ['nullable', 'string', 'max:250'],
+            'logo_url'           => ['nullable', 'string', 'max:2000'],
+            'tags'               => ['nullable', 'array'],
+            'tags.*'             => ['string', 'max:100'],
+            'is_featured'        => ['nullable', 'boolean'],
+            'is_allowed_to_rate' => ['nullable', 'boolean'],
         ]);
 
-        $session->update($this->utcDates($data, ['starts_at', 'ends_at']));
+        $metaKeys = ['session_place', 'logo_url', 'tags', 'is_featured', 'is_allowed_to_rate'];
+        $metaUpdate = $request->only($metaKeys);
+
+        $coreUpdate = $this->utcDates(
+            collect($data)->except($metaKeys)->toArray(),
+            ['starts_at', 'ends_at'],
+        );
+
+        if ($metaUpdate) {
+            $coreUpdate['meta'] = array_merge($session->meta ?? [], $metaUpdate);
+        }
+
+        $session->update($coreUpdate);
 
         return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
+    }
+
+    /** Update streaming & engagement settings stored in meta. */
+    public function updateStream(string $uuid, Request $request): JsonResponse
+    {
+        $session = Session::where('uuid', $uuid)->firstOrFail();
+
+        $request->validate([
+            'is_stream'                => ['nullable', 'boolean'],
+            'who_will_host'            => ['nullable', 'in:self,zoom,rtmp'],
+            'stream_link'              => ['nullable', 'string', 'max:500'],
+            'on_demand_recording_link' => ['nullable', 'string', 'max:500'],
+            'vimeo_live_id'            => ['nullable', 'string', 'max:250'],
+            'can_live_chat'            => ['nullable', 'boolean'],
+            'can_qa'                   => ['nullable', 'boolean'],
+            'can_live_polls'           => ['nullable', 'boolean'],
+            'can_attendee_list'        => ['nullable', 'boolean'],
+            'can_session'              => ['nullable', 'boolean'],
+        ]);
+
+        $session->update([
+            'meta' => array_merge($session->meta ?? [], $request->only([
+                'is_stream', 'who_will_host', 'stream_link', 'on_demand_recording_link',
+                'vimeo_live_id', 'can_live_chat', 'can_qa', 'can_live_polls',
+                'can_attendee_list', 'can_session',
+            ])),
+        ]);
+
+        return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
+    }
+
+    public function destroy(string $uuid): JsonResponse
+    {
+        $session = Session::where('uuid', $uuid)->firstOrFail();
+        $session->delete();
+
+        return response()->json(null, 204);
     }
 
     /** Add a speaker: upsert contact → participation(role=speaker) → pivot. */
