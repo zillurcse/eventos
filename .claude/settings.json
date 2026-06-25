@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/laragon/www/expouse/admin\" && wc -l app/Http/Controllers/Admin/ServicesItem/*.php)",
+      "Read(//c/laragon/www/expouse/admin/**)"
+    ]
+  }
+}

@@ -35,6 +35,8 @@ use App\Http\Controllers\Api\V1\PartnerSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
+use App\Http\Controllers\Api\V1\ServiceCategoryController;
+use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TicketTypeController;
@@ -215,6 +217,17 @@ Route::prefix('v1')->group(function () {
                 Route::post('/partners/{uuid}/products', [PartnerProductController::class, 'store']);
                 Route::post('/partners/{uuid}/booths', [BoothController::class, 'store']);
             });
+
+            // ── Event services catalogue ──
+            Route::get('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/service-categories/{category}', [ServiceCategoryController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/service-categories/{category}', [ServiceCategoryController::class, 'destroy'])->middleware('perm:events.manage');
+
+            Route::get('/events/{uuid}/services', [ServiceController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/services', [ServiceController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/services/{group}', [ServiceController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/services/{group}', [ServiceController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Announcements (§6.6) ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');
