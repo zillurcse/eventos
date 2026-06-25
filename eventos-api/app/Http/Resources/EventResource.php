@@ -19,6 +19,7 @@ class EventResource extends JsonResource
             'description' => $this->description,
             'format' => $this->format,
             'status' => $this->status,
+            'published_at' => $this->published_at?->toIso8601String(),
             'timezone' => $this->timezone,
             'resolved_timezone' => $this->resolvedTimezone(),
             'starts_at' => $this->starts_at?->toIso8601String(),

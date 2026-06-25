@@ -80,12 +80,29 @@ class EventController extends Controller
         return response()->json(['data' => new EventResource($event->fresh('coverFile'))]);
     }
 
-    public function publish(string $uuid): JsonResponse
+    /**
+     * Publish or unpublish the event (Content Hub → Publishing). Stamps
+     * published_at on first publish; clears it when reverted to draft.
+     */
+    public function publish(string $uuid, Request $request): JsonResponse
     {
         $event = Event::where('uuid', $uuid)->firstOrFail();
-        $event->update(['status' => 'published']);
 
-        return response()->json(['data' => new EventResource($event)]);
+        $data = $request->validate([
+            'status' => ['sometimes', 'in:draft,published'],
+            'is_public' => ['sometimes', 'boolean'],
+        ]);
+
+        $status = $data['status'] ?? 'published';
+
+        $event->update([
+            'status' => $status,
+            'published_at' => $status === 'published' ? ($event->published_at ?? now()) : null,
+            'is_public' => $data['is_public'] ?? $event->is_public,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        return response()->json(['data' => new EventResource($event->fresh('coverFile'))]);
     }
 
     public function destroy(string $uuid): JsonResponse
@@ -112,6 +129,10 @@ class EventController extends Controller
             'theme' => ['sometimes', 'array'],
             'theme.primary' => ['sometimes', 'nullable', 'string', 'max:9'],
             'theme.accent' => ['sometimes', 'nullable', 'string', 'max:9'],
+            'theme.font_family' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'theme.mode' => ['sometimes', 'nullable', 'in:light,dark,auto'],
+            'theme.header_style' => ['sometimes', 'nullable', 'in:solid,transparent,gradient'],
+            'theme.button_radius' => ['sometimes', 'nullable', 'in:rounded,sharp,pill'],
             'modules_enabled' => ['sometimes', 'array'],
             'branding' => ['sometimes', 'array'],
             'login' => ['sometimes', 'array'],
@@ -123,6 +144,26 @@ class EventController extends Controller
             'navigation' => ['sometimes', 'array'],
             'seo' => ['sometimes', 'array'],
             'filters' => ['sometimes', 'array'],
+            'banners' => ['sometimes', 'array'],
+            'banners.*.id' => ['sometimes', 'string'],
+            'banners.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'banners.*.url' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'banners.*.image_file_id' => ['sometimes', 'nullable', 'integer'],
+            'banners.*.image_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'faqs' => ['sometimes', 'array'],
+            'faqs.*.id' => ['sometimes', 'string'],
+            'faqs.*.question' => ['sometimes', 'required', 'string', 'max:500'],
+            'faqs.*.answer' => ['sometimes', 'required', 'string', 'max:5000'],
+            'testimonials' => ['sometimes', 'array'],
+            'testimonials.*.id' => ['sometimes', 'string'],
+            'testimonials.*.name' => ['sometimes', 'required', 'string', 'max:200'],
+            'testimonials.*.role' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'testimonials.*.company' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'testimonials.*.quote' => ['sometimes', 'required', 'string', 'max:2000'],
+            'testimonials.*.rating' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:5'],
+            'testimonials.*.avatar_file_id' => ['sometimes', 'nullable', 'integer'],
+            'testimonials.*.avatar_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'testimonials.*.featured' => ['sometimes', 'boolean'],
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
@@ -142,6 +183,9 @@ class EventController extends Controller
             'navigation' => (object) ($s->navigation ?? []),
             'seo' => (object) ($s->seo ?? []),
             'filters' => $s->filters ?? [],
+            'banners' => $s->banners ?? [],
+            'faqs' => $s->faqs ?? [],
+            'testimonials' => $s->testimonials ?? [],
         ];
     }
 

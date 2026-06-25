@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(cd \"C:/laragon/www/expouse/admin\" && wc -l app/Http/Controllers/Admin/ServicesItem/*.php)",
-      "Read(//c/laragon/www/expouse/admin/**)"
+      "Read(//c/laragon/www/expouse/admin/**)",
+      "Bash(cat app/Models/Partner.php)",
+      "Bash(cat app/Http/Controllers/Api/V1/PartnerController.php)",
+      "Bash(cat app/Http/Resources/PartnerResource.php)"
     ]
   }
 }

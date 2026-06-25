@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FormController;
+use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -234,6 +236,19 @@ Route::prefix('v1')->group(function () {
                 Route::post('/partners/{uuid}/products', [PartnerProductController::class, 'store']);
                 Route::post('/partners/{uuid}/booths', [BoothController::class, 'store']);
             });
+
+            // ── Content Hub: blog / news articles ──
+            Route::get('/events/{uuid}/blog-posts', [BlogPostController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/blog-posts', [BlogPostController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Content Hub: image gallery ──
+            Route::get('/events/{uuid}/gallery', [GalleryImageController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/gallery', [GalleryImageController::class, 'store'])->middleware('perm:events.manage');
+            Route::post('/events/{uuid}/gallery/reorder', [GalleryImageController::class, 'reorder'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Event services catalogue ──
             Route::get('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'index'])->middleware('perm:events.view');

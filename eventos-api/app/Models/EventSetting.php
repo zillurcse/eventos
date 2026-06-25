@@ -23,6 +23,9 @@ class EventSetting extends Model
         'navigation' => 'array',
         'seo' => 'array',
         'filters' => 'array',
+        'banners' => 'array',
+        'faqs' => 'array',
+        'testimonials' => 'array',
         'registration_open' => 'datetime',
         'registration_close' => 'datetime',
     ];
