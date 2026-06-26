@@ -26,6 +26,11 @@ class EventSetting extends Model
         'banners' => 'array',
         'faqs' => 'array',
         'testimonials' => 'array',
+        'social' => 'array',
+        'notifications' => 'array',
+        'chat' => 'array',
+        'meeting' => 'array',
+        'lounge' => 'array',
         'registration_open' => 'datetime',
         'registration_close' => 'datetime',
     ];

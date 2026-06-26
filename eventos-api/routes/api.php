@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
+use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FormController;
+use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
@@ -242,6 +244,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/events/{uuid}/blog-posts', [BlogPostController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Communication: sponsor CTAs (image / video / text) ──
+            Route::get('/events/{uuid}/ctas', [CtaController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/ctas', [CtaController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/ctas/{cta}', [CtaController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/ctas/{cta}', [CtaController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Communication: gamification (points + award) ──
+            Route::get('/events/{uuid}/gamification', [GamificationController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/events/{uuid}/gamification', [GamificationController::class, 'update'])->middleware('perm:events.manage');
 
             // ── Content Hub: image gallery ──
             Route::get('/events/{uuid}/gallery', [GalleryImageController::class, 'index'])->middleware('perm:events.view');
