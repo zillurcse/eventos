@@ -33,8 +33,8 @@ return [
             ['key' => 'twitter',    'label' => 'X / Twitter','type' => 'text',     'is_required' => false],
         ],
 
-        // Partner (exhibitor/sponsor) company profile
-        'partner' => [
+        // Exhibitor (exhibitor/sponsor) company profile
+        'exhibitor' => [
             ['key' => 'company_name', 'label' => 'Company name', 'type' => 'text',     'is_required' => true],
             ['key' => 'website',      'label' => 'Website',      'type' => 'text',     'is_required' => false],
             ['key' => 'description',  'label' => 'Description',  'type' => 'textarea', 'is_required' => false],

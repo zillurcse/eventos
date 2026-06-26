@@ -2,25 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class PartnerMember extends Model
+class ExhibitorPackage extends Model
 {
-    use SoftDeletes;
+    use BelongsToOrganization, SoftDeletes;
+
+    protected $table = 'exhibitor_packages';
 
     protected $guarded = [];
-
-    public function partner(): BelongsTo
-    {
-        return $this->belongsTo(Partner::class);
-    }
-
-    public function contact(): BelongsTo
-    {
-        return $this->belongsTo(Contact::class);
-    }
 
     protected $casts = [
         'meta' => 'array',

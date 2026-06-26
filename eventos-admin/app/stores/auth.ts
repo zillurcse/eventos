@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-export interface PartnerLink {
+export interface ExhibitorLink {
   id: string
   name: string
   type: string            // exhibitor | sponsor
@@ -15,9 +15,9 @@ interface User {
   name: string
   email: string
   is_platform_staff?: boolean
-  personas?: string[]     // platform | organizer | partner
+  personas?: string[]     // platform | organizer | exhibitor
   memberships?: Array<{ organization: { id?: string, name: string, slug?: string }, status?: string, roles?: string[] }>
-  partners?: PartnerLink[]
+  exhibitors?: ExhibitorLink[]
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -31,15 +31,15 @@ export const useAuthStore = defineStore('auth', {
     personas: (s): string[] => s.user?.personas ?? [],
     isPlatform: (s): boolean => !!s.user?.is_platform_staff || (s.user?.personas?.includes('platform') ?? false),
     isOrganizer: (s): boolean => s.user?.personas?.includes('organizer') ?? false,
-    isPartner: (s): boolean => s.user?.personas?.includes('partner') ?? false,
+    isExhibitor: (s): boolean => s.user?.personas?.includes('exhibitor') ?? false,
     orgName: (s): string | null => s.user?.memberships?.find(m => m.status === 'active')?.organization?.name ?? null,
-    primaryPartner: (s): PartnerLink | null => s.user?.partners?.[0] ?? null,
+    primaryExhibitor: (s): ExhibitorLink | null => s.user?.exhibitors?.[0] ?? null,
 
     /** Where this user should land after signing in. */
     home(): string {
       if (this.isPlatform) return '/'
       if (this.isOrganizer) return '/org'
-      if (this.isPartner) return '/partner'
+      if (this.isExhibitor) return '/exhibitor'
       return '/login'
     },
   },

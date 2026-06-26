@@ -3,37 +3,37 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PartnerMemberResource;
+use App\Http\Resources\ExhibitorMemberResource;
 use App\Models\Contact;
-use App\Models\Partner;
-use App\Models\PartnerMember;
+use App\Models\Exhibitor;
+use App\Models\ExhibitorMember;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Partner team self-management (architecture §6.3). The active partner is
- * resolved by ResolvePartnerAdmin, which sets the tenant GUC to that partner's
- * org — so org-scoped writes (contacts, partner_members) satisfy RLS on the
+ * Exhibitor team self-management (architecture §6.3). The active exhibitor is
+ * resolved by ResolveExhibitorAdmin, which sets the tenant GUC to that exhibitor's
+ * org — so org-scoped writes (contacts, exhibitor_members) satisfy RLS on the
  * default connection. Member logins are global `users` (no RLS).
  */
-class PartnerSelfMemberController extends Controller
+class ExhibitorSelfMemberController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $members = PartnerMember::with('contact')
-            ->where('partner_id', $request->attributes->get('partner_id'))
+        $members = ExhibitorMember::with('contact')
+            ->where('exhibitor_id', $request->attributes->get('exhibitor_id'))
             ->latest('id')
             ->get();
 
-        return response()->json(['data' => PartnerMemberResource::collection($members)]);
+        return response()->json(['data' => ExhibitorMemberResource::collection($members)]);
     }
 
     /** Invite a teammate; supplying a password gives them a login (admin or staff). */
     public function store(Request $request): JsonResponse
     {
-        $partner = Partner::findOrFail($request->attributes->get('partner_id'));
+        $exhibitor = Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
 
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -61,17 +61,17 @@ class PartnerSelfMemberController extends Controller
             $contact->update(['user_id' => $user->id]);
         }
 
-        $member = PartnerMember::updateOrCreate(
-            ['partner_id' => $partner->id, 'contact_id' => $contact->id],
+        $member = ExhibitorMember::updateOrCreate(
+            ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
             ['role' => $data['role'] ?? 'staff', 'is_lead_capturer' => $data['is_lead_capturer'] ?? false],
         );
 
-        return response()->json(['data' => new PartnerMemberResource($member->load('contact'))], 201);
+        return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }
 
     public function destroy(Request $request, int $member): JsonResponse
     {
-        PartnerMember::where('partner_id', $request->attributes->get('partner_id'))
+        ExhibitorMember::where('exhibitor_id', $request->attributes->get('exhibitor_id'))
             ->where('id', $member)
             ->firstOrFail()
             ->delete();
@@ -82,8 +82,8 @@ class PartnerSelfMemberController extends Controller
     /** Reset a teammate's login password. */
     public function password(Request $request, int $member): JsonResponse
     {
-        $m = PartnerMember::with('contact')
-            ->where('partner_id', $request->attributes->get('partner_id'))
+        $m = ExhibitorMember::with('contact')
+            ->where('exhibitor_id', $request->attributes->get('exhibitor_id'))
             ->where('id', $member)
             ->firstOrFail();
 

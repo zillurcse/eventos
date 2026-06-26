@@ -3,13 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class PartnerProduct extends Model
+class ExhibitorMember extends Model
 {
     use SoftDeletes;
 
     protected $guarded = [];
+
+    public function exhibitor(): BelongsTo
+    {
+        return $this->belongsTo(Exhibitor::class);
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class);
+    }
 
     protected $casts = [
         'meta' => 'array',

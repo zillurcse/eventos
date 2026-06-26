@@ -1,8 +1,8 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'partner', title: 'My Booth', subtitle: 'Your exhibitor / sponsor space' })
+definePageMeta({ middleware: 'exhibitor', title: 'My Booth', subtitle: 'Your exhibitor / sponsor space' })
 
 const api = useApi()
-const partner = ref<any>(null)
+const exhibitor = ref<any>(null)
 const booth = ref<any>(null)
 const suspended = ref(false)
 const savedProfile = ref(false)
@@ -12,16 +12,16 @@ const error = ref('')
 const profile = reactive({ name: '', description: '', website: '', logo_file_id: null as number | null })
 const boothForm = reactive({ code: '', type: 'physical', links: [] as { label: string, url: string }[] })
 
-const isExhibitor = computed(() => partner.value?.type === 'exhibitor')
+const isExhibitor = computed(() => exhibitor.value?.type === 'exhibitor')
 
 async function load() {
   try {
-    partner.value = (await api<any>('/partner/space')).data
-    profile.name = partner.value.name ?? ''
-    profile.description = partner.value.description ?? ''
-    profile.website = partner.value.website ?? ''
+    exhibitor.value = (await api<any>('/exhibitor/space')).data
+    profile.name = exhibitor.value.name ?? ''
+    profile.description = exhibitor.value.description ?? ''
+    profile.website = exhibitor.value.website ?? ''
     if (isExhibitor.value) {
-      booth.value = (await api<any>('/partner/booth')).data
+      booth.value = (await api<any>('/exhibitor/booth')).data
       if (booth.value) {
         boothForm.code = booth.value.code ?? ''
         boothForm.type = booth.value.type ?? 'physical'
@@ -38,14 +38,14 @@ async function saveProfile() {
   try {
     const body: any = { name: profile.name, description: profile.description, website: profile.website }
     if (profile.logo_file_id) body.logo_file_id = profile.logo_file_id
-    partner.value = (await api<any>('/partner/space', { method: 'PATCH', body })).data
+    exhibitor.value = (await api<any>('/exhibitor/space', { method: 'PATCH', body })).data
     savedProfile.value = true; setTimeout(() => (savedProfile.value = false), 1500)
   } catch (e: any) { error.value = e?.data?.message || 'Could not save.' }
 }
 
 async function saveBooth() {
   const body = { code: boothForm.code || null, type: boothForm.type, resources: { links: boothForm.links.filter(l => l.url) } }
-  booth.value = (await api<any>('/partner/booth', { method: 'PUT', body })).data
+  booth.value = (await api<any>('/exhibitor/booth', { method: 'PUT', body })).data
   savedBooth.value = true; setTimeout(() => (savedBooth.value = false), 1500)
 }
 function addLink() { boothForm.links.push({ label: '', url: '' }) }
@@ -57,17 +57,17 @@ onMounted(load)
 <template>
   <div>
     <div v-if="suspended" class="card">
-      <p class="error">This partner account is suspended. Contact the event organizer.</p>
+      <p class="error">This exhibitor account is suspended. Contact the event organizer.</p>
     </div>
 
-    <template v-else-if="partner">
+    <template v-else-if="exhibitor">
       <div class="grid grid-cols-[1.4fr_1fr] gap-[18px] items-start">
         <!-- Profile -->
         <div class="card">
           <h2>Profile <span v-if="savedProfile" class="badge active">saved ✓</span></h2>
           <div class="flex gap-4 items-start">
             <div class="w-40">
-              <UploadButton :preview="partner.logo_url" collection="logo" path="/partner/uploads" @uploaded="v => profile.logo_file_id = v.id" />
+              <UploadButton :preview="exhibitor.logo_url" collection="logo" path="/exhibitor/uploads" @uploaded="v => profile.logo_file_id = v.id" />
             </div>
             <div class="flex-1">
               <label>Name</label>
@@ -86,16 +86,16 @@ onMounted(load)
         <div class="card">
           <h2>Booth</h2>
           <p class="muted -mt-1.5">
-            <span class="badge">{{ partner.type }}</span>
-            <span class="badge ml-1.5" :class="partner.status">{{ partner.status }}</span>
-            <span v-if="partner.package?.name" class="badge ml-1.5">{{ partner.package.name }}</span>
+            <span class="badge">{{ exhibitor.type }}</span>
+            <span class="badge ml-1.5" :class="exhibitor.status">{{ exhibitor.status }}</span>
+            <span v-if="exhibitor.package?.name" class="badge ml-1.5">{{ exhibitor.package.name }}</span>
           </p>
           <div class="stats grid-cols-[1fr_1fr]">
-            <div class="stat"><div class="n">{{ partner.products?.length ?? 0 }}</div><div class="l">Products</div></div>
-            <div class="stat"><div class="n">{{ partner.members_count ?? partner.members?.length ?? 0 }}</div><div class="l">Members</div></div>
+            <div class="stat"><div class="n">{{ exhibitor.products?.length ?? 0 }}</div><div class="l">Products</div></div>
+            <div class="stat"><div class="n">{{ exhibitor.members_count ?? exhibitor.members?.length ?? 0 }}</div><div class="l">Members</div></div>
           </div>
-          <NuxtLink class="btn ghost sm" to="/partner/products">Products</NuxtLink>
-          <NuxtLink class="btn ghost sm ml-2" to="/partner/members">Team</NuxtLink>
+          <NuxtLink class="btn ghost sm" to="/exhibitor/products">Products</NuxtLink>
+          <NuxtLink class="btn ghost sm ml-2" to="/exhibitor/members">Team</NuxtLink>
         </div>
       </div>
 

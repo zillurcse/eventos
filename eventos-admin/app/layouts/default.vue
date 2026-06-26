@@ -16,7 +16,7 @@ const nav = computed<NavItem[]>(() => {
     { to: '/organizations', label: 'Organizations', icon: 'grid' },
     { to: '/staff', label: 'Staff', icon: 'users' },
     { to: '/organizers', label: 'Organizers', icon: 'briefcase' },
-    { to: '/partners', label: 'Partners', icon: 'store' },
+    { to: '/exhibitors', label: 'Exhibitors', icon: 'store' },
     { to: '/plans', label: 'Plans', icon: 'layers' },
   ]
   if (auth.isOrganizer) return [
@@ -24,10 +24,10 @@ const nav = computed<NavItem[]>(() => {
     { to: '/org/events', label: 'Events', icon: 'calendar' },
     { to: '/org/team', label: 'Team', icon: 'users' },
   ]
-  if (auth.isPartner) return [
-    { to: '/partner', label: 'My Booth', icon: 'store' },
-    { to: '/partner/products', label: 'Products', icon: 'box' },
-    { to: '/partner/members', label: 'Team', icon: 'users' },
+  if (auth.isExhibitor) return [
+    { to: '/exhibitor', label: 'My Booth', icon: 'store' },
+    { to: '/exhibitor/products', label: 'Products', icon: 'box' },
+    { to: '/exhibitor/members', label: 'Team', icon: 'users' },
   ]
   return []
 })
@@ -35,7 +35,7 @@ const nav = computed<NavItem[]>(() => {
 function isActive(to: string) {
   return to === '/org/events' ? route.path.startsWith('/org/events') : route.path === to
 }
-const title = computed(() => (route.meta.title as string) || auth.orgName || auth.primaryPartner?.name || 'Welcome')
+const title = computed(() => (route.meta.title as string) || auth.orgName || auth.primaryExhibitor?.name || 'Welcome')
 const subtitle = computed(() => (route.meta.subtitle as string) || 'Welcome to your dashboard')
 </script>
 

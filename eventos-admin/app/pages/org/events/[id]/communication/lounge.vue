@@ -100,7 +100,7 @@ async function load() {
     const [ev, settings, prt] = await Promise.all([
       api<any>(`/events/${id}`),
       api<any>(`/events/${id}/settings`),
-      api<any>(`/partners?event=${id}`),
+      api<any>(`/exhibitors?event=${id}`),
     ])
 
     eventDates.value = buildDateRange(ev.data?.starts_at, ev.data?.ends_at)

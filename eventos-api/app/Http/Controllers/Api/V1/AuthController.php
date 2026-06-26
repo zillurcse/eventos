@@ -8,7 +8,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Contact;
 use App\Models\Membership;
-use App\Models\PartnerMember;
+use App\Models\ExhibitorMember;
 use App\Models\User;
 use App\Services\Tenancy\OrganizationProvisioner;
 use Illuminate\Http\JsonResponse;
@@ -76,10 +76,10 @@ class AuthController extends Controller
     }
 
     /**
-     * Attach the user's cross-org memberships AND partner memberships. This is an
+     * Attach the user's cross-org memberships AND exhibitor memberships. This is an
      * identity-plane lookup (no tenant chosen yet), so it runs on the migrator
      * connection (BYPASSRLS) but is constrained to the user's own rows. The SPA
-     * uses these to classify the signed-in persona (platform/organizer/partner).
+     * uses these to classify the signed-in persona (platform/organizer/exhibitor).
      */
     protected function withIdentity(User $user): User
     {
@@ -90,13 +90,13 @@ class AuthController extends Controller
 
         $contactIds = Contact::on('pgsql_admin')->where('user_id', $user->id)->pluck('id');
 
-        $partnerMemberships = PartnerMember::on('pgsql_admin')
-            ->with(['partner.organization', 'partner.event'])
+        $exhibitorMemberships = ExhibitorMember::on('pgsql_admin')
+            ->with(['exhibitor.organization', 'exhibitor.event'])
             ->whereIn('contact_id', $contactIds)
             ->get();
 
         return $user
             ->setRelation('memberships', $memberships)
-            ->setRelation('partnerMemberships', $partnerMemberships);
+            ->setRelation('exhibitorMemberships', $exhibitorMemberships);
     }
 }

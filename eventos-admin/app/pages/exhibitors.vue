@@ -1,9 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Exhibitors & sponsors', subtitle: 'Partner accounts across all tenants' })
+definePageMeta({ middleware: 'platform', title: 'Exhibitors & sponsors', subtitle: 'Exhibitor accounts across all tenants' })
 
 const api = useApi()
 
-const partners = ref<any[]>([])
+const exhibitors = ref<any[]>([])
 const filters = reactive({ q: '', type: '', status: '' })
 const loginFor = ref<string | null>(null)
 const loginForm = reactive({ email: '', first_name: '', last_name: '', password: '' })
@@ -13,11 +13,11 @@ async function load() {
   const qs = new URLSearchParams(
     Object.entries(filters).filter(([, v]) => v) as [string, string][],
   ).toString()
-  try { partners.value = (await api<any>(`/admin/partners${qs ? '?' + qs : ''}`)).data } catch { /* */ }
+  try { exhibitors.value = (await api<any>(`/admin/exhibitors${qs ? '?' + qs : ''}`)).data } catch { /* */ }
 }
 
 async function setStatus(p: any, status: string) {
-  await api(`/admin/partners/${p.id}`, { method: 'PATCH', body: { status } })
+  await api(`/admin/exhibitors/${p.id}`, { method: 'PATCH', body: { status } })
   await load()
 }
 
@@ -30,11 +30,11 @@ function openLogin(p: any) {
 async function saveLogin(p: any) {
   error.value = ''
   try {
-    await api(`/admin/partners/${p.id}/admin`, { method: 'POST', body: { ...loginForm } })
+    await api(`/admin/exhibitors/${p.id}/admin`, { method: 'POST', body: { ...loginForm } })
     loginFor.value = null
     await load()
   } catch (e: any) {
-    error.value = e?.data?.message || 'Could not set the partner login.'
+    error.value = e?.data?.message || 'Could not set the exhibitor login.'
   }
 }
 
@@ -64,10 +64,10 @@ onMounted(load)
     <div class="card">
       <table>
         <thead>
-          <tr><th>Partner</th><th>Type</th><th>Organization</th><th>Event</th><th>Status</th><th>Admin login</th><th /></tr>
+          <tr><th>Exhibitor</th><th>Type</th><th>Organization</th><th>Event</th><th>Status</th><th>Admin login</th><th /></tr>
         </thead>
         <tbody>
-          <template v-for="p in partners" :key="p.id">
+          <template v-for="p in exhibitors" :key="p.id">
             <tr>
               <td><strong>{{ p.name }}</strong></td>
               <td><span class="badge">{{ p.type }}</span></td>
@@ -100,7 +100,7 @@ onMounted(load)
           </template>
         </tbody>
       </table>
-      <p v-if="!partners.length" class="muted">No partners found.</p>
+      <p v-if="!exhibitors.length" class="muted">No exhibitors found.</p>
     </div>
   </div>
 </template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed } from 'vue'
+import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import { useApi } from '../../../../composables/useApi'
-import { useUpload } from '../../../../composables/useUpload'
+import { useApi } from '../../../../../composables/useApi'
+import { useUpload } from '../../../../../composables/useUpload'
 
 declare const definePageMeta: (meta: Record<string, unknown>) => void
 definePageMeta({ middleware: 'organizer', layout: 'event' })
@@ -35,7 +35,7 @@ const PHONE_CODES = [
   { code: '+971', flag: '🇦🇪' }, { code: '+91',  flag: '🇮🇳' }, { code: '+966', flag: '🇸🇦' },
   { code: '+974', flag: '🇶🇦' }, { code: '+65',  flag: '🇸🇬' }, { code: '+60',  flag: '🇲🇾' },
 ]
-const TYPE_OPTIONS  = ['Exhibitor', 'Sponsor', 'Partner']
+const TYPE_OPTIONS  = ['Exhibitor', 'Sponsor']
 const STALL_OPTIONS = ['A1','A2','A3','B1','B2','B3','C1','C2','C3','D1','D2','D3']
 const COUNTRIES     = ['Bangladesh','United States','United Kingdom','UAE','India','Saudi Arabia','Qatar','Kuwait','Singapore','Malaysia','Canada','Australia']
 const TABS          = ['Details','Members','Documents','Projects','Products','Permissions']
@@ -54,6 +54,45 @@ const spotlightUploading = ref(false)
 const error       = ref('')
 const tagInput    = ref('')
 const aboutRef    = ref<HTMLElement | null>(null)
+
+// ── Edit-drawer sub-resources (Members / Documents / Projects / Products / Permissions) ──
+interface FeatureLine { key: string; enabled: boolean; limit: number }
+const ALL_FEATURES = [
+  { key: 'teams',          label: 'Teams' },
+  { key: 'projects',       label: 'Projects' },
+  { key: 'products',       label: 'Products' },
+  { key: 'documents',      label: 'Documents' },
+  { key: 'videos',         label: 'Videos' },
+  { key: 'cta',            label: 'CTA' },
+  { key: 'meetings',       label: 'Meetings' },
+  { key: 'lounge',         label: 'Lounge' },
+  { key: 'lead_analytics', label: 'Lead Analytics' },
+  { key: 'lead_export',    label: 'Lead Export' },
+  { key: 'analytics',      label: 'Analytics' },
+]
+const members     = ref<any[]>([])
+const documents   = ref<any[]>([])
+const projects    = ref<any[]>([])
+const products    = ref<any[]>([])
+const entitlements = ref<FeatureLine[]>([])
+const subSaving   = ref(false)
+const subError    = ref('')
+const memberForm  = reactive({ email: '', first_name: '', last_name: '', role: 'staff', password: '' })
+const docForm     = reactive({ title: '', url: '' })
+const projectForm = reactive({ name: '', description: '', status: '' })
+const productForm = reactive({ name: '', description: '', price: '' })
+
+function featureLabel(key: string) { return ALL_FEATURES.find(f => f.key === key)?.label ?? key }
+function mergeFeatures(saved: FeatureLine[] | null): FeatureLine[] {
+  const map = new Map((saved ?? []).map(f => [f.key, f]))
+  return ALL_FEATURES.map(f => {
+    const s = map.get(f.key)
+    return s ? { key: f.key, enabled: !!s.enabled, limit: Number(s.limit ?? 1) } : { key: f.key, enabled: false, limit: 1 }
+  })
+}
+function money(cents: number | null) {
+  return cents != null ? '$' + (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'
+}
 
 // ── Table / filter / pagination state ────────────────────────────────
 const search        = ref('')
@@ -121,12 +160,12 @@ watch(aboutRef, (el) => { if (el) el.innerHTML = draft.about || '' })
 
 // ── API ───────────────────────────────────────────────────────────────
 async function load() {
-  try { partners.value = (await api<any>(`/partners?event=${id}`)).data } catch { /* */ }
+  try { partners.value = (await api<any>(`/exhibitors?event=${id}`)).data } catch { /* */ }
 }
 async function loadMeta() {
   try {
     const [pkgRes, settingsRes] = await Promise.all([
-      api<any>(`/partner-packages?event=${id}`),
+      api<any>(`/exhibitor-packages?event=${id}`),
       api<any>(`/events/${id}/settings`),
     ])
     packages.value = pkgRes.data
@@ -140,12 +179,13 @@ function openAdd() {
   activeTab.value = 'Details'; error.value = ''; drawerMode.value = 'add'
 }
 
-function openEdit(p: any) {
+function populateDraft(p: any) {
   Object.assign(draft, {
     ...freshDraft(),
     name: p.name || '', email: p.email || '',
     logo_url: p.logo_url || '', logo_file_id: p.logo_file_id ?? null,
-    package_id: p.package_id || '', stall_no: p.stall_no || '', type: p.type || 'Exhibitor',
+    package_id: p.package_id ?? '', stall_no: p.stall_no || '',
+    type: p.type ? p.type.charAt(0).toUpperCase() + p.type.slice(1) : 'Exhibitor',
     phone_code: p.phone_code || '+880', phone: p.phone || '',
     rating: !!p.rating, featured: !!p.featured, premium: !!p.premium,
     about: p.about || '',
@@ -159,8 +199,92 @@ function openEdit(p: any) {
     social: { facebook: '', linkedin: '', twitter: '', instagram: '', whatsapp: '', youtube: '', ...(p.social || {}) },
     contact: { full_name: '', company_name: '', position: '', email: '', phone_code: '+880', phone: '', ...(p.contact || {}) },
   })
-  editingId.value = p.id; activeTab.value = 'Details'; error.value = ''
+  nextTick(() => { if (aboutRef.value) aboutRef.value.innerHTML = draft.about || '' })
+}
+
+async function openEdit(p: any) {
+  editingId.value = p.id; activeTab.value = 'Details'
+  error.value = ''; subError.value = ''
+  Object.assign(draft, freshDraft())
+  members.value = []; documents.value = []; projects.value = []; products.value = []
+  entitlements.value = mergeFeatures(null)
   drawerMode.value = 'edit'
+  try {
+    const full = (await api<any>(`/exhibitors/${p.id}`)).data
+    populateDraft(full)
+    members.value   = full.members ?? []
+    documents.value = full.documents ?? []
+    projects.value  = full.projects ?? []
+    products.value  = full.products ?? []
+    entitlements.value = mergeFeatures(full.entitlements)
+  } catch { /* */ }
+}
+
+// ── Sub-resource management (edit tabs) ───────────────────────────────
+async function addMember() {
+  if (!memberForm.email) return
+  subError.value = ''; subSaving.value = true
+  try {
+    const r = await api<any>(`/exhibitors/${editingId.value}/members`, { method: 'POST', body: { ...memberForm } })
+    members.value.push(r.data)
+    Object.assign(memberForm, { email: '', first_name: '', last_name: '', role: 'staff', password: '' })
+  } catch (e: any) { subError.value = e?.data?.message || 'Could not add member.' }
+  finally { subSaving.value = false }
+}
+async function removeMember(m: any) {
+  if (!confirm(`Remove ${m.contact?.email || 'this member'}?`)) return
+  try { await api(`/exhibitors/${editingId.value}/members/${m.id}`, { method: 'DELETE' }); members.value = members.value.filter((x: any) => x.id !==m.id) } catch { /* */ }
+}
+
+async function addDocument() {
+  if (!docForm.title) return
+  subError.value = ''; subSaving.value = true
+  try {
+    const r = await api<any>(`/exhibitors/${editingId.value}/documents`, { method: 'POST', body: { ...docForm } })
+    documents.value.push(r.data); docForm.title = ''; docForm.url = ''
+  } catch (e: any) { subError.value = e?.data?.message || 'Could not add document.' }
+  finally { subSaving.value = false }
+}
+async function removeDocument(d: any) {
+  if (!confirm(`Remove "${d.title}"?`)) return
+  try { await api(`/exhibitors/${editingId.value}/documents/${d.id}`, { method: 'DELETE' }); documents.value = documents.value.filter((x: any) => x.id !==d.id) } catch { /* */ }
+}
+
+async function addProject() {
+  if (!projectForm.name) return
+  subError.value = ''; subSaving.value = true
+  try {
+    const r = await api<any>(`/exhibitors/${editingId.value}/projects`, { method: 'POST', body: { ...projectForm } })
+    projects.value.push(r.data); projectForm.name = ''; projectForm.description = ''; projectForm.status = ''
+  } catch (e: any) { subError.value = e?.data?.message || 'Could not add project.' }
+  finally { subSaving.value = false }
+}
+async function removeProject(p: any) {
+  if (!confirm(`Remove "${p.name}"?`)) return
+  try { await api(`/exhibitors/${editingId.value}/projects/${p.id}`, { method: 'DELETE' }); projects.value = projects.value.filter((x: any) => x.id !==p.id) } catch { /* */ }
+}
+
+async function addProduct() {
+  if (!productForm.name) return
+  subError.value = ''; subSaving.value = true
+  try {
+    const body = { name: productForm.name, description: productForm.description || undefined, price_cents: productForm.price ? Math.round(Number(productForm.price) * 100) : undefined }
+    const r = await api<any>(`/exhibitors/${editingId.value}/products`, { method: 'POST', body })
+    products.value.push(r.data); productForm.name = ''; productForm.description = ''; productForm.price = ''
+  } catch (e: any) { subError.value = e?.data?.message || 'Could not add product.' }
+  finally { subSaving.value = false }
+}
+async function removeProduct(p: any) {
+  if (!confirm(`Remove "${p.name}"?`)) return
+  try { await api(`/exhibitors/${editingId.value}/products/${p.id}`, { method: 'DELETE' }); products.value = products.value.filter((x: any) => x.id !==p.id) } catch { /* */ }
+}
+
+async function savePermissions() {
+  subError.value = ''; subSaving.value = true
+  try {
+    await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: { entitlements: JSON.parse(JSON.stringify(entitlements.value)) } })
+  } catch (e: any) { subError.value = e?.data?.message || 'Could not save permissions.' }
+  finally { subSaving.value = false }
 }
 
 // ── Save ──────────────────────────────────────────────────────────────
@@ -183,9 +307,11 @@ function buildPayload() {
 
 async function create() {
   error.value = ''; saving.value = true
+  const adminEmail = draft.email
   try {
-    await api('/partners', { method: 'POST', body: buildPayload() })
+    const res = await api<any>('/exhibitors', { method: 'POST', body: buildPayload() })
     drawerMode.value = null; await load()
+    if (res?.admin_invited) alert(`A 6-digit access code was emailed to ${adminEmail} for the exhibitor admin login.`)
   } catch (e: any) { error.value = e?.data?.message || 'Could not create.' }
   finally { saving.value = false }
 }
@@ -193,7 +319,7 @@ async function create() {
 async function update() {
   error.value = ''; saving.value = true
   try {
-    await api(`/partners/${editingId.value}`, { method: 'PUT', body: buildPayload() })
+    await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: buildPayload() })
     drawerMode.value = null; await load()
   } catch (e: any) { error.value = e?.data?.message || 'Could not update.' }
   finally { saving.value = false }
@@ -201,7 +327,7 @@ async function update() {
 
 async function remove(p: any) {
   if (!confirm(`Delete "${p.name}"?`)) return
-  try { await api(`/partners/${p.id}`, { method: 'DELETE' }); await load() } catch { /* */ }
+  try { await api(`/exhibitors/${p.id}`, { method: 'DELETE' }); await load() } catch { /* */ }
 }
 
 // ── Logo upload ───────────────────────────────────────────────────────
@@ -582,7 +708,8 @@ onMounted(() => { load(); loadMeta() })
         <input v-model="draft.name" placeholder="Enter the exhibitor Name">
 
         <label>Exhibitor Email</label>
-        <input v-model="draft.email" type="email" placeholder="Enter the exhibitor email">
+        <input :value="draft.email" type="email" readonly disabled class="bg-[#f2f3f5] text-muted cursor-not-allowed" placeholder="—">
+        <p class="muted text-[.78rem] mt-0.5 mb-1.5">The admin login email can't be changed after creation.</p>
 
         <label>Package</label>
         <select v-model="draft.package_id">
@@ -824,27 +951,135 @@ onMounted(() => { load(); loadMeta() })
 
       <!-- ── MEMBERS TAB ─────────────────────────────────────────────── -->
       <template v-else-if="activeTab === 'Members'">
-        <p class="muted text-center py-10">Member management coming soon.</p>
+        <div class="border border-line rounded-xl p-4 mb-4">
+          <p class="font-semibold text-[.92rem] m-0 mb-2">Invite a team member</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <input v-model="memberForm.email" type="email" placeholder="Email" class="flex-[1_1_180px] m-0">
+            <input v-model="memberForm.first_name" placeholder="First name" class="flex-[1_1_120px] m-0">
+            <input v-model="memberForm.last_name" placeholder="Last name" class="flex-[1_1_120px] m-0">
+            <select v-model="memberForm.role" class="m-0" style="width:120px;">
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input v-model="memberForm.password" type="password" placeholder="Password (enables login)" class="flex-[1_1_160px] m-0">
+            <button class="btn sm" :disabled="subSaving || !memberForm.email" @click="addMember">ADD</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Member</th><th>Role</th><th>Login</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="m in members" :key="m.id">
+              <td><span class="font-semibold text-ink">{{ m.contact?.name || m.contact?.email }}</span><br><span class="muted text-[.8rem]">{{ m.contact?.email }}</span></td>
+              <td><span class="badge">{{ m.role }}</span></td>
+              <td><span v-if="m.contact?.can_login" class="badge active">can sign in</span><span v-else class="muted">no login</span></td>
+              <td class="text-right"><button class="bg-transparent border-0 cursor-pointer text-[#dc2626]" title="Remove" @click="removeMember(m)">🗑</button></td>
+            </tr>
+            <tr v-if="!members.length"><td colspan="4" class="muted text-center py-8">No members yet.</td></tr>
+          </tbody>
+        </table>
+        <p v-if="subError" class="error mt-2">{{ subError }}</p>
       </template>
 
       <!-- ── DOCUMENTS TAB ──────────────────────────────────────────── -->
       <template v-else-if="activeTab === 'Documents'">
-        <p class="muted text-center py-10">No documents uploaded yet.</p>
+        <div class="border border-line rounded-xl p-4 mb-4">
+          <p class="font-semibold text-[.92rem] m-0 mb-2">Add a document</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <input v-model="docForm.title" placeholder="Title" class="flex-[1_1_180px] m-0">
+            <input v-model="docForm.url" placeholder="https://… (link to file)" class="flex-[1_1_220px] m-0">
+            <button class="btn sm" :disabled="subSaving || !docForm.title" @click="addDocument">ADD</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Title</th><th>Link</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="d in documents" :key="d.id">
+              <td class="font-semibold text-ink">{{ d.title }}</td>
+              <td><a v-if="d.url" :href="d.url" target="_blank" class="text-brand text-[.84rem]">{{ d.url }}</a><span v-else class="muted">—</span></td>
+              <td class="text-right"><button class="bg-transparent border-0 cursor-pointer text-[#dc2626]" title="Remove" @click="removeDocument(d)">🗑</button></td>
+            </tr>
+            <tr v-if="!documents.length"><td colspan="3" class="muted text-center py-8">No documents yet.</td></tr>
+          </tbody>
+        </table>
+        <p v-if="subError" class="error mt-2">{{ subError }}</p>
       </template>
 
       <!-- ── PROJECTS TAB ───────────────────────────────────────────── -->
       <template v-else-if="activeTab === 'Projects'">
-        <p class="muted text-center py-10">No projects added yet.</p>
+        <div class="border border-line rounded-xl p-4 mb-4">
+          <p class="font-semibold text-[.92rem] m-0 mb-2">Add a project</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <input v-model="projectForm.name" placeholder="Project name" class="flex-[1_1_180px] m-0">
+            <input v-model="projectForm.description" placeholder="Description" class="flex-[1_1_220px] m-0">
+            <input v-model="projectForm.status" placeholder="Status" class="flex-[0_1_130px] m-0">
+            <button class="btn sm" :disabled="subSaving || !projectForm.name" @click="addProject">ADD</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Description</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="pr in projects" :key="pr.id">
+              <td class="font-semibold text-ink">{{ pr.name }}</td>
+              <td class="muted text-[.84rem]">{{ pr.description || '—' }}</td>
+              <td><span v-if="pr.status" class="badge">{{ pr.status }}</span><span v-else class="muted">—</span></td>
+              <td class="text-right"><button class="bg-transparent border-0 cursor-pointer text-[#dc2626]" title="Remove" @click="removeProject(pr)">🗑</button></td>
+            </tr>
+            <tr v-if="!projects.length"><td colspan="4" class="muted text-center py-8">No projects yet.</td></tr>
+          </tbody>
+        </table>
+        <p v-if="subError" class="error mt-2">{{ subError }}</p>
       </template>
 
       <!-- ── PRODUCTS TAB ───────────────────────────────────────────── -->
       <template v-else-if="activeTab === 'Products'">
-        <p class="muted text-center py-10">No products added yet.</p>
+        <div class="border border-line rounded-xl p-4 mb-4">
+          <p class="font-semibold text-[.92rem] m-0 mb-2">Add a product</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <input v-model="productForm.name" placeholder="Product name" class="flex-[1_1_180px] m-0">
+            <input v-model="productForm.description" placeholder="Description" class="flex-[1_1_220px] m-0">
+            <input v-model="productForm.price" type="number" step="0.01" placeholder="Price ($)" class="flex-[0_1_120px] m-0">
+            <button class="btn sm" :disabled="subSaving || !productForm.name" @click="addProduct">ADD</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Product</th><th>Description</th><th>Price</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="pd in products" :key="pd.id">
+              <td class="font-semibold text-ink">{{ pd.name }}</td>
+              <td class="muted text-[.84rem]">{{ pd.description || '—' }}</td>
+              <td>{{ money(pd.price_cents) }}</td>
+              <td class="text-right"><button class="bg-transparent border-0 cursor-pointer text-[#dc2626]" title="Remove" @click="removeProduct(pd)">🗑</button></td>
+            </tr>
+            <tr v-if="!products.length"><td colspan="4" class="muted text-center py-8">No products yet.</td></tr>
+          </tbody>
+        </table>
+        <p v-if="subError" class="error mt-2">{{ subError }}</p>
       </template>
 
       <!-- ── PERMISSIONS TAB ────────────────────────────────────────── -->
       <template v-else-if="activeTab === 'Permissions'">
-        <p class="muted text-center py-10">Permission settings coming soon.</p>
+        <p class="muted text-[.86rem] mt-0 mb-3">Toggle which Showcase features this exhibitor can use, and set per-feature limits.</p>
+        <div class="flex flex-col gap-2">
+          <div
+            v-for="f in entitlements" :key="f.key"
+            class="flex items-center gap-3 px-4 py-2.5 border border-line rounded-xl bg-[#fafbfc]"
+            :class="{ 'bg-brand-soft border-brand/20': f.enabled }"
+          >
+            <input v-model="f.enabled" type="checkbox" class="w-4.5 h-4.5 m-0 rounded shrink-0 cursor-pointer accent-brand">
+            <span class="flex-1 text-[.93rem] font-medium text-ink select-none">{{ featureLabel(f.key) }}</span>
+            <div class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white">
+              <button class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer" @click="f.limit = Math.max(0, f.limit - 1)">−</button>
+              <span class="w-8 h-9 flex items-center justify-center text-[.91rem] font-semibold border-x border-[#d7dae1] select-none">{{ f.limit }}</span>
+              <button class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer" @click="f.limit++">+</button>
+            </div>
+          </div>
+        </div>
+        <p v-if="subError" class="error mt-3">{{ subError }}</p>
+        <div class="flex pt-4 mt-2">
+          <button class="btn flex-1 py-3 tracking-widest" :disabled="subSaving" @click="savePermissions">
+            {{ subSaving ? 'SAVING…' : 'SAVE PERMISSIONS' }}
+          </button>
+        </div>
       </template>
 
     </Drawer>

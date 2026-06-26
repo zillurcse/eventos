@@ -9,7 +9,7 @@ use App\Http\Resources\SessionResource;
 use App\Models\Event;
 use App\Models\EventSetting;
 use App\Models\Membership;
-use App\Models\Partner;
+use App\Models\Exhibitor;
 use App\Models\Session;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -251,7 +251,7 @@ class EventController extends Controller
     {
         $event = Event::with('coverFile')->where('uuid', $uuid)->firstOrFail();
 
-        $partners = Partner::where('event_id', $event->id)->count();
+        $exhibitors = Exhibitor::where('event_id', $event->id)->count();
         $sessions = Session::where('event_id', $event->id)->count();
         $team = Membership::where('status', 'active')->count();   // RLS-scoped to this org
 
@@ -269,7 +269,7 @@ class EventController extends Controller
         $checklist = [
             ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details'],
             ['key' => 'branding', 'label' => 'Branding & Cover', 'done' => (bool) $event->cover_file_id, 'to' => 'details'],
-            ['key' => 'exhibitors', 'label' => 'Exhibitor & Booth Details', 'done' => $partners > 0, 'to' => 'exhibitors'],
+            ['key' => 'exhibitors', 'label' => 'Exhibitor & Booth Details', 'done' => $exhibitors > 0, 'to' => 'showcase/exhibitors'],
             ['key' => 'sessions', 'label' => 'Sessions & Agenda', 'done' => $sessions > 0, 'to' => 'sessions'],
             ['key' => 'team', 'label' => 'Team Member Access', 'done' => $team > 1, 'to' => 'team'],
             ['key' => 'publish', 'label' => 'Review & Publish Event', 'done' => $event->status === 'published', 'to' => null],
@@ -282,7 +282,7 @@ class EventController extends Controller
             'starts_at' => $event->starts_at?->toIso8601String(),
             'ends_at' => $event->ends_at?->toIso8601String(),
             'cover_url' => $event->coverFile ? Storage::disk($event->coverFile->disk)->url($event->coverFile->path) : null,
-            'counts' => ['partners' => $partners, 'sessions' => $sessions],
+            'counts' => ['exhibitors' => $exhibitors, 'sessions' => $sessions],
             'checklist' => $checklist,
             'completed' => collect($checklist)->where('done', true)->count(),
             'total' => count($checklist),

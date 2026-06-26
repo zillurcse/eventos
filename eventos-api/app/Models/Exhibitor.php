@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * Unified exhibitor | sponsor (type discriminator) — architecture §6.3, §10.4.
  */
-class Partner extends Model
+class Exhibitor extends Model
 {
     use BelongsToOrganization, SoftDeletes, HasUuid, Auditable, HasDynamicFields;
 
@@ -32,7 +32,7 @@ class Partner extends Model
 
     public function package(): BelongsTo
     {
-        return $this->belongsTo(PartnerPackage::class, 'package_id');
+        return $this->belongsTo(ExhibitorPackage::class, 'package_id');
     }
 
     public function adminContact(): BelongsTo
@@ -47,22 +47,22 @@ class Partner extends Model
 
     public function members(): HasMany
     {
-        return $this->hasMany(PartnerMember::class);
+        return $this->hasMany(ExhibitorMember::class);
     }
 
     public function documents(): HasMany
     {
-        return $this->hasMany(PartnerDocument::class);
+        return $this->hasMany(ExhibitorDocument::class);
     }
 
     public function products(): HasMany
     {
-        return $this->hasMany(PartnerProduct::class);
+        return $this->hasMany(ExhibitorProduct::class);
     }
 
     public function projects(): HasMany
     {
-        return $this->hasMany(PartnerProject::class);
+        return $this->hasMany(ExhibitorProject::class);
     }
 
     public function booths(): HasMany

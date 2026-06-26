@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\AdminMembershipController;
 use App\Http\Controllers\Api\V1\Admin\AdminMetricsController;
 use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
-use App\Http\Controllers\Api\V1\Admin\AdminPartnerController;
+use App\Http\Controllers\Api\V1\Admin\AdminExhibitorController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
@@ -30,12 +30,14 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\NotificationTemplateController;
 use App\Http\Controllers\Api\V1\OrganizationController;
-use App\Http\Controllers\Api\V1\PartnerController;
-use App\Http\Controllers\Api\V1\PartnerMemberController;
-use App\Http\Controllers\Api\V1\PartnerPackageController;
-use App\Http\Controllers\Api\V1\PartnerProductController;
-use App\Http\Controllers\Api\V1\PartnerSelfMemberController;
-use App\Http\Controllers\Api\V1\PartnerSpaceController;
+use App\Http\Controllers\Api\V1\ExhibitorController;
+use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
+use App\Http\Controllers\Api\V1\ExhibitorMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorPackageController;
+use App\Http\Controllers\Api\V1\ExhibitorProductController;
+use App\Http\Controllers\Api\V1\ExhibitorProjectController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
@@ -111,29 +113,29 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], '/organizations/{uuid}/members/{membership}', [AdminMembershipController::class, 'update']);
             Route::delete('/organizations/{uuid}/members/{membership}', [AdminMembershipController::class, 'destroy']);
 
-            // Exhibitors & sponsors (partner accounts) across all tenants.
-            Route::get('/partners', [AdminPartnerController::class, 'index']);
-            Route::get('/partners/{uuid}', [AdminPartnerController::class, 'show']);
-            Route::post('/partners/{uuid}/admin', [AdminPartnerController::class, 'setAdmin']);
-            Route::match(['put', 'patch'], '/partners/{uuid}', [AdminPartnerController::class, 'update']);
+            // Exhibitors & sponsors across all tenants.
+            Route::get('/exhibitors', [AdminExhibitorController::class, 'index']);
+            Route::get('/exhibitors/{uuid}', [AdminExhibitorController::class, 'show']);
+            Route::post('/exhibitors/{uuid}/admin', [AdminExhibitorController::class, 'setAdmin']);
+            Route::match(['put', 'patch'], '/exhibitors/{uuid}', [AdminExhibitorController::class, 'update']);
         });
 
-        // ── Partner self-service: admin + staff (resolves the partner → its org) ──
-        Route::middleware('partner.admin')->prefix('partner')->group(function () {
-            Route::get('/space', [PartnerSpaceController::class, 'show']);
-            Route::match(['put', 'patch'], '/space', [PartnerSpaceController::class, 'update']);
+        // ── Exhibitor self-service: admin + staff (resolves the exhibitor → its org) ──
+        Route::middleware('exhibitor.admin')->prefix('exhibitor')->group(function () {
+            Route::get('/space', [ExhibitorSpaceController::class, 'show']);
+            Route::match(['put', 'patch'], '/space', [ExhibitorSpaceController::class, 'update']);
             Route::post('/uploads', [FileUploadController::class, 'store']);
-            Route::post('/products', [PartnerSpaceController::class, 'storeProduct']);
+            Route::post('/products', [ExhibitorSpaceController::class, 'storeProduct']);
 
             // Exhibitor booth details (code/type/resources).
-            Route::get('/booth', [PartnerSpaceController::class, 'showBooth']);
-            Route::match(['put', 'patch'], '/booth', [PartnerSpaceController::class, 'updateBooth']);
+            Route::get('/booth', [ExhibitorSpaceController::class, 'showBooth']);
+            Route::match(['put', 'patch'], '/booth', [ExhibitorSpaceController::class, 'updateBooth']);
 
             // Team management (invite teammates, give them logins).
-            Route::get('/members', [PartnerSelfMemberController::class, 'index']);
-            Route::post('/members', [PartnerSelfMemberController::class, 'store']);
-            Route::delete('/members/{member}', [PartnerSelfMemberController::class, 'destroy']);
-            Route::post('/members/{member}/password', [PartnerSelfMemberController::class, 'password']);
+            Route::get('/members', [ExhibitorSelfMemberController::class, 'index']);
+            Route::post('/members', [ExhibitorSelfMemberController::class, 'store']);
+            Route::delete('/members/{member}', [ExhibitorSelfMemberController::class, 'destroy']);
+            Route::post('/members/{member}/password', [ExhibitorSelfMemberController::class, 'password']);
         });
 
         // ── Attendee context: networking & feed (§6.5, §6.6) ──
@@ -222,21 +224,28 @@ Route::prefix('v1')->group(function () {
             Route::post('/check-in-stations', [CheckInStationController::class, 'store'])->middleware('perm:checkin.manage');
             Route::post('/check-in/scan', [CheckInController::class, 'scan'])->middleware('perm:checkin.manage');
 
-            // ── Partners: exhibitors & sponsors (§6.3) ──
-            Route::middleware('perm:partners.manage')->group(function () {
-                Route::get('/partner-packages', [PartnerPackageController::class, 'index']);
-                Route::post('/partner-packages', [PartnerPackageController::class, 'store']);
-                Route::match(['put', 'patch'], '/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'update']);
-                Route::delete('/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'destroy']);
-                Route::get('/partners', [PartnerController::class, 'index']);
-                Route::post('/partners', [PartnerController::class, 'store']);
-                Route::get('/partners/{uuid}', [PartnerController::class, 'show']);
-                Route::match(['put', 'patch'], '/partners/{uuid}', [PartnerController::class, 'update']);
-                Route::post('/partners/{uuid}/members', [PartnerMemberController::class, 'store']);
-                Route::delete('/partners/{uuid}/members/{member}', [PartnerMemberController::class, 'destroy']);
-                Route::get('/partners/{uuid}/products', [PartnerProductController::class, 'index']);
-                Route::post('/partners/{uuid}/products', [PartnerProductController::class, 'store']);
-                Route::post('/partners/{uuid}/booths', [BoothController::class, 'store']);
+            // ── Exhibitors & sponsors (§6.3) ──
+            Route::middleware('perm:exhibitors.manage')->group(function () {
+                Route::get('/exhibitor-packages', [ExhibitorPackageController::class, 'index']);
+                Route::post('/exhibitor-packages', [ExhibitorPackageController::class, 'store']);
+                Route::match(['put', 'patch'], '/exhibitor-packages/{exhibitorPackage}', [ExhibitorPackageController::class, 'update']);
+                Route::delete('/exhibitor-packages/{exhibitorPackage}', [ExhibitorPackageController::class, 'destroy']);
+                Route::get('/exhibitors', [ExhibitorController::class, 'index']);
+                Route::post('/exhibitors', [ExhibitorController::class, 'store']);
+                Route::get('/exhibitors/{uuid}', [ExhibitorController::class, 'show']);
+                Route::match(['put', 'patch'], '/exhibitors/{uuid}', [ExhibitorController::class, 'update']);
+                Route::post('/exhibitors/{uuid}/members', [ExhibitorMemberController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/members/{member}', [ExhibitorMemberController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/products', [ExhibitorProductController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/products', [ExhibitorProductController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/products/{product}', [ExhibitorProductController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/documents', [ExhibitorDocumentController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/documents', [ExhibitorDocumentController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/documents/{document}', [ExhibitorDocumentController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/projects', [ExhibitorProjectController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/projects', [ExhibitorProjectController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/projects/{project}', [ExhibitorProjectController::class, 'destroy']);
+                Route::post('/exhibitors/{uuid}/booths', [BoothController::class, 'store']);
             });
 
             // ── Content Hub: blog / news articles ──

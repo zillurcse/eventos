@@ -57,9 +57,9 @@ class Event extends Model
         return $this->hasMany(Participation::class);
     }
 
-    public function partners(): HasMany
+    public function exhibitors(): HasMany
     {
-        return $this->hasMany(Partner::class);
+        return $this->hasMany(Exhibitor::class);
     }
 
     public function ticketTypes(): HasMany

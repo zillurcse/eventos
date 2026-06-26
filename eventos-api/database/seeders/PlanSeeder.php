@@ -32,7 +32,7 @@ class PlanSeeder extends Seeder
                 'name' => 'Business', 'price_cents' => 19900, 'sort_order' => 3,
                 'limits' => ['max_events' => 25, 'max_attendees' => 5000, 'storage_gb' => 100, 'api_rate' => 1000],
                 'modules' => ['module.feed', 'module.ticketing', 'module.networking', 'module.surveys',
-                    'module.email_builder', 'module.partners', 'module.analytics'],
+                    'module.email_builder', 'module.exhibitors', 'module.analytics'],
             ],
             [
                 'name' => 'Enterprise', 'price_cents' => 99900, 'sort_order' => 4,

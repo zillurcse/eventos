@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
-use App\Models\Partner;
-use App\Models\PartnerMember;
+use App\Models\Exhibitor;
+use App\Models\ExhibitorMember;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,14 +15,14 @@ use Illuminate\Validation\Rule;
  * Super-admin governance of exhibitors & sponsors across all tenants
  * (architecture §2.1, §6.3). Reads/writes run on the migrator (BYPASSRLS)
  * connection and drop the tenant global scope, since this control plane spans
- * every organization. Account-level actions (password reset, disable) on a
- * partner-admin's login are handled through AdminUserController.
+ * every organization. Account-level actions (password reset, disable) on an
+ * exhibitor-admin's login are handled through AdminUserController.
  */
-class AdminPartnerController extends Controller
+class AdminExhibitorController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $partners = Partner::on('pgsql_admin')
+        $exhibitors = Exhibitor::on('pgsql_admin')
             ->withoutGlobalScope('organization')
             ->with(['organization:id,uuid,name', 'event:id,uuid,name', 'members' => fn ($q) => $q->with('contact')])
             ->when($request->filled('q'), fn ($q) => $q->where('name', 'ilike', '%'.trim((string) $request->query('q')).'%'))
@@ -32,19 +32,19 @@ class AdminPartnerController extends Controller
             ->limit(200)
             ->get();
 
-        return response()->json(['data' => $partners->map(fn (Partner $p) => $this->present($p))]);
+        return response()->json(['data' => $exhibitors->map(fn (Exhibitor $e) => $this->present($e))]);
     }
 
     public function show(string $uuid): JsonResponse
     {
-        $partner = Partner::on('pgsql_admin')
+        $exhibitor = Exhibitor::on('pgsql_admin')
             ->withoutGlobalScope('organization')
             ->with(['organization:id,uuid,name', 'event:id,uuid,name', 'members' => fn ($q) => $q->with('contact')])
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        return response()->json(['data' => array_merge($this->present($partner), [
-            'members' => $partner->members->map(fn (PartnerMember $m) => [
+        return response()->json(['data' => array_merge($this->present($exhibitor), [
+            'members' => $exhibitor->members->map(fn (ExhibitorMember $m) => [
                 'id' => $m->id,
                 'role' => $m->role,
                 'name' => $m->contact?->fullName(),
@@ -55,10 +55,10 @@ class AdminPartnerController extends Controller
         ])]);
     }
 
-    /** Create or reset the partner-admin login (User + linked Contact + admin member). */
+    /** Create or reset the exhibitor-admin login (User + linked Contact + admin member). */
     public function setAdmin(string $uuid, Request $request): JsonResponse
     {
-        $partner = Partner::on('pgsql_admin')->withoutGlobalScope('organization')->where('uuid', $uuid)->firstOrFail();
+        $exhibitor = Exhibitor::on('pgsql_admin')->withoutGlobalScope('organization')->where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -67,15 +67,15 @@ class AdminPartnerController extends Controller
             'password' => ['required', 'string', 'min:8'],
         ]);
 
-        // Contact is unique by (organization_id, email); reuse or create on the partner's org.
+        // Contact is unique by (organization_id, email); reuse or create on the exhibitor's org.
         $contact = Contact::on('pgsql_admin')->withoutGlobalScope('organization')
-            ->where('organization_id', $partner->organization_id)
+            ->where('organization_id', $exhibitor->organization_id)
             ->where('email', $data['email'])
             ->first();
 
         if (! $contact) {
             $contact = new Contact([
-                'organization_id' => $partner->organization_id,
+                'organization_id' => $exhibitor->organization_id,
                 'email' => $data['email'],
                 'first_name' => $data['first_name'] ?? null,
                 'last_name' => $data['last_name'] ?? null,
@@ -100,9 +100,9 @@ class AdminPartnerController extends Controller
 
         $contact->update(['user_id' => $user->id]);
 
-        // Ensure an admin partner_member links the contact to this partner.
-        $member = PartnerMember::on('pgsql_admin')->withTrashed()
-            ->where('partner_id', $partner->id)
+        // Ensure an admin exhibitor_member links the contact to this exhibitor.
+        $member = ExhibitorMember::on('pgsql_admin')->withTrashed()
+            ->where('exhibitor_id', $exhibitor->id)
             ->where('contact_id', $contact->id)
             ->first();
 
@@ -112,49 +112,49 @@ class AdminPartnerController extends Controller
             }
             $member->update(['role' => 'admin']);
         } else {
-            $member = new PartnerMember(['partner_id' => $partner->id, 'contact_id' => $contact->id, 'role' => 'admin']);
+            $member = new ExhibitorMember(['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id, 'role' => 'admin']);
             $member->setConnection('pgsql_admin');
             $member->save();
         }
 
-        $partner->update(['admin_contact_id' => $contact->id]);
+        $exhibitor->update(['admin_contact_id' => $contact->id]);
 
         return response()->json([
-            'data' => $this->present($partner->fresh(['organization', 'event', 'members' => fn ($q) => $q->with('contact')])),
+            'data' => $this->present($exhibitor->fresh(['organization', 'event', 'members' => fn ($q) => $q->with('contact')])),
         ], 201);
     }
 
-    /** Activate / suspend / draft a partner. Suspending blocks its admin login (ResolvePartnerAdmin). */
+    /** Activate / suspend / draft an exhibitor. Suspending blocks its admin login (ResolveExhibitorAdmin). */
     public function update(string $uuid, Request $request): JsonResponse
     {
-        $partner = Partner::on('pgsql_admin')->withoutGlobalScope('organization')->where('uuid', $uuid)->firstOrFail();
+        $exhibitor = Exhibitor::on('pgsql_admin')->withoutGlobalScope('organization')->where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
             'status' => ['required', Rule::in(['draft', 'active', 'suspended'])],
         ]);
 
-        $partner->update(['status' => $data['status']]);
+        $exhibitor->update(['status' => $data['status']]);
 
         return response()->json([
-            'data' => $this->present($partner->fresh(['organization', 'event', 'members' => fn ($q) => $q->with('contact')])),
+            'data' => $this->present($exhibitor->fresh(['organization', 'event', 'members' => fn ($q) => $q->with('contact')])),
         ]);
     }
 
     // ── helpers ──────────────────────────────────────────────
 
-    protected function present(Partner $p): array
+    protected function present(Exhibitor $e): array
     {
-        $admin = $p->relationLoaded('members')
-            ? $p->members->first(fn (PartnerMember $m) => $m->role === 'admin' && $m->contact?->user_id)
+        $admin = $e->relationLoaded('members')
+            ? $e->members->first(fn (ExhibitorMember $m) => $m->role === 'admin' && $m->contact?->user_id)
             : null;
 
         return [
-            'id' => $p->uuid,
-            'name' => $p->name,
-            'type' => $p->type,                 // exhibitor | sponsor
-            'status' => $p->status,             // draft | active | suspended
-            'organization' => $p->organization?->name,
-            'event' => $p->event?->name,
+            'id' => $e->uuid,
+            'name' => $e->name,
+            'type' => $e->type,                 // exhibitor | sponsor
+            'status' => $e->status,             // draft | active | suspended
+            'organization' => $e->organization?->name,
+            'event' => $e->event?->name,
             'has_admin_login' => (bool) $admin,
             'admin_email' => $admin?->contact?->email,
         ];

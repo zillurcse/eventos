@@ -3,21 +3,21 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PartnerMemberResource;
+use App\Http\Resources\ExhibitorMemberResource;
 use App\Models\Contact;
-use App\Models\Partner;
-use App\Models\PartnerMember;
+use App\Models\Exhibitor;
+use App\Models\ExhibitorMember;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Partner staff/members. An `admin` member with a password gets a login User
- * (linked to their contact) so they can self-manage the partner space (§6.3).
+ * Exhibitor staff/members. An `admin` member with a password gets a login User
+ * (linked to their contact) so they can self-manage the exhibitor space (§6.3).
  */
-class PartnerMemberController extends Controller
+class ExhibitorMemberController extends Controller
 {
-    public function store(string $partnerUuid, Request $request): JsonResponse
+    public function store(string $exhibitorUuid, Request $request): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -28,7 +28,7 @@ class PartnerMemberController extends Controller
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
-        $partner = Partner::where('uuid', $partnerUuid)->firstOrFail();
+        $exhibitor = Exhibitor::where('uuid', $exhibitorUuid)->firstOrFail();
 
         $contact = Contact::firstOrCreate(
             ['email' => $data['email']],
@@ -36,7 +36,7 @@ class PartnerMemberController extends Controller
         );
 
         // Any member given a password gets a login (admins and staff both
-        // self-serve the partner space — architecture §6.3).
+        // self-serve the exhibitor space — architecture §6.3).
         if (! empty($data['password']) && ! $contact->user_id) {
             $user = User::firstOrCreate(
                 ['email' => $data['email']],
@@ -49,19 +49,19 @@ class PartnerMemberController extends Controller
             $contact->update(['user_id' => $user->id]);
         }
 
-        $member = PartnerMember::updateOrCreate(
-            ['partner_id' => $partner->id, 'contact_id' => $contact->id],
+        $member = ExhibitorMember::updateOrCreate(
+            ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
             ['role' => $data['role'] ?? 'staff', 'is_lead_capturer' => $data['is_lead_capturer'] ?? false],
         );
 
-        return response()->json(['data' => new PartnerMemberResource($member->load('contact'))], 201);
+        return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }
 
-    public function destroy(string $partnerUuid, int $member): JsonResponse
+    public function destroy(string $exhibitorUuid, int $member): JsonResponse
     {
-        $partner = Partner::where('uuid', $partnerUuid)->firstOrFail();
+        $exhibitor = Exhibitor::where('uuid', $exhibitorUuid)->firstOrFail();
 
-        PartnerMember::where('partner_id', $partner->id)->where('id', $member)->firstOrFail()->delete();
+        ExhibitorMember::where('exhibitor_id', $exhibitor->id)->where('id', $member)->firstOrFail()->delete();
 
         return response()->json(['message' => 'Member removed.']);
     }

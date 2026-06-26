@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'partner', title: 'Products', subtitle: 'Showcase what your booth offers' })
+definePageMeta({ middleware: 'exhibitor', title: 'Products', subtitle: 'Showcase what your booth offers' })
 
 const api = useApi()
 const products = ref<any[]>([])
@@ -10,7 +10,7 @@ const creating = ref(false)
 
 async function load() {
   try {
-    const space = (await api<any>('/partner/space')).data
+    const space = (await api<any>('/exhibitor/space')).data
     products.value = space.products ?? []
   } catch (e: any) {
     if (e?.response?.status === 403) suspended.value = true
@@ -21,7 +21,7 @@ async function create() {
   error.value = ''
   creating.value = true
   try {
-    await api('/partner/products', {
+    await api('/exhibitor/products', {
       method: 'POST',
       body: {
         name: form.name,
@@ -48,7 +48,7 @@ onMounted(load)
 <template>
   <div>
     <div v-if="suspended" class="card">
-      <p class="error">This partner account is suspended.</p>
+      <p class="error">This exhibitor account is suspended.</p>
     </div>
 
     <template v-else>

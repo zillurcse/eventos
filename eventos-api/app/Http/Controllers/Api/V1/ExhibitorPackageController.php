@@ -3,26 +3,26 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PartnerPackageResource;
+use App\Http\Resources\ExhibitorPackageResource;
 use App\Models\Event;
-use App\Models\PartnerPackage;
+use App\Models\ExhibitorPackage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
-class PartnerPackageController extends Controller
+class ExhibitorPackageController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = PartnerPackage::query()->orderBy('rank');
+        $query = ExhibitorPackage::query()->orderBy('rank');
 
         if ($request->filled('event')) {
             $event = Event::where('uuid', $request->string('event'))->firstOrFail();
             $query->where('event_id', $event->id);
         }
 
-        return PartnerPackageResource::collection($query->get());
+        return ExhibitorPackageResource::collection($query->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -39,7 +39,7 @@ class PartnerPackageController extends Controller
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
 
-        $package = PartnerPackage::create([
+        $package = ExhibitorPackage::create([
             'event_id' => $event->id,
             'name' => $data['name'],
             'kind' => $data['kind'] ?? 'both',
@@ -49,10 +49,10 @@ class PartnerPackageController extends Controller
             'rank' => $data['rank'] ?? 0,
         ]);
 
-        return response()->json(['data' => new PartnerPackageResource($package)], 201);
+        return response()->json(['data' => new ExhibitorPackageResource($package)], 201);
     }
 
-    public function update(Request $request, PartnerPackage $partnerPackage): JsonResponse
+    public function update(Request $request, ExhibitorPackage $exhibitorPackage): JsonResponse
     {
         $data = $request->validate([
             'name'         => ['sometimes', 'required', 'string', 'max:120'],
@@ -63,14 +63,14 @@ class PartnerPackageController extends Controller
             'rank'         => ['nullable', 'integer'],
         ]);
 
-        $partnerPackage->update($data);
+        $exhibitorPackage->update($data);
 
-        return response()->json(['data' => new PartnerPackageResource($partnerPackage)]);
+        return response()->json(['data' => new ExhibitorPackageResource($exhibitorPackage)]);
     }
 
-    public function destroy(PartnerPackage $partnerPackage): Response
+    public function destroy(ExhibitorPackage $exhibitorPackage): Response
     {
-        $partnerPackage->delete();
+        $exhibitorPackage->delete();
 
         return response()->noContent();
     }

@@ -50,7 +50,7 @@ const sections = computed<any[]>(() => [
   { key: 'showcase', label: 'Showcase Arena', svg: I.showcase, children: [
     { label: 'Manage filters', to: r('showcase/filters') },
     { label: 'Exhibitor Packages', to: r('showcase/packages') },
-    { label: 'Exhibitors', to: r('exhibitors') },
+    { label: 'Exhibitors', to: r('showcase/exhibitors') },
     { label: 'Speakers', to: r('showcase/speakers') },
     { label: 'Sessions', to: r('sessions') },
   ] },

@@ -3,33 +3,33 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PartnerProductResource;
-use App\Http\Resources\PartnerResource;
+use App\Http\Resources\ExhibitorProductResource;
+use App\Http\Resources\ExhibitorResource;
 use App\Models\Booth;
-use App\Models\Partner;
+use App\Models\Exhibitor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Partner-admin self-service space (architecture §6.3). The active partner is
- * resolved by the ResolvePartnerAdmin middleware (tenant GUC = the partner's org).
+ * Exhibitor-admin self-service space (architecture §6.3). The active exhibitor is
+ * resolved by the ResolveExhibitorAdmin middleware (tenant GUC = the exhibitor's org).
  */
-class PartnerSpaceController extends Controller
+class ExhibitorSpaceController extends Controller
 {
     private const WITH = ['package', 'members.contact', 'products', 'logoFile'];
 
     public function show(Request $request): JsonResponse
     {
-        $partner = Partner::with(self::WITH)->findOrFail($request->attributes->get('partner_id'));
+        $exhibitor = Exhibitor::with(self::WITH)->findOrFail($request->attributes->get('exhibitor_id'));
 
-        return response()->json(['data' => new PartnerResource($partner)]);
+        return response()->json(['data' => new ExhibitorResource($exhibitor)]);
     }
 
-    /** Partner edits its own public profile (name/description/website/logo/profile_data). */
+    /** Exhibitor edits its own public profile (name/description/website/logo/profile_data). */
     public function update(Request $request): JsonResponse
     {
-        $partner = Partner::findOrFail($request->attributes->get('partner_id'));
+        $exhibitor = Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:180'],
@@ -40,36 +40,36 @@ class PartnerSpaceController extends Controller
             'logo_file_id' => ['sometimes', 'nullable', 'integer', Rule::exists('files', 'id')],
         ]);
 
-        $partner->update($data);
+        $exhibitor->update($data);
 
-        return response()->json(['data' => new PartnerResource($partner->fresh(self::WITH))]);
+        return response()->json(['data' => new ExhibitorResource($exhibitor->fresh(self::WITH))]);
     }
 
     public function storeProduct(Request $request): JsonResponse
     {
-        $partner = Partner::findOrFail($request->attributes->get('partner_id'));
+        $exhibitor = Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
 
-        $product = $partner->products()->create(PartnerProductController::validated($request));
+        $product = $exhibitor->products()->create(ExhibitorProductController::validated($request));
 
-        return response()->json(['data' => new PartnerProductResource($product)], 201);
+        return response()->json(['data' => new ExhibitorProductResource($product)], 201);
     }
 
     // ── Exhibitor booth details ──────────────────────────────
 
     public function showBooth(Request $request): JsonResponse
     {
-        $partner = Partner::findOrFail($request->attributes->get('partner_id'));
-        abort_unless($partner->type === 'exhibitor', 422, 'Only exhibitors have a booth.');
+        $exhibitor = Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
+        abort_unless($exhibitor->type === 'exhibitor', 422, 'Only exhibitors have a booth.');
 
-        $booth = Booth::where('partner_id', $partner->id)->first();
+        $booth = Booth::where('exhibitor_id', $exhibitor->id)->first();
 
         return response()->json(['data' => $booth ? $this->boothArray($booth) : null]);
     }
 
     public function updateBooth(Request $request): JsonResponse
     {
-        $partner = Partner::findOrFail($request->attributes->get('partner_id'));
-        abort_unless($partner->type === 'exhibitor', 422, 'Only exhibitors have a booth.');
+        $exhibitor = Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
+        abort_unless($exhibitor->type === 'exhibitor', 422, 'Only exhibitors have a booth.');
 
         $data = $request->validate([
             'code' => ['nullable', 'string', 'max:60'],
@@ -78,10 +78,10 @@ class PartnerSpaceController extends Controller
         ]);
 
         $booth = Booth::updateOrCreate(
-            ['partner_id' => $partner->id],
+            ['exhibitor_id' => $exhibitor->id],
             [
-                'event_id' => $partner->event_id,
-                'organization_id' => $partner->organization_id,
+                'event_id' => $exhibitor->event_id,
+                'organization_id' => $exhibitor->organization_id,
                 'code' => $data['code'] ?? null,
                 'type' => $data['type'] ?? 'physical',
                 'resources' => $data['resources'] ?? null,

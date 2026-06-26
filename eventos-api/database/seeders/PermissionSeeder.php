@@ -19,7 +19,7 @@ class PermissionSeeder extends Seeder
 
     public const TENANT = [
         'events.manage', 'events.view',
-        'attendees.manage', 'speakers.manage', 'partners.manage',
+        'attendees.manage', 'speakers.manage', 'exhibitors.manage',
         'sessions.manage', 'venues.manage',
         'ticketing.manage', 'checkin.manage',
         'forms.manage', 'email.manage',

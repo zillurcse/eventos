@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'partner', title: 'Team', subtitle: 'Your booth staff and admins' })
+definePageMeta({ middleware: 'exhibitor', title: 'Team', subtitle: 'Your booth staff and admins' })
 
 const auth = useAuthStore()
 const api = useApi()
@@ -16,7 +16,7 @@ const isSelf = (m: any) => m.contact?.email === auth.user?.email
 
 async function load() {
   try {
-    members.value = (await api<any>('/partner/members')).data
+    members.value = (await api<any>('/exhibitor/members')).data
   } catch (e: any) {
     if (e?.response?.status === 403) suspended.value = true
   }
@@ -26,7 +26,7 @@ async function add() {
   error.value = ''
   adding.value = true
   try {
-    await api('/partner/members', { method: 'POST', body: { ...form } })
+    await api('/exhibitor/members', { method: 'POST', body: { ...form } })
     form.email = ''; form.first_name = ''; form.last_name = ''; form.password = ''; form.role = 'staff'
     await load()
   } catch (e: any) {
@@ -38,7 +38,7 @@ async function add() {
 
 async function remove(m: any) {
   if (!confirm(`Remove ${m.contact?.email}?`)) return
-  await api(`/partner/members/${m.id}`, { method: 'DELETE' })
+  await api(`/exhibitor/members/${m.id}`, { method: 'DELETE' })
   await load()
 }
 
@@ -48,7 +48,7 @@ function openReset(m: any) {
 }
 async function savePassword(m: any) {
   if (pwValue.value.length < 8) return
-  await api(`/partner/members/${m.id}/password`, { method: 'POST', body: { password: pwValue.value } })
+  await api(`/exhibitor/members/${m.id}/password`, { method: 'POST', body: { password: pwValue.value } })
   pwFor.value = null; pwValue.value = ''
   await load()
 }
@@ -59,7 +59,7 @@ onMounted(load)
 <template>
   <div>
     <div v-if="suspended" class="card">
-      <p class="error">This partner account is suspended.</p>
+      <p class="error">This exhibitor account is suspended.</p>
     </div>
 
     <template v-else>

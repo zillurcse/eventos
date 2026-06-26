@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\Membership;
-use App\Models\PartnerMember;
+use App\Models\ExhibitorMember;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,9 +14,9 @@ use Illuminate\Validation\Rule;
 
 /**
  * Super-admin account governance (architecture §2.1). Manages every login
- * account on the platform — platform staff, organizer members, and partner
+ * account on the platform — platform staff, organizer members, and exhibitor
  * admins — across all tenants. Org-scoped lookups (memberships, contacts,
- * partner members) run on the migrator (BYPASSRLS) connection; the global
+ * exhibitor members) run on the migrator (BYPASSRLS) connection; the global
  * `users` table has no RLS, so it uses the default connection.
  */
 class AdminUserController extends Controller
@@ -25,7 +25,7 @@ class AdminUserController extends Controller
     {
         // Classification id-sets — drive both the `types` label and the ?type= filter.
         $organizerIds = Membership::on('pgsql_admin')->distinct()->pluck('user_id');
-        $partnerUserIds = $this->partnerAdminUserIds();
+        $exhibitorUserIds = $this->exhibitorAdminUserIds();
         $type = $request->query('type');
 
         $users = User::query()
@@ -35,7 +35,7 @@ class AdminUserController extends Controller
             })
             ->when($type === 'platform', fn ($q) => $q->where('is_platform_staff', true))
             ->when($type === 'organizer', fn ($q) => $q->whereIn('id', $organizerIds))
-            ->when($type === 'partner', fn ($q) => $q->whereIn('id', $partnerUserIds))
+            ->when($type === 'exhibitor', fn ($q) => $q->whereIn('id', $exhibitorUserIds))
             ->latest('id')
             ->limit(100)
             ->get();
@@ -48,7 +48,7 @@ class AdminUserController extends Controller
 
         return response()->json([
             'data' => $users->map(fn (User $u) => $this->present(
-                $u, $memberships->get($u->id) ?? collect(), $organizerIds, $partnerUserIds,
+                $u, $memberships->get($u->id) ?? collect(), $organizerIds, $exhibitorUserIds,
             )),
         ]);
     }
@@ -151,10 +151,10 @@ class AdminUserController extends Controller
 
     // ── helpers ──────────────────────────────────────────────
 
-    /** Users that hold an admin login for at least one partner. */
-    protected function partnerAdminUserIds(): Collection
+    /** Users that hold an admin login for at least one exhibitor. */
+    protected function exhibitorAdminUserIds(): Collection
     {
-        $adminContactIds = PartnerMember::on('pgsql_admin')->where('role', 'admin')->pluck('contact_id');
+        $adminContactIds = ExhibitorMember::on('pgsql_admin')->where('role', 'admin')->pluck('contact_id');
 
         return Contact::on('pgsql_admin')
             ->whereIn('id', $adminContactIds)
@@ -172,10 +172,10 @@ class AdminUserController extends Controller
 
         $organizerIds = $memberships->isNotEmpty() ? collect([$user->id]) : collect();
 
-        return $this->present($user, $memberships, $organizerIds, $this->partnerAdminUserIds());
+        return $this->present($user, $memberships, $organizerIds, $this->exhibitorAdminUserIds());
     }
 
-    protected function present(User $u, Collection $memberships, Collection $organizerIds, Collection $partnerUserIds): array
+    protected function present(User $u, Collection $memberships, Collection $organizerIds, Collection $exhibitorUserIds): array
     {
         $types = [];
         if ($u->is_platform_staff) {
@@ -184,8 +184,8 @@ class AdminUserController extends Controller
         if ($organizerIds->contains($u->id)) {
             $types[] = 'organizer';
         }
-        if ($partnerUserIds->contains($u->id)) {
-            $types[] = 'partner';
+        if ($exhibitorUserIds->contains($u->id)) {
+            $types[] = 'exhibitor';
         }
 
         return [

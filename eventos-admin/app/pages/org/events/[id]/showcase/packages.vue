@@ -25,7 +25,8 @@ interface Package {
 }
 
 // ── Feature catalogue ─────────────────────────────────────────────────
-const ALL_FEATURES = [
+// `countable: false` → on/off only (no quantity stepper in the drawer)
+const ALL_FEATURES: { key: string; label: string; countable?: boolean }[] = [
   { key: 'teams',             label: 'Teams' },
   { key: 'projects',          label: 'Projects' },
   { key: 'products',          label: 'Products' },
@@ -34,12 +35,16 @@ const ALL_FEATURES = [
   { key: 'cta',               label: 'CTA' },
   { key: 'meetings',          label: 'Meetings' },
   { key: 'lounge',            label: 'Lounge' },
-  { key: 'teams_connections', label: "Team's Connections" },
-  { key: 'recommended_leads', label: 'Recommended leads' },
-  { key: 'lead_analytics',    label: 'Lead Analytics' },
-  { key: 'lead_export',       label: 'Lead Export' },
-  { key: 'analytics',         label: 'Analytics' },
+  { key: 'teams_connections', label: "Team's Connections", countable: false },
+  { key: 'recommended_leads', label: 'Recommended leads',  countable: false },
+  { key: 'lead_analytics',    label: 'Lead Analytics',      countable: false },
+  { key: 'lead_export',       label: 'Lead Export',         countable: false },
+  { key: 'analytics',         label: 'Analytics',           countable: false },
 ]
+
+function isCountable(key: string) {
+  return ALL_FEATURES.find(f => f.key === key)?.countable !== false
+}
 
 // ── State ─────────────────────────────────────────────────────────────
 const packages   = ref<Package[]>([])
@@ -82,7 +87,7 @@ function enabledLabels(pkg: Package) {
 // ── API ───────────────────────────────────────────────────────────────
 async function load() {
   try {
-    packages.value = (await api<any>(`/partner-packages?event=${id}`)).data
+    packages.value = (await api<any>(`/exhibitor-packages?event=${id}`)).data
   } catch { /* */ }
 }
 
@@ -111,15 +116,19 @@ async function saveDraft() {
     const payload = {
       event:        id,
       name:         draft.name,
-      entitlements: JSON.parse(JSON.stringify(draft.features)),
+      entitlements: draft.features.map((f: FeatureLine) => ({
+        key:     f.key,
+        enabled: f.enabled,
+        limit:   isCountable(f.key) ? f.limit : 0,
+      })),
     }
 
     if (editingId.value) {
-      const res = await api<any>(`/partner-packages/${editingId.value}`, { method: 'PUT', body: payload })
+      const res = await api<any>(`/exhibitor-packages/${editingId.value}`, { method: 'PUT', body: payload })
       const idx = packages.value.findIndex(p => p.id === editingId.value)
       if (idx >= 0) packages.value[idx] = res.data
     } else {
-      const res = await api<any>('/partner-packages', { method: 'POST', body: payload })
+      const res = await api<any>('/exhibitor-packages', { method: 'POST', body: payload })
       packages.value.push(res.data)
     }
 
@@ -134,7 +143,7 @@ async function saveDraft() {
 async function removePackage(pkg: Package) {
   if (!confirm(`Delete package "${pkg.name}"?`)) return
   try {
-    await api(`/partner-packages/${pkg.id}`, { method: 'DELETE' })
+    await api(`/exhibitor-packages/${pkg.id}`, { method: 'DELETE' })
     packages.value = packages.value.filter(p => p.id !== pkg.id)
   } catch { /* */ }
 }
@@ -216,7 +225,10 @@ onMounted(load)
             class="w-4.5 h-4.5 m-0 rounded shrink-0 cursor-pointer accent-brand"
           >
           <span class="flex-1 text-[.93rem] font-medium text-ink select-none">{{ featureLabel(f.key) }}</span>
-          <div class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white">
+          <div
+            v-if="isCountable(f.key)"
+            class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white"
+          >
             <button
               class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer hover:bg-[#f0f0f7] transition-colors select-none"
               @click="f.limit = Math.max(0, f.limit - 1)"

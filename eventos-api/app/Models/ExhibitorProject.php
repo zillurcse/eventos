@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class PartnerPackage extends Model
+class ExhibitorProject extends Model
 {
-    use BelongsToOrganization, SoftDeletes;
+    use SoftDeletes;
 
     protected $guarded = [];
 
