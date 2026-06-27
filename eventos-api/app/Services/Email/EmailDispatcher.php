@@ -12,25 +12,34 @@ use Illuminate\Support\Facades\Mail;
  */
 class EmailDispatcher
 {
-    public function __construct(protected EmailRenderer $renderer) {}
+    public function __construct(
+        protected EmailRenderer $renderer,
+        protected MergeVariables $variables,
+    ) {}
 
     /** Render the template's blocks → compiled_html (cached on the template). */
     public function compile(EmailTemplate $template): string
     {
-        $blocks = $template->design['blocks'] ?? [];
-        $html = $this->renderer->render($blocks);
+        $design = $template->design ?? [];
+        $html = $this->renderer->render($design['blocks'] ?? [], $design['settings'] ?? []);
 
         $template->update(['compiled_html' => $html]);
 
         return $html;
     }
 
-    /** Compiled HTML with merge variables applied (no DB write). */
+    /**
+     * Compiled HTML with merge variables applied (no DB write). Recompiles each
+     * call so the preview reflects in-flight edits, and falls back to realistic
+     * sample values for any variable the caller didn't supply.
+     */
     public function preview(EmailTemplate $template, array $merge = []): string
     {
-        $html = $template->compiled_html ?: $this->compile($template);
+        $design = $template->design ?? [];
+        $html = $this->renderer->render($design['blocks'] ?? [], $design['settings'] ?? []);
+        $vars = array_replace_recursive($this->variables->sampleData(), $merge);
 
-        return $this->renderer->merge($html, $merge);
+        return $this->renderer->merge($html, $vars);
     }
 
     public function send(EmailTemplate $template, string $to, array $merge = [], string $trigger = 'test'): EmailSend

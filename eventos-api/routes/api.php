@@ -304,8 +304,13 @@ Route::prefix('v1')->group(function () {
             // Email builder
             Route::middleware('perm:email.manage')->group(function () {
                 Route::get('/email-templates', [EmailTemplateController::class, 'index']);
+                Route::get('/email-variables', [EmailTemplateController::class, 'variables']);
                 Route::post('/email-templates', [EmailTemplateController::class, 'store']);
+                Route::post('/email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft']);
                 Route::get('/email-templates/{uuid}', [EmailTemplateController::class, 'show']);
+                Route::match(['put', 'patch'], '/email-templates/{uuid}', [EmailTemplateController::class, 'update']);
+                Route::delete('/email-templates/{uuid}', [EmailTemplateController::class, 'destroy']);
+                Route::post('/email-templates/{uuid}/duplicate', [EmailTemplateController::class, 'duplicate']);
                 Route::post('/email-templates/{uuid}/preview', [EmailTemplateController::class, 'preview']);
                 Route::post('/email-templates/{uuid}/send-test', [EmailTemplateController::class, 'sendTest']);
             });
