@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
+use App\Http\Controllers\Api\V1\FloorController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
@@ -281,6 +282,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/events/{uuid}/services', [ServiceController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/services/{group}', [ServiceController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/services/{group}', [ServiceController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Floor plans (floor.expouse canvas editor) ──
+            Route::get('/events/{uuid}/floors', [FloorController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/floors', [FloorController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/floors/{floor}', [FloorController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/floors/{floor}', [FloorController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/floors/{floor}', [FloorController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Announcements (§6.6) ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');

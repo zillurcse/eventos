@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
 /* Tailwind v4 auto-detects sources near the stylesheet; this CSS now lives deep
-   under modules/, so point the scanner explicitly at the app shell and every
-   feature module (paths are relative to this file). Without these, utility
+   under modules/, so point the scanner explicitly at the app shell and the
+   admin feature modules (paths are relative to this file). Without these, utility
    classes used in templates (flex, grid, gap-*, arbitrary values…) aren't
-   generated and the UI renders unstyled. */
+   generated and the UI renders unstyled. The floor.expouse feature was converted
+   from Tailwind v3 to v4 and shares this single v4 instance, so it is scanned too. */
 @source "../../../../../app";
-@source "../../../../../modules";
+@source "../../../../../modules/expouse-admin";
+@source "../../../../../modules/floor.expouse/app";
 
 /* Brand palette as Tailwind theme tokens → generates bg-brand / text-muted / border-line etc. */
 @theme {

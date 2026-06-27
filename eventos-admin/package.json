@@ -10,9 +10,20 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@nuxt/icon": "^2.2.4",
+    "@nuxt/image": "^2.0.0",
+    "@nuxtjs/google-fonts": "^3.2.0",
     "@pinia/nuxt": "^0.11.0",
+    "browser-image-compression": "^2.0.2",
+    "html2canvas": "^1.4.1",
+    "izitoast": "^1.4.0",
+    "jspdf": "^3.0.4",
+    "localforage": "^1.10.0",
     "nuxt": "^4.4.8",
+    "nuxt-color-picker": "^1.2.8",
+    "nuxt-toast": "^1.4.0",
     "pinia": "^3.0.0",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9"
