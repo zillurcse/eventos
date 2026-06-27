@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Block, BlockType, EmailSettings } from '~/composables/useEmailBlocks'
+import type { Block, BlockType, EmailSettings, TemplatePreset } from '~/composables/useEmailBlocks'
 import {
   createBlock, cloneBlock, findContext, walkBlocks,
   defaultSettings, starterBlocks, PALETTE,
@@ -42,6 +42,43 @@ const device = ref<'desktop' | 'mobile'>('desktop')
 const showSettingsDrawer = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
+const showGallery = ref(!props.template)
+
+// ── undo / redo ──────────────────────────────────────────────────────────────
+const history = ref<string[]>([])
+const historyIndex = ref(-1)
+const historyPausing = ref(false)
+
+function snapshot() {
+  if (historyPausing.value) return
+  const snap = JSON.stringify({ blocks: JSON.parse(JSON.stringify(blocks)), settings: JSON.parse(JSON.stringify(settings)) })
+  // drop redo tail
+  history.value = history.value.slice(0, historyIndex.value + 1)
+  history.value.push(snap)
+  if (history.value.length > 60) history.value.shift()
+  historyIndex.value = history.value.length - 1
+}
+function applySnapshot(snap: string) {
+  const { blocks: b, settings: s } = JSON.parse(snap)
+  historyPausing.value = true
+  blocks.splice(0, blocks.length, ...b)
+  Object.assign(settings, s)
+  historyPausing.value = false
+}
+function undo() {
+  if (historyIndex.value <= 0) return
+  historyIndex.value--
+  applySnapshot(history.value[historyIndex.value]!)
+  dirty.value = true
+}
+function redo() {
+  if (historyIndex.value >= history.value.length - 1) return
+  historyIndex.value++
+  applySnapshot(history.value[historyIndex.value]!)
+  dirty.value = true
+}
+const canUndo = computed(() => historyIndex.value > 0)
+const canRedo = computed(() => historyIndex.value < history.value.length - 1)
 
 // ── selected block lookup ────────────────────────────────────────────────
 const selectedBlock = computed<Block | null>(() => {
@@ -51,10 +88,17 @@ const selectedBlock = computed<Block | null>(() => {
   return found
 })
 
+// ── drag state ───────────────────────────────────────────────────────────
+const dragId = ref<string | null>(null)
+const dragType = ref<BlockType | null>(null)
+const dropIndex = ref<number | null>(null)
+const canvasEl = ref<HTMLElement | null>(null)
+
 // ── builder API (provided to nested canvas blocks) ───────────────────────
 provide('emailBuilder', {
   selectedId,
   varGroups,
+  dragId,
   select: (id: string | null) => { selectedId.value = id },
   remove: (id: string) => {
     const ctx = findContext(blocks, id)
@@ -76,10 +120,18 @@ provide('emailBuilder', {
     const [b] = ctx.arr.splice(ctx.index, 1)
     ctx.arr.splice(j, 0, b!)
   },
+  startBlockDrag: (id: string) => { dragId.value = id },
+  endBlockDrag: () => { dragId.value = null; dropIndex.value = null },
 })
 
-// mark dirty on any document change
-watch([blocks, settings, name, subject, fromName, fromEmail, replyTo], () => { dirty.value = true }, { deep: true })
+// mark dirty + snapshot on any document change
+let snapTimer: ReturnType<typeof setTimeout> | null = null
+watch([blocks, settings], () => {
+  dirty.value = true
+  if (snapTimer) clearTimeout(snapTimer)
+  snapTimer = setTimeout(snapshot, 400)
+}, { deep: true })
+watch([name, subject, fromName, fromEmail, replyTo], () => { dirty.value = true })
 
 // ── palette add / drag ───────────────────────────────────────────────────
 function addBlock(type: BlockType, index?: number) {
@@ -88,12 +140,44 @@ function addBlock(type: BlockType, index?: number) {
   else blocks.splice(index, 0, b)
   selectedId.value = b.id
 }
-const dragType = ref<BlockType | null>(null)
-const dropIndex = ref<number | null>(null)
-function onDrop(index: number) {
-  if (dragType.value) addBlock(dragType.value, index)
-  dragType.value = null
+/** Called from the canvas @dragover — computes nearest slot from mouse Y */
+function onCanvasDragOver(e: DragEvent) {
+  if (!dragId.value && !dragType.value) return
+  if (!canvasEl.value) return
+  const wrappers = Array.from(canvasEl.value.querySelectorAll<HTMLElement>('[data-bidx]'))
+  if (!wrappers.length) { dropIndex.value = 0; return }
+  let slot = blocks.length
+  for (const el of wrappers) {
+    const rect = el.getBoundingClientRect()
+    if (e.clientY < rect.top + rect.height / 2) {
+      slot = parseInt(el.dataset.bidx!)
+      break
+    }
+  }
+  // skip the slot that would leave the dragged block in the same position
+  if (dragId.value) {
+    const from = blocks.findIndex(b => b.id === dragId.value)
+    if (slot === from || slot === from + 1) { dropIndex.value = null; return }
+  }
+  dropIndex.value = slot
+}
+
+function commitDrop() {
+  const index = dropIndex.value
   dropIndex.value = null
+  if (index === null) { dragId.value = null; dragType.value = null; return }
+  if (dragId.value) {
+    const fromIndex = blocks.findIndex(b => b.id === dragId.value)
+    if (fromIndex !== -1) {
+      const [b] = blocks.splice(fromIndex, 1)
+      const toIndex = fromIndex < index ? index - 1 : index
+      blocks.splice(Math.max(0, toIndex), 0, b!)
+    }
+    dragId.value = null
+  } else if (dragType.value) {
+    addBlock(dragType.value, index)
+    dragType.value = null
+  }
 }
 function iconPaths(icon: string) {
   return icon.split(' M').map((s, i) => (i ? 'M' + s : s))
@@ -168,9 +252,29 @@ async function sendTest() {
   }
 }
 
+function applyGalleryPreset(preset: TemplatePreset) {
+  const newBlocks = preset.blocks().map(b => JSON.parse(JSON.stringify(b)))
+  const newSettings = { ...defaultSettings(), ...preset.settings() }
+  blocks.splice(0, blocks.length, ...newBlocks)
+  Object.assign(settings, newSettings)
+  showGallery.value = false
+  dirty.value = false
+  nextTick(snapshot)
+}
+
+function onKeydown(e: KeyboardEvent) {
+  const ctrl = e.ctrlKey || e.metaKey
+  if (ctrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+  if (ctrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo() }
+  if (ctrl && e.key === 's') { e.preventDefault(); save() }
+}
+
 onMounted(async () => {
   try { varGroups.value = (await api<{ data: VarGroup[] }>('/email-variables')).data } catch { /* non-fatal */ }
+  snapshot()
+  window.addEventListener('keydown', onKeydown)
 })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 </script>
 
 <template>
@@ -184,6 +288,15 @@ onMounted(async () => {
       <span v-if="dirty" class="text-[.72rem] text-[#b45309] bg-[#fef3c7] px-2 py-0.5 rounded-full">Unsaved</span>
 
       <div class="ml-auto flex items-center gap-2">
+        <!-- undo / redo -->
+        <div class="flex border border-line rounded-lg overflow-hidden">
+          <button class="w-8 h-8 grid place-items-center cursor-pointer bg-white hover:bg-[#f5f5fa] disabled:opacity-30 disabled:cursor-not-allowed border-r border-line" title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="undo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h10a6 6 0 0 1 0 12H7"/><path d="M7 3l-4 4 4 4"/></svg>
+          </button>
+          <button class="w-8 h-8 grid place-items-center cursor-pointer bg-white hover:bg-[#f5f5fa] disabled:opacity-30 disabled:cursor-not-allowed" title="Redo (Ctrl+Y)" :disabled="!canRedo" @click="redo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7H11a6 6 0 0 0 0 12h6"/><path d="M17 3l4 4-4 4"/></svg>
+          </button>
+        </div>
         <div class="flex bg-[#f1f1f6] rounded-lg p-0.5">
           <button class="px-3 py-1.5 rounded-md text-[.82rem] cursor-pointer" :class="mode === 'edit' ? 'bg-white shadow-sm font-semibold' : 'text-[#5f6b7a]'" @click="mode = 'edit'">Edit</button>
           <button class="px-3 py-1.5 rounded-md text-[.82rem] cursor-pointer" :class="mode === 'preview' ? 'bg-white shadow-sm font-semibold' : 'text-[#5f6b7a]'" @click="mode = 'preview'">Preview</button>
@@ -213,6 +326,7 @@ onMounted(async () => {
           </button>
         </div>
         <button class="w-full mt-4 text-[.78rem] text-[#6352e7] font-semibold border border-line rounded-lg py-2 cursor-pointer hover:bg-[#f5f3ff]" @click="selectedId = null; showSettingsDrawer = false">⚙ Email settings</button>
+        <button class="w-full mt-2 text-[.78rem] text-[#5f6b7a] font-semibold border border-line rounded-lg py-2 cursor-pointer hover:bg-[#f5f5fa]" @click="showGallery = true">📋 Templates</button>
       </aside>
 
       <!-- ───────── Canvas ───────── -->
@@ -234,19 +348,26 @@ onMounted(async () => {
 
         <!-- edit canvas -->
         <div v-else class="mx-auto" :style="{ maxWidth: settings.contentWidth + 'px' }">
-          <div class="rounded-xl shadow-sm overflow-hidden" :style="{ background: settings.contentBackground, fontFamily: settings.fontFamily }" @click.stop>
-            <!-- top drop zone -->
-            <div
-              class="h-2 transition-all" :class="dropIndex === 0 ? 'bg-[#6352e7]/30 h-6' : ''"
-              @dragover.prevent="dropIndex = 0" @dragleave="dropIndex = null" @drop="onDrop(0)"
-            />
+          <div
+            ref="canvasEl"
+            class="rounded-xl shadow-sm overflow-hidden"
+            :style="{ background: settings.contentBackground, fontFamily: settings.fontFamily }"
+            @click.stop
+            @dragover.prevent="onCanvasDragOver"
+            @dragleave.self="dropIndex = null"
+            @drop.prevent="commitDrop"
+          >
+            <!-- drop line at top -->
+            <DropLine :show="dropIndex === 0" />
+
             <template v-for="(b, i) in blocks" :key="b.id">
-              <MailCanvasBlock :block="b" />
-              <div
-                class="h-2 transition-all" :class="dropIndex === i + 1 ? 'bg-[#6352e7]/30 h-6' : ''"
-                @dragover.prevent="dropIndex = i + 1" @dragleave="dropIndex = null" @drop="onDrop(i + 1)"
-              />
+              <div :data-bidx="i" :class="dragId === b.id ? 'opacity-30 pointer-events-none' : ''">
+                <MailCanvasBlock :block="b" />
+              </div>
+              <!-- drop line after each block -->
+              <DropLine :show="dropIndex === i + 1" />
             </template>
+
             <div v-if="!blocks.length" class="py-16 text-center text-[#8b93a7]">
               Drag a block here or click one on the left to start.
             </div>
@@ -276,6 +397,13 @@ onMounted(async () => {
         </div>
       </aside>
     </div>
+
+    <!-- template gallery -->
+    <MailTemplateGallery
+      v-if="showGallery"
+      @select="applyGalleryPreset"
+      @close="showGallery = false"
+    />
 
     <!-- send-test modal -->
     <div v-if="testOpen" class="fixed inset-0 z-[160] bg-black/35 grid place-items-center" @click.self="testOpen = false">

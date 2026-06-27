@@ -11,6 +11,8 @@ use App\Models\EventSetting;
 use App\Models\Membership;
 use App\Models\Exhibitor;
 use App\Models\Session;
+use App\Services\Email\EventTemplateSeeder;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -40,7 +42,7 @@ class EventController extends Controller
         return response()->json(['data' => new EventResource($event)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TenantContext $tenant, EventTemplateSeeder $templateSeeder): JsonResponse
     {
         $data = $this->validateEvent($request, creating: true);
         $data = $this->utcDates($data, ['starts_at', 'ends_at']);
@@ -60,6 +62,8 @@ class EventController extends Controller
             'meta' => isset($data['location']) ? ['location' => $data['location']] : null,
             'created_by' => $request->user()->id,
         ]);
+
+        $templateSeeder->seedForEvent($event, $tenant->id());
 
         return response()->json(['data' => new EventResource($event->load('coverFile'))], 201);
     }

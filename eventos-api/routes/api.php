@@ -307,6 +307,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/email-variables', [EmailTemplateController::class, 'variables']);
                 Route::post('/email-templates', [EmailTemplateController::class, 'store']);
                 Route::post('/email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft']);
+                Route::post('/email-templates/seed', [EmailTemplateController::class, 'seed']);
                 Route::get('/email-templates/{uuid}', [EmailTemplateController::class, 'show']);
                 Route::match(['put', 'patch'], '/email-templates/{uuid}', [EmailTemplateController::class, 'update']);
                 Route::delete('/email-templates/{uuid}', [EmailTemplateController::class, 'destroy']);

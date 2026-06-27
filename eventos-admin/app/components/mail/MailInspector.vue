@@ -157,7 +157,9 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
           <button class="text-[#dc2626] bg-transparent border-0 cursor-pointer" @click="removeSocial(i)">🗑</button>
         </div>
         <button class="text-[#6352e7] font-semibold text-[.8rem] bg-transparent border-0 cursor-pointer" @click="addSocial">+ Add network</button>
-        <label class="ins-l">Label color</label>
+        <label class="ins-l">Icon size (px)</label>
+        <input v-model.number="block.style.iconSize" type="number" min="16" max="60" class="m-0">
+        <label class="ins-l">Icon color</label>
         <div class="ins-color"><input v-model="block.style.color" type="color"><input v-model="block.style.color" class="m-0"></div>
       </template>
 
@@ -165,6 +167,39 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
       <template v-else-if="block.type === 'html'">
         <label class="ins-l">Custom HTML</label>
         <textarea v-model="block.html" rows="8" class="m-0 font-mono text-[.78rem]" />
+      </template>
+
+      <!-- LOGO -->
+      <template v-else-if="block.type === 'logo'">
+        <label class="ins-l">Logo image</label>
+        <div class="flex gap-2 items-center">
+          <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>
+        </div>
+        <label class="ins-l">Or image URL</label>
+        <input v-model="block.src" class="m-0" placeholder="https://…">
+        <label class="ins-l">Alt text</label>
+        <input v-model="block.alt" class="m-0" placeholder="Company logo">
+        <label class="ins-l">Link URL (optional)</label>
+        <input v-model="block.href" class="m-0" placeholder="https://…">
+        <label class="ins-l">Width (px)</label>
+        <input v-model.number="block.style.width" type="number" min="40" max="600" class="m-0">
+        <label class="ins-l">Background</label>
+        <div class="ins-color"><input :value="block.style.backgroundColor || '#ffffff'" type="color" @input="block.style.backgroundColor = ($event.target as HTMLInputElement).value"><input v-model="block.style.backgroundColor" class="m-0" placeholder="#ffffff"></div>
+      </template>
+
+      <!-- VIDEO -->
+      <template v-else-if="block.type === 'video'">
+        <p class="text-[#8b93a7] text-[.78rem] mb-2">Email clients can't play video inline — we show a thumbnail with a play button that links to the video.</p>
+        <label class="ins-l">Thumbnail image</label>
+        <div class="flex gap-2 items-center">
+          <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>
+        </div>
+        <label class="ins-l">Or thumbnail URL</label>
+        <input v-model="block.src" class="m-0" placeholder="https://…">
+        <label class="ins-l">Video link URL</label>
+        <input v-model="block.url" class="m-0" placeholder="https://youtube.com/…">
+        <label class="ins-l">Corner radius (px)</label>
+        <input v-model.number="block.style.borderRadius" type="number" min="0" max="40" class="m-0">
       </template>
 
       <!-- COLUMNS -->

@@ -7,6 +7,7 @@ use App\Http\Resources\EmailTemplateResource;
 use App\Models\Event;
 use App\Models\EmailTemplate;
 use App\Services\Email\EmailDispatcher;
+use App\Services\Email\EventTemplateSeeder;
 use App\Services\Email\MergeVariables;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -140,6 +141,22 @@ class EmailTemplateController extends Controller
             'subject' => $send->subject,
             'status' => $send->status,
         ], 202);
+    }
+
+    /** Seed the 36 default system templates for an event (idempotent). */
+    public function seed(Request $request, TenantContext $tenant, EventTemplateSeeder $seeder): JsonResponse
+    {
+        $data = $request->validate(['event' => ['required', 'string']]);
+        $event = Event::where('uuid', $data['event'])->firstOrFail();
+
+        $seeder->seedForEvent($event, $tenant->id());
+
+        $templates = EmailTemplate::where('event_id', $event->id)->latest('id')->get();
+
+        return response()->json([
+            'seeded' => $templates->count(),
+            'data'   => EmailTemplateResource::collection($templates),
+        ]);
     }
 
     /** The dynamic merge-variable catalogue surfaced to the builder's variable picker. */
