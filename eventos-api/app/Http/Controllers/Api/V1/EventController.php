@@ -216,6 +216,19 @@ class EventController extends Controller
             'lounge.sponsor_meetings.*' => ['integer', 'min:0', 'max:100000'],
             'lounge.sponsor_order' => ['sometimes', 'array'],
             'lounge.sponsor_order.*' => ['string', 'max:60'],
+            'communication' => ['sometimes', 'array'],
+            'communication.functionality' => ['sometimes', 'array'],
+            'communication.functionality.*' => ['array'],
+            'communication.functionality.*.attendee' => ['sometimes', 'boolean'],
+            'communication.functionality.*.speaker' => ['sometimes', 'boolean'],
+            'communication.functionality.*.exhibitor' => ['sometimes', 'boolean'],
+            'communication.functionality.*.sponsor' => ['sometimes', 'boolean'],
+            'communication.moderation' => ['sometimes', 'array'],
+            'communication.moderation.*' => ['boolean'],
+            'communication.feed_tabs' => ['sometimes', 'array'],
+            'communication.feed_tabs.*.key' => ['sometimes', 'string', 'max:60'],
+            'communication.feed_tabs.*.label' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'communication.feed_tabs.*.enabled' => ['sometimes', 'boolean'],
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
@@ -243,6 +256,7 @@ class EventController extends Controller
             'chat' => (object) ($s->chat ?? []),
             'meeting' => (object) ($s->meeting ?? []),
             'lounge' => (object) ($s->lounge ?? []),
+            'communication' => (object) ($s->communication ?? []),
         ];
     }
 

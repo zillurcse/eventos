@@ -40,8 +40,8 @@ function rename(i: number, val: string) { const arr = [...props.modelValue]; arr
       <span v-else class="flex-1 font-bold text-[.9rem]" :class="editable ? 'text-[#6352e7]' : 'text-[#475569]'">{{ it.label }}</span>
       <button v-if="editable" class="bg-transparent border-none text-[#8b93ff] cursor-pointer text-[.95rem] px-1.5 py-0.5" title="Rename" @click="editingIndex = editingIndex === i ? null : i">✎</button>
       <button
-        class="w-7 h-7 rounded-full border-2 border-[#d7dae1] bg-white grid place-items-center cursor-pointer shrink-0"
-        :class="{ 'bg-[#6352e7] border-[#6352e7]': it.enabled }"
+        class="w-7 h-7 rounded-full border-2 grid place-items-center cursor-pointer shrink-0"
+        :class="it.enabled ? 'bg-[#6352e7] border-[#6352e7]' : 'bg-white border-[#d7dae1]'"
         :title="it.enabled ? 'Active' : 'Inactive'" @click="toggle(i)"
       >
         <svg v-if="it.enabled" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5" /></svg>

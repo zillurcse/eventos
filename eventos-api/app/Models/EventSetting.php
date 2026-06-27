@@ -31,6 +31,7 @@ class EventSetting extends Model
         'chat' => 'array',
         'meeting' => 'array',
         'lounge' => 'array',
+        'communication' => 'array',
         'registration_open' => 'datetime',
         'registration_close' => 'datetime',
     ];
