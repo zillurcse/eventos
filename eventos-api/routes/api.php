@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FloorController;
+use App\Http\Controllers\Api\V1\BadgeDesignController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
@@ -289,6 +290,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/floors/{floor}', [FloorController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/floors/{floor}', [FloorController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/floors/{floor}', [FloorController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Badge designs (badge.expouse canvas editor) ──
+            Route::get('/events/{uuid}/badge-designs/element-library', [BadgeDesignController::class, 'elementLibrary'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Announcements (§6.6) ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');

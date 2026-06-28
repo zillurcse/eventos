@@ -70,7 +70,7 @@ const sections = computed<any[]>(() => [
   { key: 'ads', label: 'AD Managements', svg: I.ads, children: kids([['Manage ADs', 'ads/manage'], ['Insights', 'ads/insights']]) },
   { key: 'users', label: 'Users', svg: I.users, children: kids([['All Users', 'users/all'], ['WebApp users', 'users/webapp'], ['Blocked users', 'users/blocked']]) },
   { key: 'expolens', label: 'ExpoLens', svg: I.expolens, children: kids([['Photo Gallery', 'expolens/gallery'], ['Find Attendee Photos', 'expolens/find'], ['Moderate Uploads', 'expolens/moderate']]) },
-  { key: 'floor', label: 'Floor Plan', svg: I.floor, to: r('floor-plan') },
+  { key: 'floor', label: 'Floor Plan', svg: I.floor, to: r('floor') },
   { key: 'analytics', label: 'Analytics', svg: I.analytics, children: kids([['Website', 'analytics/website'], ['APP / Event platform', 'analytics/platform'], ['Marketing', 'analytics/marketing'], ['Survey', 'analytics/survey'], ['Ads', 'analytics/ads']]) },
   { key: 'mobile', label: 'Mobile App', svg: I.mobile, children: kids([['Help Screens', 'mobile/help-screens'], ['Manage Tabs', 'mobile/manage-tabs'], ['Branded Mobile App', 'mobile/branded-app'], ['Add App Banner', 'mobile/app-banner']]) },
 ])

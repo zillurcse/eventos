@@ -20,7 +20,36 @@ export default defineNuxtConfig({
     'nuxt-color-picker',
     'nuxt-toast',
     'pinia-plugin-persistedstate/nuxt',
+    // Module required by the badge.expouse feature (modules/badge.expouse) — its
+    // canvas uses the <Qrcode> component to render QR elements.
+    'nuxt-qrcode',
   ],
+
+  // @nuxt/icon: pre-bundle the iconify collections the badge/floor editors use
+  // into the local server bundle. Without this, @nuxt/icon discovers each set on
+  // first use and bundles it on the fly, causing a one-time dev page reload (and
+  // blank icons until the client API resolves them). Collections come from the
+  // installed @iconify-json/* dev deps.
+  icon: {
+    serverBundle: {
+      collections: [
+        'mdi', 'tabler', 'ph', 'line-md', 'material-symbols', 'carbon',
+        'fluent-mdl2', 'solar', 'streamline', 'streamline-plump',
+        'streamline-sharp', 'streamline-ultimate', 'bi', 'bitcoin-icons',
+        'quill', 'vaadin',
+      ],
+    },
+  },
+
+  // Default QR rendering for the badge editor's <Qrcode> elements.
+  qrcode: {
+    options: {
+      variant: { inner: 'circle', marker: 'rounded', pixel: 'rounded' },
+      radius: 1,
+      blackColor: 'currentColor',
+      whiteColor: 'transparent',
+    },
+  },
 
   // Font families the floor-plan editor offers for canvas text. download:false
   // keeps them as CDN <link>s (no build-time fetch) — fine for this SPA.
@@ -37,7 +66,7 @@ export default defineNuxtConfig({
   },
 
   build: {
-    transpile: ['pinia-plugin-persistedstate'],
+    transpile: ['pinia-plugin-persistedstate', 'qrcode'],
   },
 
   // Global design system (Tailwind v4 + the shared component layer). It lives in

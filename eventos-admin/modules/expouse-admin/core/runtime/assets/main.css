@@ -9,6 +9,7 @@
 @source "../../../../../app";
 @source "../../../../../modules/expouse-admin";
 @source "../../../../../modules/floor.expouse/app";
+@source "../../../../../modules/badge.expouse/app";
 
 /* Brand palette as Tailwind theme tokens → generates bg-brand / text-muted / border-line etc. */
 @theme {
@@ -31,6 +32,13 @@
 
 /* ── Base ──────────────────────────────────────────────── */
 @layer base {
+  /* Tailwind v4 changed the default border/divide color from gray-200 to
+     currentColor. The admin always pairs `border` with an explicit color so it's
+     unaffected, but the badge.expouse (and other ported v3) templates use bare
+     `border` / `border-b`; without this they'd draw dark current-color borders.
+     Restore the v3 default so those designs render as intended. */
+  *, ::before, ::after, ::backdrop { border-color: var(--color-gray-200, #e5e7eb); }
+
   html, body { @apply m-0 h-full; }
   body { @apply bg-bg text-ink antialiased; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   a { @apply text-brand no-underline; }
