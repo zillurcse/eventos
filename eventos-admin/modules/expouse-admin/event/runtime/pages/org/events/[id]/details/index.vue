@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -43,13 +45,17 @@ async function load() {
   form.url = e.location?.url ?? ''
 }
 
+const saving = ref(false)
+
 async function save() {
   error.value = ''
+  saving.value = true
   try {
     await api(`/events/${id}`, { method: 'PATCH', body: {
       name: form.name,
-      starts_at: form.starts_at || undefined,
-      ends_at: form.ends_at || undefined,
+      // Send empty string as null so dates can be cleared; only omit when unchanged-empty.
+      starts_at: form.starts_at || null,
+      ends_at: form.ends_at || null,
       description: form.description || null,
       timezone: form.timezone || 'UTC',
       format: form.format,
@@ -58,9 +64,15 @@ async function save() {
         url: showUrl.value ? (form.url || null) : null,
       },
     } })
+    // Re-sync from the DB so the form visibly reflects what was persisted.
+    await load()
     saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Event details saved')
   } catch (e: any) {
     error.value = e?.data?.message || 'Could not save.'
+    toast.error(error.value)
+  } finally {
+    saving.value = false
   }
 }
 
@@ -114,6 +126,6 @@ onMounted(load)
     </p>
 
     <p v-if="error" class="error">{{ error }}</p>
-    <div class="mt-4"><button class="btn" :disabled="!form.name" @click="save">Save changes</button></div>
+    <div class="mt-4"><button class="btn" :disabled="!form.name || saving" @click="save">{{ saving ? 'Saving…' : 'Save changes' }}</button></div>
   </div>
 </template>

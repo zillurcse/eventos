@@ -19,6 +19,7 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'is_platform_staff' => (bool) $this->is_platform_staff,
+            'must_change_password' => (bool) $this->must_change_password,
             'locale' => $this->locale,
             'timezone' => $this->timezone,
             'personas' => $this->personas($exhibitorMembers),

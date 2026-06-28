@@ -49,6 +49,15 @@ export function useExhibitorManager(eventId: string) {
   const perPage       = ref(10)
   const actionsOpenId = ref<string | null>(null)
 
+  // ── Reset password modal ─────────────────────────────────────────────
+  const resetTarget   = ref<any | null>(null)            // exhibitor being reset
+  const resetMode     = ref<'auto' | 'manual'>('auto')
+  const resetPassword = ref('')
+  const resetMustChange = ref(true)
+  const resetSaving   = ref(false)
+  const resetError    = ref('')
+  const resetResult   = ref<{ email: string, password: string } | null>(null) // step 2 (auto)
+
   watch(perPage, () => { page.value = 1 })
   watch([search, filterType, filterPackage], () => { page.value = 1 })
 
@@ -189,6 +198,52 @@ export function useExhibitorManager(eventId: string) {
     catch (e: any) { toast.error(e?.data?.message || 'Could not delete.') }
   }
 
+  // ── Activate / deactivate ────────────────────────────────────────────
+  async function setStatus(p: any, status: 'active' | 'suspended') {
+    try {
+      await api(`/exhibitors/${p.id}`, { method: 'PUT', body: { status } })
+      await load()
+      toast.success(status === 'active' ? 'Exhibitor activated' : 'Exhibitor deactivated')
+    } catch (e: any) { toast.error(e?.data?.message || 'Could not update status.') }
+  }
+  function toggleStatus(p: any) {
+    setStatus(p, (p.status || 'active') === 'active' ? 'suspended' : 'active')
+    actionsOpenId.value = null
+  }
+
+  // ── Reset password ───────────────────────────────────────────────────
+  function openResetPassword(p: any) {
+    resetTarget.value = p
+    resetMode.value = 'auto'
+    resetPassword.value = ''
+    resetMustChange.value = true
+    resetError.value = ''
+    resetResult.value = null
+    actionsOpenId.value = null
+  }
+  function closeResetPassword() { resetTarget.value = null; resetResult.value = null }
+  async function submitResetPassword() {
+    if (!resetTarget.value) return
+    if (resetMode.value === 'manual' && resetPassword.value.length < 8) {
+      resetError.value = 'Password must have at least 8 characters'
+      return
+    }
+    resetError.value = ''; resetSaving.value = true
+    try {
+      const body: any = { mode: resetMode.value, must_change: resetMustChange.value }
+      if (resetMode.value === 'manual') body.password = resetPassword.value
+      const r = await api<any>(`/exhibitors/${resetTarget.value.id}/reset-password`, { method: 'POST', body })
+      if (resetMode.value === 'auto') {
+        resetResult.value = r.data                 // { email, password } → reveal step
+      } else {
+        toast.success('Password reset')
+        resetTarget.value = null
+      }
+    } catch (e: any) {
+      resetError.value = e?.data?.message || 'Could not reset password.'
+    } finally { resetSaving.value = false }
+  }
+
   // ── Uploads ──────────────────────────────────────────────────────────
   async function pickLogo(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
@@ -288,6 +343,9 @@ export function useExhibitorManager(eventId: string) {
     // table
     search, filterType, filterPackage, page, perPage, actionsOpenId,
     filtered, paginated, totalPages, paginationLabel, packageName, resetFilters, toggleActions,
+    // reset password + status
+    resetTarget, resetMode, resetPassword, resetMustChange, resetSaving, resetError, resetResult,
+    openResetPassword, closeResetPassword, submitResetPassword, toggleStatus,
     // actions
     init, load, loadMeta, openAdd, openEdit, populateDraft,
     buildPayload, create, update, remove,

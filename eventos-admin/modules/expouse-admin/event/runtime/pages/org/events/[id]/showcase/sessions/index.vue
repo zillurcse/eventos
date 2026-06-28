@@ -7,6 +7,7 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 const route  = useRoute()
 const router = useRouter()
 const api    = useApi()
+const { upload } = useUpload()
 const id     = route.params.id as string
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -14,6 +15,8 @@ const id     = route.params.id as string
 interface Track { id: number; name: string; color: string }
 
 interface SessionSpeaker { id: string; name: string; image_url?: string | null }
+interface Sponsor { id: string; name: string; logo_url?: string | null }
+interface SessionDocument { name: string; url: string }
 
 interface EventSpeaker {
   id: string; name: string; email: string
@@ -32,7 +35,10 @@ interface Session {
   stream_url: string | null
   session_place: string | null
   logo_url: string | null
+  icon_url: string | null
   tags: string[]
+  sponsors: Sponsor[]
+  documents: SessionDocument[]
   is_featured: boolean
   is_allowed_to_rate: boolean
   track: Track | null
@@ -48,8 +54,11 @@ interface DraftShape {
   track_id: number | ''
   session_place: string
   logo_url: string | null
+  icon_url: string | null
   capacity: number | ''
   speaker_ids: string[]
+  sponsors: Sponsor[]
+  documents: SessionDocument[]
   tags: string[]
   is_featured: boolean
   is_allowed_to_rate: boolean
@@ -57,9 +66,11 @@ interface DraftShape {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
+const event         = ref<any>(null)
 const sessions      = ref<Session[]>([])
 const tracks        = ref<Track[]>([])
 const eventSpeakers = ref<EventSpeaker[]>([])
+const sponsorsList  = ref<Sponsor[]>([])
 const search        = ref('')
 
 // Create drawer
@@ -75,14 +86,28 @@ const addingTrack      = ref(false)
 const editingTrackId   = ref<number | null>(null)
 const editingTrackName = ref('')
 
+// Pickers
+const speakerModal  = ref(false)
+const speakerSearch = ref('')
+const sponsorModal  = ref(false)
+const sponsorSearch = ref('')
+
+// Documents
+const DOC_EXT = ['doc', 'docx', 'ppt', 'pptx', 'pdf']
+const docUploading = ref(false)
+
+// Rich-text description editor
+const descEditor = ref<HTMLElement | null>(null)
+
 // Three-dot menus
 const openMenuId = ref<string | null>(null)
 
 function freshDraft(): DraftShape {
   return {
     title: '', description: '', date: '', start_time: '', end_time: '',
-    track_id: '', session_place: '', logo_url: null, capacity: '',
-    speaker_ids: [], tags: [], is_featured: false, is_allowed_to_rate: false,
+    track_id: '', session_place: '', logo_url: null, icon_url: null, capacity: '',
+    speaker_ids: [], sponsors: [], documents: [], tags: [],
+    is_featured: false, is_allowed_to_rate: false,
   }
 }
 
@@ -121,6 +146,40 @@ function buildDatetime(date: string, time: string): string | null {
   if (!date) return null
   return time ? `${date}T${time}:00` : `${date}T00:00:00`
 }
+
+// ── Choose Day options (derived from the event's date range) ───────────────────
+
+const dayOptions = computed<{ value: string, label: string }[]>(() => {
+  if (!event.value?.starts_at) return []
+  const start = new Date(event.value.starts_at)
+  const end   = event.value.ends_at ? new Date(event.value.ends_at) : start
+  if (Number.isNaN(start.getTime())) return []
+
+  const out: { value: string, label: string }[] = []
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const last   = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  let guard = 0
+  while (cursor <= last && guard++ < 366) {
+    const value = [
+      cursor.getFullYear(),
+      String(cursor.getMonth() + 1).padStart(2, '0'),
+      String(cursor.getDate()).padStart(2, '0'),
+    ].join('-')
+    out.push({
+      value,
+      label: cursor.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return out
+})
+
+// End must be after start when both are set.
+const timeError = computed(() =>
+  draft.start_time && draft.end_time && draft.end_time <= draft.start_time
+    ? 'Schedule End must be after Schedule Start'
+    : '',
+)
 
 // ── Grouped sessions ──────────────────────────────────────────────────────────
 
@@ -170,14 +229,18 @@ const STATUS_DOT: Record<string, string> = {
 
 async function load() {
   try {
-    const [sessRes, trkRes, spkRes] = await Promise.all([
+    const [sessRes, trkRes, spkRes, evtRes, sponRes] = await Promise.all([
       api<any>(`/sessions?event=${id}`),
       api<any>(`/tracks?event=${id}`),
       api<any>(`/events/${id}/speakers`),
+      api<any>(`/events/${id}`),
+      api<any>(`/exhibitors?event=${id}&type=sponsor`),
     ])
     sessions.value      = sessRes.data
     tracks.value        = trkRes.data
     eventSpeakers.value = spkRes.data
+    event.value         = evtRes.data
+    sponsorsList.value  = (sponRes.data || []).map((e: any) => ({ id: e.id, name: e.name, logo_url: e.logo_url ?? null }))
   } catch { /* */ }
 }
 
@@ -197,7 +260,7 @@ function closeOverlays() {
 
 function editSession(s: Session) {
   openMenuId.value = null
-  router.push(`/org/events/${id}/sessions/${s.id}`)
+  router.push(`/org/events/${id}/showcase/sessions/${s.id}`)
 }
 
 async function toggleStatus(s: Session) {
@@ -235,6 +298,7 @@ function openAdd() {
 }
 
 async function saveDraft() {
+  if (timeError.value) { error.value = timeError.value; return }
   error.value = ''
   saving.value = true
   try {
@@ -247,8 +311,11 @@ async function saveDraft() {
       track_id:           draft.track_id    || null,
       session_place:      draft.session_place || null,
       logo_url:           draft.logo_url    || null,
+      icon_url:           draft.icon_url    || null,
       capacity:           draft.capacity    || null,
       tags:               draft.tags,
+      sponsors:           draft.sponsors,
+      documents:          draft.documents,
       is_featured:        draft.is_featured,
       is_allowed_to_rate: draft.is_allowed_to_rate,
     }
@@ -256,7 +323,7 @@ async function saveDraft() {
     const res = await api<any>('/sessions', { method: 'POST', body })
     const newSession: Session = res.data
 
-    // Link selected speakers
+    // Link selected speakers (relational — session_speaker pivot).
     for (const spkId of draft.speaker_ids) {
       const sp = eventSpeakers.value.find(s => s.id === spkId)
       if (!sp) continue
@@ -292,6 +359,16 @@ async function saveDraft() {
   } finally {
     saving.value = false
   }
+}
+
+// ── Rich-text description ──────────────────────────────────────────────────────
+
+function fmtText(cmd: string) {
+  document.execCommand(cmd, false)
+  syncDesc()
+}
+function syncDesc() {
+  if (descEditor.value) draft.description = descEditor.value.innerHTML
 }
 
 // ── Track inline CRUD ─────────────────────────────────────────────────────────
@@ -351,13 +428,57 @@ function onTagKey(e: KeyboardEvent) {
   if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() }
 }
 
-// ── Speaker toggle (create drawer) ───────────────────────────────────────────
+// ── Speakers picker ───────────────────────────────────────────────────────────
+
+const filteredEventSpeakers = computed(() => {
+  const q = speakerSearch.value.toLowerCase()
+  return q ? eventSpeakers.value.filter(s => s.name?.toLowerCase().includes(q)) : eventSpeakers.value
+})
+const selectedSpeakers = computed(() => eventSpeakers.value.filter(s => draft.speaker_ids.includes(s.id)))
 
 function toggleSpeakerDraft(spkId: string) {
   const idx = draft.speaker_ids.indexOf(spkId)
   if (idx >= 0) draft.speaker_ids.splice(idx, 1)
   else draft.speaker_ids.push(spkId)
 }
+
+// ── Sponsors picker ───────────────────────────────────────────────────────────
+
+const filteredSponsors = computed(() => {
+  const q = sponsorSearch.value.toLowerCase()
+  return q ? sponsorsList.value.filter(s => s.name?.toLowerCase().includes(q)) : sponsorsList.value
+})
+function isSponsorSelected(s: Sponsor) { return draft.sponsors.some(x => x.id === s.id) }
+function toggleSponsor(s: Sponsor) {
+  const i = draft.sponsors.findIndex(x => x.id === s.id)
+  if (i >= 0) draft.sponsors.splice(i, 1)
+  else draft.sponsors.push({ id: s.id, name: s.name, logo_url: s.logo_url ?? null })
+}
+function removeSponsor(sid: string) {
+  draft.sponsors = draft.sponsors.filter(x => x.id !== sid)
+}
+
+// ── Documents (multi-upload, doc/ppt/pdf, max 10MB, max 10 files) ─────────────
+
+async function onDocsPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  error.value = ''
+  for (const file of files) {
+    if (draft.documents.length >= 10) { error.value = 'Maximum 10 files allowed.'; break }
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (!DOC_EXT.includes(ext)) { error.value = `Only doc, ppt and pdf files allowed (${file.name}).`; continue }
+    if (file.size > 10 * 1024 * 1024) { error.value = `${file.name} exceeds 10 MB.`; continue }
+    docUploading.value = true
+    try {
+      const r = await upload(file, { collection: 'session_doc' })
+      draft.documents.push({ name: file.name, url: r.url })
+    } catch { error.value = `Could not upload ${file.name}.` }
+    finally { docUploading.value = false }
+  }
+}
+function removeDoc(i: number) { draft.documents.splice(i, 1) }
 
 onMounted(load)
 </script>
@@ -502,45 +623,53 @@ onMounted(load)
     <!-- ── Create Drawer ─────────────────────────────────────────────────── -->
     <Drawer v-if="drawerOpen" title="Schedule Session" @close="drawerOpen = false">
 
-      <!-- Date -->
+      <!-- Choose Day -->
       <div class="mb-4">
-        <label class="block mb-1.5">Date</label>
-        <input v-model="draft.date" type="date" class="m-0 w-full">
+        <label class="block mb-1.5">Choose Day</label>
+        <select v-model="draft.date" class="m-0 w-full">
+          <option value="">Select</option>
+          <option v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
+        </select>
+        <p v-if="!dayOptions.length" class="text-[.78rem] text-muted mt-1">
+          Set the event start &amp; end dates to choose a day.
+        </p>
       </div>
 
-      <!-- Start / End time -->
-      <div class="flex gap-3 mb-4">
+      <!-- Schedule Start / End -->
+      <div class="flex gap-3 mb-1">
         <div class="flex-1">
-          <label class="block mb-1.5">Start Time</label>
+          <label class="block mb-1.5">Schedule Start</label>
           <input v-model="draft.start_time" type="time" class="m-0 w-full">
         </div>
         <div class="flex-1">
-          <label class="block mb-1.5">End Time</label>
+          <label class="block mb-1.5">Schedule End</label>
           <input v-model="draft.end_time" type="time" class="m-0 w-full">
         </div>
       </div>
+      <p v-if="timeError" class="error mb-3">{{ timeError }}</p>
+      <div v-else class="mb-3" />
 
       <!-- Title -->
       <div class="mb-4">
         <label class="block mb-1.5">Title <span class="text-[#dc2626]">*</span></label>
-        <input v-model="draft.title" placeholder="e.g. Opening Keynote" class="m-0">
+        <input v-model="draft.title" placeholder="Enter Title" class="m-0">
       </div>
 
       <!-- Session Place -->
       <div class="mb-4">
         <label class="block mb-1.5">Session Place</label>
-        <input v-model="draft.session_place" placeholder="e.g. Main Hall, Room A" class="m-0">
+        <input v-model="draft.session_place" placeholder="Enter Session Place" class="m-0">
       </div>
 
       <!-- Track (inline CRUD) -->
       <div class="mb-4 relative">
-        <label class="block mb-1.5">Track</label>
+        <label class="block mb-1.5">Select Track</label>
         <button
           type="button"
           class="w-full flex items-center justify-between px-3 py-2 border border-line rounded-xl bg-white text-[.9rem]"
           @click.stop="showTrackMenu = !showTrackMenu; editingTrackId = null"
         >
-          <span>{{ tracks.find(t => t.id === draft.track_id)?.name ?? '— No track —' }}</span>
+          <span>{{ tracks.find(t => t.id === draft.track_id)?.name ?? 'Select' }}</span>
           <span class="text-muted text-xs">▾</span>
         </button>
         <div
@@ -585,7 +714,7 @@ onMounted(load)
             <div class="flex gap-1.5">
               <input
                 v-model="newTrackName"
-                placeholder="New track name…"
+                placeholder="Enter track name"
                 class="flex-1 m-0 py-1 text-[.87rem]"
                 @keydown.enter="createTrack"
               >
@@ -593,63 +722,122 @@ onMounted(load)
                 class="btn sm"
                 :disabled="!newTrackName.trim() || addingTrack"
                 @click="createTrack"
-              >Add</button>
+              >ADD</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Description -->
+      <!-- Description (rich text) -->
       <div class="mb-4">
         <label class="block mb-1.5">Description</label>
-        <textarea
-          v-model="draft.description"
-          rows="3"
-          placeholder="What is this session about?"
-          class="w-full resize-y m-0"
-        />
+        <div class="border border-line rounded-xl overflow-hidden">
+          <div class="flex items-center gap-1 px-2 py-1.5 border-b border-line bg-[#fafbfc]">
+            <button type="button" class="rt-btn font-bold" title="Bold" @mousedown.prevent="fmtText('bold')">B</button>
+            <button type="button" class="rt-btn italic" title="Italic" @mousedown.prevent="fmtText('italic')">I</button>
+            <button type="button" class="rt-btn underline" title="Underline" @mousedown.prevent="fmtText('underline')">U</button>
+            <button type="button" class="rt-btn line-through" title="Strikethrough" @mousedown.prevent="fmtText('strikeThrough')">S</button>
+          </div>
+          <div
+            ref="descEditor"
+            class="rt-area px-3 py-2 min-h-[120px] text-[.9rem] focus:outline-none"
+            contenteditable="true"
+            data-ph="Let's write an awesome story!"
+            @input="syncDesc"
+          />
+        </div>
       </div>
 
-      <!-- Logo -->
-      <div class="mb-4">
-        <label class="block mb-1.5">Session Logo</label>
-        <UploadButton
-          :preview="draft.logo_url"
-          collection="logo"
-          @uploaded="draft.logo_url = $event.url"
-        />
+      <!-- Logo + Icon -->
+      <div class="flex gap-6 mb-4">
+        <div>
+          <label class="block mb-1.5">Logo</label>
+          <UploadButton :preview="draft.logo_url" collection="session_logo" @uploaded="draft.logo_url = $event.url" />
+        </div>
+        <div>
+          <label class="block mb-1.5">Icon</label>
+          <UploadButton :preview="draft.icon_url" collection="session_icon" @uploaded="draft.icon_url = $event.url" />
+        </div>
       </div>
 
       <!-- Speakers -->
       <div class="mb-4">
         <label class="block mb-2">Speakers</label>
-        <div v-if="!eventSpeakers.length" class="muted text-[.84rem]">
-          No event speakers yet — add them in <strong>Showcase › Speakers</strong> first.
-        </div>
-        <div v-else class="flex flex-wrap gap-2">
-          <button
-            v-for="sp in eventSpeakers"
+        <div class="flex flex-wrap gap-2 items-center">
+          <div
+            v-for="sp in selectedSpeakers"
             :key="sp.id"
-            type="button"
-            class="flex items-center gap-2 px-3 py-1.5 border rounded-full text-[.83rem] transition-colors"
-            :class="draft.speaker_ids.includes(sp.id)
-              ? 'border-brand bg-brand-soft text-brand font-semibold'
-              : 'border-line bg-white text-ink hover:bg-[#fafbfc]'"
-            @click="toggleSpeakerDraft(sp.id)"
+            class="relative w-16 h-16 rounded-xl overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
+            :title="sp.name"
           >
-            <div class="w-5 h-5 rounded-full overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.6rem] font-bold shrink-0">
-              <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
-              <span v-else>{{ initials(sp.name) }}</span>
-            </div>
-            {{ sp.name }}
-          </button>
+            <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
+            <span v-else>{{ initials(sp.name) }}</span>
+            <button
+              class="absolute -top-1 -right-1 w-4 h-4 bg-[#dc2626] text-white rounded-full text-[.7rem] leading-none flex items-center justify-center"
+              @click.stop="toggleSpeakerDraft(sp.id)"
+            >×</button>
+          </div>
+          <button
+            type="button"
+            class="w-16 h-16 border-2 border-dashed border-line rounded-xl flex items-center justify-center text-2xl text-muted hover:border-brand hover:text-brand transition-colors"
+            @click.stop="speakerModal = true"
+          >+</button>
         </div>
       </div>
 
-      <!-- Tags -->
+      <!-- Session Sponsors -->
       <div class="mb-4">
-        <label class="block mb-1.5">Tags</label>
-        <div class="flex flex-wrap gap-1.5 mb-2">
+        <label class="block mb-2">Session Sponsors</label>
+        <div class="flex flex-wrap gap-2 items-center">
+          <div
+            v-for="sp in draft.sponsors"
+            :key="sp.id"
+            class="relative w-16 h-16 rounded-xl overflow-hidden bg-[#f1f1f5] text-muted flex items-center justify-center text-[.8rem] font-bold border border-line p-1 text-center"
+            :title="sp.name"
+          >
+            <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name" class="w-full h-full object-contain">
+            <span v-else class="leading-tight line-clamp-2">{{ sp.name }}</span>
+            <button
+              class="absolute -top-1 -right-1 w-4 h-4 bg-[#dc2626] text-white rounded-full text-[.7rem] leading-none flex items-center justify-center"
+              @click.stop="removeSponsor(sp.id)"
+            >×</button>
+          </div>
+          <button
+            type="button"
+            class="w-16 h-16 border-2 border-dashed border-line rounded-xl flex items-center justify-center text-2xl text-muted hover:border-brand hover:text-brand transition-colors"
+            @click.stop="sponsorModal = true"
+          >+</button>
+        </div>
+      </div>
+
+      <!-- Documents -->
+      <div class="mb-4">
+        <label class="block mb-1.5">Documents</label>
+        <label class="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl p-4 cursor-pointer hover:border-brand bg-[#fafbfc] transition-colors">
+          <input type="file" multiple accept=".doc,.docx,.ppt,.pptx,.pdf" class="hidden" @change="onDocsPick">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5 text-muted"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <span class="text-muted text-[.86rem]">{{ docUploading ? 'Uploading…' : 'Only doc, ppt and pdf file allowed' }}</span>
+        </label>
+        <p class="text-[.76rem] text-muted mt-1">Maximum : 10 MB and 10 files are only allowed to upload</p>
+        <div v-if="draft.documents.length" class="mt-2 flex flex-col gap-1">
+          <div
+            v-for="(d, i) in draft.documents"
+            :key="i"
+            class="flex items-center justify-between px-3 py-1.5 bg-[#f4f5f7] rounded-lg text-[.84rem]"
+          >
+            <span class="truncate flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 text-muted shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              {{ d.name }}
+            </span>
+            <button class="text-[#dc2626] leading-none text-[1.1rem] px-1" @click="removeDoc(i)">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Tags -->
+      <div class="mb-4">
+        <label class="block mb-1.5">Custom Tags</label>
+        <div v-if="draft.tags.length" class="flex flex-wrap gap-1.5 mb-2">
           <span
             v-for="(tag, i) in draft.tags" :key="i"
             class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
@@ -663,7 +851,7 @@ onMounted(load)
         </div>
         <input
           v-model="tagInput"
-          placeholder="Type a tag and press Enter or comma"
+          placeholder="Add tag &amp; press enter"
           class="m-0"
           @keydown="onTagKey"
           @blur="addTag"
@@ -674,11 +862,11 @@ onMounted(load)
       <div class="mb-5 flex flex-col gap-3">
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input v-model="draft.is_allowed_to_rate" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-          <span class="text-[.93rem] font-medium text-ink">Allow attendee ratings</span>
+          <span class="text-[.93rem] font-medium text-ink">Attendees can rate this session</span>
         </label>
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input v-model="draft.is_featured" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-          <span class="text-[.93rem] font-medium text-ink">Featured session</span>
+          <span class="text-[.93rem] font-medium text-ink">Featured schedule</span>
         </label>
       </div>
 
@@ -688,12 +876,115 @@ onMounted(load)
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
         <button
           class="btn"
-          :disabled="!draft.title.trim() || saving"
+          :disabled="!draft.title.trim() || !!timeError || saving"
           @click="saveDraft"
         >
-          {{ saving ? 'Saving…' : 'CREATE SESSION' }}
+          {{ saving ? 'Saving…' : 'ADD' }}
         </button>
       </div>
     </Drawer>
+
+    <!-- ── Speakers picker modal ─────────────────────────────────────────── -->
+    <div
+      v-if="speakerModal"
+      class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4"
+      @click.self="speakerModal = false"
+    >
+      <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+        <div class="flex items-start justify-between p-5 border-b border-line">
+          <div>
+            <div class="font-bold text-[1.05rem] text-ink">Speakers</div>
+            <div class="muted text-[.84rem]">Choose speakers</div>
+          </div>
+          <button class="text-muted hover:text-ink text-[1.3rem] leading-none" @click="speakerModal = false">×</button>
+        </div>
+        <div class="p-5 pb-3">
+          <input v-model="speakerSearch" placeholder="Search" class="m-0 w-full">
+        </div>
+        <div class="px-5 overflow-y-auto flex-1">
+          <div v-if="!filteredEventSpeakers.length" class="text-center muted py-10 text-[.88rem]">
+            No speakers found. Add them in <strong>Showcase › Speakers</strong> first.
+          </div>
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-4">
+            <button
+              v-for="sp in filteredEventSpeakers"
+              :key="sp.id"
+              type="button"
+              class="border-2 rounded-xl p-2 flex flex-col items-center gap-2 transition-colors"
+              :class="draft.speaker_ids.includes(sp.id) ? 'border-brand bg-brand-soft' : 'border-line hover:bg-[#fafbfc]'"
+              @click="toggleSpeakerDraft(sp.id)"
+            >
+              <div class="w-full aspect-square rounded-lg overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[1.4rem] font-bold">
+                <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
+                <span v-else>{{ initials(sp.name) }}</span>
+              </div>
+              <span class="text-[.8rem] font-medium text-center truncate w-full">{{ sp.name }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-line">
+          <button class="btn ghost" @click="speakerModal = false">Cancel</button>
+          <button class="btn" @click="speakerModal = false">SELECT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Session Sponsors picker modal ─────────────────────────────────── -->
+    <div
+      v-if="sponsorModal"
+      class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4"
+      @click.self="sponsorModal = false"
+    >
+      <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+        <div class="flex items-start justify-between p-5 border-b border-line">
+          <div>
+            <div class="font-bold text-[1.05rem] text-ink">Session Sponsors</div>
+            <div class="muted text-[.84rem]">Choose from exhibitors marked as sponsor</div>
+          </div>
+          <button class="text-muted hover:text-ink text-[1.3rem] leading-none" @click="sponsorModal = false">×</button>
+        </div>
+        <div class="p-5 pb-3">
+          <input v-model="sponsorSearch" placeholder="Search" class="m-0 w-full">
+        </div>
+        <div class="px-5 overflow-y-auto flex-1">
+          <div v-if="!filteredSponsors.length" class="text-center muted py-10 text-[.88rem]">
+            No sponsors yet — add exhibitors of type <strong>Sponsor</strong> first.
+          </div>
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-4">
+            <button
+              v-for="sp in filteredSponsors"
+              :key="sp.id"
+              type="button"
+              class="border-2 rounded-xl p-2 flex flex-col items-center gap-2 transition-colors"
+              :class="isSponsorSelected(sp) ? 'border-brand bg-brand-soft' : 'border-line hover:bg-[#fafbfc]'"
+              @click="toggleSponsor(sp)"
+            >
+              <div class="w-full aspect-square rounded-lg overflow-hidden bg-[#f1f1f5] text-muted flex items-center justify-center text-[.95rem] font-bold p-2 text-center">
+                <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name" class="w-full h-full object-contain">
+                <span v-else class="line-clamp-3">{{ sp.name }}</span>
+              </div>
+              <span class="text-[.8rem] font-medium text-center truncate w-full">{{ sp.name }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 p-4 border-t border-line">
+          <button class="btn ghost" @click="sponsorModal = false">Cancel</button>
+          <button class="btn" @click="sponsorModal = false">SELECT</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.rt-btn {
+  width: 28px; height: 28px; border-radius: 6px; color: var(--ink);
+  display: flex; align-items: center; justify-content: center; font-size: .9rem;
+}
+.rt-btn:hover { background: #eceef1; }
+.rt-area:empty::before {
+  content: attr(data-ph);
+  color: var(--faint);
+  font-style: italic;
+}
+</style>

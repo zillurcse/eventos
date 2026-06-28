@@ -57,6 +57,7 @@ class SessionController extends Controller
             'tags.*'             => ['string', 'max:100'],
             'is_featured'        => ['nullable', 'boolean'],
             'is_allowed_to_rate' => ['nullable', 'boolean'],
+            ...$this->extraMetaRules(),
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
@@ -77,7 +78,10 @@ class SessionController extends Controller
             'meta'       => [
                 'session_place'      => $data['session_place'] ?? null,
                 'logo_url'           => $data['logo_url'] ?? null,
+                'icon_url'           => $data['icon_url'] ?? null,
                 'tags'               => $data['tags'] ?? [],
+                'sponsors'           => $data['sponsors'] ?? [],
+                'documents'          => $data['documents'] ?? [],
                 'is_featured'        => $data['is_featured'] ?? false,
                 'is_allowed_to_rate' => $data['is_allowed_to_rate'] ?? false,
             ],
@@ -108,9 +112,10 @@ class SessionController extends Controller
             'tags.*'             => ['string', 'max:100'],
             'is_featured'        => ['nullable', 'boolean'],
             'is_allowed_to_rate' => ['nullable', 'boolean'],
+            ...$this->extraMetaRules(),
         ]);
 
-        $metaKeys = ['session_place', 'logo_url', 'tags', 'is_featured', 'is_allowed_to_rate'];
+        $metaKeys = ['session_place', 'logo_url', 'icon_url', 'tags', 'sponsors', 'documents', 'is_featured', 'is_allowed_to_rate'];
         $metaUpdate = $request->only($metaKeys);
 
         $coreUpdate = $this->utcDates(
@@ -203,5 +208,24 @@ class SessionController extends Controller
         $session->speakers()->detach($participation->id);
 
         return response()->json(['message' => 'Speaker removed.']);
+    }
+
+    /**
+     * Validation for the meta-stored extras shared by store/update: the icon
+     * image, session sponsors (denormalized {id,name,logo_url} refs from the
+     * event's sponsor exhibitors) and uploaded documents ({name,url}, max 10).
+     */
+    private function extraMetaRules(): array
+    {
+        return [
+            'icon_url'            => ['nullable', 'string', 'max:2000'],
+            'sponsors'            => ['nullable', 'array'],
+            'sponsors.*.id'       => ['required_with:sponsors', 'string'],
+            'sponsors.*.name'     => ['nullable', 'string', 'max:250'],
+            'sponsors.*.logo_url' => ['nullable', 'string', 'max:2000'],
+            'documents'           => ['nullable', 'array', 'max:10'],
+            'documents.*.name'    => ['required_with:documents', 'string', 'max:250'],
+            'documents.*.url'     => ['required_with:documents', 'string', 'max:2000'],
+        ];
     }
 }

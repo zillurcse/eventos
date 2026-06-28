@@ -52,7 +52,7 @@ const sections = computed<any[]>(() => [
     { label: 'Exhibitor Packages', to: r('showcase/packages') },
     { label: 'Exhibitors', to: r('showcase/exhibitors') },
     { label: 'Speakers', to: r('showcase/speakers') },
-    { label: 'Sessions', to: r('sessions') },
+    { label: 'Sessions', to: r('showcase/sessions') },
   ] },
   { key: 'content', label: 'Content Hub', svg: I.content, children: kids([['Website Theme', 'content-hub/theme'], ['Publishing', 'content-hub/publishing'], ['Website Banners', 'content-hub/banners'], ['Social Links', 'content-hub/social'], ['Participant Profile', 'content-hub/profile'], ['Event Highlights', 'content-hub/highlights'], ['Image Gallery', 'content-hub/gallery'], ['FAQ', 'content-hub/faq'], ['Testimonials', 'content-hub/testimonials'], ['Blog', 'content-hub/blog']]) },
   { key: 'engagement', label: 'Event Engagement', svg: I.engagement, children: [

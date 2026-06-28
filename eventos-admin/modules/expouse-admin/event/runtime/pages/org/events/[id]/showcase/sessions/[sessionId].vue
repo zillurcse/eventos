@@ -334,7 +334,7 @@ onMounted(load)
       <div class="flex items-center gap-2 text-[.85rem] mb-5">
         <button
           class="text-brand hover:underline bg-transparent border-0 cursor-pointer p-0"
-          @click="router.push(`/org/events/${id}/sessions`)"
+          @click="router.push(`/org/events/${id}/showcase/sessions`)"
         >
           Sessions
         </button>
@@ -668,7 +668,7 @@ onMounted(load)
     <!-- Not found -->
     <div v-else class="card text-center py-12 muted">
       Session not found.
-      <button class="btn ghost ml-3" @click="router.push(`/org/events/${id}/sessions`)">Back to Sessions</button>
+      <button class="btn ghost ml-3" @click="router.push(`/org/events/${id}/showcase/sessions`)">Back to Sessions</button>
     </div>
   </div>
 </template>

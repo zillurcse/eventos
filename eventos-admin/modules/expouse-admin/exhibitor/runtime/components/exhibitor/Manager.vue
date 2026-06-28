@@ -5,7 +5,7 @@ const mgr = useExhibitorManager(props.eventId)
 provide(ExhibitorKey, mgr)
 onMounted(mgr.init)
 
-const { drawerMode, actionsOpenId } = mgr
+const { drawerMode, actionsOpenId, resetTarget } = mgr
 </script>
 
 <template>
@@ -20,5 +20,6 @@ const { drawerMode, actionsOpenId } = mgr
 
     <ExhibitorAddDrawer v-if="drawerMode === 'add'" />
     <ExhibitorEditDrawer v-if="drawerMode === 'edit'" />
+    <ExhibitorResetPasswordModal v-if="resetTarget" />
   </div>
 </template>

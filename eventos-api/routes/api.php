@@ -236,6 +236,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/exhibitors', [ExhibitorController::class, 'store']);
                 Route::get('/exhibitors/{uuid}', [ExhibitorController::class, 'show']);
                 Route::match(['put', 'patch'], '/exhibitors/{uuid}', [ExhibitorController::class, 'update']);
+                Route::post('/exhibitors/{uuid}/reset-password', [ExhibitorController::class, 'resetPassword']);
                 Route::post('/exhibitors/{uuid}/members', [ExhibitorMemberController::class, 'store']);
                 Route::delete('/exhibitors/{uuid}/members/{member}', [ExhibitorMemberController::class, 'destroy']);
                 Route::get('/exhibitors/{uuid}/products', [ExhibitorProductController::class, 'index']);

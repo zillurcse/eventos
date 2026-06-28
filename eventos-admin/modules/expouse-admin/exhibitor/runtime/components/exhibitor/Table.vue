@@ -4,6 +4,7 @@ const {
   search, filterType, filterPackage, resetFilters,
   paginated, filtered, perPage, page, totalPages, paginationLabel,
   packageName, toggleActions, actionsOpenId, openEdit, remove,
+  openResetPassword, toggleStatus,
 } = useExhibitorContext()
 </script>
 
@@ -92,8 +93,12 @@ const {
                   <path d="M6 9l6 6 6-6"/>
                 </svg>
               </button>
-              <div v-if="actionsOpenId === p.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-35 overflow-hidden">
+              <div v-if="actionsOpenId === p.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-44 overflow-hidden">
                 <button class="w-full text-left px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="openEdit(p); actionsOpenId = null">Edit</button>
+                <button class="w-full text-left px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="toggleStatus(p)">
+                  {{ (p.status || 'active') === 'active' ? 'Deactivate' : 'Activate' }}
+                </button>
+                <button class="w-full text-left px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="openResetPassword(p)">Reset Password</button>
                 <button class="w-full text-left px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-[#dc2626] transition-colors" @click="remove(p); actionsOpenId = null">Delete</button>
               </div>
             </div>

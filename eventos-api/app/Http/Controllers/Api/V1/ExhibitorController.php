@@ -138,6 +138,103 @@ class ExhibitorController extends Controller
         return response()->json(['data' => new ExhibitorResource($exhibitor->fresh(self::WITH)->loadCount('members'))]);
     }
 
+    /**
+     * Reset the exhibitor-admin login password. Two modes (matching the UI):
+     *  - auto:   generate a strong password and return it so the organizer can
+     *            view/copy it once.
+     *  - manual: set a specific password supplied by the organizer.
+     * Optionally flags the login to change the password on next sign-in. If the
+     * exhibitor has no login yet but does have an admin email, one is provisioned
+     * on the spot with this password (no 6-digit code email).
+     */
+    public function resetPassword(string $uuid, Request $request): JsonResponse
+    {
+        $exhibitor = Exhibitor::where('uuid', $uuid)->firstOrFail();
+
+        $data = $request->validate([
+            'mode' => ['required', 'in:auto,manual'],
+            'password' => ['required_if:mode,manual', 'nullable', 'string', 'min:8'],
+            'must_change' => ['nullable', 'boolean'],
+        ]);
+
+        $password = $data['mode'] === 'auto'
+            ? Str::password(14, symbols: false)
+            : $data['password'];
+
+        $user = $this->resolveAdminUser($exhibitor);
+
+        if (! $user) {
+            // No login yet — provision one if we have an email to attach it to.
+            if (empty($exhibitor->email)) {
+                throw ValidationException::withMessages([
+                    'exhibitor' => 'This exhibitor has no admin email to attach a login to. Add an admin email first.',
+                ]);
+            }
+            $contact = Contact::firstOrCreate(
+                ['email' => $exhibitor->email],
+                ['first_name' => $exhibitor->name],
+            );
+            $user = User::firstOrCreate(
+                ['email' => $exhibitor->email],
+                ['name' => $exhibitor->name, 'email_verified_at' => now()],
+            );
+            $contact->update(['user_id' => $user->id]);
+            ExhibitorMember::updateOrCreate(
+                ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
+                ['role' => 'admin'],
+            );
+            $exhibitor->update(['admin_contact_id' => $contact->id]);
+        }
+
+        $user->forceFill([
+            'password' => $password,                              // hashed by the model cast
+            'must_change_password' => (bool) ($data['must_change'] ?? false),
+        ])->save();
+
+        return response()->json([
+            'data' => [
+                'email' => $user->email,
+                // Only echo the secret for the auto-generate flow (one-time view).
+                'password' => $data['mode'] === 'auto' ? $password : null,
+                'must_change' => (bool) ($data['must_change'] ?? false),
+            ],
+        ]);
+    }
+
+    /** The exhibitor's admin login User, if one exists. */
+    protected function resolveAdminUser(Exhibitor $exhibitor): ?User
+    {
+        $contactId = $exhibitor->admin_contact_id;
+
+        if ($contactId) {
+            $contact = Contact::find($contactId);
+            if ($contact?->user_id) {
+                return User::find($contact->user_id);
+            }
+        }
+
+        // Fall back to any admin member that has a login.
+        $member = ExhibitorMember::with('contact')
+            ->where('exhibitor_id', $exhibitor->id)
+            ->where('role', 'admin')
+            ->get()
+            ->first(fn ($m) => $m->contact?->user_id);
+
+        if ($member?->contact?->user_id) {
+            return User::find($member->contact->user_id);
+        }
+
+        // Last resort: the exhibitor's email mapped to a contact with a login.
+        if ($exhibitor->email) {
+            $contact = Contact::where('email', $exhibitor->email)->first();
+            if ($contact?->user_id) {
+                return User::find($contact->user_id);
+            }
+        }
+
+        return null;
+    }
+
     /** Collect the profile_data fields actually present in the request. */
     protected function profileFrom(Request $request): array
     {
