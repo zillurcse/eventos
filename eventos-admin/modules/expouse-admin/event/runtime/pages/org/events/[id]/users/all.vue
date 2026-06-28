@@ -3,5 +3,9 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 </script>
 
 <template>
-  <SectionPlaceholder section="Users" title="All Users" />
+  <EventUsersTable
+    title="All Users"
+    subtitle="Everyone taking part in this event — attendees, speakers and staff."
+    empty-text="No users yet — registrations and speakers will appear here."
+  />
 </template>

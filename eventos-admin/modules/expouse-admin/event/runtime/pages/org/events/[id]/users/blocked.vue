@@ -3,5 +3,11 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 </script>
 
 <template>
-  <SectionPlaceholder section="Users" title="Blocked users" />
+  <EventUsersTable
+    title="Blocked users"
+    subtitle="Users who have been blocked from this event. Unblock to restore their access."
+    :query="{ blocked: 1 }"
+    count-label="blocked user"
+    empty-text="No blocked users — block someone from All Users and they'll show up here."
+  />
 </template>

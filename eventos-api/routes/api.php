@@ -23,6 +23,8 @@ use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FloorController;
 use App\Http\Controllers\Api\V1\BadgeDesignController;
+use App\Http\Controllers\Api\V1\ParticipantController;
+use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
@@ -217,6 +219,20 @@ Route::prefix('v1')->group(function () {
                 Route::match(['put', 'patch'], '/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'update']);
                 Route::delete('/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'destroy']);
             });
+
+            // ── Event advertisements (AD Managements) ──
+            Route::get('/events/{uuid}/ads', [EventAdController::class, 'index'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/ads/insights', [EventAdController::class, 'insights'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/ads', [EventAdController::class, 'store'])->middleware('perm:events.manage');
+            Route::post('/ads/{ad}/track', [EventAdController::class, 'track'])->middleware('perm:events.view');
+            Route::get('/ads/{ad}', [EventAdController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/ads/{ad}', [EventAdController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/ads/{ad}', [EventAdController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Event people directory ("Users" section) ──
+            Route::get('/events/{uuid}/participants', [ParticipantController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/participants/{participation}/block', [ParticipantController::class, 'setBlocked'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/participants/{participation}', [ParticipantController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Ticketing & check-in (§6.4) ──
             Route::get('/ticket-types', [TicketTypeController::class, 'index'])->middleware('perm:events.view');
