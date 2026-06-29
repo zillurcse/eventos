@@ -174,7 +174,7 @@
     />
 
     <!-- Image Upload Modal -->
-    <ImageUploadModal
+    <FloorImageUploadModal
       v-if="showImageModal"
       @close="showImageModal = false"
       @uploaded="handleImageUploaded"

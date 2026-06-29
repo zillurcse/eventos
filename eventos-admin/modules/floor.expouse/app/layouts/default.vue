@@ -3,8 +3,8 @@
     <main class="absolute inset-0 overflow-hidden">
       <slot />
     </main>
-    <Toolbar class="absolute top-0 left-0 w-full z-10" />
-    <Sidebar class="absolute top-10 left-0 h-[calc(100%-2.5rem)] z-10" />
+    <FloorToolbar class="absolute top-0 left-0 w-full z-10" />
+    <FloorSidebar class="absolute top-10 left-0 h-[calc(100%-2.5rem)] z-10" />
     <RightSidebar v-if="store.selectedObjects" />
   </div>
 </template>

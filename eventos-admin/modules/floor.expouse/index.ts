@@ -40,13 +40,16 @@ export default defineNuxtModule({
           name: 'org-events-id-floor',
           path: '/org/events/:id()/floor',
           file: resolve('app/pages/index.vue'),
-          meta: { middleware: 'auth' },
+          // layout set here (not just via definePageMeta) so the editor renders
+          // full-screen in floor's own layout instead of inside the admin's
+          // persona sidebar shell — mirrors the badge.expouse module.
+          meta: { layout: 'floorplan', middleware: 'auth' },
         },
         {
           name: 'org-events-id-floor-preview',
           path: '/org/events/:id()/floor/preview',
           file: resolve('app/pages/preview.vue'),
-          meta: { middleware: 'auth' },
+          meta: { layout: 'floorplan-blank', middleware: 'auth' },
         },
       )
     })
