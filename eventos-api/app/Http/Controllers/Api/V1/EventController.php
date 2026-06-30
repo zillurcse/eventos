@@ -233,6 +233,10 @@ class EventController extends Controller
             'communication.feed_tabs.*.key' => ['sometimes', 'string', 'max:60'],
             'communication.feed_tabs.*.label' => ['sometimes', 'nullable', 'string', 'max:120'],
             'communication.feed_tabs.*.enabled' => ['sometimes', 'boolean'],
+            'mobile_access_panel' => ['sometimes', 'array'],
+            'mobile_access_panel.title' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'mobile_access_panel.credentials_title' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'mobile_access_panel.details' => ['sometimes', 'nullable', 'string', 'max:10000'],
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
@@ -261,7 +265,19 @@ class EventController extends Controller
             'meeting' => (object) ($s->meeting ?? []),
             'lounge' => (object) ($s->lounge ?? []),
             'communication' => (object) ($s->communication ?? []),
+            'mobile_access_panel' => (object) ($s->mobile_access_panel ?? []),
         ];
+    }
+
+    /** Update the username stored in event.meta.mobile_access. */
+    public function updateCredentials(string $uuid, Request $request): JsonResponse
+    {
+        $event = Event::where('uuid', $uuid)->firstOrFail();
+        $data = $request->validate(['username' => ['required', 'string', 'max:120']]);
+        $meta = $event->meta ?? [];
+        $meta['mobile_access']['username'] = $data['username'];
+        $event->update(['meta' => $meta]);
+        return response()->json(['data' => ['username' => $data['username']]]);
     }
 
     /** Event home: setup checklist + counts + mobile-access credentials. */
@@ -284,6 +300,9 @@ class EventController extends Controller
             $event->update(['meta' => $meta]);
         }
 
+        $settings = EventSetting::firstOrCreate(['event_id' => $event->id]);
+        $panel = $settings->mobile_access_panel ?? [];
+
         $checklist = [
             ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details'],
             ['key' => 'branding', 'label' => 'Branding & Cover', 'done' => (bool) $event->cover_file_id, 'to' => 'details'],
@@ -305,6 +324,11 @@ class EventController extends Controller
             'completed' => collect($checklist)->where('done', true)->count(),
             'total' => count($checklist),
             'credentials' => $meta['mobile_access'],
+            'mobile_access_panel' => [
+                'title' => $panel['title'] ?? 'Setup your mobile access',
+                'credentials_title' => $panel['credentials_title'] ?? 'Credentials',
+                'details' => $panel['details'] ?? null,
+            ],
         ]]);
     }
 

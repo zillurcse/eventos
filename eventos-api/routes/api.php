@@ -184,6 +184,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/events', [EventController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/events/{uuid}', [EventController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/publish', [EventController::class, 'publish'])->middleware('perm:events.manage');
+            Route::patch('/events/{uuid}/credentials', [EventController::class, 'updateCredentials'])->middleware('perm:events.manage');
             Route::delete('/events/{uuid}', [EventController::class, 'destroy'])->middleware('perm:events.manage');
 
             // Venues & rooms

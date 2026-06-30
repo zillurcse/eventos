@@ -44,9 +44,8 @@
   a { @apply text-brand no-underline; }
   h1 { @apply text-2xl font-bold mb-1; }
   h2 { @apply font-semibold mb-3; font-size: 1.02rem; }
-  input, textarea, select { @apply w-full my-1.5 bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5; }
-  input:focus, textarea:focus, select:focus { @apply outline-none border-brand; box-shadow: 0 0 0 3px var(--brand-soft); }
-  select { @apply cursor-pointer; }
+  input, textarea { @apply w-full my-1.5 bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5; }
+  input:focus, textarea:focus { @apply outline-none border-brand; box-shadow: 0 0 0 3px var(--brand-soft); }
   label { @apply text-muted text-[.85rem]; }
   table { @apply w-full; border-collapse: collapse; }
   th, td { @apply text-left px-3 py-[11px] border-b border-line; }
@@ -91,7 +90,7 @@
   .search input { @apply pl-[38px] my-0; }
 
   /* ── Cards ───────────────────────────────────────────── */
-  .card { @apply bg-white border border-line rounded-2xl p-5 mb-4; }
+  .card { @apply bg-white border border-line rounded-xl p-5 mb-4; }
   .section-title { @apply text-[1.15rem] font-bold mt-2 mb-3.5; }
   .cards-grid { @apply grid gap-5 mb-[30px]; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .entity-card { @apply bg-white border border-line rounded-2xl overflow-hidden; transition: box-shadow .15s, transform .15s; }
@@ -148,7 +147,7 @@
   .modal-actions { @apply flex justify-end gap-2.5 mt-[18px]; }
 
   /* ── Upload ──────────────────────────────────────────── */
-  .uploader { @apply border-[1.5px] border-dashed border-[#cdd2dc] rounded-[14px] h-[150px] grid place-items-center cursor-pointer overflow-hidden relative text-muted text-center; background: #fafbfc; }
+  .uploader { @apply border-[1.5px] border-dashed border-[#cdd2dc] rounded-[10px] h-[150px] flex justify-center items-center cursor-pointer overflow-hidden relative text-muted text-center; background: #fafbfc; }
   .uploader:hover { @apply border-brand text-brand; }
   .uploader img { @apply w-full h-full object-cover; }
   .uploader input[type=file] { @apply hidden; }

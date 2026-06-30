@@ -267,7 +267,7 @@ onMounted(() => {
       </header>
 
       <!-- ea2-content: p-6 pb-[60px] max-w-[1240px] w-full -->
-      <main class="px-7 pt-6 pb-[60px] max-w-[1240px] w-full">
+      <main class="px-7 pt-6 pb-[60px] w-full">
         <slot />
       </main>
     </div>
