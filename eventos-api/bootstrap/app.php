@@ -4,7 +4,7 @@ use App\Http\Middleware\EnsureFeature;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformStaff;
 use App\Http\Middleware\ResolveParticipant;
-use App\Http\Middleware\ResolvePartnerAdmin;
+use App\Http\Middleware\ResolveExhibitorAdmin;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => ResolveTenant::class,
             'perm' => EnsurePermission::class,
             'feature' => EnsureFeature::class,
-            'partner.admin' => ResolvePartnerAdmin::class,
+            'exhibitor.admin' => ResolveExhibitorAdmin::class,
             'participant' => ResolveParticipant::class,
             'platform' => EnsurePlatformStaff::class,
         ]);

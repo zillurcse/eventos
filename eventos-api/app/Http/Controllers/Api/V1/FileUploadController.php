@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 /**
  * Image uploads → MinIO (the `s3` disk). The bucket is bootstrapped with public
  * download, so the returned URL is directly loadable in the browser. Runs under
- * the tenant (organizer) or partner GUC, so the `files` row satisfies RLS.
+ * the tenant (organizer) or exhibitor GUC, so the `files` row satisfies RLS.
  */
 class FileUploadController extends Controller
 {

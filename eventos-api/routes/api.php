@@ -3,15 +3,17 @@
 use App\Http\Controllers\Api\V1\Admin\AdminMembershipController;
 use App\Http\Controllers\Api\V1\Admin\AdminMetricsController;
 use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
-use App\Http\Controllers\Api\V1\Admin\AdminPartnerController;
+use App\Http\Controllers\Api\V1\Admin\AdminExhibitorController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
+use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
@@ -19,22 +21,32 @@ use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
+use App\Http\Controllers\Api\V1\FloorController;
+use App\Http\Controllers\Api\V1\BadgeDesignController;
+use App\Http\Controllers\Api\V1\ParticipantController;
+use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
+use App\Http\Controllers\Api\V1\GamificationController;
+use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\NotificationTemplateController;
 use App\Http\Controllers\Api\V1\OrganizationController;
-use App\Http\Controllers\Api\V1\PartnerController;
-use App\Http\Controllers\Api\V1\PartnerMemberController;
-use App\Http\Controllers\Api\V1\PartnerPackageController;
-use App\Http\Controllers\Api\V1\PartnerProductController;
-use App\Http\Controllers\Api\V1\PartnerSelfMemberController;
-use App\Http\Controllers\Api\V1\PartnerSpaceController;
+use App\Http\Controllers\Api\V1\ExhibitorController;
+use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
+use App\Http\Controllers\Api\V1\ExhibitorMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorPackageController;
+use App\Http\Controllers\Api\V1\ExhibitorProductController;
+use App\Http\Controllers\Api\V1\ExhibitorProjectController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
+use App\Http\Controllers\Api\V1\ServiceCategoryController;
+use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
@@ -105,29 +117,29 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], '/organizations/{uuid}/members/{membership}', [AdminMembershipController::class, 'update']);
             Route::delete('/organizations/{uuid}/members/{membership}', [AdminMembershipController::class, 'destroy']);
 
-            // Exhibitors & sponsors (partner accounts) across all tenants.
-            Route::get('/partners', [AdminPartnerController::class, 'index']);
-            Route::get('/partners/{uuid}', [AdminPartnerController::class, 'show']);
-            Route::post('/partners/{uuid}/admin', [AdminPartnerController::class, 'setAdmin']);
-            Route::match(['put', 'patch'], '/partners/{uuid}', [AdminPartnerController::class, 'update']);
+            // Exhibitors & sponsors across all tenants.
+            Route::get('/exhibitors', [AdminExhibitorController::class, 'index']);
+            Route::get('/exhibitors/{uuid}', [AdminExhibitorController::class, 'show']);
+            Route::post('/exhibitors/{uuid}/admin', [AdminExhibitorController::class, 'setAdmin']);
+            Route::match(['put', 'patch'], '/exhibitors/{uuid}', [AdminExhibitorController::class, 'update']);
         });
 
-        // ── Partner self-service: admin + staff (resolves the partner → its org) ──
-        Route::middleware('partner.admin')->prefix('partner')->group(function () {
-            Route::get('/space', [PartnerSpaceController::class, 'show']);
-            Route::match(['put', 'patch'], '/space', [PartnerSpaceController::class, 'update']);
+        // ── Exhibitor self-service: admin + staff (resolves the exhibitor → its org) ──
+        Route::middleware('exhibitor.admin')->prefix('exhibitor')->group(function () {
+            Route::get('/space', [ExhibitorSpaceController::class, 'show']);
+            Route::match(['put', 'patch'], '/space', [ExhibitorSpaceController::class, 'update']);
             Route::post('/uploads', [FileUploadController::class, 'store']);
-            Route::post('/products', [PartnerSpaceController::class, 'storeProduct']);
+            Route::post('/products', [ExhibitorSpaceController::class, 'storeProduct']);
 
             // Exhibitor booth details (code/type/resources).
-            Route::get('/booth', [PartnerSpaceController::class, 'showBooth']);
-            Route::match(['put', 'patch'], '/booth', [PartnerSpaceController::class, 'updateBooth']);
+            Route::get('/booth', [ExhibitorSpaceController::class, 'showBooth']);
+            Route::match(['put', 'patch'], '/booth', [ExhibitorSpaceController::class, 'updateBooth']);
 
             // Team management (invite teammates, give them logins).
-            Route::get('/members', [PartnerSelfMemberController::class, 'index']);
-            Route::post('/members', [PartnerSelfMemberController::class, 'store']);
-            Route::delete('/members/{member}', [PartnerSelfMemberController::class, 'destroy']);
-            Route::post('/members/{member}/password', [PartnerSelfMemberController::class, 'password']);
+            Route::get('/members', [ExhibitorSelfMemberController::class, 'index']);
+            Route::post('/members', [ExhibitorSelfMemberController::class, 'store']);
+            Route::delete('/members/{member}', [ExhibitorSelfMemberController::class, 'destroy']);
+            Route::post('/members/{member}/password', [ExhibitorSelfMemberController::class, 'password']);
         });
 
         // ── Attendee context: networking & feed (§6.5, §6.6) ──
@@ -208,6 +220,20 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'destroy']);
             });
 
+            // ── Event advertisements (AD Managements) ──
+            Route::get('/events/{uuid}/ads', [EventAdController::class, 'index'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/ads/insights', [EventAdController::class, 'insights'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/ads', [EventAdController::class, 'store'])->middleware('perm:events.manage');
+            Route::post('/ads/{ad}/track', [EventAdController::class, 'track'])->middleware('perm:events.view');
+            Route::get('/ads/{ad}', [EventAdController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/ads/{ad}', [EventAdController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/ads/{ad}', [EventAdController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Event people directory ("Users" section) ──
+            Route::get('/events/{uuid}/participants', [ParticipantController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/participants/{participation}/block', [ParticipantController::class, 'setBlocked'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/participants/{participation}', [ParticipantController::class, 'destroy'])->middleware('perm:events.manage');
+
             // ── Ticketing & check-in (§6.4) ──
             Route::get('/ticket-types', [TicketTypeController::class, 'index'])->middleware('perm:events.view');
             Route::post('/ticket-types', [TicketTypeController::class, 'store'])->middleware('perm:ticketing.manage');
@@ -216,22 +242,79 @@ Route::prefix('v1')->group(function () {
             Route::post('/check-in-stations', [CheckInStationController::class, 'store'])->middleware('perm:checkin.manage');
             Route::post('/check-in/scan', [CheckInController::class, 'scan'])->middleware('perm:checkin.manage');
 
-            // ── Partners: exhibitors & sponsors (§6.3) ──
-            Route::middleware('perm:partners.manage')->group(function () {
-                Route::get('/partner-packages', [PartnerPackageController::class, 'index']);
-                Route::post('/partner-packages', [PartnerPackageController::class, 'store']);
-                Route::match(['put', 'patch'], '/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'update']);
-                Route::delete('/partner-packages/{partnerPackage}', [PartnerPackageController::class, 'destroy']);
-                Route::get('/partners', [PartnerController::class, 'index']);
-                Route::post('/partners', [PartnerController::class, 'store']);
-                Route::get('/partners/{uuid}', [PartnerController::class, 'show']);
-                Route::match(['put', 'patch'], '/partners/{uuid}', [PartnerController::class, 'update']);
-                Route::post('/partners/{uuid}/members', [PartnerMemberController::class, 'store']);
-                Route::delete('/partners/{uuid}/members/{member}', [PartnerMemberController::class, 'destroy']);
-                Route::get('/partners/{uuid}/products', [PartnerProductController::class, 'index']);
-                Route::post('/partners/{uuid}/products', [PartnerProductController::class, 'store']);
-                Route::post('/partners/{uuid}/booths', [BoothController::class, 'store']);
+            // ── Exhibitors & sponsors (§6.3) ──
+            Route::middleware('perm:exhibitors.manage')->group(function () {
+                Route::get('/exhibitor-packages', [ExhibitorPackageController::class, 'index']);
+                Route::post('/exhibitor-packages', [ExhibitorPackageController::class, 'store']);
+                Route::match(['put', 'patch'], '/exhibitor-packages/{exhibitorPackage}', [ExhibitorPackageController::class, 'update']);
+                Route::delete('/exhibitor-packages/{exhibitorPackage}', [ExhibitorPackageController::class, 'destroy']);
+                Route::get('/exhibitors', [ExhibitorController::class, 'index']);
+                Route::post('/exhibitors', [ExhibitorController::class, 'store']);
+                Route::get('/exhibitors/{uuid}', [ExhibitorController::class, 'show']);
+                Route::match(['put', 'patch'], '/exhibitors/{uuid}', [ExhibitorController::class, 'update']);
+                Route::post('/exhibitors/{uuid}/reset-password', [ExhibitorController::class, 'resetPassword']);
+                Route::post('/exhibitors/{uuid}/members', [ExhibitorMemberController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/members/{member}', [ExhibitorMemberController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/products', [ExhibitorProductController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/products', [ExhibitorProductController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/products/{product}', [ExhibitorProductController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/documents', [ExhibitorDocumentController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/documents', [ExhibitorDocumentController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/documents/{document}', [ExhibitorDocumentController::class, 'destroy']);
+                Route::get('/exhibitors/{uuid}/projects', [ExhibitorProjectController::class, 'index']);
+                Route::post('/exhibitors/{uuid}/projects', [ExhibitorProjectController::class, 'store']);
+                Route::delete('/exhibitors/{uuid}/projects/{project}', [ExhibitorProjectController::class, 'destroy']);
+                Route::post('/exhibitors/{uuid}/booths', [BoothController::class, 'store']);
             });
+
+            // ── Content Hub: blog / news articles ──
+            Route::get('/events/{uuid}/blog-posts', [BlogPostController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/blog-posts', [BlogPostController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/blog-posts/{post}', [BlogPostController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Communication: sponsor CTAs (image / video / text) ──
+            Route::get('/events/{uuid}/ctas', [CtaController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/ctas', [CtaController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/ctas/{cta}', [CtaController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/ctas/{cta}', [CtaController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Communication: gamification (points + award) ──
+            Route::get('/events/{uuid}/gamification', [GamificationController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/events/{uuid}/gamification', [GamificationController::class, 'update'])->middleware('perm:events.manage');
+
+            // ── Content Hub: image gallery ──
+            Route::get('/events/{uuid}/gallery', [GalleryImageController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/gallery', [GalleryImageController::class, 'store'])->middleware('perm:events.manage');
+            Route::post('/events/{uuid}/gallery/reorder', [GalleryImageController::class, 'reorder'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Event services catalogue ──
+            Route::get('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/service-categories/{category}', [ServiceCategoryController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/service-categories/{category}', [ServiceCategoryController::class, 'destroy'])->middleware('perm:events.manage');
+
+            Route::get('/events/{uuid}/services', [ServiceController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/services', [ServiceController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/services/{group}', [ServiceController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/services/{group}', [ServiceController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Floor plans (floor.expouse canvas editor) ──
+            Route::get('/events/{uuid}/floors', [FloorController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/floors', [FloorController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/floors/{floor}', [FloorController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/floors/{floor}', [FloorController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/floors/{floor}', [FloorController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Badge designs (badge.expouse canvas editor) ──
+            Route::get('/events/{uuid}/badge-designs/element-library', [BadgeDesignController::class, 'elementLibrary'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Announcements (§6.6) ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');
@@ -255,8 +338,14 @@ Route::prefix('v1')->group(function () {
             // Email builder
             Route::middleware('perm:email.manage')->group(function () {
                 Route::get('/email-templates', [EmailTemplateController::class, 'index']);
+                Route::get('/email-variables', [EmailTemplateController::class, 'variables']);
                 Route::post('/email-templates', [EmailTemplateController::class, 'store']);
+                Route::post('/email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft']);
+                Route::post('/email-templates/seed', [EmailTemplateController::class, 'seed']);
                 Route::get('/email-templates/{uuid}', [EmailTemplateController::class, 'show']);
+                Route::match(['put', 'patch'], '/email-templates/{uuid}', [EmailTemplateController::class, 'update']);
+                Route::delete('/email-templates/{uuid}', [EmailTemplateController::class, 'destroy']);
+                Route::post('/email-templates/{uuid}/duplicate', [EmailTemplateController::class, 'duplicate']);
                 Route::post('/email-templates/{uuid}/preview', [EmailTemplateController::class, 'preview']);
                 Route::post('/email-templates/{uuid}/send-test', [EmailTemplateController::class, 'sendTest']);
             });

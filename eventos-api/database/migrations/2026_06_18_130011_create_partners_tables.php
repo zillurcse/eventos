@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Unified partner model — exhibitor | sponsor via a type discriminator
+ * Unified exhibitor model — exhibitor | sponsor via a type discriminator
  * (architecture §6.3). All sub-features (members, documents, products,
  * projects, booths) are shared.
  */
@@ -14,7 +14,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('partner_packages', function (Blueprint $table) {
+        Schema::create('exhibitor_packages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('event_id')->constrained()->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
@@ -29,20 +29,21 @@ return new class extends Migration
             $table->softDeletesTz();
         });
 
-        Schema::create('partners', function (Blueprint $table) {
+        Schema::create('exhibitors', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('event_id')->constrained()->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
             $table->string('type', 20)->default('exhibitor');  // exhibitor | sponsor
-            $table->foreignId('package_id')->nullable()->constrained('partner_packages')->nullOnDelete();
+            $table->foreignId('package_id')->nullable()->constrained('exhibitor_packages')->nullOnDelete();
             $table->string('name', 180);
             $table->string('slug', 180);
+            $table->string('email', 180)->nullable();          // exhibitor-admin login email (unique per event)
             $table->string('description', 1000)->nullable();
             $table->string('website', 255)->nullable();
             $table->unsignedBigInteger('logo_file_id')->nullable()->index(); // soft ref → files
             $table->integer('tier_rank')->default(0);
-            $table->foreignId('admin_contact_id')->nullable()->constrained('contacts')->nullOnDelete(); // partner admin login
+            $table->foreignId('admin_contact_id')->nullable()->constrained('contacts')->nullOnDelete(); // exhibitor admin login
             $table->jsonb('placements')->nullable();
             $table->jsonb('profile_data')->nullable();         // builder-defined projection
             $table->string('status', 20)->default('draft');    // draft|active|suspended
@@ -51,12 +52,13 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
         });
-        DB::statement('CREATE UNIQUE INDEX uq_partner_slug ON partners (event_id, slug) WHERE deleted_at IS NULL');
-        DB::statement('CREATE INDEX idx_partners_event_type ON partners (event_id, type) WHERE deleted_at IS NULL');
+        DB::statement('CREATE UNIQUE INDEX uq_exhibitor_slug ON exhibitors (event_id, slug) WHERE deleted_at IS NULL');
+        DB::statement('CREATE INDEX idx_exhibitors_event_type ON exhibitors (event_id, type) WHERE deleted_at IS NULL');
+        DB::statement('CREATE UNIQUE INDEX uq_exhibitor_event_email ON exhibitors (event_id, lower(email)) WHERE email IS NOT NULL AND deleted_at IS NULL');
 
-        Schema::create('partner_members', function (Blueprint $table) {
+        Schema::create('exhibitor_members', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('partner_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('exhibitor_id')->constrained()->cascadeOnDelete();
             $table->foreignId('contact_id')->constrained()->cascadeOnDelete();
             $table->foreignId('participation_id')->nullable()->constrained()->nullOnDelete();
             $table->string('role', 30)->default('staff');      // admin | staff (admin can log in)
@@ -64,13 +66,13 @@ return new class extends Migration
             $table->timestampsTz();
             $table->softDeletesTz();
 
-            $table->unique(['partner_id', 'contact_id']);
-            $table->index('partner_id');
+            $table->unique(['exhibitor_id', 'contact_id']);
+            $table->index('exhibitor_id');
         });
 
-        Schema::create('partner_documents', function (Blueprint $table) {
+        Schema::create('exhibitor_documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('partner_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('exhibitor_id')->constrained()->cascadeOnDelete();
             $table->string('title', 200);
             $table->unsignedBigInteger('file_id')->nullable()->index(); // soft ref → files
             $table->string('url', 500)->nullable();
@@ -79,9 +81,9 @@ return new class extends Migration
             $table->softDeletesTz();
         });
 
-        Schema::create('partner_products', function (Blueprint $table) {
+        Schema::create('exhibitor_products', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('partner_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('exhibitor_id')->constrained()->cascadeOnDelete();
             $table->string('name', 200);
             $table->string('description', 1000)->nullable();
             $table->bigInteger('price_cents')->nullable();
@@ -91,9 +93,9 @@ return new class extends Migration
             $table->softDeletesTz();
         });
 
-        Schema::create('partner_projects', function (Blueprint $table) {
+        Schema::create('exhibitor_projects', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('partner_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('exhibitor_id')->constrained()->cascadeOnDelete();
             $table->string('name', 200);
             $table->string('description', 1000)->nullable();
             $table->string('status', 30)->nullable();
@@ -104,7 +106,7 @@ return new class extends Migration
 
         Schema::create('booths', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('partner_id')->constrained()->cascadeOnDelete(); // type=exhibitor
+            $table->foreignId('exhibitor_id')->constrained()->cascadeOnDelete(); // type=exhibitor
             $table->foreignId('event_id')->constrained()->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
             $table->foreignId('room_id')->nullable()->constrained()->nullOnDelete();
@@ -119,11 +121,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('booths');
-        Schema::dropIfExists('partner_projects');
-        Schema::dropIfExists('partner_products');
-        Schema::dropIfExists('partner_documents');
-        Schema::dropIfExists('partner_members');
-        Schema::dropIfExists('partners');
-        Schema::dropIfExists('partner_packages');
+        Schema::dropIfExists('exhibitor_projects');
+        Schema::dropIfExists('exhibitor_products');
+        Schema::dropIfExists('exhibitor_documents');
+        Schema::dropIfExists('exhibitor_members');
+        Schema::dropIfExists('exhibitors');
+        Schema::dropIfExists('exhibitor_packages');
     }
 };

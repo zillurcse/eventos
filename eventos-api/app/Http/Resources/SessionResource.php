@@ -25,7 +25,10 @@ class SessionResource extends JsonResource
             // Extra fields from meta JSONB
             'session_place'      => $meta['session_place'] ?? null,
             'logo_url'           => $meta['logo_url'] ?? null,
+            'icon_url'           => $meta['icon_url'] ?? null,
             'tags'               => $meta['tags'] ?? [],
+            'sponsors'           => $meta['sponsors'] ?? [],
+            'documents'          => $meta['documents'] ?? [],
             'is_featured'        => $meta['is_featured'] ?? false,
             'is_allowed_to_rate' => $meta['is_allowed_to_rate'] ?? false,
 

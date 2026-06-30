@@ -9,8 +9,10 @@ use App\Http\Resources\SessionResource;
 use App\Models\Event;
 use App\Models\EventSetting;
 use App\Models\Membership;
-use App\Models\Partner;
+use App\Models\Exhibitor;
 use App\Models\Session;
+use App\Services\Email\EventTemplateSeeder;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -40,7 +42,7 @@ class EventController extends Controller
         return response()->json(['data' => new EventResource($event)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TenantContext $tenant, EventTemplateSeeder $templateSeeder): JsonResponse
     {
         $data = $this->validateEvent($request, creating: true);
         $data = $this->utcDates($data, ['starts_at', 'ends_at']);
@@ -61,6 +63,8 @@ class EventController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        $templateSeeder->seedForEvent($event, $tenant->id());
+
         return response()->json(['data' => new EventResource($event->load('coverFile'))], 201);
     }
 
@@ -80,12 +84,29 @@ class EventController extends Controller
         return response()->json(['data' => new EventResource($event->fresh('coverFile'))]);
     }
 
-    public function publish(string $uuid): JsonResponse
+    /**
+     * Publish or unpublish the event (Content Hub → Publishing). Stamps
+     * published_at on first publish; clears it when reverted to draft.
+     */
+    public function publish(string $uuid, Request $request): JsonResponse
     {
         $event = Event::where('uuid', $uuid)->firstOrFail();
-        $event->update(['status' => 'published']);
 
-        return response()->json(['data' => new EventResource($event)]);
+        $data = $request->validate([
+            'status' => ['sometimes', 'in:draft,published'],
+            'is_public' => ['sometimes', 'boolean'],
+        ]);
+
+        $status = $data['status'] ?? 'published';
+
+        $event->update([
+            'status' => $status,
+            'published_at' => $status === 'published' ? ($event->published_at ?? now()) : null,
+            'is_public' => $data['is_public'] ?? $event->is_public,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        return response()->json(['data' => new EventResource($event->fresh('coverFile'))]);
     }
 
     public function destroy(string $uuid): JsonResponse
@@ -112,6 +133,10 @@ class EventController extends Controller
             'theme' => ['sometimes', 'array'],
             'theme.primary' => ['sometimes', 'nullable', 'string', 'max:9'],
             'theme.accent' => ['sometimes', 'nullable', 'string', 'max:9'],
+            'theme.font_family' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'theme.mode' => ['sometimes', 'nullable', 'in:light,dark,auto'],
+            'theme.header_style' => ['sometimes', 'nullable', 'in:solid,transparent,gradient'],
+            'theme.button_radius' => ['sometimes', 'nullable', 'in:rounded,sharp,pill'],
             'modules_enabled' => ['sometimes', 'array'],
             'branding' => ['sometimes', 'array'],
             'login' => ['sometimes', 'array'],
@@ -123,6 +148,91 @@ class EventController extends Controller
             'navigation' => ['sometimes', 'array'],
             'seo' => ['sometimes', 'array'],
             'filters' => ['sometimes', 'array'],
+            'banners' => ['sometimes', 'array'],
+            'banners.*.id' => ['sometimes', 'string'],
+            'banners.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'banners.*.url' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'banners.*.image_file_id' => ['sometimes', 'nullable', 'integer'],
+            'banners.*.image_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'faqs' => ['sometimes', 'array'],
+            'faqs.*.id' => ['sometimes', 'string'],
+            'faqs.*.question' => ['sometimes', 'required', 'string', 'max:500'],
+            'faqs.*.answer' => ['sometimes', 'required', 'string', 'max:5000'],
+            'testimonials' => ['sometimes', 'array'],
+            'testimonials.*.id' => ['sometimes', 'string'],
+            'testimonials.*.name' => ['sometimes', 'required', 'string', 'max:200'],
+            'testimonials.*.role' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'testimonials.*.company' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'testimonials.*.quote' => ['sometimes', 'required', 'string', 'max:2000'],
+            'testimonials.*.rating' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:5'],
+            'testimonials.*.avatar_file_id' => ['sometimes', 'nullable', 'integer'],
+            'testimonials.*.avatar_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'testimonials.*.featured' => ['sometimes', 'boolean'],
+            'social' => ['sometimes', 'array'],
+            'social.hashtag' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'social.facebook' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'social.twitter' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'social.linkedin' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'social.youtube' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'social.instagram' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'notifications' => ['sometimes', 'array'],
+            'notifications.*.web' => ['sometimes', 'boolean'],
+            'notifications.*.email' => ['sometimes', 'boolean'],
+            'notifications.*.sms' => ['sometimes', 'boolean'],
+            'chat' => ['sometimes', 'array'],
+            'chat.*.attendee' => ['sometimes', 'boolean'],
+            'chat.*.speaker' => ['sometimes', 'boolean'],
+            'chat.*.exhibitor' => ['sometimes', 'boolean'],
+            'chat.*.sponsor' => ['sometimes', 'boolean'],
+            'meeting' => ['sometimes', 'array'],
+            'meeting.permissions' => ['sometimes', 'array'],
+            'meeting.permissions.*.attendee' => ['sometimes', 'boolean'],
+            'meeting.permissions.*.speaker' => ['sometimes', 'boolean'],
+            'meeting.permissions.*.exhibitor' => ['sometimes', 'boolean'],
+            'meeting.permissions.*.sponsor' => ['sometimes', 'boolean'],
+            'meeting.intelligent' => ['sometimes', 'boolean'],
+            'meeting.slot_duration' => ['sometimes', 'integer', 'in:10,15,30'],
+            'meeting.restrictions' => ['sometimes', 'array'],
+            'meeting.restrictions.*.requests' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'meeting.restrictions.*.confirmed' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'lounge' => ['sometimes', 'array'],
+            'lounge.enabled' => ['sometimes', 'boolean'],
+            'lounge.slots_open_all' => ['sometimes', 'boolean'],
+            'lounge.slots' => ['sometimes', 'array'],
+            'lounge.slots.*' => ['array'],
+            'lounge.slots.*.*' => ['string', 'max:40'],
+            'lounge.attendee_tables_enabled' => ['sometimes', 'boolean'],
+            'lounge.attendee_tables' => ['sometimes', 'array'],
+            'lounge.attendee_tables.*.id' => ['sometimes', 'string', 'max:60'],
+            'lounge.attendee_tables.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'lounge.attendee_tables.*.capacity' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:10000'],
+            'lounge.attendee_tables.*.image_file_id' => ['sometimes', 'nullable', 'integer'],
+            'lounge.attendee_tables.*.image_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'lounge.exhibitor_tables_enabled' => ['sometimes', 'boolean'],
+            'lounge.exhibitor_default_meetings' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'lounge.exhibitor_meetings' => ['sometimes', 'array'],
+            'lounge.exhibitor_meetings.*' => ['integer', 'min:0', 'max:100000'],
+            'lounge.exhibitor_order' => ['sometimes', 'array'],
+            'lounge.exhibitor_order.*' => ['string', 'max:60'],
+            'lounge.sponsor_tables_enabled' => ['sometimes', 'boolean'],
+            'lounge.sponsor_default_meetings' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'lounge.sponsor_meetings' => ['sometimes', 'array'],
+            'lounge.sponsor_meetings.*' => ['integer', 'min:0', 'max:100000'],
+            'lounge.sponsor_order' => ['sometimes', 'array'],
+            'lounge.sponsor_order.*' => ['string', 'max:60'],
+            'communication' => ['sometimes', 'array'],
+            'communication.functionality' => ['sometimes', 'array'],
+            'communication.functionality.*' => ['array'],
+            'communication.functionality.*.attendee' => ['sometimes', 'boolean'],
+            'communication.functionality.*.speaker' => ['sometimes', 'boolean'],
+            'communication.functionality.*.exhibitor' => ['sometimes', 'boolean'],
+            'communication.functionality.*.sponsor' => ['sometimes', 'boolean'],
+            'communication.moderation' => ['sometimes', 'array'],
+            'communication.moderation.*' => ['boolean'],
+            'communication.feed_tabs' => ['sometimes', 'array'],
+            'communication.feed_tabs.*.key' => ['sometimes', 'string', 'max:60'],
+            'communication.feed_tabs.*.label' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'communication.feed_tabs.*.enabled' => ['sometimes', 'boolean'],
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
@@ -142,6 +252,15 @@ class EventController extends Controller
             'navigation' => (object) ($s->navigation ?? []),
             'seo' => (object) ($s->seo ?? []),
             'filters' => $s->filters ?? [],
+            'banners' => $s->banners ?? [],
+            'faqs' => $s->faqs ?? [],
+            'testimonials' => $s->testimonials ?? [],
+            'social' => (object) ($s->social ?? []),
+            'notifications' => (object) ($s->notifications ?? []),
+            'chat' => (object) ($s->chat ?? []),
+            'meeting' => (object) ($s->meeting ?? []),
+            'lounge' => (object) ($s->lounge ?? []),
+            'communication' => (object) ($s->communication ?? []),
         ];
     }
 
@@ -150,7 +269,7 @@ class EventController extends Controller
     {
         $event = Event::with('coverFile')->where('uuid', $uuid)->firstOrFail();
 
-        $partners = Partner::where('event_id', $event->id)->count();
+        $exhibitors = Exhibitor::where('event_id', $event->id)->count();
         $sessions = Session::where('event_id', $event->id)->count();
         $team = Membership::where('status', 'active')->count();   // RLS-scoped to this org
 
@@ -168,7 +287,7 @@ class EventController extends Controller
         $checklist = [
             ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details'],
             ['key' => 'branding', 'label' => 'Branding & Cover', 'done' => (bool) $event->cover_file_id, 'to' => 'details'],
-            ['key' => 'exhibitors', 'label' => 'Exhibitor & Booth Details', 'done' => $partners > 0, 'to' => 'exhibitors'],
+            ['key' => 'exhibitors', 'label' => 'Exhibitor & Booth Details', 'done' => $exhibitors > 0, 'to' => 'showcase/exhibitors'],
             ['key' => 'sessions', 'label' => 'Sessions & Agenda', 'done' => $sessions > 0, 'to' => 'sessions'],
             ['key' => 'team', 'label' => 'Team Member Access', 'done' => $team > 1, 'to' => 'team'],
             ['key' => 'publish', 'label' => 'Review & Publish Event', 'done' => $event->status === 'published', 'to' => null],
@@ -181,7 +300,7 @@ class EventController extends Controller
             'starts_at' => $event->starts_at?->toIso8601String(),
             'ends_at' => $event->ends_at?->toIso8601String(),
             'cover_url' => $event->coverFile ? Storage::disk($event->coverFile->disk)->url($event->coverFile->path) : null,
-            'counts' => ['partners' => $partners, 'sessions' => $sessions],
+            'counts' => ['exhibitors' => $exhibitors, 'sessions' => $sessions],
             'checklist' => $checklist,
             'completed' => collect($checklist)->where('done', true)->count(),
             'total' => count($checklist),

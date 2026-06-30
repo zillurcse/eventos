@@ -27,6 +27,7 @@ class Event extends Model
     protected $casts = [
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'published_at' => 'datetime',
         'is_public' => 'boolean',
         'meta' => 'array',
     ];
@@ -56,9 +57,9 @@ class Event extends Model
         return $this->hasMany(Participation::class);
     }
 
-    public function partners(): HasMany
+    public function exhibitors(): HasMany
     {
-        return $this->hasMany(Partner::class);
+        return $this->hasMany(Exhibitor::class);
     }
 
     public function ticketTypes(): HasMany

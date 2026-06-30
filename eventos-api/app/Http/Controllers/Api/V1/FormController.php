@@ -42,7 +42,7 @@ class FormController extends Controller
             'name' => ['required', 'string', 'max:180'],
             'key' => ['nullable', 'string', 'max:60'],
             'event' => ['nullable', 'string'], // bind to an event (uuid) — e.g. registration
-            'target_entity' => ['nullable', 'in:contact,participation,partner,survey'],
+            'target_entity' => ['nullable', 'in:contact,participation,exhibitor,survey'],
             'fields' => ['array'],
             'fields.*.key' => ['required_with:fields', 'string', 'max:60'],
             'fields.*.type' => ['required_with:fields', 'string', 'max:30'],

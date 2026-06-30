@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/laragon/www/expouse/admin\" && wc -l app/Http/Controllers/Admin/ServicesItem/*.php)",
+      "Read(//c/laragon/www/expouse/admin/**)",
+      "Bash(cat app/Models/Partner.php)",
+      "Bash(cat app/Http/Controllers/Api/V1/PartnerController.php)",
+      "Bash(cat app/Http/Resources/PartnerResource.php)",
+      "PowerShell(docker compose -f \"c:\\\\Users\\\\zillu\\\\OneDrive\\\\Desktop\\\\myinfo\\\\eventmanagementapp\\\\docker-compose.yml\" exec -T api php artisan migrate --database=pgsql_admin --force)",
+      "PowerShell(docker compose -f \"c:\\\\Users\\\\zillu\\\\OneDrive\\\\Desktop\\\\myinfo\\\\eventmanagementapp\\\\docker-compose.yml\" exec -T api php artisan tinker --execute=\"use Illuminate\\\\Support\\\\Facades\\\\DB; \\\\$c = DB::connection\\('pgsql_admin'\\); echo 'exhibitor_packages exists: '.\\(\\\\Schema::connection\\('pgsql_admin'\\)->hasTable\\('exhibitor_packages'\\)?'yes':'no'\\).PHP_EOL; echo 'partner_packages gone: '.\\(\\\\Schema::connection\\('pgsql_admin'\\)->hasTable\\('partner_packages'\\)?'STILL THERE':'yes'\\).PHP_EOL; echo 'rls enabled: '.\\\\$c->selectOne\\(\\\\\"select relrowsecurity from pg_class where relname='exhibitor_packages'\\\\\"\\)->relrowsecurity.PHP_EOL; echo 'row count: '.\\\\$c->table\\('exhibitor_packages'\\)->count\\(\\).PHP_EOL; echo 'fk target: '.\\\\$c->selectOne\\(\\\\\"select confrelid::regclass::text as t from pg_constraint where conname='partners_package_id_foreign'\\\\\"\\)->t.PHP_EOL;\")",
+      "PowerShell(docker compose -f \"c:\\\\Users\\\\zillu\\\\OneDrive\\\\Desktop\\\\myinfo\\\\eventmanagementapp\\\\docker-compose.yml\" exec -T api sh -lc \"php artisan optimize:clear >/dev/null 2>&1; php artisan route:list --path=exhibitor 2>&1 | head -40\")",
+      "PowerShell(curl.exe -s -o NUL -w \"GET / -> HTTP %{http_code}`n\" http://localhost:3000/)",
+      "PowerShell(curl.exe -s -o NUL -w \"GET /pages/exhibitor/members.vue -> HTTP %{http_code}`n\" \"http://localhost:3000/_nuxt/pages/exhibitor/members.vue?macro=true\")",
+      "PowerShell(curl.exe -s -o NUL -w \"GET /_nuxt/app/pages/exhibitor/members.vue -> HTTP %{http_code}`n\" \"http://localhost:3000/_nuxt/app/pages/exhibitor/members.vue?macro=true\")",
+      "PowerShell(docker compose -f \"c:\\\\Users\\\\zillu\\\\OneDrive\\\\Desktop\\\\myinfo\\\\eventmanagementapp\\\\docker-compose.yml\" exec -T admin npm install vue-sonner 2>&1)",
+      "Bash(docker compose *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\zillu\\.claude\\projects\\c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp\\memory"
+    ]
+  }
+}

@@ -25,7 +25,7 @@ return new class extends Migration
         'contacts',
         'events', 'event_settings', 'venues', 'rooms', 'tracks',
         'forms', 'participations', 'participation_groups', 'form_submissions',
-        'sessions', 'partner_packages', 'partners', 'booths',
+        'sessions', 'exhibitor_packages', 'exhibitors', 'booths',
         'ticket_types', 'discount_codes', 'orders', 'tickets',
         'check_in_stations', 'check_ins', 'badges',
         'connections', 'availability_slots', 'meetings',

@@ -10,8 +10,8 @@ class UserResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $partnerMembers = $this->relationLoaded('partnerMemberships')
-            ? $this->partnerMemberships
+        $exhibitorMembers = $this->relationLoaded('exhibitorMemberships')
+            ? $this->exhibitorMemberships
             : new Collection;
 
         return [
@@ -19,24 +19,25 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'is_platform_staff' => (bool) $this->is_platform_staff,
+            'must_change_password' => (bool) $this->must_change_password,
             'locale' => $this->locale,
             'timezone' => $this->timezone,
-            'personas' => $this->personas($partnerMembers),
+            'personas' => $this->personas($exhibitorMembers),
             'memberships' => MembershipResource::collection($this->whenLoaded('memberships')),
-            'partners' => $partnerMembers->map(fn ($pm) => [
-                'id' => $pm->partner?->uuid,
-                'name' => $pm->partner?->name,
-                'type' => $pm->partner?->type,            // exhibitor | sponsor
-                'role' => $pm->role,                       // admin | staff
-                'status' => $pm->partner?->status,
-                'organization' => $pm->partner?->organization?->name,
-                'event' => $pm->partner?->event?->name,
+            'exhibitors' => $exhibitorMembers->map(fn ($em) => [
+                'id' => $em->exhibitor?->uuid,
+                'name' => $em->exhibitor?->name,
+                'type' => $em->exhibitor?->type,          // exhibitor | sponsor
+                'role' => $em->role,                       // admin | staff
+                'status' => $em->exhibitor?->status,
+                'organization' => $em->exhibitor?->organization?->name,
+                'event' => $em->exhibitor?->event?->name,
             ])->values(),
         ];
     }
 
     /** Classify the signed-in persona(s) so the SPA can route. */
-    protected function personas(Collection $partnerMembers): array
+    protected function personas(Collection $exhibitorMembers): array
     {
         $personas = [];
 
@@ -46,8 +47,8 @@ class UserResource extends JsonResource
         if ($this->relationLoaded('memberships') && $this->memberships->firstWhere('status', 'active')) {
             $personas[] = 'organizer';
         }
-        if ($partnerMembers->isNotEmpty()) {
-            $personas[] = 'partner';
+        if ($exhibitorMembers->isNotEmpty()) {
+            $personas[] = 'exhibitor';
         }
 
         return $personas;

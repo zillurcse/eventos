@@ -17,7 +17,7 @@ class FeatureSeeder extends Seeder
             // boolean module toggles
             ['key' => 'module.networking',   'name' => 'Networking & Meetings', 'type' => 'boolean'],
             ['key' => 'module.feed',         'name' => 'Event Feed',            'type' => 'boolean'],
-            ['key' => 'module.partners',     'name' => 'Exhibitors & Sponsors', 'type' => 'boolean'],
+            ['key' => 'module.exhibitors',   'name' => 'Exhibitors & Sponsors', 'type' => 'boolean'],
             ['key' => 'module.surveys',      'name' => 'Surveys & Polls',       'type' => 'boolean'],
             ['key' => 'module.ticketing',    'name' => 'Ticketing',             'type' => 'boolean'],
             ['key' => 'module.email_builder','name' => 'Email Builder',         'type' => 'boolean'],
