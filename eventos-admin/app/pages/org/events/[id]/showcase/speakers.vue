@@ -191,11 +191,7 @@ onMounted(load)
     <!-- Card -->
     <div class="card">
       <div class="flex items-center justify-between gap-4 mb-4">
-        <input
-          v-model="search"
-          placeholder="Search speakers…"
-          class="m-0 max-w-[260px]"
-        >
+        <AppInput v-model="search" placeholder="Search speakers…" class="max-w-65" />
         <button class="btn" @click="openAdd">
           <Icon name="plus" class="w-3.75 h-3.75" /> SPEAKER
         </button>
@@ -290,82 +286,66 @@ onMounted(load)
 
       <!-- Photo -->
       <div class="mb-5">
-        <label class="block mb-1.5">Photo</label>
-        <UploadButton
-          :preview="draft.image_url"
-          collection="avatar"
-          @uploaded="draft.image_url = $event.url"
-        />
+        <FormField label="Photo">
+          <UploadButton
+            :preview="draft.image_url"
+            collection="avatar"
+            @uploaded="draft.image_url = $event.url"
+          />
+        </FormField>
       </div>
 
       <!-- Basic info -->
-      <div class="mb-5">
-        <label class="block mb-1.5">Basic Info</label>
-        <div class="flex flex-col gap-2">
-          <input v-model="draft.name" placeholder="Full name *" class="m-0">
-          <input v-model="draft.email" type="email" placeholder="Email address *" class="m-0">
-          <input v-model="draft.designation" placeholder="Designation (e.g. CEO)" class="m-0">
-          <input v-model="draft.company" placeholder="Company / Organisation" class="m-0">
-        </div>
+      <div class="mb-5 flex flex-col gap-3">
+        <AppInput v-model="draft.name"        label="Full Name"             required placeholder="e.g. Jane Smith" />
+        <AppInput v-model="draft.email"       label="Email Address"         required type="email" placeholder="jane@example.com" />
+        <AppInput v-model="draft.designation" label="Designation"           placeholder="e.g. CEO" />
+        <AppInput v-model="draft.company"     label="Company / Organisation" placeholder="Acme Corp" />
       </div>
 
       <!-- Bio -->
       <div class="mb-5">
-        <label class="block mb-1.5">Bio</label>
-        <textarea
-          v-model="draft.bio"
-          rows="4"
-          placeholder="Short biography…"
-          class="w-full resize-y m-0"
-        />
+        <AppTextarea v-model="draft.bio" label="Bio" :rows="4" placeholder="Short biography…" />
       </div>
 
       <!-- Social links -->
-      <div class="mb-5">
-        <label class="block mb-1.5">Social Links</label>
-        <div class="flex flex-col gap-2">
-          <input v-model="draft.linkedin" placeholder="LinkedIn URL" class="m-0">
-          <input v-model="draft.twitter" placeholder="Twitter / X URL" class="m-0">
-          <input v-model="draft.facebook" placeholder="Facebook URL" class="m-0">
-          <input v-model="draft.instagram" placeholder="Instagram URL" class="m-0">
-          <input v-model="draft.whatsapp" placeholder="WhatsApp number" class="m-0">
-        </div>
+      <div class="mb-5 flex flex-col gap-3">
+        <p class="text-muted text-[.85rem] mb-0 mt-0 font-medium">Social Links</p>
+        <AppInput v-model="draft.linkedin"  placeholder="LinkedIn URL" />
+        <AppInput v-model="draft.twitter"   placeholder="Twitter / X URL" />
+        <AppInput v-model="draft.facebook"  placeholder="Facebook URL" />
+        <AppInput v-model="draft.instagram" placeholder="Instagram URL" />
+        <AppInput v-model="draft.whatsapp"  placeholder="WhatsApp number" />
       </div>
 
       <!-- Tags -->
       <div class="mb-5">
-        <label class="block mb-1.5">Tags</label>
-        <div class="flex flex-wrap gap-1.5 mb-2">
-          <span
-            v-for="(tag, i) in draft.tags" :key="i"
-            class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
-          >
-            {{ tag }}
-            <button
-              class="bg-transparent border-0 p-0 cursor-pointer text-brand leading-none text-[.9rem]"
-              @click="removeTag(i)"
-            >×</button>
-          </span>
-        </div>
-        <input
-          v-model="tagInput"
-          placeholder="Type a tag and press Enter or comma"
-          class="m-0"
-          @keydown="onTagKey"
-          @blur="addTag"
-        >
+        <FormField label="Tags">
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <span
+              v-for="(tag, i) in draft.tags" :key="i"
+              class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
+            >
+              {{ tag }}
+              <button
+                class="bg-transparent border-0 p-0 cursor-pointer text-brand leading-none text-[.9rem]"
+                @click="removeTag(i)"
+              >×</button>
+            </span>
+          </div>
+          <AppInput
+            v-model="tagInput"
+            placeholder="Type a tag and press Enter or comma"
+            @keydown="onTagKey"
+            @blur="addTag"
+          />
+        </FormField>
       </div>
 
       <!-- Options -->
       <div class="mb-5 flex flex-col gap-3">
-        <label class="flex items-center gap-3 cursor-pointer select-none">
-          <input v-model="draft.is_featured" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-          <span class="text-[.93rem] font-medium text-ink">Featured speaker</span>
-        </label>
-        <label class="flex items-center gap-3 cursor-pointer select-none">
-          <input v-model="draft.is_public" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-          <span class="text-[.93rem] font-medium text-ink">Public profile</span>
-        </label>
+        <AppCheckbox v-model="draft.is_featured" label="Featured speaker" description="Highlighted in the event showcase" />
+        <AppCheckbox v-model="draft.is_public"   label="Public profile"   description="Visible to all event attendees" />
       </div>
 
       <p v-if="error" class="error mt-3">{{ error }}</p>
