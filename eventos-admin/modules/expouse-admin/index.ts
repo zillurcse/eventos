@@ -3,7 +3,6 @@ import core from './core'
 import platform from './platform'
 import organizer from './organizer'
 import event from './event'
-import mail from './mail'
 import exhibitor from './exhibitor'
 
 /**
@@ -17,7 +16,7 @@ import exhibitor from './exhibitor'
 export default defineNuxtModule({
   meta: { name: 'expouse-admin' },
   async setup() {
-    for (const feature of [core, platform, organizer, event, mail, exhibitor]) {
+    for (const feature of [core, platform, organizer, event, exhibitor]) {
       await installModule(feature)
     }
   },

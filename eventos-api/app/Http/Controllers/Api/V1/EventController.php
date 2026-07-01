@@ -65,6 +65,14 @@ class EventController extends Controller
 
         $templateSeeder->seedForEvent($event, $tenant->id());
 
+        // Give every new event a ready-to-use random subdomain (e.g. expo1234),
+        // stored in event_settings.domain.subdomain. The organizer can change it
+        // later on the Domain settings page.
+        $setting = EventSetting::firstOrCreate(['event_id' => $event->id]);
+        $setting->update([
+            'domain' => array_merge($setting->domain ?? [], ['subdomain' => $this->uniqueSubdomain()]),
+        ]);
+
         return response()->json(['data' => new EventResource($event->load('coverFile'))], 201);
     }
 
@@ -237,9 +245,36 @@ class EventController extends Controller
             'mobile_access_panel.title' => ['sometimes', 'nullable', 'string', 'max:200'],
             'mobile_access_panel.credentials_title' => ['sometimes', 'nullable', 'string', 'max:200'],
             'mobile_access_panel.details' => ['sometimes', 'nullable', 'string', 'max:10000'],
+            // Sender Details (Mail): default from-identity + optional custom SMTP.
+            'sender' => ['sometimes', 'array'],
+            'sender.from' => ['sometimes', 'nullable', 'email', 'max:180'],
+            'sender.sender_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'sender.cc' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'sender.bcc' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'sender.reply_to' => ['sometimes', 'nullable', 'email', 'max:180'],
+            'sender.is_smtp_config' => ['sometimes', 'boolean'],
+            'sender.mail_mailer' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'sender.mail_host' => ['sometimes', 'nullable', 'string', 'max:180'],
+            'sender.mail_port' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'sender.mail_encryption' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'sender.mail_username' => ['sometimes', 'nullable', 'string', 'max:180'],
+            'sender.mail_password' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
+
+        // The SMTP password is write-only: a blank value on save keeps the stored
+        // one (the GET response never echoes it back), so re-saving other fields
+        // doesn't wipe the password.
+        if (array_key_exists('sender', $data)) {
+            $existing = $s->sender ?? [];
+            $incoming = $data['sender'];
+            if (($incoming['mail_password'] ?? '') === '' || ! array_key_exists('mail_password', $incoming)) {
+                $incoming['mail_password'] = $existing['mail_password'] ?? null;
+            }
+            $data['sender'] = array_merge($existing, $incoming);
+        }
+
         $s->fill($data)->save();
 
         return response()->json(['data' => $this->settingsArray($s->fresh())]);
@@ -266,7 +301,18 @@ class EventController extends Controller
             'lounge' => (object) ($s->lounge ?? []),
             'communication' => (object) ($s->communication ?? []),
             'mobile_access_panel' => (object) ($s->mobile_access_panel ?? []),
+            'sender' => (object) $this->senderArray($s),
         ];
+    }
+
+    /** Sender config for the client — password is never echoed, only a flag. */
+    protected function senderArray(EventSetting $s): array
+    {
+        $sender = $s->sender ?? [];
+        $hasPassword = ! empty($sender['mail_password']);
+        unset($sender['mail_password']);
+
+        return $sender + ['has_smtp_password' => $hasPassword];
     }
 
     /** Update the username stored in event.meta.mobile_access. */
@@ -365,6 +411,20 @@ class EventController extends Controller
             // RLS scopes `files` to the active org, so exists() also enforces ownership.
             'cover_file_id' => ['nullable', 'integer', Rule::exists('files', 'id')],
         ]);
+    }
+
+    /**
+     * A random, globally-unique subdomain like `expo1234` (prefix + 4–5 digits).
+     * Checked on pgsql_admin because event_settings is RLS-scoped but subdomains
+     * must be unique across every tenant.
+     */
+    protected function uniqueSubdomain(): string
+    {
+        do {
+            $sub = 'expo'.random_int(1000, 99999);
+        } while (EventSetting::on('pgsql_admin')->where('domain->subdomain', $sub)->exists());
+
+        return $sub;
     }
 
     protected function uniqueSlug(string $name): string

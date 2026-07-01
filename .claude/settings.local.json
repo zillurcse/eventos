@@ -7,7 +7,11 @@
       "Bash(docker --version)",
       "Bash(docker compose *)",
       "Bash(php --version)",
-      "Bash(composer --version)"
+      "Bash(composer --version)",
+      "Bash(cd \"c:/Users/zillu/OneDrive/Desktop/myinfo/eventmanagementapp/eventos-admin/modules/expouse-admin/event/runtime\" && rm -f \"pages/org/events/[id]/showcase/speakers.vue\" \"components/SpeakerCategorySelect.vue\" && echo \"deleted\" && ls \"pages/org/events/[id]/showcase/speakers/\" && ls components/speaker/)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase"
     ]
   }
 }

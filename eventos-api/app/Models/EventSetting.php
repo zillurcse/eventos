@@ -33,6 +33,7 @@ class EventSetting extends Model
         'lounge' => 'array',
         'communication' => 'array',
         'mobile_access_panel' => 'array',
+        'sender' => 'array',
         'registration_open' => 'datetime',
         'registration_close' => 'datetime',
     ];

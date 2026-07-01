@@ -215,6 +215,11 @@ Route::prefix('v1')->group(function () {
 
             // Showcase speakers (event-level, not tied to a session)
             Route::middleware('perm:speakers.manage')->group(function () {
+                Route::get('/events/{uuid}/speaker-categories', [SpeakerController::class, 'categories']);
+                Route::post('/events/{uuid}/speaker-categories', [SpeakerController::class, 'storeCategory']);
+                Route::match(['put', 'patch'], '/events/{uuid}/speaker-categories/{category}', [SpeakerController::class, 'updateCategory']);
+                Route::delete('/events/{uuid}/speaker-categories/{category}', [SpeakerController::class, 'destroyCategory']);
+
                 Route::get('/events/{uuid}/speakers', [SpeakerController::class, 'index']);
                 Route::post('/events/{uuid}/speakers', [SpeakerController::class, 'store']);
                 Route::match(['put', 'patch'], '/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'update']);

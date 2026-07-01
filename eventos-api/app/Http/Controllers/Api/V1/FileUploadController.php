@@ -22,8 +22,15 @@ class FileUploadController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // The `document` collection carries presentation decks / handouts, so it
+        // accepts common office file types (and images) up to 20 MB. Every other
+        // collection is image-only (≤ 5 MB).
+        $isDocument = $request->input('collection') === 'document';
+
         $data = $request->validate([
-            'file' => ['required', 'file', 'image', 'max:5120'],   // ≤ 5 MB
+            'file' => $isDocument
+                ? ['required', 'file', 'max:20480', 'mimes:pdf,ppt,pptx,doc,docx,xls,xlsx,csv,txt,key,png,jpg,jpeg,webp']
+                : ['required', 'file', 'image', 'max:5120'],
             'collection' => ['nullable', Rule::in(['cover', 'logo', 'avatar', 'document', 'banner', 'email_header'])],
         ]);
 
