@@ -3,6 +3,7 @@ export default defineNuxtRouteMiddleware(() => {
   auth.init()
 
   if (!auth.isAuthed) {
-    return navigateTo('/login')
+    // The branded landing page ("/") is the sign-in surface for the microsite.
+    return navigateTo('/')
   }
 })

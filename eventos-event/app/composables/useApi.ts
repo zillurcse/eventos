@@ -11,11 +11,16 @@ export function useApi() {
   return $fetch.create({
     baseURL: apiBase as string,
     onRequest({ options }) {
-      if (auth.token) {
-        const headers = new Headers(options.headers as HeadersInit)
-        headers.set('Authorization', `Bearer ${auth.token}`)
-        options.headers = headers
-      }
+      const headers = new Headers(options.headers as HeadersInit)
+
+      // Scope every call to the event this subdomain resolves to ("API call
+      // under the subdomain") — the API reads this for public/event context.
+      const sub = useEventSubdomain()
+      if (sub) headers.set('X-Event-Subdomain', sub)
+
+      if (auth.token) headers.set('Authorization', `Bearer ${auth.token}`)
+
+      options.headers = headers
     },
     onResponseError({ response }) {
       if (response.status === 401) auth.logout()

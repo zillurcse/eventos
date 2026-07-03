@@ -1,5 +1,11 @@
 <script setup lang="ts">
 const auth = useAuthStore()
+const site = useSiteStore()
+const route = useRoute()
+
+// The branded landing page (login + inline signup) is full-bleed (its own
+// chrome); the topbar only frames the signed-in app pages.
+const showChrome = computed(() => auth.isAuthed && route.path !== '/')
 
 onMounted(() => {
   auth.init()
@@ -9,20 +15,18 @@ onMounted(() => {
 
 <template>
   <div>
-    <nav class="topbar">
+    <nav v-if="showChrome" class="topbar">
       <div class="container">
-        <NuxtLink to="/" class="brand">EventOS · Event</NuxtLink>
-        <template v-if="auth.isAuthed">
-          <NuxtLink to="/">Dashboard</NuxtLink>
-          <NuxtLink to="/events">Events</NuxtLink>
-          <a href="#" @click.prevent="auth.logout()">Logout</a>
-        </template>
-        <NuxtLink v-else to="/login">Sign in</NuxtLink>
+        <NuxtLink to="/dashboard" class="brand">{{ site.name }}</NuxtLink>
+        <NuxtLink to="/dashboard">Dashboard</NuxtLink>
+        <NuxtLink to="/events">Events</NuxtLink>
+        <a href="#" @click.prevent="auth.logout()">Logout</a>
       </div>
     </nav>
 
-    <main class="container">
+    <main v-if="showChrome" class="container">
       <NuxtPage />
     </main>
+    <NuxtPage v-else />
   </div>
 </template>

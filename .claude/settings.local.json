@@ -8,7 +8,10 @@
       "Bash(docker compose *)",
       "Bash(php --version)",
       "Bash(composer --version)",
-      "Bash(cd \"c:/Users/zillu/OneDrive/Desktop/myinfo/eventmanagementapp/eventos-admin/modules/expouse-admin/event/runtime\" && rm -f \"pages/org/events/[id]/showcase/speakers.vue\" \"components/SpeakerCategorySelect.vue\" && echo \"deleted\" && ls \"pages/org/events/[id]/showcase/speakers/\" && ls components/speaker/)"
+      "Bash(cd \"c:/Users/zillu/OneDrive/Desktop/myinfo/eventmanagementapp/eventos-admin/modules/expouse-admin/event/runtime\" && rm -f \"pages/org/events/[id]/showcase/speakers.vue\" \"components/SpeakerCategorySelect.vue\" && echo \"deleted\" && ls \"pages/org/events/[id]/showcase/speakers/\" && ls components/speaker/)",
+      "Bash(cat app/Http/Resources/FormResource.php)",
+      "Bash(cat app/Http/Resources/FormFieldResource.php)",
+      "Bash(curl -s -m 8 http://localhost:8088/api/v1/health)"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase"

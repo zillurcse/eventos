@@ -41,4 +41,28 @@ return [
             ['key' => 'contact_email','label' => 'Contact email','type' => 'email',    'is_required' => true,  'is_pii' => true],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Domains
+    |--------------------------------------------------------------------------
+    | apex           — platform apex; every event gets <subdomain>.<apex> free
+    |                  (served by a wildcard DNS + TLS cert on the edge).
+    | cname_target   — where an organizer points a CUSTOM sub-domain (CNAME).
+    | ip             — A-record target for a custom APEX domain (CNAME not allowed
+    |                  on a bare apex).
+    | challenge_prefix — TXT host prefix used to prove domain ownership.
+    | reserved       — subdomains organizers may not claim.
+    */
+    'domain' => [
+        'apex' => env('PLATFORM_APEX', 'eventos.app'),
+        'cname_target' => env('PLATFORM_CNAME_TARGET', 'cname.eventos.app'),
+        'ip' => env('PLATFORM_INGRESS_IP', '76.76.21.21'),
+        'challenge_prefix' => '_eventos-challenge',
+        'reserved' => [
+            'www', 'app', 'api', 'admin', 'dashboard', 'mail', 'smtp', 'ftp',
+            'ns', 'ns1', 'ns2', 'cname', 'cdn', 'assets', 'static', 'status',
+            'support', 'help', 'docs', 'blog', 'go', 'link', 'my', 'account',
+        ],
+    ],
 ];

@@ -11,12 +11,14 @@ use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BoothController;
+use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
+use App\Http\Controllers\Api\V1\DomainController;
 use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
@@ -43,6 +45,7 @@ use App\Http\Controllers\Api\V1\ExhibitorProjectController;
 use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
 use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
+use App\Http\Controllers\Api\V1\PublicSiteController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\ServiceCategoryController;
@@ -68,6 +71,11 @@ Route::prefix('v1')->group(function () {
     Route::get('/plans', [PlanController::class, 'index']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+
+    // Public per-event microsite bootstrap (resolve subdomain → published event
+    // branding/config) + email-first login/signup branching. No auth, no tenant.
+    Route::get('/public/site', [PublicSiteController::class, 'show']);
+    Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
     // Public form rendering + submission (the form uuid is the render token).
     Route::get('/forms/{uuid}', [FormController::class, 'render']);
@@ -181,6 +189,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/events/{uuid}/overview', [EventController::class, 'overview'])->middleware('perm:events.view');
             Route::get('/events/{uuid}/settings', [EventController::class, 'showSettings'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/events/{uuid}/settings', [EventController::class, 'updateSettings'])->middleware('perm:events.manage');
+
+            // ── Domain settings (subdomain + custom domain DNS verification) ──
+            Route::get('/events/{uuid}/domain', [DomainController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/events/{uuid}/domain', [DomainController::class, 'update'])->middleware('perm:events.manage');
+            Route::post('/events/{uuid}/domain/verify', [DomainController::class, 'verify'])->middleware('perm:events.manage');
             Route::post('/events', [EventController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/events/{uuid}', [EventController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/publish', [EventController::class, 'publish'])->middleware('perm:events.manage');
@@ -234,6 +247,16 @@ Route::prefix('v1')->group(function () {
             Route::get('/ads/{ad}', [EventAdController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/ads/{ad}', [EventAdController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/ads/{ad}', [EventAdController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Breakout Rooms (Event Engagement) ──
+            Route::get('/events/{uuid}/breakout-rooms', [BreakoutRoomController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/breakout-rooms', [BreakoutRoomController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/breakout-rooms/{room}', [BreakoutRoomController::class, 'show'])->middleware('perm:events.view');
+            Route::post('/breakout-rooms/{room}/token', [BreakoutRoomController::class, 'token'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/breakout-rooms/{room}', [BreakoutRoomController::class, 'update'])->middleware('perm:events.manage');
+            Route::post('/breakout-rooms/{room}/duplicate', [BreakoutRoomController::class, 'duplicate'])->middleware('perm:events.manage');
+            Route::patch('/breakout-rooms/{room}/status', [BreakoutRoomController::class, 'setStatus'])->middleware('perm:events.manage');
+            Route::delete('/breakout-rooms/{room}', [BreakoutRoomController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Event people directory ("Users" section) ──
             Route::get('/events/{uuid}/participants', [ParticipantController::class, 'index'])->middleware('perm:events.view');

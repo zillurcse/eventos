@@ -129,6 +129,18 @@ services:
       api:
         condition: service_started
 
+  # ── LiveKit (self-hosted WebRTC SFU for Breakout Rooms) ────────
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml", "--node-ip", "${LIVEKIT_NODE_IP:-127.0.0.1}"]
+    volumes:
+      - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"          # signaling (WS/HTTP)
+      - "${LIVEKIT_RTC_TCP_PORT:-7881}:7881"  # RTC over TCP fallback
+      - "50000-50100:50000-50100/udp"         # RTC media (UDP range)
+
   # ── Mailpit (catch-all SMTP + web UI) ──────────────────────────
   mailpit:
     image: axllent/mailpit:latest
@@ -230,6 +242,8 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       NUXT_PUBLIC_API_BASE: "http://localhost:${API_HTTP_PORT:-8080}/api/v1"
       NUXT_PUBLIC_REVERB_PORT: "${REVERB_PORT:-8081}"
+      # Platform apex for per-event subdomains (<subdomain>.<base>). Match PLATFORM_APEX.
+      NUXT_PUBLIC_EVENT_BASE_DOMAIN: "${EVENT_BASE_DOMAIN:-expouse.test}"
 
 volumes:
   pgdata:
