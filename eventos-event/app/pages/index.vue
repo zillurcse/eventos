@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: false })
+
 interface Field {
   key: string
   label: string | null
@@ -40,7 +42,7 @@ const DEFAULT_FIELDS: Field[] = [
 
 onMounted(() => {
   auth.init()
-  if (auth.isAuthed) navigateTo('/dashboard')
+  if (auth.isAuthed) navigateTo('/reception')
 })
 
 const initials = computed(() =>
@@ -87,7 +89,7 @@ async function onSignIn() {
   loading.value = true
   try {
     await auth.login(email.value, password.value)
-    navigateTo('/dashboard')
+    navigateTo('/reception')
   } catch (e: any) {
     error.value = e?.data?.message || 'Those credentials do not match our records.'
   } finally {
@@ -107,7 +109,7 @@ async function onRegister() {
     const ef = regFields.value.find(f => f.type === 'email' || f.key === 'email')
     const em = ef ? regValues[ef.key] : email.value
     await auth.login(em, regPassword.value)
-    navigateTo('/dashboard')
+    navigateTo('/reception')
   } catch (e: any) {
     error.value = e?.data?.message || 'We could not complete your registration. Please check the form and try again.'
   } finally {

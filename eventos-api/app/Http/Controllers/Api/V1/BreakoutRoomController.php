@@ -100,13 +100,23 @@ class BreakoutRoomController extends Controller
      * Role resolution is coarse for now (manager → host, else attendee); it will
      * read breakout_room_roles once participant infra lands (architecture §4).
      */
-    public function token(int $room, Request $request): JsonResponse
+    public function token(Request $request): JsonResponse
     {
-        $model = BreakoutRoom::findOrFail($room);
+        // Read the room id from the route (not a typed arg): this endpoint is
+        // reachable both as /breakout-rooms/{room}/token and, for attendees, as
+        // /events/{event}/breakout-rooms/{room}/token — and Laravel binds scalar
+        // route params to controller args positionally, so a typed $room would
+        // capture {event} on the two-param route.
+        $model = BreakoutRoom::findOrFail((int) $request->route('room'));
         $user = $request->user();
+        $isManager = (bool) $user?->hasPermission('events.manage');
 
         if ($model->status === 'archived') {
             throw ValidationException::withMessages(['room' => 'This room is closed.']);
+        }
+        // Attendees may only join published rooms; managers can preview drafts.
+        if (! $isManager && $model->status !== 'published') {
+            throw ValidationException::withMessages(['room' => 'This room is not open yet.']);
         }
         if ($model->access_type === 'coded') {
             $code = (string) $request->input('access_code');
@@ -115,7 +125,7 @@ class BreakoutRoomController extends Controller
             }
         }
 
-        $role = $user?->hasPermission('events.manage') ? 'host' : 'attendee';
+        $role = $isManager ? 'host' : 'attendee';
 
         $config = $this->provider($model)->joinConfig($model, [
             'identity' => 'user_'.($user?->id ?? 'guest'),

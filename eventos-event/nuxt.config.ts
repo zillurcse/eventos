@@ -28,8 +28,9 @@ export default defineNuxtConfig({
   },
 
   vite: {
-    // Pre-bundle the WS client deps so first load doesn't trigger a Vite reload.
-    optimizeDeps: { include: ['laravel-echo', 'pusher-js'] },
+    // Pre-bundle client deps so first load doesn't trigger a Vite reload/re-optimize
+    // (livekit-client powers the breakout Rooms video, laravel-echo/pusher the WS).
+    optimizeDeps: { include: ['laravel-echo', 'pusher-js', 'livekit-client'] },
     server: {
       // Windows + Docker bind mounts don't propagate inotify events, so poll.
       watch: { usePolling: true, interval: 300 },

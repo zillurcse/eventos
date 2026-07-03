@@ -75,6 +75,8 @@ Route::prefix('v1')->group(function () {
     // Public per-event microsite bootstrap (resolve subdomain → published event
     // branding/config) + email-first login/signup branching. No auth, no tenant.
     Route::get('/public/site', [PublicSiteController::class, 'show']);
+    Route::get('/public/reception', [PublicSiteController::class, 'reception']);
+    Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
     // Public form rendering + submission (the form uuid is the render token).
@@ -161,6 +163,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
             Route::get('/meetings', [MeetingController::class, 'index']);
             Route::post('/meetings', [MeetingController::class, 'store']);
+            // Attendee join: mint a media token for a published breakout room in
+            // this event (role derived server-side; attendees are subscribe-only).
+            Route::post('/breakout-rooms/{room}/token', [BreakoutRoomController::class, 'token']);
             Route::post('/track', [AnalyticsController::class, 'track']); // analytics fact
         });
 

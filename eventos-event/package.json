@@ -12,6 +12,7 @@
   "dependencies": {
     "@pinia/nuxt": "^0.11.0",
     "laravel-echo": "^2.1.0",
+    "livekit-client": "^2.20.0",
     "nuxt": "^4.4.8",
     "pinia": "^3.0.0",
     "pusher-js": "^8.4.0",
