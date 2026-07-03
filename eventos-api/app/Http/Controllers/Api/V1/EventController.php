@@ -150,9 +150,6 @@ class EventController extends Controller
             'login' => ['sometimes', 'array'],
             'login.methods' => ['sometimes', 'array'],
             'login.require_login' => ['sometimes', 'boolean'],
-            'domain' => ['sometimes', 'array'],
-            'domain.subdomain' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'domain.custom_domain' => ['sometimes', 'nullable', 'string', 'max:255'],
             'navigation' => ['sometimes', 'array'],
             'seo' => ['sometimes', 'array'],
             'filters' => ['sometimes', 'array'],
@@ -262,6 +259,10 @@ class EventController extends Controller
         ]);
 
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
+
+        // Domain is owned by DomainController (DNS verification state); never let a
+        // generic settings save overwrite it, even if a client sends it.
+        unset($data['domain']);
 
         // The SMTP password is write-only: a blank value on save keeps the stored
         // one (the GET response never echoes it back), so re-saving other fields

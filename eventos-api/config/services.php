@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    /*
+    | LiveKit (self-hosted) — native WebRTC SFU for Breakout Rooms.
+    | `url` is the ws:// endpoint the browser connects to; `host` is the
+    | server-side HTTP endpoint for RoomService RPC (differs inside Docker).
+    */
+    'livekit' => [
+        'url' => env('LIVEKIT_URL', 'ws://localhost:7880'),
+        'host' => env('LIVEKIT_HOST', 'http://livekit:7880'),
+        'api_key' => env('LIVEKIT_API_KEY', 'devkey'),
+        'api_secret' => env('LIVEKIT_API_SECRET', 'devsecret_change_me_min_32_chars_'),
+        'token_ttl' => (int) env('LIVEKIT_TOKEN_TTL', 3600),
+    ],
+
 ];

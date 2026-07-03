@@ -53,4 +53,28 @@ class User extends Authenticatable
     {
         return (bool) $this->is_platform_staff;
     }
+
+    /**
+     * Does this user hold the given permission key in the active organization?
+     * Mirrors the `perm:` middleware (EnsurePermission) so services/resources can
+     * make the same RBAC decision. Platform staff bypass. Falls back to the
+     * ambient TenantContext when no org id is passed.
+     */
+    public function hasPermission(string $permission, ?int $organizationId = null): bool
+    {
+        if ($this->isPlatformStaff()) {
+            return true;
+        }
+
+        $organizationId ??= app(\App\Support\Tenancy\TenantContext::class)->id();
+        if (! $organizationId) {
+            return false;
+        }
+
+        return Membership::where('organization_id', $organizationId)
+            ->where('user_id', $this->id)
+            ->first()?->roles()
+            ->whereHas('permissions', fn ($q) => $q->where('key', $permission))
+            ->exists() ?? false;
+    }
 }

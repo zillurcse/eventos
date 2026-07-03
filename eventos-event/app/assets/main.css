@@ -1,6 +1,8 @@
 :root {
   --bg: #f1f5f9; --card: #fff; --ink: #0f172a; --muted: #64748b;
   --brand: #047857; --brand-dark: #065f46; --line: #e2e8f0;
+  /* Per-event theme — overwritten at runtime by the site store (applyBranding). */
+  --brand-primary: #6352e7; --brand-accent: #22d3ee;
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); }
