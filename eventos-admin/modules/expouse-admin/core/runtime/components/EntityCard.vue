@@ -17,7 +17,11 @@ const NuxtLink = resolveComponent('NuxtLink')
         <div class="meta"><slot name="meta" /></div>
       </div>
       <div v-if="$slots.menu" class="menu">
-        <button class="menu-btn" aria-label="Actions" @click="open = !open">⋮</button>
+        <button class="menu-btn" aria-label="Actions" @click="open = !open">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
+          </svg>
+        </button>
         <div v-if="open" class="fixed inset-0 z-30" @click="open = false" />
         <div v-if="open" class="menu-pop" @click="open = false">
           <slot name="menu" />

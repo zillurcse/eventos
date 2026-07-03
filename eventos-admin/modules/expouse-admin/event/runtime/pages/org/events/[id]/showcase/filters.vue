@@ -114,60 +114,67 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="mb-4">
-      <h2 class="section-title m-0">Manage Filter</h2>
-      <p class="muted text-[.86rem] mt-0.5 mb-0">Events filter. Use drag and drop to rearrange the position.</p>
+    <!-- Page header -->
+    <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
+      <div>
+        <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Manage Filters</h1>
+        <p class="text-muted text-[.88rem]">Drag rows to reorder how filters appear to attendees.</p>
+      </div>
+      <button class="btn" @click="openAdd">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add filter
+      </button>
     </div>
 
     <div class="card">
-      <div class="flex items-center justify-between gap-4 mb-3.5">
-        <div>
-          <div class="font-bold text-base">Filter</div>
-          <div class="muted text-[.84rem]">Drag and drop rows to rearrange the position.</div>
-        </div>
-        <button class="btn" @click="openAdd"><Icon name="plus" class="w-[15px] h-[15px]" /> FILTER</button>
-      </div>
-
-      <div class="search max-w-[380px] mb-3.5">
-        <Icon name="search" />
-        <input v-model="search" placeholder="Search">
+      <div class="search max-w-[320px] mb-4">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input v-model="search" placeholder="Search filters">
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>TITLE</th><th>LABEL</th><th>OPTIONS</th>
-            <th class="text-right">ACTIONS</th>
+            <th class="w-8"></th>
+            <th>Title</th><th>Label</th><th>Options</th>
+            <th class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="(f, i) in paged" :key="f.id"
-            class="cursor-grab align-middle"
-            :class="{ 'opacity-50 bg-[#f3f0ff]': dragIndex === i }"
+            class="cursor-grab align-middle transition-colors"
+            :class="dragIndex === i ? 'opacity-50 bg-brand-soft/50' : ''"
             draggable="true" @dragstart="onDragStart(i)" @dragover="onDragOver(i, $event)" @dragend="onDragEnd"
           >
-            <td class="text-[#6352e7] font-semibold">{{ f.title }}</td>
-            <td class="text-[#6352e7]">{{ label(f) }}</td>
-            <td class="muted">{{ optionsText(f) }}</td>
+            <td class="text-faint w-8">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.3"/><circle cx="8" cy="12" r="1.3"/><circle cx="8" cy="18" r="1.3"/><circle cx="16" cy="6" r="1.3"/><circle cx="16" cy="12" r="1.3"/><circle cx="16" cy="18" r="1.3"/></svg>
+            </td>
+            <td class="text-brand-dark font-semibold">{{ f.title }}</td>
+            <td class="text-brand-dark">{{ label(f) }}</td>
+            <td class="text-muted">{{ optionsText(f) }}</td>
             <td class="text-right whitespace-nowrap">
-              <button
-                class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#6352e7]"
-                title="Edit" @click="openEdit(f)"
-              >✎</button>
-              <button
-                class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]"
-                title="Delete" @click="removeFilter(f)"
-              >🗑</button>
+              <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-brand hover:bg-brand-soft border-0 bg-transparent cursor-pointer" title="Edit" @click="openEdit(f)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
+              <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-[#dc2626] hover:bg-[#fef2f2] border-0 bg-transparent cursor-pointer" title="Delete" @click="removeFilter(f)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
             </td>
           </tr>
           <tr v-if="!paged.length">
-            <td colspan="4" class="muted text-center py-7">No filters yet. Click <strong>+ FILTER</strong> to add one.</td>
+            <td colspan="5" class="text-center py-12">
+              <div class="flex flex-col items-center gap-2.5 text-muted">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-faint"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                <p class="m-0 text-[.88rem]">No filters yet.</p>
+                <button class="btn sm" @click="openAdd">Add your first filter</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
 
-      <div class="flex items-center justify-end gap-4 mt-3.5 flex-wrap">
+      <div v-if="filtered.length" class="flex items-center justify-end gap-4 mt-4 pt-3.5 border-t border-line flex-wrap">
         <label class="flex items-center gap-1.5 text-[.84rem] m-0">Nb / page
           <select v-model.number="perPage" class="w-auto m-0 py-1.5 px-2">
             <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option>
@@ -178,7 +185,7 @@ onMounted(load)
             <option v-for="p in totalPages" :key="p" :value="p">{{ p }}</option>
           </select>
         </label>
-        <span class="muted text-[.84rem]">{{ rangeText }}</span>
+        <span class="text-muted text-[.84rem]">{{ rangeText }}</span>
         <button class="btn ghost sm" :disabled="page <= 1" @click="page--">‹</button>
         <button class="btn ghost sm" :disabled="page >= totalPages" @click="page++">›</button>
       </div>
@@ -186,73 +193,88 @@ onMounted(load)
 
     <!-- Add / Update drawer -->
     <Drawer v-if="drawerOpen" :title="editingId ? 'Update Filter' : 'Add Filter'" @close="drawerOpen = false">
-      <h2 class="text-[1.1rem] m-0 mb-1">Filter Details</h2>
-      <p class="muted text-[.84rem] m-0 mb-4">Modify filters to help users narrow results based on selected categories, dates, or custom preferences.</p>
+      <p class="text-muted text-[.84rem] m-0 mb-4">Modify filters to help users narrow results based on selected categories, dates, or custom preferences.</p>
 
-      <label>Filter</label>
-      <input v-model="draft.title" placeholder="Enter Filter Title">
+      <label>Filter title</label>
+      <input v-model="draft.title" placeholder="Enter filter title">
 
-      <div v-for="(h, hi) in draft.headings" :key="hi" class="mt-3.5">
-        <!-- collapsed bar -->
-        <button
-          v-if="expanded !== hi"
-          class="w-full text-left py-3.5 px-4 border border-line rounded-lg bg-[#f7f8fa] cursor-pointer font-semibold text-[#6352e7]"
-          @click="expanded = hi"
-        >+ {{ h.heading || ('Heading ' + (hi + 1)) }}</button>
-        <!-- expanded editor -->
-        <div v-else class="border border-line rounded-xl p-4">
-          <div class="flex justify-between items-center">
-            <label class="m-0">Heading</label>
-            <label class="flex items-center gap-1.5 text-[.82rem] m-0 cursor-pointer">
-              <input v-model="h.mandatory" type="checkbox" class="w-4 h-4 m-0 accent-[#6352e7]"> Mandatory
-            </label>
-          </div>
-          <input v-model="h.heading" placeholder="Enter Heading">
+      <div v-for="(h, hi) in draft.headings" :key="hi" class="mt-3">
+        <div class="rounded-xl border border-line overflow-hidden">
+          <!-- collapsed bar -->
+          <button
+            v-if="expanded !== hi"
+            class="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[#f7f8fa] cursor-pointer text-left border-0"
+            @click="expanded = hi"
+          >
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="font-semibold text-[.9rem] text-brand-dark truncate">{{ h.heading || ('Heading ' + (hi + 1)) }}</span>
+              <span v-if="h.mandatory" class="badge shrink-0">Required</span>
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-faint shrink-0"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
 
-          <label>Options</label>
-          <div v-for="(o, oi) in h.options" :key="oi" class="flex items-center gap-2 mb-1.5">
-            <input v-model="h.options[oi]" :placeholder="'Option #' + (oi + 1)" class="m-0">
-            <button
-              class="w-[30px] h-[30px] rounded-full border border-line bg-white cursor-pointer text-[#6352e7] shrink-0"
-              title="Remove" @click="removeOption(hi, oi)"
-            >✕</button>
-          </div>
-          <div class="text-right">
-            <button
-              class="bg-transparent border-0 text-[#6352e7] font-bold text-[.82rem] cursor-pointer tracking-[.02em]"
-              @click="addOption(hi)"
-            >+ ADD OPTION</button>
-          </div>
-
-          <div v-if="bulkFor === hi" class="my-2">
-            <textarea v-model="bulkText" rows="3" placeholder="Paste one option per line (or comma-separated)" />
-            <div class="text-right">
-              <button class="btn sm ghost" @click="bulkFor = null">Cancel</button>
-              <button class="btn sm" @click="applyBulk(hi)">Add options</button>
+          <!-- expanded editor -->
+          <div v-else class="p-4">
+            <div class="flex items-center justify-between gap-3">
+              <label class="m-0">Heading</label>
+              <label class="flex items-center gap-2 text-[.82rem] m-0 cursor-pointer select-none">
+                Mandatory
+                <span class="relative w-10 h-[22px] rounded-full shrink-0 transition-colors duration-150" :class="h.mandatory ? 'bg-brand' : 'bg-[#cdd2dc]'">
+                  <i class="absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-150" :class="h.mandatory ? 'translate-x-[18px]' : 'translate-x-0'" />
+                </span>
+                <input v-model="h.mandatory" type="checkbox" class="sr-only">
+              </label>
             </div>
-          </div>
+            <input v-model="h.heading" placeholder="Enter heading">
 
-          <div class="flex justify-between items-center mt-2">
-            <button class="btn ghost sm" @click="toggleBulk(hi)">+ BULK UPLOAD</button>
-            <button
-              v-if="draft.headings.length > 1"
-              class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]"
-              title="Delete heading" @click="removeHeading(hi)"
-            >🗑</button>
+            <label class="mt-3 block">Options</label>
+            <div v-for="(o, oi) in h.options" :key="oi" class="flex items-center gap-2 mb-2">
+              <input v-model="h.options[oi]" :placeholder="'Option #' + (oi + 1)" class="m-0">
+              <button
+                class="w-8 h-8 rounded-lg border border-line bg-white grid place-items-center text-muted hover:text-[#dc2626] hover:border-[#f3c9c9] shrink-0 cursor-pointer"
+                title="Remove option" @click="removeOption(hi, oi)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <button class="btn ghost sm" @click="addOption(hi)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Add option
+            </button>
+
+            <div v-if="bulkFor === hi" class="mt-3">
+              <textarea v-model="bulkText" rows="3" placeholder="Paste one option per line (or comma-separated)" />
+              <div class="flex justify-end gap-2 mt-1.5">
+                <button class="btn sm ghost" @click="bulkFor = null">Cancel</button>
+                <button class="btn sm" @click="applyBulk(hi)">Add options</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between mt-4 pt-3 border-t border-line">
+              <button class="btn ghost sm" @click="toggleBulk(hi)">Bulk upload</button>
+              <button
+                v-if="draft.headings.length > 1"
+                class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-[#dc2626] hover:bg-[#fef2f2] border-0 bg-transparent cursor-pointer"
+                title="Delete heading" @click="removeHeading(hi)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="text-right mt-3">
-        <button
-          class="bg-transparent border-0 text-[#6352e7] font-bold text-[.82rem] cursor-pointer tracking-[.02em]"
-          @click="addHeading"
-        >+ ADD HEADING</button>
-      </div>
+      <button
+        class="w-full mt-3 py-3 rounded-xl border-2 border-dashed border-line text-muted hover:border-brand hover:text-brand hover:bg-brand-soft/30 transition-colors flex items-center justify-center gap-2 text-[.85rem] font-semibold bg-transparent cursor-pointer"
+        @click="addHeading"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add heading
+      </button>
 
-      <div class="modal-actions border-t border-line pt-4 mt-2">
+      <div class="modal-actions border-t border-line pt-4 mt-4">
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
-        <button class="btn" :disabled="!draft.title.trim()" @click="saveDraft">{{ editingId ? 'UPDATE' : 'ADD' }}</button>
+        <button class="btn" :disabled="!draft.title.trim()" @click="saveDraft">{{ editingId ? 'Update filter' : 'Add filter' }}</button>
       </div>
     </Drawer>
   </div>

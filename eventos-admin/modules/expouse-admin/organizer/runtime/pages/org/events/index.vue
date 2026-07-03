@@ -92,54 +92,83 @@ onMounted(load)
       <button class="btn" @click="openCreate"><Icon name="plus" class="w-4 h-4" /> Create event</button>
     </div>
 
-    <h2 class="section-title">Ongoing Events</h2>
-    <div v-if="ongoing.length" class="cards-grid">
-      <EntityCard v-for="e in ongoing" :key="e.id" :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
-        <template #meta>
-          {{ fmtLabel[e.format] || e.format }}
-          <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
-        </template>
-        <template #menu>
-          <button @click="navigateTo(`/org/events/${e.id}`)">Manage</button>
-          <button @click="openEdit(e)">Edit</button>
-          <button v-if="e.status === 'draft'" @click="publish(e)">Publish</button>
-          <button @click="remove(e)">Delete</button>
-        </template>
-      </EntityCard>
-    </div>
-    <p v-else class="muted mb-[30px]">No ongoing events.</p>
+    <EventsEmptyState
+      v-if="!events.length"
+      title="No events yet"
+      description="Create your first event to start managing sessions, speakers and attendees."
+      cta-label="Create event"
+      @cta="openCreate"
+    />
 
-    <h2 class="section-title">Past Events</h2>
-    <div v-if="past.length" class="cards-grid">
-      <EntityCard v-for="e in past" :key="e.id" :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
-        <template #meta>
-          {{ fmtLabel[e.format] || e.format }}
-          <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
-        </template>
-        <template #menu>
-          <button @click="navigateTo(`/org/events/${e.id}`)">Manage</button>
-          <button @click="openEdit(e)">Edit</button>
-          <button @click="remove(e)">Delete</button>
-        </template>
-      </EntityCard>
-    </div>
-    <p v-else class="muted">No past events.</p>
+    <template v-else>
+      <section class="mb-[30px]">
+        <h2 class="section-title flex items-center gap-2">
+          Ongoing Events
+          <span v-if="ongoing.length" class="badge">{{ ongoing.length }}</span>
+        </h2>
+        <div v-if="ongoing.length" class="cards-grid">
+          <EntityCard
+            v-for="e in ongoing" :key="e.id"
+            :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
+            <template #meta>
+              {{ fmtLabel[e.format] || e.format }}
+              <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
+            </template>
+            <template #menu>
+              <EventCardMenu
+                :event="e" :to="`/org/events/${e.id}`" allow-publish
+                @edit="openEdit(e)" @publish="publish(e)" @delete="remove(e)" />
+            </template>
+          </EntityCard>
+        </div>
+        <EventsEmptyState v-else compact description="No ongoing events match your search." />
+      </section>
+
+      <section>
+        <h2 class="section-title flex items-center gap-2">
+          Past Events
+          <span v-if="past.length" class="badge">{{ past.length }}</span>
+        </h2>
+        <div v-if="past.length" class="cards-grid">
+          <EntityCard
+            v-for="e in past" :key="e.id"
+            :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
+            <template #meta>
+              {{ fmtLabel[e.format] || e.format }}
+              <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
+            </template>
+            <template #menu>
+              <EventCardMenu :event="e" :to="`/org/events/${e.id}`" @edit="openEdit(e)" @delete="remove(e)" />
+            </template>
+          </EntityCard>
+        </div>
+        <EventsEmptyState v-else compact description="No past events match your search." />
+      </section>
+    </template>
 
     <Modal v-if="showModal" :title="editingId ? 'Edit event' : 'Create event'" @close="showModal = false">
       <label>Cover image</label>
       <UploadButton :preview="form.cover_url" collection="cover" @uploaded="v => { form.cover_file_id = v.id; form.cover_url = v.url }" />
-      <label>Event name</label>
-      <input v-model="form.name" placeholder="e.g. AI Expo 2026">
-      <label>Format</label>
-      <select v-model="form.format">
-        <option value="venue">In-person</option>
-        <option value="online">Online</option>
-        <option value="hybrid">Hybrid</option>
-      </select>
+
+      <div class="mt-3">
+        <label>Event name</label>
+        <input v-model="form.name" placeholder="e.g. AI Expo 2026">
+      </div>
+
+      <div>
+        <label>Format</label>
+        <select v-model="form.format">
+          <option value="venue">In-person</option>
+          <option value="online">Online</option>
+          <option value="hybrid">Hybrid</option>
+        </select>
+      </div>
+
       <div class="flex gap-3">
         <div class="flex-1"><label>Starts</label><input v-model="form.starts_at" type="datetime-local"></div>
         <div class="flex-1"><label>Ends</label><input v-model="form.ends_at" type="datetime-local"></div>
       </div>
+
       <p v-if="error" class="error">{{ error }}</p>
       <div class="modal-actions">
         <button class="btn ghost" @click="showModal = false">Cancel</button>
