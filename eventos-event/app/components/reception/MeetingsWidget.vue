@@ -6,9 +6,9 @@ defineProps<{ today: number, upcoming: number, hasCurrent: boolean }>()
   <div class="mw">
     <header class="mw-head">
       <h2>Meetings</h2>
-      <a href="#" class="viewall" @click.prevent>View all
+      <NuxtLink to="/meetings" class="viewall">View all
         <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
-      </a>
+      </NuxtLink>
     </header>
 
     <div class="counters">

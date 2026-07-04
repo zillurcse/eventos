@@ -40,6 +40,7 @@ class ResolveParticipant
         DB::statement("set app.current_organization = '{$event->organization_id}'");
 
         $request->attributes->set('event_id', $event->id);
+        $request->attributes->set('organization_id', $event->organization_id);
         $request->attributes->set('participation_id', $participation->id);
 
         return $next($request);

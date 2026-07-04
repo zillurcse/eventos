@@ -7,6 +7,8 @@ use App\Models\Contact;
 use App\Models\Event;
 use App\Models\EventAd;
 use App\Models\Exhibitor;
+use App\Models\ExhibitorDocument;
+use App\Models\ExhibitorProduct;
 use App\Models\Meeting;
 use App\Models\Membership;
 use App\Models\Organization;
@@ -230,15 +232,46 @@ trait SeedsEventContent
     /** An exhibitor or sponsor (unified Exhibitor model, type discriminator). */
     private function partner(Organization $org, Event $event, string $name, string $type, int $booth, string $logo, int $i): void
     {
-        Exhibitor::updateOrCreate(
-            ['event_id' => $event->id, 'slug' => Str::slug($name)],
+        $categories = ['Technology', 'Robotics', 'Cloud & Data', 'Manufacturing', 'Media'];
+        $category = $type === 'sponsor' ? 'Partner' : $categories[$i % count($categories)];
+        $slug = Str::slug($name);
+
+        $exhibitor = Exhibitor::updateOrCreate(
+            ['event_id' => $event->id, 'slug' => $slug],
             [
                 'organization_id' => $org->id, 'type' => $type, 'name' => $name, 'status' => 'active',
-                'website' => 'https://example.com/'.Str::slug($name),
+                'description' => "{$name} is a leading {$category} company showcasing its latest work at the event. "
+                    ."Stop by booth {$booth} for live demos, meet the team, and discover how {$name} can help your business.",
+                'website' => 'https://example.com/'.$slug,
                 'tier_rank' => 100 - $i,
-                'profile_data' => ['logo_url' => $logo, 'booth' => (string) $booth],
+                'profile_data' => [
+                    'logo_url' => $logo,
+                    'booth' => (string) $booth,
+                    'category' => $category,
+                    'linkedin' => 'https://linkedin.com/company/'.$slug,
+                ],
             ],
         );
+
+        // Give exhibitors a couple of products + a public brochure so the
+        // directory's detail view has real content to show.
+        if ($type === 'exhibitor') {
+            foreach (['Flagship Platform', 'Starter Kit'] as $j => $product) {
+                ExhibitorProduct::updateOrCreate(
+                    ['exhibitor_id' => $exhibitor->id, 'name' => $product],
+                    [
+                        'description' => "{$product} by {$name} — built to help teams move faster and scale with confidence.",
+                        'price_cents' => ($j + 1) * 49900,
+                        'meta' => ['image_url' => $this->pic($slug.'-p'.$j, 400, 260)],
+                    ],
+                );
+            }
+
+            ExhibitorDocument::updateOrCreate(
+                ['exhibitor_id' => $exhibitor->id, 'title' => 'Company Brochure'],
+                ['url' => 'https://example.com/'.$slug.'/brochure.pdf', 'visibility' => 'all'],
+            );
+        }
     }
 
     /** A confirmed one-on-one meeting between two attendees. */

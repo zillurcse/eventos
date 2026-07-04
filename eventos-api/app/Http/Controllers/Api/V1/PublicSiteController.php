@@ -276,6 +276,42 @@ class PublicSiteController extends Controller
     }
 
     /**
+     * GET /api/v1/public/exhibitors — the attendee-facing exhibitor & sponsor
+     * directory ("Exhibitors" tab) for the event this subdomain resolves to.
+     * Public read (published events only); only ACTIVE exhibitors are exposed.
+     * Returns the full list (client sorts/searches/filters) with each booth's
+     * products and public documents inlined, plus the derived category facets.
+     */
+    public function exhibitors(Request $request): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $list = Exhibitor::on('pgsql_admin')
+            ->with(['logoFile', 'products', 'documents'])
+            ->where('event_id', $event->id)
+            ->where('status', 'active')
+            ->orderByDesc('tier_rank')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Exhibitor $e) => $this->formatExhibitorFull($e))
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'exhibitors' => $list->where('type', 'exhibitor')->values(),
+                'sponsors' => $list->where('type', 'sponsor')->values(),
+                'categories' => $list->pluck('category')->filter()->unique()->sort()->values(),
+            ],
+        ]);
+    }
+
+    /**
      * GET /api/v1/public/sessions — the attendee-facing agenda ("Sessions" tab)
      * for the event this subdomain resolves to. Public read (published events
      * only). Returns the full session list (with speakers, track, room, tags,
@@ -441,6 +477,55 @@ class PublicSiteController extends Controller
             'booth' => $profile['booth'] ?? ($profile['stand'] ?? null),
             'logo_url' => $logo ? Storage::disk($logo->disk)->url($logo->path) : ($profile['logo_url'] ?? null),
         ];
+    }
+
+    /** A full exhibitor projection for the directory (cards + detail modal). */
+    protected function formatExhibitorFull(Exhibitor $e): array
+    {
+        $logo = $e->logoFile;
+        $profile = $e->profile_data ?? [];
+
+        return [
+            'id' => $e->uuid,
+            'name' => $e->name,
+            'type' => $e->type,
+            'category' => $profile['category'] ?? '',
+            'description' => $e->description ?? ($profile['description'] ?? ''),
+            'website' => $profile['website_url'] ?? $e->website,
+            'booth' => $profile['booth'] ?? ($profile['stand'] ?? null),
+            'tier_rank' => (int) $e->tier_rank,
+            'is_featured' => (bool) ($profile['is_featured'] ?? false),
+            'logo_url' => $logo ? Storage::disk($logo->disk)->url($logo->path) : ($profile['logo_url'] ?? null),
+            'social' => array_filter([
+                'linkedin' => $profile['linkedin'] ?? null,
+                'twitter' => $profile['twitter'] ?? null,
+                'facebook' => $profile['facebook'] ?? null,
+                'instagram' => $profile['instagram'] ?? null,
+            ]),
+            'products' => $e->products->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'description' => $p->description,
+                'price' => $p->price_cents !== null ? round($p->price_cents / 100, 2) : null,
+                'image_url' => ($p->meta['image_url'] ?? null) ?: $this->fileUrl($p->image_file_id),
+            ])->values(),
+            'documents' => $e->documents
+                ->filter(fn ($d) => ($d->visibility ?? 'all') === 'all')
+                ->map(fn ($d) => ['id' => $d->id, 'title' => $d->title, 'url' => $d->url])
+                ->values(),
+        ];
+    }
+
+    /** Resolve a soft file reference (image_file_id) to a public URL, or null. */
+    protected function fileUrl(?int $fileId): ?string
+    {
+        if (! $fileId) {
+            return null;
+        }
+
+        $file = \App\Models\File::on('pgsql_admin')->find($fileId);
+
+        return $file ? Storage::disk($file->disk)->url($file->path) : null;
     }
 
     /**

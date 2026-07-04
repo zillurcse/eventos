@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Meeting extends Model
@@ -17,6 +18,11 @@ class Meeting extends Model
     {
         return $this->belongsToMany(Participation::class, 'meeting_participants')
             ->withPivot('role', 'rsvp', 'joined_at');
+    }
+
+    public function organizer(): BelongsTo
+    {
+        return $this->belongsTo(Participation::class, 'organizer_participation_id');
     }
 
     protected $casts = [

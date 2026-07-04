@@ -18,7 +18,11 @@
       "Bash(node verify-aiexpo.mjs)",
       "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\Api\\\\\\\\\\\\\\\\V1\\\\\\\\\\\\\\\\ConnectionController;\" routes/api.php)",
       "Bash(php -l app/Http/Controllers/Api/V1/DelegateController.php)",
-      "Bash(php -l routes/api.php)"
+      "Bash(php -l routes/api.php)",
+      "Bash(curl -s -o /dev/null -w \"meetings page HTTP %{http_code}\\\\n\" \"http://localhost:3001/meetings?subdomain=demo\")",
+      "Bash(grep -rl -i \"exhibitor\" eventos-api/app/ eventos-api/routes/)",
+      "Bash(grep -rl -i \"exhibitor\" eventos-event/app/)",
+      "Bash(curl -s -o /dev/null -w \"exhibitors page HTTP %{http_code}\\\\n\" \"http://localhost:3001/exhibitors?subdomain=demo\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",

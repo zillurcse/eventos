@@ -79,6 +79,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/reception', [PublicSiteController::class, 'reception']);
     Route::get('/public/sessions', [PublicSiteController::class, 'sessions']);
     Route::get('/public/speakers', [PublicSiteController::class, 'speakers']);
+    Route::get('/public/exhibitors', [PublicSiteController::class, 'exhibitors']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
@@ -172,6 +173,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
             Route::get('/meetings', [MeetingController::class, 'index']);
             Route::post('/meetings', [MeetingController::class, 'store']);
+            Route::patch('/meetings/{meeting}', [MeetingController::class, 'respond']);
             // Attendee join: mint a media token for a published breakout room in
             // this event (role derived server-side; attendees are subscribe-only).
             Route::post('/breakout-rooms/{room}/token', [BreakoutRoomController::class, 'token']);
