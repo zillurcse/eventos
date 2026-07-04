@@ -19,6 +19,14 @@ class BreakoutRoom extends Model
 
     protected $guarded = [];
 
+    /**
+     * Room types that run as a one-way broadcast/stage: only hosts and invited
+     * speakers publish, attendees watch. Every other type is participatory —
+     * attendees get their own mic/camera so they can take part (round tables,
+     * networking lounges, workshops, team/VIP rooms, …).
+     */
+    public const BROADCAST_TYPES = ['panel', 'ama', 'interview', 'sponsor_demo'];
+
     protected $casts = [
         'recording_enabled' => 'boolean',
         'capacity' => 'integer',
@@ -31,5 +39,11 @@ class BreakoutRoom extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    /** Whether ordinary attendees may publish mic/camera in this room. */
+    public function attendeesCanPublish(): bool
+    {
+        return ! in_array($this->type, self::BROADCAST_TYPES, true);
     }
 }

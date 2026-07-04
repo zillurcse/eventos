@@ -31,7 +31,9 @@ class LiveKitProvider implements MeetingProvider
     public function joinConfig(BreakoutRoom $room, array $participant): array
     {
         $role = $participant['role'] ?? 'attendee';
-        $canPublish = in_array($role, self::PUBLISH_ROLES, true);
+        // Publish grant defaults to the role matrix, but the caller may widen it
+        // for participatory room types (attendees who get their own mic/camera).
+        $canPublish = $participant['canPublish'] ?? in_array($role, self::PUBLISH_ROLES, true);
         $isAdmin = in_array($role, self::ADMIN_ROLES, true);
 
         $grant = [

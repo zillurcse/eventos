@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FeedPost extends Model
@@ -12,6 +13,49 @@ class FeedPost extends Model
     use BelongsToOrganization, SoftDeletes, HasUuid;
 
     protected $guarded = [];
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(FeedComment::class, 'post_id');
+    }
+
+    /**
+     * Reactions on this post. The reactable morph stores a literal string type
+     * ('feed_post'), not a class morph-map key, so the relation is scoped by
+     * hand rather than via morphMany.
+     */
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(FeedReaction::class, 'reactable_id')
+            ->where('reactable_type', 'feed_post');
+    }
+
+    /**
+     * Display projection for a feed author (post or comment). Authors are
+     * polymorphic: a participation (attendee) or a user (organizer). Attendee
+     * avatars come from participation.profile_data.image_url.
+     *
+     * @return array{name: string, avatar: string|null, role: string}
+     */
+    public static function authorInfo(?string $type, ?int $id): array
+    {
+        if ($type === 'participation' && $id) {
+            $p = Participation::with('contact')->find($id);
+            if ($p) {
+                $name = trim(($p->contact->first_name ?? '').' '.($p->contact->last_name ?? ''));
+
+                return [
+                    'name' => $name ?: 'Attendee',
+                    'avatar' => $p->profile_data['image_url'] ?? null,
+                    'role' => 'attendee',
+                ];
+            }
+
+            return ['name' => 'Attendee', 'avatar' => null, 'role' => 'attendee'];
+        }
+
+        return ['name' => 'Organizer', 'avatar' => null, 'role' => 'organizer'];
+    }
 
     protected $casts = [
         'meta' => 'array',

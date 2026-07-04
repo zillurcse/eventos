@@ -131,6 +131,10 @@ class BreakoutRoomController extends Controller
             'identity' => 'user_'.($user?->id ?? 'guest'),
             'name' => $user?->name ?? 'Guest',
             'role' => $role,
+            // Participatory rooms (round table, networking, workshop, …) let
+            // attendees publish their own mic/camera so they can take part;
+            // broadcast rooms (panel/AMA/…) keep them as watch-only viewers.
+            'canPublish' => $isManager || $model->attendeesCanPublish(),
         ]);
 
         return response()->json(['data' => $config]);

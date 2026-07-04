@@ -15,10 +15,14 @@
       "Bash(curl -s \"http://localhost:8088/api/v1/public/reception?subdomain=demo\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\)['data']; print\\('event:', d['about']['name']\\); print\\('banners',len\\(d['banners']\\),'| sessions',len\\(d['sessions']\\),'| speakers',len\\(d['speakers']\\),'| exhibitors',len\\(d['exhibitors']\\),'| sponsors',len\\(d['sponsors']\\)\\); print\\('strip ads',len\\(d['ads']['strip']\\),'| sidebar ads',len\\(d['ads']['sidebar']\\)\\); print\\('social keys:', list\\(d['about']['social'].keys\\(\\)\\)\\); print\\('sample speaker:', d['speakers'][0]['name'], '/', d['speakers'][0]['designation']\\)\")",
       "Bash(sed 's/const SUB = .demo./const SUB = \"aiexpo\"/; s/alex@demo.test/alex@aiexpo.test/; s/reception-demo.png/reception-aiexpo.png/' verify.mjs)",
-      "Bash(node verify-aiexpo.mjs)"
+      "Bash(node verify-aiexpo.mjs)",
+      "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Http\\\\\\\\\\\\\\\\Controllers\\\\\\\\\\\\\\\\Api\\\\\\\\\\\\\\\\V1\\\\\\\\\\\\\\\\ConnectionController;\" routes/api.php)",
+      "Bash(php -l app/Http/Controllers/Api/V1/DelegateController.php)",
+      "Bash(php -l routes/api.php)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase"
+      "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",
+      "c:\\Users\\zillu\\.claude\\projects\\c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp\\memory"
     ]
   }
 }

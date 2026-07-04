@@ -5,10 +5,10 @@ interface Tab { key: string, label: string, to?: string, icon: string }
 
 const tabs: Tab[] = [
   { key: 'reception', label: 'Reception', to: '/reception', icon: 'M4 20v-8l8-6 8 6v8h-6v-6h-4v6z' },
-  { key: 'feed', label: 'Event Feed', icon: 'M4 5h16M4 12h16M4 19h10' },
-  { key: 'sessions', label: 'Sessions', icon: 'M5 4h14v16l-7-3-7 3z' },
-  { key: 'speakers', label: 'Speakers', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0' },
-  { key: 'delegates', label: 'Delegates', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19a6 6 0 0 1 12 0M17 11a3 3 0 1 0 0-6M15 13a6 6 0 0 1 7 6' },
+  { key: 'feed', label: 'Event Feed', to: '/feed', icon: 'M4 5h16M4 12h16M4 19h10' },
+  { key: 'sessions', label: 'Sessions', to: '/sessions', icon: 'M5 4h14v16l-7-3-7 3z' },
+  { key: 'speakers', label: 'Speakers', to: '/speakers', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0' },
+  { key: 'delegates', label: 'Delegates', to: '/delegates', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19a6 6 0 0 1 12 0M17 11a3 3 0 1 0 0-6M15 13a6 6 0 0 1 7 6' },
   { key: 'meetings', label: 'Meetings', icon: 'M7 4v3M17 4v3M4 9h16M5 7h14v13H5z' },
   { key: 'lounge', label: 'Lounge', icon: 'M4 12v-2a3 3 0 0 1 6 0v2h4v-2a3 3 0 0 1 6 0v2M3 12h18v6H3zM6 18v2M18 18v2' },
   { key: 'expolens', label: 'ExpoLens', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 7h3l1-2h8l1 2h3v12H4z' },

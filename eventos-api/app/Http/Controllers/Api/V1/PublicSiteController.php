@@ -240,6 +240,112 @@ class PublicSiteController extends Controller
     }
 
     /**
+     * GET /api/v1/public/speakers — the attendee-facing speaker directory
+     * ("Speakers" tab) for the event this subdomain resolves to. Public read
+     * (published events only); only PUBLIC speakers are exposed. Returns the
+     * full list (client sorts/searches) plus the event's speaker categories.
+     */
+    public function speakers(Request $request): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $speakers = Participation::on('pgsql_admin')
+            ->with('contact')
+            ->where('event_id', $event->id)
+            ->speakers()
+            ->orderByRaw("COALESCE((profile_data->>'is_featured')::boolean, false) DESC")
+            ->orderByRaw("COALESCE((profile_data->>'sort_order')::int, 0) ASC")
+            ->orderBy('created_at')
+            ->get()
+            ->filter(fn (Participation $p) => ($p->profile_data['is_public'] ?? true))
+            ->map(fn (Participation $p) => $this->formatSpeakerFull($p))
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'speakers' => $speakers,
+                'categories' => $event->meta['speaker_categories'] ?? [],
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/v1/public/sessions — the attendee-facing agenda ("Sessions" tab)
+     * for the event this subdomain resolves to. Public read (published events
+     * only). Returns the full session list (with speakers, track, room, tags,
+     * sponsors and stream/replay links) plus the derived facets the page filters
+     * by: the event's day range, the tracks in use, and the distinct tags and
+     * speakers. All reads run on `pgsql_admin` (no tenant chosen yet).
+     */
+    public function sessions(Request $request): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $sessions = Session::on('pgsql_admin')
+            ->with(['speakers.contact', 'track', 'room'])
+            ->where('event_id', $event->id)
+            ->orderByRaw('starts_at IS NULL, starts_at ASC')
+            ->get();
+
+        // Tracks actually used by these sessions, de-duped and ordered as the
+        // organizer sorted them — these become the "All Tracks / …" filter tabs.
+        $tracks = $sessions
+            ->pluck('track')
+            ->filter()
+            ->unique('id')
+            ->sortBy('sort_order')
+            ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'color' => $t->color])
+            ->values();
+
+        // Distinct tags across all sessions (Advance Filter › Tags).
+        $tags = $sessions
+            ->flatMap(fn (Session $s) => $s->meta['tags'] ?? [])
+            ->filter()
+            ->unique()
+            ->values();
+
+        // Distinct speakers across all sessions (Advance Filter › Speakers).
+        $speakers = $sessions
+            ->flatMap(fn (Session $s) => $s->speakers)
+            ->unique('uuid')
+            ->map(fn (Participation $p) => [
+                'id' => $p->uuid,
+                'name' => $p->contact?->fullName(),
+                'image_url' => $p->profile_data['image_url'] ?? null,
+            ])
+            ->sortBy('name')
+            ->values();
+
+        return response()->json([
+            'data' => [
+                'event' => [
+                    'uuid' => $event->uuid,
+                    'name' => $event->name,
+                    'timezone' => $event->resolvedTimezone(),
+                    'starts_at' => $event->starts_at?->toIso8601String(),
+                    'ends_at' => $event->ends_at?->toIso8601String(),
+                ],
+                'tracks' => $tracks,
+                'tags' => $tags,
+                'speakers' => $speakers,
+                'sessions' => SessionResource::collection($sessions),
+            ],
+        ]);
+    }
+
+    /**
      * GET /api/v1/public/rooms — the attendee-facing breakout room list for the
      * event this subdomain resolves to. Public read (published events only);
      * exposes only PUBLISHED, non-HIDDEN rooms and never leaks the access code
@@ -295,6 +401,29 @@ class PublicSiteController extends Controller
             'company' => $profile['company'] ?? '',
             'category' => $profile['category'] ?? '',
             'image_url' => $profile['image_url'] ?? null,
+        ];
+    }
+
+    /** A full speaker projection for the Speakers directory (cards + detail). */
+    protected function formatSpeakerFull(Participation $p): array
+    {
+        $profile = $p->profile_data ?? [];
+
+        return [
+            'id' => $p->uuid,
+            'name' => $p->contact?->fullName(),
+            'designation' => $profile['designation'] ?? '',
+            'company' => $profile['company'] ?? '',
+            'category' => $profile['category'] ?? '',
+            'bio' => $profile['bio'] ?? '',
+            'image_url' => $profile['image_url'] ?? null,
+            'is_featured' => (bool) ($profile['is_featured'] ?? false),
+            'social' => array_filter([
+                'linkedin' => $profile['linkedin'] ?? null,
+                'twitter' => $profile['twitter'] ?? null,
+                'facebook' => $profile['facebook'] ?? null,
+                'instagram' => $profile['instagram'] ?? null,
+            ]),
         ];
     }
 

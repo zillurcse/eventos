@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\CtaController;
+use App\Http\Controllers\Api\V1\DelegateController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
@@ -76,6 +77,8 @@ Route::prefix('v1')->group(function () {
     // branding/config) + email-first login/signup branching. No auth, no tenant.
     Route::get('/public/site', [PublicSiteController::class, 'show']);
     Route::get('/public/reception', [PublicSiteController::class, 'reception']);
+    Route::get('/public/sessions', [PublicSiteController::class, 'sessions']);
+    Route::get('/public/speakers', [PublicSiteController::class, 'speakers']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
@@ -156,8 +159,14 @@ Route::prefix('v1')->group(function () {
         Route::middleware('participant')->prefix('events/{event}')->group(function () {
             Route::get('/feed', [FeedController::class, 'index']);
             Route::post('/feed', [FeedController::class, 'store']);
+            Route::get('/feed/{post}/comments', [FeedController::class, 'comments']);
             Route::post('/feed/{post}/comments', [FeedController::class, 'comment']);
             Route::post('/feed/{post}/reactions', [FeedController::class, 'react']);
+            Route::post('/feed/{post}/poll/vote', [FeedController::class, 'votePoll']);
+            // Attendee media uploads (feed images/video/PDF) → MinIO, under the
+            // event's org GUC set by the participant middleware.
+            Route::post('/uploads', [FileUploadController::class, 'store']);
+            Route::get('/delegates', [DelegateController::class, 'index']);
             Route::get('/connections', [ConnectionController::class, 'index']);
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
