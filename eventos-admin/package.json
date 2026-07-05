@@ -30,6 +30,7 @@
     "qrcode.vue": "^3.10.0",
     "uuid": "^11.1.1",
     "vue": "^3.5.35",
+    "vue-advanced-cropper": "^2.8.9",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9",
     "vue3-draggable-resizable": "^1.6.5",

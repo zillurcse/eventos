@@ -24,7 +24,6 @@ export function useExhibitorManager(eventId: string) {
   const error      = ref('')
   const draft      = reactive<Draft>(freshDraft())
 
-  const logoUploading = ref(false)
   const spotlightUploading = ref(false)
   const tagInput = ref('')
 
@@ -245,12 +244,6 @@ export function useExhibitorManager(eventId: string) {
   }
 
   // ── Uploads ──────────────────────────────────────────────────────────
-  async function pickLogo(e: Event) {
-    const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-    logoUploading.value = true
-    try { const r = await upload(file, { collection: 'exhibitor_logo' }); draft.logo_url = r.url; draft.logo_file_id = r.id }
-    finally { logoUploading.value = false }
-  }
   async function pickSpotlight(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
     spotlightUploading.value = true
@@ -336,7 +329,7 @@ export function useExhibitorManager(eventId: string) {
     // list + meta
     exhibitors, packages, filters,
     // drawer / editing
-    drawerMode, editingId, activeTab, saving, error, draft, logoUploading, spotlightUploading, tagInput,
+    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput,
     // sub-resources
     members, documents, projects, products, entitlements, subSaving, subError,
     memberForm, docForm, projectForm, productForm,
@@ -349,7 +342,7 @@ export function useExhibitorManager(eventId: string) {
     // actions
     init, load, loadMeta, openAdd, openEdit, populateDraft,
     buildPayload, create, update, remove,
-    pickLogo, pickSpotlight, addTag, removeTag, addCta,
+    pickSpotlight, addTag, removeTag, addCta,
     addMember, removeMember, addDocument, removeDocument,
     addProject, removeProject, addProduct, removeProduct, savePermissions,
   }

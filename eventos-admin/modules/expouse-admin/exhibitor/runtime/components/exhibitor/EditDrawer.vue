@@ -5,7 +5,7 @@ const { activeTab, editingId, drawerMode } = useExhibitorContext()
 <template>
   <Drawer :key="'edit-' + editingId" title="Edit Exhibitor" @close="drawerMode = null">
     <!-- Sticky tabs -->
-    <div class="sticky top-0 bg-white z-10 -mx-5.5 px-5.5 border-b border-line mb-4" style="margin-top:-22px;padding-top:4px;">
+    <div class="sticky -top-7 bg-white z-10 -mx-5.5 px-5.5 border-b border-line mb-4" style="margin-top:-22px;padding-top:4px;">
       <div class="flex gap-0 overflow-x-auto">
         <button
           v-for="tab in EXHIBITOR_TABS" :key="tab"

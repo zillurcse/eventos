@@ -86,8 +86,13 @@
   /* ── Toolbar / search ────────────────────────────────── */
   .toolbar { @apply flex items-center gap-3 mb-[22px]; }
   .search { @apply relative flex-1 max-w-[420px]; }
-  .search svg { @apply absolute left-3 top-1/2 -translate-y-1/2 text-faint w-[17px] h-[17px]; }
+  .search > svg { @apply absolute left-3 top-1/2 -translate-y-1/2 text-faint w-[17px] h-[17px]; }
   .search input { @apply pl-[38px] my-0; }
+
+  /* ── Filter pills (FilterSelect) ─────────────────────── */
+  .filter-pill { @apply inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-line bg-white text-[.85rem] text-ink cursor-pointer; font-weight: 550; }
+  .filter-pill:hover { @apply border-[#c9cdd6]; }
+  .filter-pill.active { @apply border-brand text-brand bg-brand-soft; }
 
   /* ── Cards ───────────────────────────────────────────── */
   .card { @apply bg-white border border-line rounded-xl p-5 mb-4; }
@@ -144,7 +149,41 @@
   .modal-backdrop { @apply fixed inset-0 grid place-items-center z-[100] p-5; background: rgba(17,20,36,.45); }
   .modal { @apply bg-white rounded-[18px] w-full max-w-[520px] max-h-[90vh] overflow-auto p-6; }
   .modal h2 { @apply text-[1.2rem]; }
+  .modal.lg { @apply max-w-[680px]; }
   .modal-actions { @apply flex justify-end gap-2.5 mt-[18px]; }
+
+  /* ── Tabs ────────────────────────────────────────────── */
+  .tabs { @apply flex gap-1 border-b border-line mb-4; }
+  .tab { @apply px-3.5 py-2 text-[.85rem] font-semibold text-muted cursor-pointer bg-transparent; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab:hover { @apply text-ink; }
+  .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+  /* ── DataTable ───────────────────────────────────────── */
+  .dt-wrap { @apply rounded-xl border border-line overflow-hidden bg-white; }
+  .dt-wrap table { @apply w-full; }
+  .dt-wrap thead th { @apply py-3 border-b border-line; background: #f7f8fa; font-size: .7rem; }
+  .dt-wrap tbody td { @apply py-3.5; }
+  .dt-wrap th:first-child, .dt-wrap td:first-child { @apply pl-5; }
+  .dt-wrap th:last-child, .dt-wrap td:last-child { @apply pr-5; }
+  .dt-wrap tbody tr { transition: background-color .12s; }
+  .dt-wrap tbody tr:not(.dt-empty):hover { background: #f8f9fc; }
+  .dt-foot { @apply flex items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5 border-t border-line flex-wrap; background: #fafbfc; }
+  .dt-page-btn { @apply min-w-8 h-8 px-1.5 rounded-lg border border-line bg-white grid place-items-center text-[.8rem] text-muted cursor-pointer; font-weight: 600; }
+  .dt-page-btn:hover { @apply text-ink border-[#c9cdd6]; }
+  .dt-page-btn.active { @apply bg-brand-soft text-brand border-brand; }
+  .dt-page-btn:disabled { @apply opacity-40 cursor-not-allowed; }
+  .dt-page-btn:disabled:hover { @apply text-muted border-line; }
+
+  /* ── Image cards (ImageField) ────────────────────────── */
+  .img-card { @apply relative rounded-xl overflow-hidden border border-line; background: #fafbfc; }
+  .img-card img { @apply w-full h-full object-cover block; }
+  .img-card-actions { @apply absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 transition-opacity; background: rgba(15, 18, 32, .45); }
+  .img-card:hover .img-card-actions { @apply opacity-100; }
+  .img-action { @apply w-8 h-8 rounded-lg grid place-items-center text-ink cursor-pointer border-0 shadow-sm; background: rgba(255, 255, 255, .95); }
+  .img-action:hover { @apply bg-white; }
+  .img-action.danger { @apply text-[#dc2626]; }
+  .img-add { @apply border-[1.5px] border-dashed border-[#cdd2dc] rounded-xl grid place-items-center cursor-pointer text-muted text-[.82rem] font-medium; background: #fafbfc; }
+  .img-add:hover { @apply border-brand text-brand; }
 
   /* ── Upload ──────────────────────────────────────────── */
   .uploader { @apply border-[1.5px] border-dashed border-[#cdd2dc] rounded-[10px] h-[150px] flex justify-center items-center cursor-pointer overflow-hidden relative text-muted text-center; background: #fafbfc; }

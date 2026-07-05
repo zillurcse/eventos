@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const {
   draft, packages, filters, editingId,
-  logoUploading, spotlightUploading, pickLogo, pickSpotlight,
+  spotlightUploading, pickSpotlight,
   tagInput, addTag, removeTag, addCta,
   error, saving, update, remove,
 } = useExhibitorContext()
@@ -14,30 +14,30 @@ onMounted(syncAbout)
 watch(() => draft.about, () => { if (aboutRef.value && document.activeElement !== aboutRef.value) syncAbout() })
 function fmtAbout(cmd: string) { document.execCommand(cmd, false); if (aboutRef.value) draft.about = aboutRef.value.innerHTML }
 function onAboutInput(e: Event) { draft.about = (e.target as HTMLElement).innerHTML }
+
+function onLogoChange(v: string | string[] | null) {
+  draft.logo_url = (Array.isArray(v) ? v[0] : v) || ''
+}
+function onLogoUploaded(v: { id: number, url: string }) {
+  draft.logo_file_id = v.id
+}
 </script>
 
 <template>
   <div>
     <!-- Logo uploader -->
-    <div class="flex justify-center mb-5">
-      <label class="relative cursor-pointer block" style="width:100%;max-width:285px;">
-        <div class="w-full rounded-2xl overflow-hidden bg-[#e8eaed] flex items-center justify-center" style="height:155px;">
-          <img v-if="draft.logo_url" :src="draft.logo_url" class="w-full h-full object-cover" alt="logo">
-          <svg v-else viewBox="0 0 285 155" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-            <rect width="285" height="155" fill="#dde1e7"/>
-            <ellipse cx="200" cy="110" rx="120" ry="60" fill="#7ec8c0"/>
-            <ellipse cx="100" cy="120" rx="90" ry="50" fill="#5aa8a0"/>
-            <circle cx="185" cy="55" r="28" fill="#f0b04a"/>
-            <ellipse cx="75" cy="115" rx="70" ry="40" fill="#4a9890"/>
-          </svg>
-        </div>
-        <div class="absolute inset-0 flex items-center justify-center">
-          <div class="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center text-brand text-2xl font-light select-none">
-            {{ logoUploading ? '…' : '+' }}
-          </div>
-        </div>
-        <input type="file" accept="image/*" class="hidden" @change="pickLogo">
-      </label>
+    <div class="flex justify-center mb-5 mt-10">
+      <ImageField
+        :model-value="draft.logo_url || null"
+        :aspect="285 / 155"
+        :output-width="570"
+        :output-height="310"
+        collection="exhibitor_logo"
+        card-width="285px"
+        hint="285×155px recommended"
+        @update:model-value="onLogoChange"
+        @uploaded="onLogoUploaded"
+      />
     </div>
 
     <label>Exhibitor Name</label>

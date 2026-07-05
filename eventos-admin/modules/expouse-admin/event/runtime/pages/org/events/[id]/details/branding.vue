@@ -7,11 +7,18 @@ const route = useRoute()
 const api = useApi()
 const id = route.params.id as string
 
+interface BannerItem {
+  image:   string
+  title?:  string
+  url?:    string
+  active?: boolean
+}
+
 const coverUrl     = ref<string | null>(null)
 const coverFileId  = ref<number | null>(null)
 const theme        = reactive({ primary: '#6352e7', accent: '#22d3ee' })
 const logoUrl      = ref<string | null>(null)
-const banners      = ref<string[]>([])
+const banners      = ref<BannerItem[]>([])
 const emailHeaderUrl = ref<string | null>(null)
 const login        = reactive<{ type: string; banner_url: string | null; video_url: string; website_url: string }>(
   { type: 'banner', banner_url: null, video_url: '', website_url: '' },
@@ -28,17 +35,19 @@ async function load() {
   theme.accent   = s.data.theme?.accent  || '#22d3ee'
   const b = s.data.branding || {}
   logoUrl.value        = b.logo_url ?? null
-  banners.value        = Array.isArray(b.banners) ? b.banners : []
+  // Banners were once stored as plain URL strings; normalize to objects.
+  banners.value        = (Array.isArray(b.banners) ? b.banners : [])
+    .map((x: any) => (typeof x === 'string' ? { image: x, active: true } : x))
+    .filter((x: any) => x?.image)
   emailHeaderUrl.value = b.email_header_url ?? null
   if (b.login) Object.assign(login, { type: b.login.type || 'banner', banner_url: b.login.banner_url ?? null, video_url: b.login.video_url ?? '', website_url: b.login.website_url ?? '' })
 }
 
-function addBanner(v: { url: string })   { banners.value.push(v.url) }
-function removeBanner(i: number)         { banners.value.splice(i, 1) }
+function onBannersUpdate(v: BannerItem[]) { banners.value = v }
 
-function onCoverUploaded(v: { id: number; url: string }) { coverFileId.value = v.id; coverUrl.value = v.url }
-function onLogoUploaded(v: { url: string })              { logoUrl.value = v.url }
-function onEmailHeaderUploaded(v: { url: string })       { emailHeaderUrl.value = v.url }
+function onCoverUploaded(v: { id: number; url: string })    { coverFileId.value = v.id; coverUrl.value = v.url }
+function onLogoUploaded(v: { url: string | null })          { logoUrl.value = v.url }
+function onEmailHeaderUploaded(v: { url: string | null })   { emailHeaderUrl.value = v.url }
 function onLoginUpdate(v: Partial<typeof login>)         { Object.assign(login, v) }
 
 async function save() {
@@ -110,8 +119,7 @@ onMounted(load)
     <BrandingCommunityBanners
       class="mb-4"
       :banners="banners"
-      @add="addBanner"
-      @remove="removeBanner"
+      @update="onBannersUpdate"
     />
 
     <BrandingLoginPageDesign

@@ -36,7 +36,11 @@ class FileUploadController extends Controller
                 $isDocument => ['required', 'file', 'max:20480', 'mimes:pdf,ppt,pptx,doc,docx,xls,xlsx,csv,txt,key,png,jpg,jpeg,webp'],
                 default => ['required', 'file', 'image', 'max:5120'],
             },
-            'collection' => ['nullable', Rule::in(['cover', 'logo', 'avatar', 'document', 'banner', 'email_header', 'feed'])],
+            'collection' => ['nullable', Rule::in([
+                'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
+                'ad_image', 'lounge', 'breakout_room_poster', 'session_doc', 'session_icon', 'session_logo',
+                'exhibitor_logo', 'exhibitor_spotlight', 'ctas',
+            ])],
         ]);
 
         $upload = $request->file('file');

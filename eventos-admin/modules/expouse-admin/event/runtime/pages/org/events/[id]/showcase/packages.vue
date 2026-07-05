@@ -83,6 +83,12 @@ function enabledLabels(pkg: Package) {
     .join(', ') || '—'
 }
 
+const columns = [
+  { key: 'name', label: 'Name' },
+  { key: 'features', label: 'Features' },
+]
+function searchText(pkg: Package) { return pkg.name + ' ' + enabledLabels(pkg) }
+
 // ── API ───────────────────────────────────────────────────────────────
 async function load() {
   try {
@@ -164,46 +170,41 @@ onMounted(load)
           <div class="muted text-[.84rem]">Configure what features each exhibitor package includes.</div>
         </div>
         <button class="btn" @click="openAdd">
-          <Icon name="plus" class="w-3.75 h-3.75" /> PACKAGE
+          + PACKAGE
         </button>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>NAME</th>
-            <th>FEATURES</th>
-            <th class="text-right">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="pkg in packages" :key="pkg.id">
-            <td class="font-semibold text-brand">{{ pkg.name }}</td>
-            <td>
-              <span class="muted text-[.84rem]">
-                <span class="font-semibold text-ink">{{ enabledCount(pkg) }}</span>
-                / {{ ALL_FEATURES.length }} —
-                <span class="text-[.82rem]">{{ enabledLabels(pkg) }}</span>
-              </span>
-            </td>
-            <td class="text-right whitespace-nowrap">
-              <button
-                class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-brand"
-                title="Edit" @click="openEdit(pkg)"
-              >✎</button>
-              <button
-                class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]"
-                title="Delete" @click="removePackage(pkg)"
-              >🗑</button>
-            </td>
-          </tr>
-          <tr v-if="!packages.length">
-            <td colspan="3" class="muted text-center py-8">
-              No packages yet. Click <strong>+ PACKAGE</strong> to add one.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable
+        :items="packages"
+        :columns="columns"
+        :search-text="searchText"
+        row-key="id"
+        storage-key="showcase-packages"
+      >
+        <template #cell-name="{ row }">
+          <span class="font-semibold text-brand">{{ row.name }}</span>
+        </template>
+        <template #cell-features="{ row }">
+          <span class="muted text-[.84rem]">
+            <span class="font-semibold text-ink">{{ enabledCount(row) }}</span>
+            / {{ ALL_FEATURES.length }} —
+            <span class="text-[.82rem]">{{ enabledLabels(row) }}</span>
+          </span>
+        </template>
+        <template #actions="{ row }">
+          <button
+            class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-brand"
+            title="Edit" @click="openEdit(row)"
+          >✎</button>
+          <button
+            class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]"
+            title="Delete" @click="removePackage(row)"
+          >🗑</button>
+        </template>
+        <template #empty>
+          <span class="muted">No packages yet. Click <strong>+ PACKAGE</strong> to add one.</span>
+        </template>
+      </DataTable>
     </div>
 
     <!-- Add / Edit Drawer -->

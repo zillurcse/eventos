@@ -73,7 +73,7 @@ class PublicSiteController extends Controller
                     'logo_url' => $branding['logo_url'] ?? null,
                     'primary' => $theme['primary'] ?? '#6352e7',
                     'accent' => $theme['accent'] ?? '#22d3ee',
-                    'banners' => $branding['banners'] ?? [],
+                    'banners' => $this->publicBanners($branding),
                     'login' => [
                         'type' => $branding['login']['type'] ?? 'banner',
                         'banner_url' => $branding['login']['banner_url'] ?? null,
@@ -226,7 +226,7 @@ class PublicSiteController extends Controller
                     'name' => $event->name,
                     'slug' => $event->slug,
                 ],
-                'banners' => $branding['banners'] ?? [],
+                'banners' => $this->publicBanners($branding),
                 'ads' => [
                     'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
                     'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
@@ -514,6 +514,22 @@ class PublicSiteController extends Controller
                 ->map(fn ($d) => ['id' => $d->id, 'title' => $d->title, 'url' => $d->url])
                 ->values(),
         ];
+    }
+
+    /**
+     * Community banners are stored either as plain URL strings (legacy) or as
+     * {image, title, url, active} objects from the admin's banner form. The
+     * public payload stays a flat list of image URLs, hidden banners excluded.
+     */
+    protected function publicBanners(array $branding): array
+    {
+        return collect($branding['banners'] ?? [])
+            ->map(fn ($b) => is_array($b)
+                ? (($b['active'] ?? true) ? ($b['image'] ?? null) : null)
+                : $b)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** Resolve a soft file reference (image_file_id) to a public URL, or null. */

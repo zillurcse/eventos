@@ -6,8 +6,12 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'coverUploaded', v: { id: number; url: string }): void
-  (e: 'logoUploaded',  v: { url: string }): void
+  (e: 'logoUploaded',  v: { url: string | null }): void
 }>()
+
+function onLogoChange(v: string | string[] | null) {
+  emit('logoUploaded', { url: Array.isArray(v) ? v[0] ?? null : v })
+}
 </script>
 
 <template>
@@ -30,9 +34,14 @@ const emit = defineEmits<{
       <div>
         <label class="block mb-1.5">Cover image</label>
         <p class="text-[.8rem] text-muted mb-3">Displayed on event cards and the event page hero.</p>
-        <UploadButton
-          :preview="coverUrl"
+        <ImageField
+          :model-value="coverUrl"
+          :aspect="1200 / 630"
+          :output-width="1200"
+          :output-height="630"
           collection="cover"
+          hint="1200×630px recommended"
+          :removable="false"
           @uploaded="emit('coverUploaded', $event)"
         />
       </div>
@@ -40,10 +49,14 @@ const emit = defineEmits<{
       <div>
         <label class="block mb-1.5">Logo</label>
         <p class="text-[.8rem] text-muted mb-3">Your event logo shown in the app header.</p>
-        <UploadButton
-          :preview="logoUrl"
+        <ImageField
+          :model-value="logoUrl"
+          :aspect="1"
+          :output-width="512"
+          :output-height="512"
           collection="logo"
-          @uploaded="emit('logoUploaded', $event)"
+          hint="512×512px recommended"
+          @update:model-value="onLogoChange"
         />
       </div>
     </div>
