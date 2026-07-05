@@ -58,6 +58,8 @@ class LoungeController extends Controller
                 'name' => $t['name'],
                 'capacity' => $t['capacity'],
                 'image_url' => $t['image_url'],
+                'design' => $t['design'],
+                'accent' => $t['accent'],
                 'occupants' => $occupants,
                 'occupied' => $occupied,
                 'live' => $occupied > 0,
@@ -136,12 +138,15 @@ class LoungeController extends Controller
                     continue;
                 }
                 $id = 'att_'.$t['id'];
+                $design = in_array($t['design'] ?? null, ['round', 'boardroom', 'lounge'], true) ? $t['design'] : 'round';
                 $tables[] = [
                     'id' => $id,
                     'kind' => 'attendee',
                     'name' => $t['name'] ?: 'Table',
                     'capacity' => max(1, (int) ($t['capacity'] ?? 4)),
                     'image_url' => $t['image_url'] ?? null,
+                    'design' => $design,
+                    'accent' => $t['accent'] ?? null,
                     'room' => $room($id),
                 ];
             }
@@ -182,6 +187,8 @@ class LoungeController extends Controller
                 'name' => $p->name,
                 'capacity' => self::BRANDED_TABLE_SEATS,
                 'image_url' => $logo ? Storage::disk($logo->disk)->url($logo->path) : null,
+                'design' => 'round',   // branded tables use the default look
+                'accent' => null,      // (tinted by the event brand color)
                 'room' => $room($id),
             ];
         })->all();

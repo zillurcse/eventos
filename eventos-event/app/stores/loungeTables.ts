@@ -9,12 +9,16 @@ export interface LoungeOccupant {
   avatar_url: string | null
 }
 
+export type LoungeTableDesign = 'round' | 'boardroom' | 'lounge'
+
 export interface LoungeTable {
   id: string
   kind: LoungeTableKind
   name: string
   capacity: number
   image_url: string | null
+  design: LoungeTableDesign
+  accent: string | null
   occupants: LoungeOccupant[]
   occupied: number
   live: boolean
