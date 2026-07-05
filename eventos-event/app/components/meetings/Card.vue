@@ -20,7 +20,15 @@ const subtitle = computed(() => {
 })
 
 const when = computed(() => {
-  const iso = props.meeting.starts_at
+  const m = props.meeting
+  // Lounge booking: show the exact slot day + range in the event's local terms.
+  if (m.date && m.slot) {
+    const [y, mo, dd] = m.date.split('-').map(Number)
+    const day = new Date(y ?? 1970, (mo ?? 1) - 1, dd ?? 1)
+      .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    return `${day} · ${m.slot}`
+  }
+  const iso = m.starts_at
   if (!iso) return 'Time to be arranged'
   const d = new Date(iso)
   return d.toLocaleString(undefined, {

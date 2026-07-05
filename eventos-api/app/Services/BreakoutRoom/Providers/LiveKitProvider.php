@@ -30,6 +30,16 @@ class LiveKitProvider implements MeetingProvider
 
     public function joinConfig(BreakoutRoom $room, array $participant): array
     {
+        return $this->joinConfigForRoom($this->roomName($room), $participant);
+    }
+
+    /**
+     * Mint a join config for an arbitrary LiveKit room name — used by features
+     * that aren't backed by a BreakoutRoom row (e.g. networking-lounge tables).
+     * The caller owns the room-name scheme; keep it tenant-safe (no BIGINT ids).
+     */
+    public function joinConfigForRoom(string $roomName, array $participant): array
+    {
         $role = $participant['role'] ?? 'attendee';
         // Publish grant defaults to the role matrix, but the caller may widen it
         // for participatory room types (attendees who get their own mic/camera).
@@ -37,7 +47,7 @@ class LiveKitProvider implements MeetingProvider
         $isAdmin = in_array($role, self::ADMIN_ROLES, true);
 
         $grant = [
-            'room' => $this->roomName($room),
+            'room' => $roomName,
             'roomJoin' => true,
             'canPublish' => $canPublish,
             'canPublishData' => true,   // chat / reactions / raise-hand ride the data channel
@@ -48,14 +58,71 @@ class LiveKitProvider implements MeetingProvider
         return [
             'provider' => 'webrtc',
             'url' => (string) config('services.livekit.url'),
-            'room' => $this->roomName($room),
+            'room' => $roomName,
             'token' => $this->mintToken(
                 identity: $participant['identity'],
                 name: $participant['name'] ?? $participant['identity'],
                 grant: $grant,
-                metadata: json_encode(['role' => $role]),
+                metadata: json_encode(array_filter([
+                    'role' => $role,
+                    'avatar_url' => $participant['avatar_url'] ?? null,
+                ])),
             ),
         ];
+    }
+
+    /**
+     * Live participant counts keyed by room name, from a single ListRooms RPC.
+     * Returns [] when LiveKit is unreachable so callers degrade gracefully
+     * (tables render as empty/available rather than erroring).
+     */
+    public function roomOccupancy(): array
+    {
+        try {
+            $out = [];
+            foreach ($this->rpc('ListRooms', [])['rooms'] ?? [] as $r) {
+                $out[$r['name'] ?? ''] = (int) ($r['num_participants'] ?? 0);
+            }
+
+            return $out;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** Live participant count for one room (0 when unreachable). */
+    public function participantCount(string $roomName): int
+    {
+        try {
+            return count($this->rpc('ListParticipants', ['room' => $roomName])['participants'] ?? []);
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Live occupants of one room as [{ identity, name, avatar_url }] — the seat
+     * roster for the lounge table card. avatar_url is pulled from the join-time
+     * participant metadata. Returns [] when the room is empty or unreachable.
+     */
+    public function participants(string $roomName): array
+    {
+        try {
+            return collect($this->rpc('ListParticipants', ['room' => $roomName])['participants'] ?? [])
+                ->map(function ($p) {
+                    $meta = json_decode($p['metadata'] ?? '', true);
+
+                    return [
+                        'identity' => $p['identity'] ?? '',
+                        'name' => $p['name'] ?? ($p['identity'] ?? 'Guest'),
+                        'avatar_url' => is_array($meta) ? ($meta['avatar_url'] ?? null) : null,
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function removeParticipant(BreakoutRoom $room, string $identity): void
@@ -134,13 +201,18 @@ class LiveKitProvider implements MeetingProvider
         $token = $this->mintToken(
             identity: 'server',
             name: 'server',
-            grant: ['roomAdmin' => true, 'room' => $body['room'] ?? ''],
+            // roomAdmin authorizes per-room ops (participants, metadata); roomList
+            // authorizes the room-wide ListRooms occupancy read.
+            grant: ['roomAdmin' => true, 'roomList' => true, 'room' => $body['room'] ?? ''],
         );
 
+        // Twirp requires a JSON *object* body; an empty PHP array encodes to `[]`
+        // (a JSON array) which LiveKit rejects as malformed — coerce to `{}`.
         $response = Http::withToken($token)
             ->acceptJson()
+            ->withBody(json_encode($body ?: (object) []), 'application/json')
             ->post(rtrim((string) config('services.livekit.host'), '/')
-                .'/twirp/livekit.RoomService/'.$method, $body);
+                .'/twirp/livekit.RoomService/'.$method);
 
         if ($response->failed()) {
             throw new RuntimeException("LiveKit RPC {$method} failed: ".$response->body());

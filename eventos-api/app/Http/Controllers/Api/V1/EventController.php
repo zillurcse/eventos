@@ -213,6 +213,8 @@ class EventController extends Controller
             'lounge.attendee_tables.*.capacity' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:10000'],
             'lounge.attendee_tables.*.image_file_id' => ['sometimes', 'nullable', 'integer'],
             'lounge.attendee_tables.*.image_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'lounge.attendee_tables.*.design' => ['sometimes', 'nullable', 'string', 'in:round,boardroom,lounge'],
+            'lounge.attendee_tables.*.accent' => ['sometimes', 'nullable', 'string', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
             'lounge.exhibitor_tables_enabled' => ['sometimes', 'boolean'],
             'lounge.exhibitor_default_meetings' => ['sometimes', 'integer', 'min:0', 'max:100000'],
             'lounge.exhibitor_meetings' => ['sometimes', 'array'],

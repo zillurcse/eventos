@@ -10,7 +10,7 @@ const tabs: Tab[] = [
   { key: 'speakers', label: 'Speakers', to: '/speakers', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0' },
   { key: 'delegates', label: 'Delegates', to: '/delegates', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19a6 6 0 0 1 12 0M17 11a3 3 0 1 0 0-6M15 13a6 6 0 0 1 7 6' },
   { key: 'meetings', label: 'Meetings', to: '/meetings', icon: 'M7 4v3M17 4v3M4 9h16M5 7h14v13H5z' },
-  { key: 'lounge', label: 'Lounge', icon: 'M4 12v-2a3 3 0 0 1 6 0v2h4v-2a3 3 0 0 1 6 0v2M3 12h18v6H3zM6 18v2M18 18v2' },
+  { key: 'lounge', label: 'Lounge', to: '/lounge', icon: 'M4 12v-2a3 3 0 0 1 6 0v2h4v-2a3 3 0 0 1 6 0v2M3 12h18v6H3zM6 18v2M18 18v2' },
   { key: 'expolens', label: 'ExpoLens', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 7h3l1-2h8l1 2h3v12H4z' },
   { key: 'rooms', label: 'Rooms', to: '/rooms', icon: 'M4 20V6l8-3 8 3v14M4 20h16M9 20v-5h6v5' },
   { key: 'exhibitors', label: 'Exhibitors', to: '/exhibitors', icon: 'M4 9l1-4h14l1 4M4 9v11h16V9M4 9h16M9 20v-6h6v6' },

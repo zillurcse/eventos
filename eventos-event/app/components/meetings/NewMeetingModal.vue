@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { Delegate } from '~/stores/delegates'
+import type { LoungeAvailability } from '~/stores/lounge'
 
 const emit = defineEmits<{ close: [] }>()
 
 const meetings = useMeetingsStore()
 const delegates = useDelegatesStore()
+const lounge = useLoungeStore()
 
 const step = ref<'pick' | 'form'>('pick')
 const search = ref('')
@@ -13,6 +15,12 @@ const title = ref('')
 const agenda = ref('')
 const startsAt = ref('')
 const errorMsg = ref('')
+
+// ── Lounge slot picker state ──────────────────────────────────────────────
+const avail = ref<LoungeAvailability | null>(null)
+const loadingSlots = ref(false)
+const selectedDate = ref('')
+const selectedSlot = ref('')
 
 onMounted(() => { if (!delegates.loaded) delegates.fetchDelegates() })
 
@@ -23,28 +31,81 @@ const filtered = computed<Delegate[]>(() => {
     `${d.name} ${d.job_title} ${d.company}`.toLowerCase().includes(q))
 })
 
+// Dates that actually have at least one bookable slot configured.
+const slotDates = computed<string[]>(() => {
+  const a = avail.value
+  if (!a) return []
+  return a.dates.filter(d => (a.slots[d]?.length ?? 0) > 0)
+})
+
+// Are we booking into lounge slots, or falling back to a free-form time?
+const useSlots = computed(() => !!avail.value?.enabled && slotDates.value.length > 0)
+
+const busyKeys = computed<Set<string>>(() =>
+  new Set((avail.value?.busy ?? []).map(b => `${b.date}|${b.slot}`)))
+
+const daySlots = computed<string[]>(() => avail.value?.slots[selectedDate.value] ?? [])
+
+function isBusy(slot: string): boolean {
+  return busyKeys.value.has(`${selectedDate.value}|${slot}`)
+}
+
 function initials(name?: string | null) {
   const p = (name || '?').trim().split(/\s+/)
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-function choose(d: Delegate) {
+function fmtDateTab(iso: string): string {
+  const [y, m, dd] = iso.split('-').map(Number)
+  const d = new Date(y ?? 1970, (m ?? 1) - 1, dd ?? 1)
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+async function choose(d: Delegate) {
   selected.value = d
   title.value = `Meeting with ${d.name || 'you'}`
   step.value = 'form'
+  selectedDate.value = ''
+  selectedSlot.value = ''
+  errorMsg.value = ''
+
+  loadingSlots.value = true
+  avail.value = await lounge.fetchFor(d.id)
+  loadingSlots.value = false
+  selectedDate.value = slotDates.value[0] ?? ''
+}
+
+function pickSlot(slot: string) {
+  if (isBusy(slot)) return
+  selectedSlot.value = selectedSlot.value === slot ? '' : slot
 }
 
 async function submit() {
   if (!selected.value) return
   errorMsg.value = ''
+
+  if (useSlots.value && !selectedSlot.value) {
+    errorMsg.value = 'Pick an available time slot.'
+    return
+  }
+
   const ok = await meetings.request({
     to: selected.value.id,
     title: title.value.trim() || undefined,
     agenda: agenda.value.trim() || undefined,
-    starts_at: startsAt.value ? new Date(startsAt.value).toISOString() : undefined,
+    ...(useSlots.value
+      ? { date: selectedDate.value, slot: selectedSlot.value }
+      : { starts_at: startsAt.value ? new Date(startsAt.value).toISOString() : undefined }),
   })
-  if (ok) emit('close')
-  else errorMsg.value = 'Could not send the request. Please try again.'
+
+  if (ok) { emit('close'); return }
+
+  // A taken slot is the likely cause — refresh availability so it greys out.
+  if (useSlots.value && selected.value) {
+    avail.value = await lounge.fetchFor(selected.value.id)
+    if (selectedSlot.value && isBusy(selectedSlot.value)) selectedSlot.value = ''
+  }
+  errorMsg.value = meetings.lastError || 'Could not send the request. Please try again.'
 }
 </script>
 
@@ -108,7 +169,34 @@ async function submit() {
           <textarea v-model="agenda" rows="3" maxlength="1000" placeholder="Add a note for the invitee" />
         </label>
 
-        <label class="field">
+        <!-- Lounge slot picker -->
+        <div v-if="loadingSlots" class="field"><span>Pick a time</span><p class="hint">Loading available slots…</p></div>
+
+        <div v-else-if="useSlots" class="field">
+          <span>Pick a lounge slot</span>
+
+          <div class="dates">
+            <button
+              v-for="d in slotDates" :key="d" type="button" class="date"
+              :class="{ on: selectedDate === d }"
+              @click="selectedDate = d; selectedSlot = ''"
+            >{{ fmtDateTab(d) }}</button>
+          </div>
+
+          <div v-if="daySlots.length" class="slots">
+            <button
+              v-for="s in daySlots" :key="s" type="button" class="slot"
+              :class="{ on: selectedSlot === s, taken: isBusy(s) }"
+              :disabled="isBusy(s)"
+              :title="isBusy(s) ? 'Already booked' : ''"
+              @click="pickSlot(s)"
+            >{{ s }}</button>
+          </div>
+          <p v-else class="hint">No slots on this day.</p>
+        </div>
+
+        <!-- Fallback: free-form time when the lounge has no configured slots -->
+        <label v-else class="field">
           <span>Proposed time <em>(optional)</em></span>
           <input v-model="startsAt" type="datetime-local">
         </label>
@@ -163,6 +251,18 @@ async function submit() {
 .field em { color: #94a3b8; font-style: normal; font-weight: 400; }
 .field input, .field textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 13px; font: inherit; font-size: .9rem; outline: none; resize: vertical; }
 .field input:focus, .field textarea:focus { border-color: var(--brand-primary); }
+.hint { margin: 0; font-size: .82rem; color: #94a3b8; }
+
+.dates { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; }
+.date { flex: 0 0 auto; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 8px 12px; font: inherit; font-size: .8rem; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap; }
+.date:hover { border-color: var(--brand-primary); }
+.date.on { border-color: var(--brand-primary); color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, #fff); }
+
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.slot { border: 1px solid #e2e8f0; background: #fff; border-radius: 9px; padding: 9px 6px; font: inherit; font-size: .8rem; font-weight: 600; color: #334155; cursor: pointer; }
+.slot:hover:not(:disabled) { border-color: var(--brand-primary); color: var(--brand-primary); }
+.slot.on { border-color: var(--brand-primary); background: var(--brand-primary); color: #fff; }
+.slot.taken { background: #f1f5f9; color: #cbd5e1; cursor: not-allowed; text-decoration: line-through; }
 
 .err { color: #dc2626; font-size: .84rem; margin: 0 0 12px; }
 

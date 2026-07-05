@@ -12,7 +12,15 @@ interface AttendeeTable {
   capacity: number
   image_file_id: number | null
   image_url: string | null
+  design: string          // round | boardroom | lounge
+  accent: string | null   // hex accent, null = event brand color
 }
+
+const TABLE_DESIGNS = [
+  { key: 'round', label: 'Round' },
+  { key: 'boardroom', label: 'Boardroom' },
+  { key: 'lounge', label: 'Lounge' },
+]
 interface Partner { id: string, type: string, name: string, logo_url: string | null }
 
 // ── Lounge config state (mirrors the `lounge` jsonb on event_settings) ──
@@ -114,6 +122,7 @@ async function load() {
     attendeeTablesEnabled.value = !!l.attendee_tables_enabled
     attendeeTables.value = (l.attendee_tables || []).map((t: any) => ({
       id: t.id, name: t.name || '', capacity: t.capacity ?? 4, image_file_id: t.image_file_id ?? null, image_url: t.image_url ?? null,
+      design: t.design || 'round', accent: t.accent ?? null,
     }))
     exhibitorTablesEnabled.value = !!l.exhibitor_tables_enabled
     exhibitorDefaultMeetings.value = Number.isFinite(l.exhibitor_default_meetings) ? l.exhibitor_default_meetings : 3
@@ -144,6 +153,8 @@ async function persist() {
             capacity: Math.max(0, Math.trunc(Number(t.capacity) || 0)),
             image_file_id: t.image_file_id,
             image_url: t.image_url,
+            design: TABLE_DESIGNS.some(d => d.key === t.design) ? t.design : 'round',
+            accent: t.accent || null,
           })),
           exhibitor_tables_enabled: exhibitorTablesEnabled.value,
           exhibitor_default_meetings: Math.max(0, Math.trunc(Number(exhibitorDefaultMeetings.value) || 0)),
@@ -187,7 +198,7 @@ function slotsAtHour(hour: string): { slot: string, index: number }[] {
 
 // ── Attendee tables drawer ─────────────────────────────────────────────
 function addAttendeeTable() {
-  attendeeTables.value.push({ id: 't' + Date.now(), name: 'New table', capacity: 4, image_file_id: null, image_url: null })
+  attendeeTables.value.push({ id: 't' + Date.now(), name: 'New table', capacity: 4, image_file_id: null, image_url: null, design: 'round', accent: null })
 }
 function removeAttendeeTable(i: number) { attendeeTables.value.splice(i, 1) }
 async function uploadTableImage(e: Event, t: AttendeeTable) {
@@ -392,14 +403,29 @@ onMounted(load)
             <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0ad" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
             <input type="file" accept="image/*" class="hidden" @change="uploadTableImage($event, t)">
           </label>
-          <div class="flex-1 flex flex-col gap-1.5">
+          <div class="flex-1 flex flex-col gap-2">
             <input v-model="t.name" class="m-0" placeholder="Table name">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <input v-model.number="t.capacity" type="number" min="0" class="m-0 w-20">
               <span class="text-[.82rem] text-muted">Chairs</span>
+              <span class="text-[.82rem] text-[#d1d5db]">·</span>
+              <div class="inline-flex rounded-lg border border-line overflow-hidden">
+                <button
+                  v-for="d in TABLE_DESIGNS" :key="d.key" type="button"
+                  class="px-2.5 py-1 text-[.76rem] font-semibold cursor-pointer transition-colors"
+                  :class="t.design === d.key ? 'bg-[#6352e7] text-white' : 'bg-white text-muted hover:bg-[#f3f0ff]'"
+                  @click="t.design = d.key"
+                >{{ d.label }}</button>
+              </div>
+              <input
+                :value="t.accent || '#6352e7'" type="color" title="Accent color (clear to use event brand)"
+                class="w-7 h-7 rounded-md border border-line cursor-pointer p-0 bg-transparent"
+                @input="t.accent = ($event.target as HTMLInputElement).value"
+              >
+              <button v-if="t.accent" type="button" class="text-[.72rem] text-[#9aa0ad] hover:text-[#dc2626] cursor-pointer bg-transparent border-0" @click="t.accent = null">clear</button>
             </div>
           </div>
-          <button class="text-[#dc2626] bg-transparent border-0 cursor-pointer p-1" title="Remove" @click="removeAttendeeTable(i)">🗑</button>
+          <button class="text-[#dc2626] bg-transparent border-0 cursor-pointer p-1 self-start" title="Remove" @click="removeAttendeeTable(i)">🗑</button>
         </div>
       </div>
       <p v-if="!attendeeTables.length" class="muted text-[.84rem] py-6 text-center">No tables yet. Click <strong>+ Add Table</strong>.</p>

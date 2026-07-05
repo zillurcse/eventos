@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Concerns\NormalizesTimestamps;
 use App\Http\Controllers\Controller;
+use App\Models\Event;
+use App\Models\EventSetting;
 use App\Models\Meeting;
 use App\Models\Participation;
 use App\Services\Notifications\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -39,6 +42,50 @@ class MeetingController extends Controller
         return response()->json(['data' => $meetings]);
     }
 
+    /**
+     * Bookable lounge slots for this event + which of them are already taken by
+     * me and (optionally, via ?with=<uuid>) the person I'm about to invite, so
+     * the booking picker can offer only the free ones.
+     * GET /events/{event}/lounge
+     */
+    public function lounge(Request $request): JsonResponse
+    {
+        $eventId = $request->attributes->get('event_id');
+        $me = $request->attributes->get('participation_id');
+
+        $event = Event::findOrFail($eventId);
+        $lounge = $this->loungeConfig($eventId);
+
+        $partyIds = [$me];
+        if ($with = $request->query('with')) {
+            $counterpart = Participation::where('event_id', $eventId)->where('uuid', $with)->first();
+            if ($counterpart) {
+                $partyIds[] = $counterpart->id;
+            }
+        }
+
+        $busy = Meeting::where('event_id', $eventId)
+            ->whereIn('status', ['requested', 'confirmed'])
+            ->whereNotNull('meta')
+            ->where(fn ($q) => $q
+                ->whereIn('organizer_participation_id', $partyIds)
+                ->orWhereHas('participants', fn ($p) => $p->whereIn('participations.id', $partyIds)))
+            ->get(['id', 'meta'])
+            ->map(fn (Meeting $m) => ['date' => $m->meta['lounge_date'] ?? null, 'slot' => $m->meta['lounge_slot'] ?? null])
+            ->filter(fn ($x) => $x['date'] && $x['slot'])
+            ->unique(fn ($x) => $x['date'].'|'.$x['slot'])
+            ->values();
+
+        return response()->json(['data' => [
+            'enabled' => (bool) ($lounge['enabled'] ?? false),
+            'slots_open_all' => (bool) ($lounge['slots_open_all'] ?? false),
+            'timezone' => $event->resolvedTimezone(),
+            'dates' => $this->loungeDates($event),
+            'slots' => $this->effectiveSlots($event, $lounge),
+            'busy' => $busy,
+        ]]);
+    }
+
     public function store(Request $request, NotificationService $notifications): JsonResponse
     {
         $eventId = $request->attributes->get('event_id');
@@ -52,6 +99,9 @@ class MeetingController extends Controller
             'max_participants' => ['nullable', 'integer', 'min:2'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            // A booking into one of the organizer's lounge slots (preferred).
+            'date' => ['nullable', 'date_format:Y-m-d', 'required_with:slot'],
+            'slot' => ['nullable', 'regex:/^\d{2}:\d{2}-\d{2}:\d{2}$/', 'required_with:date'],
             'invitees' => ['required', 'array', 'min:1'],
             'invitees.*' => ['string'], // participation uuids
         ]);
@@ -65,6 +115,34 @@ class MeetingController extends Controller
 
         abort_if($invitees->isEmpty(), 422, 'Select at least one person to meet.');
 
+        // Resolve a lounge-slot booking into concrete start/end + a canonical
+        // slot key, enforcing that the slot is offered and not already taken.
+        $startsAt = $data['starts_at'] ?? null;
+        $endsAt = $data['ends_at'] ?? null;
+        $meta = null;
+
+        if (! empty($data['slot']) && ! empty($data['date'])) {
+            $event = Event::findOrFail($eventId);
+            $effective = $this->effectiveSlots($event, $this->loungeConfig($eventId));
+
+            abort_unless(
+                in_array($data['slot'], $effective[$data['date']] ?? [], true),
+                422, 'That time slot is not available for the selected day.',
+            );
+
+            $partyIds = $invitees->pluck('id')->push($me)->all();
+            abort_if(
+                $this->slotIsTaken($eventId, $data['date'], $data['slot'], $partyIds),
+                422, 'That slot is already booked. Please pick another one.',
+            );
+
+            [$startHM, $endHM] = explode('-', $data['slot']);
+            $tz = $event->resolvedTimezone();
+            $startsAt = Carbon::createFromFormat('Y-m-d H:i', $data['date'].' '.$startHM, $tz)->utc();
+            $endsAt = Carbon::createFromFormat('Y-m-d H:i', $data['date'].' '.$endHM, $tz)->utc();
+            $meta = ['lounge_date' => $data['date'], 'lounge_slot' => $data['slot']];
+        }
+
         $meeting = Meeting::create([
             'event_id' => $eventId,
             'organization_id' => $orgId,
@@ -73,8 +151,9 @@ class MeetingController extends Controller
             'agenda' => $data['agenda'] ?? null,
             'type' => $data['type'] ?? 'one_on_one',
             'max_participants' => $data['max_participants'] ?? null,
-            'starts_at' => $data['starts_at'] ?? null,
-            'ends_at' => $data['ends_at'] ?? null,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'meta' => $meta,
             'status' => 'requested',
         ]);
 
@@ -185,6 +264,8 @@ class MeetingController extends Controller
             'can_respond' => $direction === 'incoming' && $myRsvp === 'pending' && $m->status === 'requested',
             'starts_at' => $m->starts_at?->toIso8601String(),
             'ends_at' => $m->ends_at?->toIso8601String(),
+            'date' => $m->meta['lounge_date'] ?? null,
+            'slot' => $m->meta['lounge_slot'] ?? null,
             'counterpart' => $counterpart ? $this->person($counterpart) : null,
             'participants' => $m->participants->map(fn ($p) => [
                 'name' => $this->name($p),
@@ -192,6 +273,84 @@ class MeetingController extends Controller
                 'rsvp' => $p->pivot->rsvp,
             ])->values(),
         ];
+    }
+
+    // ── Lounge slot helpers ────────────────────────────────────────────────
+
+    /** The `lounge` jsonb config for the event (Communication → Lounge). */
+    private function loungeConfig(int $eventId): array
+    {
+        $s = EventSetting::where('event_id', $eventId)->first();
+
+        return is_array($s?->lounge) ? $s->lounge : [];
+    }
+
+    /** Event-local dates between starts_at and ends_at (inclusive). */
+    private function loungeDates(Event $event): array
+    {
+        if (! $event->starts_at) {
+            return [];
+        }
+
+        $tz = $event->resolvedTimezone();
+        $day = $event->starts_at->copy()->setTimezone($tz)->startOfDay();
+        $last = ($event->ends_at ?? $event->starts_at)->copy()->setTimezone($tz)->startOfDay();
+
+        $dates = [];
+        while ($day->lte($last) && count($dates) < 60) {
+            $dates[] = $day->format('Y-m-d');
+            $day->addDay();
+        }
+
+        return $dates;
+    }
+
+    /**
+     * The bookable slots per date: the organizer's configured slots, or the
+     * full half-hour grid when "Open all meeting slot" is on.
+     */
+    private function effectiveSlots(Event $event, array $lounge): array
+    {
+        $dates = $this->loungeDates($event);
+
+        if (! empty($lounge['slots_open_all'])) {
+            $grid = $this->fullDayGrid();
+
+            return collect($dates)->mapWithKeys(fn ($d) => [$d => $grid])->all();
+        }
+
+        $configured = is_array($lounge['slots'] ?? null) ? $lounge['slots'] : [];
+        $out = [];
+        foreach ($dates as $d) {
+            $out[$d] = array_values(array_filter((array) ($configured[$d] ?? []), 'is_string'));
+        }
+
+        return $out;
+    }
+
+    /** Half-hour grid 10:00–18:00 — mirrors the admin slot manager. */
+    private function fullDayGrid(): array
+    {
+        $slots = [];
+        for ($h = 10; $h < 18; $h++) {
+            $slots[] = sprintf('%02d:00-%02d:30', $h, $h);
+            $slots[] = sprintf('%02d:30-%02d:00', $h, $h + 1);
+        }
+
+        return $slots;
+    }
+
+    /** True if any of the given participants already hold this exact slot. */
+    private function slotIsTaken(int $eventId, string $date, string $slot, array $partyIds): bool
+    {
+        return Meeting::where('event_id', $eventId)
+            ->whereIn('status', ['requested', 'confirmed'])
+            ->where('meta->lounge_date', $date)
+            ->where('meta->lounge_slot', $slot)
+            ->where(fn ($q) => $q
+                ->whereIn('organizer_participation_id', $partyIds)
+                ->orWhereHas('participants', fn ($p) => $p->whereIn('participations.id', $partyIds)))
+            ->exists();
     }
 
     /** Public projection of a participation (name, title, avatar). */
