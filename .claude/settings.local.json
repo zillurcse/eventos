@@ -22,7 +22,10 @@
       "Bash(curl -s -o /dev/null -w \"meetings page HTTP %{http_code}\\\\n\" \"http://localhost:3001/meetings?subdomain=demo\")",
       "Bash(grep -rl -i \"exhibitor\" eventos-api/app/ eventos-api/routes/)",
       "Bash(grep -rl -i \"exhibitor\" eventos-event/app/)",
-      "Bash(curl -s -o /dev/null -w \"exhibitors page HTTP %{http_code}\\\\n\" \"http://localhost:3001/exhibitors?subdomain=demo\")"
+      "Bash(curl -s -o /dev/null -w \"exhibitors page HTTP %{http_code}\\\\n\" \"http://localhost:3001/exhibitors?subdomain=demo\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(Object.keys\\(p.scripts||{}\\).join\\(', '\\)\\)\")",
+      "Bash(grep -niE 'HasUuid|primaryKey|keyType|incrementing|uuid|\\\\$table' app/Models/User.php)",
+      "Bash(docker compose exec -T api php artisan tinker '--execute= *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",

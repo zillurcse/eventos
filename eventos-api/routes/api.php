@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
+use App\Http\Controllers\Api\V1\LoungeController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -172,8 +173,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
             Route::get('/meetings', [MeetingController::class, 'index']);
+            Route::get('/lounge', [MeetingController::class, 'lounge']);
             Route::post('/meetings', [MeetingController::class, 'store']);
             Route::patch('/meetings/{meeting}', [MeetingController::class, 'respond']);
+            // Networking-lounge tables (live video tables + join).
+            Route::get('/lounge/tables', [LoungeController::class, 'tables']);
+            Route::post('/lounge/tables/{table}/join', [LoungeController::class, 'join']);
             // Attendee join: mint a media token for a published breakout room in
             // this event (role derived server-side; attendees are subscribe-only).
             Route::post('/breakout-rooms/{room}/token', [BreakoutRoomController::class, 'token']);

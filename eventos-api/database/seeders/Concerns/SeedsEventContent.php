@@ -6,6 +6,7 @@ use App\Models\BreakoutRoom;
 use App\Models\Contact;
 use App\Models\Event;
 use App\Models\EventAd;
+use App\Models\EventSetting;
 use App\Models\Exhibitor;
 use App\Models\ExhibitorDocument;
 use App\Models\ExhibitorProduct;
@@ -104,6 +105,9 @@ trait SeedsEventContent
             $this->partner($org, $event, $name, 'sponsor', 15000 + $i * 211, $this->pic($picPrefix.'-spo'.$i, 240, 120), $i);
         }
 
+        // --- Networking Lounge (LOUNGE tab: tables + bookable meeting slots) ---
+        $this->seedLounge($event, $tz, $picPrefix);
+
         // --- Reception ads (strip + sidebar) ---------------------------------
         EventAd::updateOrCreate(
             ['event_id' => $event->id, 'title' => 'Headline Sponsor — Cityscape'],
@@ -146,6 +150,53 @@ trait SeedsEventContent
             "  Host (can publish video in rooms): host@{$emailDomain}",
             '  Coded room "VIP Speaker Round Table" access code: VIP2026',
         ];
+    }
+
+    /**
+     * Configure the networking lounge (Communication → Lounge): a few named
+     * attendee tables, exhibitor + sponsor branded tables (the partners seeded
+     * above), and bookable meeting slots across every event day — so both the
+     * LOUNGE tab (live video tables) and the Meetings slot picker have real data.
+     */
+    private function seedLounge(Event $event, string $tz, string $picPrefix): void
+    {
+        $times = ['10:00-10:30', '10:30-11:00', '11:00-11:30', '14:00-14:30', '14:30-15:00', '15:00-15:30'];
+        $slots = [];
+        $day = $event->starts_at->copy()->setTimezone($tz)->startOfDay();
+        $last = ($event->ends_at ?? $event->starts_at)->copy()->setTimezone($tz)->startOfDay();
+        $guard = 0;
+        while ($day->lte($last) && $guard++ < 14) {
+            $slots[$day->format('Y-m-d')] = $times;
+            $day->addDay();
+        }
+
+        $attendeeTables = [
+            ['id' => 't1', 'name' => 'Expouse Table', 'capacity' => 4, 'image_file_id' => null, 'image_url' => $this->pic($picPrefix.'-lt1', 200, 200)],
+            ['id' => 't2', 'name' => 'Founders Corner', 'capacity' => 6, 'image_file_id' => null, 'image_url' => $this->pic($picPrefix.'-lt2', 200, 200)],
+            ['id' => 't3', 'name' => 'Designers Lounge', 'capacity' => 4, 'image_file_id' => null, 'image_url' => $this->pic($picPrefix.'-lt3', 200, 200)],
+            ['id' => 't4', 'name' => 'AI & Data Table', 'capacity' => 8, 'image_file_id' => null, 'image_url' => null],
+        ];
+
+        $existing = EventSetting::where('event_id', $event->id)->first();
+        $lounge = is_array($existing?->lounge) ? $existing->lounge : [];
+
+        EventSetting::updateOrCreate(
+            ['event_id' => $event->id],
+            [
+                'organization_id' => $event->organization_id,
+                'lounge' => array_merge($lounge, [
+                    'enabled' => true,
+                    'slots_open_all' => false,
+                    'slots' => $slots,
+                    'attendee_tables_enabled' => true,
+                    'attendee_tables' => $attendeeTables,
+                    'exhibitor_tables_enabled' => true,
+                    'exhibitor_default_meetings' => 3,
+                    'sponsor_tables_enabled' => true,
+                    'sponsor_default_meetings' => 10,
+                ]),
+            ],
+        );
     }
 
     /** A published LiveKit (webrtc) breakout room. */

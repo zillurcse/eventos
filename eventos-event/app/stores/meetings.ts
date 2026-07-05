@@ -24,6 +24,8 @@ export interface Meeting {
   can_respond: boolean
   starts_at: string | null
   ends_at: string | null
+  date: string | null   // lounge slot day, YYYY-MM-DD
+  slot: string | null   // lounge slot, HH:MM-HH:MM
   counterpart: MeetingPerson | null
   participants: MeetingParticipant[]
 }
@@ -34,6 +36,8 @@ export interface MeetingRequest {
   agenda?: string
   starts_at?: string
   ends_at?: string
+  date?: string        // lounge slot day, YYYY-MM-DD
+  slot?: string        // lounge slot, HH:MM-HH:MM
 }
 
 /**
@@ -49,6 +53,7 @@ export const useMeetingsStore = defineStore('meetings', {
     loaded: false,
     error: false,
     sending: false,
+    lastError: '' as string,
     acting: {} as Record<string, boolean>,
   }),
 
@@ -83,6 +88,7 @@ export const useMeetingsStore = defineStore('meetings', {
       if (!uuid) return false
 
       this.sending = true
+      this.lastError = ''
       try {
         const api = useApi()
         const res = await api<{ data: Meeting }>(`/events/${uuid}/meetings`, {
@@ -93,13 +99,17 @@ export const useMeetingsStore = defineStore('meetings', {
             agenda: req.agenda || null,
             starts_at: req.starts_at || null,
             ends_at: req.ends_at || null,
+            date: req.date || null,
+            slot: req.slot || null,
             type: 'one_on_one',
           },
         })
         // New request lands at the top of the list (outgoing, pending).
         this.meetings.unshift(res.data)
         return true
-      } catch {
+      } catch (e: any) {
+        // Surface a server-provided reason (e.g. slot already booked) when present.
+        this.lastError = e?.data?.message || e?.response?._data?.message || ''
         return false
       } finally {
         this.sending = false
