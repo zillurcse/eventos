@@ -146,7 +146,7 @@
   .stat .l { @apply text-[.76rem] text-muted uppercase mt-0.5; letter-spacing: .05em; }
 
   /* ── Modal ───────────────────────────────────────────── */
-  .modal-backdrop { @apply fixed inset-0 grid place-items-center z-[100] p-5; background: rgba(17,20,36,.45); }
+  .modal-backdrop { @apply fixed inset-0 grid place-items-center z-[99999] p-5; background: rgba(17,20,36,.45); }
   .modal { @apply bg-white rounded-[18px] w-full max-w-[520px] max-h-[90vh] overflow-auto p-6; }
   .modal h2 { @apply text-[1.2rem]; }
   .modal.lg { @apply max-w-[680px]; }

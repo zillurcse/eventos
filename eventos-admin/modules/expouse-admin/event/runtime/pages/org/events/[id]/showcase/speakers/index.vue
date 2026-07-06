@@ -210,7 +210,7 @@ onMounted(() => { load(); loadCategories() })
             @click="openDirectory"
           >SPEAKERS DIRECTORY</button>
           <button class="btn" @click="openAdd">
-            <Icon name="plus" class="w-3.75 h-3.75" /> SPEAKERS
+            + SPEAKERS
           </button>
         </div>
       </div>

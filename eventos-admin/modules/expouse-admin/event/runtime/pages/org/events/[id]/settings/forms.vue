@@ -60,7 +60,7 @@ onMounted(load)
     <div class="toolbar">
       <h2 class="section-title m-0">Form Builder</h2>
       <div class="grow flex-1" />
-      <button class="btn" @click="openCreate"><Icon name="plus" class="w-4 h-4" /> New form</button>
+      <button class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> New form</button>
     </div>
 
     <div class="card">
@@ -95,7 +95,7 @@ onMounted(load)
         </label>
         <button class="btn sm ghost" @click="removeRow(i)">✕</button>
       </div>
-      <button class="btn ghost sm" @click="addRow"><Icon name="plus" class="w-[14px] h-[14px]" /> Add field</button>
+      <button class="btn ghost sm" @click="addRow"><AppIcon name="plus" class="w-[14px] h-[14px]" /> Add field</button>
       <p v-if="error" class="error">{{ error }}</p>
       <div class="modal-actions">
         <button class="btn ghost" @click="showModal = false">Cancel</button>

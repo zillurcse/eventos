@@ -501,7 +501,7 @@ onMounted(load)
       >
       <div class="flex-1" />
       <button class="btn" @click.stop="openAdd">
-        <Icon name="plus" class="w-3.75 h-3.75" /> SCHEDULE
+        + SCHEDULE
       </button>
     </div>
 

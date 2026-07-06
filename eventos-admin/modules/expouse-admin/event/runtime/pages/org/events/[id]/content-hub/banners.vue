@@ -60,6 +60,14 @@ async function removeBanner(b: Banner) {
   await persist()
 }
 
+function onImageChange(v: string | string[] | null) {
+  draft.image_url = Array.isArray(v) ? v[0] ?? null : v
+}
+
+function onImageUploaded(v: { id: number, url: string }) {
+  draft.image_file_id = v.id
+}
+
 onMounted(load)
 </script>
 
@@ -87,30 +95,20 @@ onMounted(load)
 
       <!-- Banner grid -->
       <div v-if="banners.length" class="flex flex-wrap gap-4">
-        <div
-          v-for="b in banners" :key="b.id"
-          class="relative group w-[220px] h-[140px] rounded-xl overflow-hidden bg-[#f3f4f6] border border-line cursor-pointer shrink-0"
-          @click="openEdit(b)"
-        >
-          <img v-if="b.image_url" :src="b.image_url" :alt="b.name" class="w-full h-full object-cover">
-          <div v-else class="w-full h-full flex items-center justify-center text-muted text-sm">No image</div>
-
-          <!-- hover overlay -->
-          <div class="absolute inset-0 bg-[rgba(0,0,0,.45)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center gap-2">
-            <button
-              class="px-3 py-1.5 rounded-md bg-white text-[#1a1a2e] text-xs font-semibold hover:bg-[#f5f5f8]"
-              @click.stop="openEdit(b)"
-            >Edit</button>
-            <button
-              class="px-3 py-1.5 rounded-md bg-[#dc2626] text-white text-xs font-semibold hover:bg-[#b91c1c]"
-              @click.stop="removeBanner(b)"
-            >Remove</button>
+        <div v-for="b in banners" :key="b.id" class="w-55">
+          <div class="img-card" style="aspect-ratio: 220 / 140;">
+            <img v-if="b.image_url" :src="b.image_url" :alt="b.name">
+            <div v-else class="w-full h-full flex items-center justify-center text-muted text-sm">No image</div>
+            <div class="img-card-actions">
+              <button class="img-action" title="Edit banner" @click="openEdit(b)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+              </button>
+              <button class="img-action danger" title="Remove banner" @click="removeBanner(b)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
           </div>
-
-          <!-- name strip -->
-          <div v-if="b.name" class="absolute bottom-0 left-0 right-0 px-2.5 py-1.5 bg-[rgba(0,0,0,.5)] text-white text-xs truncate">
-            {{ b.name }}
-          </div>
+          <p v-if="b.name" class="text-[.82rem] text-ink font-medium mt-1.5 mb-0 truncate">{{ b.name }}</p>
         </div>
       </div>
 
@@ -136,11 +134,14 @@ onMounted(load)
         Banner Image
         <span class="text-[#dc2626] ml-0.5">*</span>
       </label>
-      <UploadButton
-        :preview="draft.image_url ?? undefined"
+      <ImageField
+        :model-value="draft.image_url"
+        :aspect="220 / 140"
         collection="banners"
-        path="/events/uploads"
-        @uploaded="(v: any) => { draft.image_file_id = v.id; draft.image_url = v.url }"
+        card-width="100%"
+        hint="220×140px recommended"
+        @update:model-value="onImageChange"
+        @uploaded="onImageUploaded"
       />
 
       <div class="modal-actions">

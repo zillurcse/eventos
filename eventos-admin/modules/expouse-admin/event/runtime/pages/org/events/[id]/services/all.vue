@@ -268,14 +268,14 @@ onMounted(async () => { await Promise.all([loadCategories(), loadServices()]) })
         <h2 class="section-title m-0">Services</h2>
         <p class="muted text-[.86rem] mt-0.5 mb-0">Manage your event services</p>
       </div>
-      <button class="btn" @click="openAdd"><Icon name="plus" class="w-[15px] h-[15px]" /> ADD SERVICES</button>
+      <button class="btn" @click="openAdd"><AppIcon name="plus" class="w-[15px] h-[15px]" /> ADD SERVICES</button>
     </div>
 
     <div class="card">
       <!-- toolbar -->
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <div class="search flex-1 min-w-[220px] max-w-[420px]">
-          <Icon name="search" />
+          <AppIcon name="search" />
           <input v-model="search" placeholder="Search services...">
         </div>
         <select v-model="categoryFilter" class="w-auto m-0 min-w-[170px]">

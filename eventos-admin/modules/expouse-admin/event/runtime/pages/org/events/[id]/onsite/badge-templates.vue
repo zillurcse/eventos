@@ -104,24 +104,24 @@ onMounted(load)
         <p>Design the badges printed for this event’s attendees, staff and exhibitors.</p>
       </div>
       <button class="btn-primary" @click="openCreate">
-        <Icon name="plus" /> New template
+        <AppIcon name="plus" /> New template
       </button>
     </header>
 
     <div v-if="loading" class="bt-muted">Loading templates…</div>
 
     <div v-else-if="!templates.length" class="bt-empty">
-      <Icon name="layers" />
+      <AppIcon name="layers" />
       <p>No badge templates yet.</p>
       <button class="btn-primary" @click="openCreate">
-        <Icon name="plus" /> Create your first template
+        <AppIcon name="plus" /> Create your first template
       </button>
     </div>
 
     <div v-else class="bt-grid">
       <div v-for="t in templates" :key="t.id" class="bt-card">
         <div class="bt-preview">
-          <Icon name="box" />
+          <AppIcon name="box" />
         </div>
         <div class="bt-body">
           <h3 :title="t.name">{{ t.name }}</h3>
@@ -133,10 +133,10 @@ onMounted(load)
         </div>
         <div class="bt-actions">
           <button class="btn-soft" @click="editTemplate(t)">
-            <Icon name="cog" /> Edit
+            <AppIcon name="cog" /> Edit
           </button>
           <button class="btn-danger" @click="deleteTemplate(t)" title="Delete">
-            <Icon name="logout" />
+            <AppIcon name="logout" />
           </button>
         </div>
       </div>

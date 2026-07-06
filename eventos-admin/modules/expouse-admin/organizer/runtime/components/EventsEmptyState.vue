@@ -7,7 +7,7 @@ defineEmits<{ (e: 'cta'): void }>()
 
 <template>
   <div class="empty-state" :class="{ compact }">
-    <div class="empty-state__icon"><Icon :name="icon" /></div>
+    <div class="empty-state__icon"><AppIcon :name="icon" /></div>
     <p v-if="title" class="empty-state__title">{{ title }}</p>
     <p class="muted">{{ description }}</p>
     <button v-if="ctaLabel" class="btn mt-3" @click="$emit('cta')">{{ ctaLabel }}</button>

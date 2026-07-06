@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             PlanSeeder::class,
+            IconSeeder::class,
         ]);
 
         // A platform Super Admin to sign in with (local dev only).

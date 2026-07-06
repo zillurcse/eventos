@@ -3,7 +3,6 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
 const api = useApi()
-const { upload } = useUpload()
 const id = route.params.id as string
 
 interface GalleryImage {
@@ -20,9 +19,13 @@ interface GalleryImage {
 const images = ref<GalleryImage[]>([])
 const activeAlbum = ref<string>('All')
 const saved = ref(false)
-const uploading = ref(false)
-const uploadProgress = reactive({ done: 0, total: 0 })
-const isDragOver = ref(false)
+
+// add-images drawer (ImageField, multiple)
+const addDrawerOpen = ref(false)
+const addSaving = ref(false)
+const pending = ref<{ id: number, url: string }[]>([])
+const pendingUrls = computed(() => pending.value.map(p => p.url))
+const pendingAlbum = ref('')
 
 // edit-caption drawer
 const drawerOpen = ref(false)
@@ -60,45 +63,36 @@ async function load() {
   } catch { /* */ }
 }
 
-// ── Upload (multi-file, drag & drop) ──────────────────────────────────────────
+// ── Add images (sidebar, ImageField multiple) ─────────────────────────────────
 
-async function handleFiles(files: FileList | File[]) {
-  const list = Array.from(files).filter(f => f.type.startsWith('image/'))
-  if (!list.length) return
-
-  uploading.value = true
-  uploadProgress.done = 0
-  uploadProgress.total = list.length
-  const payload: { file_id: number, url: string, album?: string }[] = []
-  const targetAlbum = activeAlbum.value !== 'All' ? activeAlbum.value : undefined
-
-  for (const f of list) {
-    try {
-      const r = await upload(f, { collection: 'cover' })
-      payload.push({ file_id: r.id, url: r.url, ...(targetAlbum ? { album: targetAlbum } : {}) })
-    } catch { /* skip failed file */ }
-    uploadProgress.done++
-  }
-
-  if (payload.length) {
-    try {
-      const res = await api<{ data: GalleryImage[] }>(`/events/${id}/gallery`, { method: 'POST', body: { images: payload } })
-      images.value.push(...res.data)
-      flash()
-    } catch { /* */ }
-  }
-  uploading.value = false
+function openAddDrawer() {
+  pending.value = []
+  pendingAlbum.value = activeAlbum.value !== 'All' ? activeAlbum.value : ''
+  addDrawerOpen.value = true
 }
 
-function onFileInput(e: Event) {
-  const files = (e.target as HTMLInputElement).files
-  if (files) handleFiles(files)
-  ;(e.target as HTMLInputElement).value = ''
+function onPendingUploaded(v: { id: number, url: string }) {
+  pending.value.push(v)
 }
 
-function onDrop(e: DragEvent) {
-  isDragOver.value = false
-  if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files)
+function onPendingChange(v: string | string[] | null) {
+  const urls = Array.isArray(v) ? v : []
+  pending.value = pending.value.filter(p => urls.includes(p.url))
+}
+
+async function saveAdd() {
+  if (!pending.value.length) return
+  addSaving.value = true
+  try {
+    const album = pendingAlbum.value.trim() || undefined
+    const payload = pending.value.map(p => ({ file_id: p.id, url: p.url, ...(album ? { album } : {}) }))
+    const res = await api<{ data: GalleryImage[] }>(`/events/${id}/gallery`, { method: 'POST', body: { images: payload } })
+    images.value.push(...res.data)
+    addDrawerOpen.value = false
+    flash()
+  } catch { /* */ } finally {
+    addSaving.value = false
+  }
 }
 
 // ── Edit / feature / delete ───────────────────────────────────────────────────
@@ -198,11 +192,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </h2>
         <p class="muted text-[.86rem] mt-0.5 mb-0">Upload event photos, organize them into albums and reorder by dragging.</p>
       </div>
-      <label class="btn cursor-pointer">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-        UPLOAD IMAGES
-        <input type="file" accept="image/*" multiple class="hidden" @change="onFileInput">
-      </label>
+      <button class="btn" @click="openAddDrawer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        ADD IMAGES
+      </button>
     </div>
 
     <!-- Album filter tabs -->
@@ -222,39 +215,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </button>
     </div>
 
-    <!-- Drop zone -->
-    <div
-      class="rounded-2xl border-2 border-dashed transition-colors duration-150 mb-5 p-6 text-center"
-      :class="isDragOver ? 'border-[#6352e7] bg-[#f3f0ff]' : 'border-line bg-[#fafafb]'"
-      @dragover.prevent="isDragOver = true"
-      @dragleave.prevent="isDragOver = false"
-      @drop.prevent="onDrop"
-    >
-      <div v-if="uploading" class="flex flex-col items-center gap-2">
-        <div class="font-semibold text-[#6352e7]">Uploading {{ uploadProgress.done }} / {{ uploadProgress.total }}…</div>
-        <div class="w-[220px] h-1.5 rounded-full bg-[#e7e5f3] overflow-hidden">
-          <div class="h-full bg-[#6352e7] transition-all duration-200" :style="{ width: `${(uploadProgress.done / Math.max(uploadProgress.total, 1)) * 100}%` }" />
-        </div>
-      </div>
-      <div v-else class="text-muted text-[.9rem]">
-        <strong class="text-[#6352e7]">Drag &amp; drop</strong> images here, or use the Upload button.
-        <span v-if="activeAlbum !== 'All'" class="block text-[.82rem] mt-1">New images will be added to album “{{ activeAlbum }}”.</span>
-      </div>
-    </div>
-
     <!-- Grid -->
     <div v-if="filtered.length" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
       <div
         v-for="(img, i) in filtered" :key="img.id"
-        class="group relative aspect-square rounded-xl overflow-hidden bg-[#f3f4f6] border border-line cursor-pointer"
-        :class="{ 'ring-2 ring-[#6352e7] opacity-60': dragIndex === globalIndexOf(img) }"
+        class="img-card aspect-square cursor-pointer"
+        :class="{ 'ring-2 ring-brand opacity-60': dragIndex === globalIndexOf(img) }"
         draggable="true"
         @dragstart="onCardDragStart(globalIndexOf(img))"
         @dragover="onCardDragOver(globalIndexOf(img), $event)"
         @dragend="onCardDragEnd"
         @click="openLightbox(i)"
       >
-        <img :src="img.url" :alt="img.caption || ''" class="w-full h-full object-cover" loading="lazy">
+        <img :src="img.url" :alt="img.caption || ''" loading="lazy">
 
         <!-- featured star -->
         <div v-if="img.is_featured" class="absolute top-2 left-2 w-6 h-6 rounded-full bg-[rgba(0,0,0,.45)] grid place-items-center text-[#f59e0b] text-sm">★</div>
@@ -265,23 +238,52 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
 
         <!-- hover overlay -->
-        <div class="absolute inset-0 bg-[rgba(0,0,0,.45)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center gap-1.5" @click.stop>
-          <button class="overlay-btn" :title="img.is_featured ? 'Unfeature' : 'Feature'" @click="toggleFeature(img)">
-            <span :class="img.is_featured ? 'text-[#f59e0b]' : 'text-white'">★</span>
+        <div class="img-card-actions" @click.stop>
+          <button class="img-action" :title="img.is_featured ? 'Unfeature' : 'Feature'" @click="toggleFeature(img)">
+            <span :class="img.is_featured ? 'text-[#f59e0b]' : 'text-ink'">★</span>
           </button>
-          <button class="overlay-btn" title="Edit" @click="openEdit(img)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <button class="img-action" title="Edit" @click="openEdit(img)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
           </button>
-          <button class="overlay-btn danger" title="Remove" @click="removeImage(img)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          <button class="img-action danger" title="Remove" @click="removeImage(img)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
     </div>
 
-    <p v-else-if="!uploading" class="muted text-[.86rem] py-10 text-center">
-      {{ images.length ? 'No images in this album.' : 'No images yet. Drag photos above or click UPLOAD IMAGES.' }}
+    <p v-else class="muted text-[.86rem] py-10 text-center">
+      {{ images.length ? 'No images in this album.' : 'No images yet. Click + ADD IMAGES to get started.' }}
     </p>
+
+    <!-- Add Images drawer -->
+    <Drawer v-if="addDrawerOpen" title="Add Images" @close="addDrawerOpen = false">
+      <label class="block mb-2">Images</label>
+      <ImageField
+        :model-value="pendingUrls"
+        multiple
+        :aspect="1"
+        collection="cover"
+        card-width="140px"
+        hint="Pick, crop and upload as many photos as you like."
+        @update:model-value="onPendingChange"
+        @uploaded="onPendingUploaded"
+      />
+
+      <label class="mt-4">Album</label>
+      <input v-model="pendingAlbum" placeholder="e.g. Day 1, Keynotes (blank = General)" list="album-list">
+      <datalist id="album-list">
+        <option v-for="a in albums.filter((a: string) => a !== 'All')" :key="a" :value="a" />
+      </datalist>
+      <p class="muted text-[.82rem] -mt-2 mb-4">Applied to all images added in this batch.</p>
+
+      <div class="modal-actions">
+        <button class="btn ghost" @click="addDrawerOpen = false">Cancel</button>
+        <button class="btn" :disabled="!pending.length || addSaving" @click="saveAdd">
+          {{ addSaving ? 'Adding…' : `ADD ${pending.length || ''}`.trim() }}
+        </button>
+      </div>
+    </Drawer>
 
     <!-- Edit drawer -->
     <Drawer v-if="drawerOpen" title="Edit Image" @close="drawerOpen = false">
@@ -336,25 +338,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
-.hidden { display: none; }
-
-.overlay-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, .15);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  backdrop-filter: blur(2px);
-  transition: background .15s;
-}
-.overlay-btn:hover { background: rgba(255, 255, 255, .3); }
-.overlay-btn.danger:hover { background: #dc2626; }
-
 .lb-nav {
   position: absolute;
   display: inline-flex;
