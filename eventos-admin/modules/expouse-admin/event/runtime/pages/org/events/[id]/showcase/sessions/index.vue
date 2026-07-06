@@ -181,6 +181,11 @@ const timeError = computed(() =>
     : '',
 )
 
+// Day + Schedule Start + Schedule End are required for a valid schedule.
+const canSave = computed(() =>
+  !!draft.title.trim() && !!draft.date && !!draft.start_time && !!draft.end_time && !timeError.value,
+)
+
 // ── Grouped sessions ──────────────────────────────────────────────────────────
 
 const grouped = computed(() => {
@@ -299,6 +304,10 @@ function openAdd() {
 
 async function saveDraft() {
   if (timeError.value) { error.value = timeError.value; return }
+  if (!draft.date || !draft.start_time || !draft.end_time) {
+    error.value = 'Choose a day and set both Schedule Start and Schedule End.'
+    return
+  }
   error.value = ''
   saving.value = true
   try {
@@ -625,7 +634,7 @@ onMounted(load)
 
       <!-- Choose Day -->
       <div class="mb-4">
-        <label class="block mb-1.5">Choose Day</label>
+        <label class="block mb-1.5">Choose Day <span class="text-[#dc2626]">*</span></label>
         <select v-model="draft.date" class="m-0 w-full">
           <option value="">Select</option>
           <option v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
@@ -638,11 +647,11 @@ onMounted(load)
       <!-- Schedule Start / End -->
       <div class="flex gap-3 mb-1">
         <div class="flex-1">
-          <label class="block mb-1.5">Schedule Start</label>
+          <label class="block mb-1.5">Schedule Start <span class="text-[#dc2626]">*</span></label>
           <input v-model="draft.start_time" type="time" class="m-0 w-full">
         </div>
         <div class="flex-1">
-          <label class="block mb-1.5">Schedule End</label>
+          <label class="block mb-1.5">Schedule End <span class="text-[#dc2626]">*</span></label>
           <input v-model="draft.end_time" type="time" class="m-0 w-full">
         </div>
       </div>
@@ -876,7 +885,7 @@ onMounted(load)
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
         <button
           class="btn"
-          :disabled="!draft.title.trim() || !!timeError || saving"
+          :disabled="!canSave || saving"
           @click="saveDraft"
         >
           {{ saving ? 'Saving…' : 'ADD' }}

@@ -129,6 +129,18 @@ function isSessionSpeaker(sp: EventSpeaker): boolean {
   return session.value?.speakers.some(s => s.id === sp.id) ?? false
 }
 
+// End must be after start when both are set.
+const timeError = computed(() =>
+  basic.start_time && basic.end_time && basic.end_time <= basic.start_time
+    ? 'End Time must be after Start Time'
+    : '',
+)
+
+// Date + Start Time + End Time are required for a valid schedule.
+const canSaveBasic = computed(() =>
+  !!basic.title.trim() && !!basic.date && !!basic.start_time && !!basic.end_time && !timeError.value,
+)
+
 // ── Load ──────────────────────────────────────────────────────────────────────
 
 async function load() {
@@ -178,6 +190,11 @@ async function load() {
 // ── Save basic ────────────────────────────────────────────────────────────────
 
 async function saveBasic() {
+  if (timeError.value) { basicError.value = timeError.value; return }
+  if (!basic.date || !basic.start_time || !basic.end_time) {
+    basicError.value = 'Set the date, start time and end time.'
+    return
+  }
   basicError.value = ''
   basicSaving.value = true
   try {
@@ -372,19 +389,20 @@ onMounted(load)
         <div class="card mb-5 p-5">
           <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Schedule</h3>
           <div class="mb-4">
-            <label class="block mb-1.5">Date</label>
+            <label class="block mb-1.5">Date <span class="text-[#dc2626]">*</span></label>
             <input v-model="basic.date" type="date" class="m-0 w-full max-w-xs">
           </div>
           <div class="flex gap-3">
             <div class="flex-1 max-w-[160px]">
-              <label class="block mb-1.5">Start Time</label>
+              <label class="block mb-1.5">Start Time <span class="text-[#dc2626]">*</span></label>
               <input v-model="basic.start_time" type="time" class="m-0 w-full">
             </div>
             <div class="flex-1 max-w-[160px]">
-              <label class="block mb-1.5">End Time</label>
+              <label class="block mb-1.5">End Time <span class="text-[#dc2626]">*</span></label>
               <input v-model="basic.end_time" type="time" class="m-0 w-full">
             </div>
           </div>
+          <p v-if="timeError" class="error mt-3 mb-0">{{ timeError }}</p>
         </div>
 
         <!-- Core details -->
@@ -552,7 +570,7 @@ onMounted(load)
         <div class="flex justify-end">
           <button
             class="btn"
-            :disabled="!basic.title.trim() || basicSaving"
+            :disabled="!canSaveBasic || basicSaving"
             @click="saveBasic"
           >
             {{ basicSaving ? 'Saving…' : 'SAVE CHANGES' }}
