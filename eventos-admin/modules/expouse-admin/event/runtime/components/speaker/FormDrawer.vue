@@ -143,10 +143,15 @@ function save() {
     <!-- Photo -->
     <div class="mb-5">
       <FormField label="Photo">
-        <UploadButton
-          :preview="draft.image_url"
+        <ImageField
+          :model-value="draft.image_url"
+          :aspect="1"
+          :output-width="400"
+          :output-height="400"
           collection="avatar"
-          @uploaded="draft.image_url = $event.url"
+          card-width="160px"
+          hint="Square image recommended"
+          @update:model-value="draft.image_url = (Array.isArray($event) ? $event[0] : $event) || null"
         />
       </FormField>
     </div>

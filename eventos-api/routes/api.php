@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FloorController;
 use App\Http\Controllers\Api\V1\BadgeDesignController;
+use App\Http\Controllers\Api\V1\IconController;
 use App\Http\Controllers\Api\V1\ParticipantController;
 use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
@@ -188,6 +189,9 @@ Route::prefix('v1')->group(function () {
         // ── Tenant-scoped (resolves org → sets RLS GUC → rate limit) ──
         Route::middleware(['tenant', 'throttle:api'])->group(function () {
             Route::get('/organization', [OrganizationController::class, 'current']);
+
+            // Global icon catalog for icon-picker fields (e.g. Participate Profile).
+            Route::get('/icons', [IconController::class, 'index']);
 
             // Image uploads → MinIO (event covers, etc.) under the tenant GUC.
             Route::post('/uploads', [FileUploadController::class, 'store']);

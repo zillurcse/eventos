@@ -26,6 +26,8 @@ class EventSetting extends Model
         'banners' => 'array',
         'faqs' => 'array',
         'testimonials' => 'array',
+        'event_highlights' => 'array',
+        'participant_profiles' => 'array',
         'social' => 'array',
         'notifications' => 'array',
         'chat' => 'array',

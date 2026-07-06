@@ -21,6 +21,13 @@ function onLogoChange(v: string | string[] | null) {
 function onLogoUploaded(v: { id: number, url: string }) {
   draft.logo_file_id = v.id
 }
+
+function onSpotlightChange(v: string | string[] | null) {
+  draft.spotlight_url = (Array.isArray(v) ? v[0] : v) || ''
+}
+function onSpotlightUploaded(v: { id: number, url: string }) {
+  draft.spotlight_file_id = v.id
+}
 </script>
 
 <template>
@@ -145,10 +152,20 @@ function onLogoUploaded(v: { id: number, url: string }) {
         </label>
       </div>
     </div>
-    <label class="uploader mt-1.5" style="height:130px;">
+    <ImageField
+      v-if="draft.spotlight_type === 'image'"
+      :model-value="draft.spotlight_url || null"
+      :aspect="16 / 9"
+      collection="exhibitor_spotlight"
+      card-width="100%"
+      hint="Spotlight banner image"
+      @update:model-value="onSpotlightChange"
+      @uploaded="onSpotlightUploaded"
+    />
+    <label v-else class="uploader mt-1.5" style="height:130px;">
       <img v-if="draft.spotlight_url" :src="draft.spotlight_url" alt="">
       <span v-else class="text-[.88rem]">{{ spotlightUploading ? 'Uploading…' : '+ Click to upload' }}</span>
-      <input type="file" :accept="draft.spotlight_type === 'image' ? 'image/*' : 'video/*'" @change="pickSpotlight">
+      <input type="file" accept="video/*" @change="pickSpotlight">
     </label>
 
     <!-- CTA -->

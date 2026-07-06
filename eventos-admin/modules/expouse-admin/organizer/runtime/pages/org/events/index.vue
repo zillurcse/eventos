@@ -85,11 +85,11 @@ onMounted(load)
   <div>
     <div class="toolbar">
       <div class="search">
-        <Icon name="search" />
+        <AppIcon name="search" />
         <input v-model="q" placeholder="Search events">
       </div>
       <div class="flex-1" />
-      <button class="btn" @click="openCreate"><Icon name="plus" class="w-4 h-4" /> Create event</button>
+      <button class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> Create event</button>
     </div>
 
     <EventsEmptyState
@@ -112,7 +112,7 @@ onMounted(load)
             :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
             <template #meta>
               {{ fmtLabel[e.format] || e.format }}
-              <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
+              <div class="row"><AppIcon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
             </template>
             <template #menu>
               <EventCardMenu
@@ -135,7 +135,7 @@ onMounted(load)
             :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
             <template #meta>
               {{ fmtLabel[e.format] || e.format }}
-              <div class="row"><Icon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
+              <div class="row"><AppIcon name="calendar" />{{ dateRange(e.starts_at, e.ends_at) }}</div>
             </template>
             <template #menu>
               <EventCardMenu :event="e" :to="`/org/events/${e.id}`" @edit="openEdit(e)" @delete="remove(e)" />

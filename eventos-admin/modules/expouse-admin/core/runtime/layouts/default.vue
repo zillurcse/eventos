@@ -48,7 +48,7 @@ const subtitle = computed(() => (route.meta.subtitle as string) || 'Welcome to y
       </NuxtLink>
       <nav class="nav-group">
         <NuxtLink v-for="item in nav" :key="item.to" :to="item.to" class="nav-item" :class="{ active: isActive(item.to) }">
-          <Icon :name="item.icon" />
+          <AppIcon :name="item.icon" />
           <span>{{ item.label }}</span>
         </NuxtLink>
       </nav>

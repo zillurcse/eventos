@@ -114,7 +114,7 @@ onMounted(load)
           <input v-model="l.url" placeholder="https://…" class="flex-1 m-0">
           <button class="btn ghost sm" @click="removeLink(i)">✕</button>
         </div>
-        <button class="btn ghost sm" @click="addLink"><Icon name="plus" class="w-3.5 h-3.5" /> Add link</button>
+        <button class="btn ghost sm" @click="addLink"><AppIcon name="plus" class="w-3.5 h-3.5" /> Add link</button>
         <div class="mt-3.5"><button class="btn" @click="saveBooth">Save booth</button></div>
       </div>
     </template>
