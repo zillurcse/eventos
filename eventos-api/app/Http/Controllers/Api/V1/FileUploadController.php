@@ -24,22 +24,25 @@ class FileUploadController extends Controller
     {
         // The `document` collection carries presentation decks / handouts, so it
         // accepts common office file types (and images) up to 20 MB. The `feed`
-        // collection additionally accepts video for attendee feed posts (≤ 80 MB).
+        // collection additionally accepts video for attendee feed posts (≤ 80 MB);
+        // `chat` mirrors it plus office docs for message attachments.
         // Every other collection is image-only (≤ 5 MB).
         $collectionInput = $request->input('collection');
         $isDocument = $collectionInput === 'document';
         $isFeed = $collectionInput === 'feed';
+        $isChat = $collectionInput === 'chat';
 
         $data = $request->validate([
             'file' => match (true) {
                 $isFeed => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf'],
+                $isChat => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf,doc,docx,xls,xlsx,csv,ppt,pptx,txt'],
                 $isDocument => ['required', 'file', 'max:20480', 'mimes:pdf,ppt,pptx,doc,docx,xls,xlsx,csv,txt,key,png,jpg,jpeg,webp'],
                 default => ['required', 'file', 'image', 'max:5120'],
             },
             'collection' => ['nullable', Rule::in([
                 'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
                 'ad_image', 'lounge', 'breakout_room_poster', 'session_doc', 'session_icon', 'session_logo',
-                'exhibitor_logo', 'exhibitor_spotlight', 'ctas',
+                'exhibitor_logo', 'exhibitor_spotlight', 'ctas', 'chat',
             ])],
         ]);
 

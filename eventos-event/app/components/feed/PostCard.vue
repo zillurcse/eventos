@@ -11,21 +11,6 @@ const commentsLoaded = ref(false)
 const commentBody = ref('')
 const sending = ref(false)
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
-function timeAgo(iso: string | null) {
-  if (!iso) return ''
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (s < 60) return 'just now'
-  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24); if (d < 7) return `${d}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
 async function toggleComments() {
   open.value = !open.value
   if (open.value && !commentsLoaded.value) {
@@ -58,6 +43,11 @@ const banner = computed(() => {
   return null
 })
 
+// Images/videos tile in the media grid; PDFs render as full-width
+// LinkedIn-style paged documents below it.
+const visualMedia = computed(() => (props.post.attachments ?? []).filter(a => a.kind !== 'pdf'))
+const docs = computed(() => (props.post.attachments ?? []).filter(a => a.kind === 'pdf'))
+
 function pctOf(votes: number) {
   const total = props.post.poll?.total_votes ?? 0
   return total > 0 ? Math.round((votes / total) * 100) : 0
@@ -85,6 +75,16 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
         </span>
         <span class="time">{{ timeAgo(post.created_at) }}</span>
       </div>
+
+      <!-- Moderation state — only ever non-published on the author's own posts ("My Posts") -->
+      <span v-if="post.status === 'pending'" class="mod pending" title="Waiting for organizer approval">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+        Pending approval
+      </span>
+      <span v-else-if="post.status === 'rejected'" class="mod rejected" title="Rejected by the organizer">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" /></svg>
+        Rejected
+      </span>
     </header>
 
     <span v-if="banner" class="banner" :class="banner.cls">
@@ -99,17 +99,18 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
     </div>
 
     <!-- Media attachments -->
-    <div v-if="post.attachments?.length" class="media" :class="`n${Math.min(post.attachments.length, 4)}`">
-      <template v-for="(a, i) in post.attachments" :key="i">
+    <div v-if="visualMedia.length" class="media" :class="`n${Math.min(visualMedia.length, 4)}`">
+      <template v-for="(a, i) in visualMedia" :key="i">
         <a v-if="a.kind === 'image'" :href="a.url" target="_blank" rel="noopener" class="mtile">
           <img :src="a.url" :alt="a.name || ''">
         </a>
-        <video v-else-if="a.kind === 'video'" :src="a.url" controls preload="metadata" class="mtile vid" />
-        <a v-else :href="a.url" target="_blank" rel="noopener" class="mtile doc">
-          <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6" /></svg>
-          <span>{{ a.name || 'Open PDF' }}</span>
-        </a>
+        <video v-else :src="a.url" controls preload="metadata" class="mtile vid" />
       </template>
+    </div>
+
+    <!-- PDF documents — inline page-wise viewer -->
+    <div v-if="docs.length" class="docstack">
+      <FeedPdfPages v-for="(a, i) in docs" :key="i" :url="a.url" :name="a.name" />
     </div>
 
     <!-- Poll -->
@@ -137,7 +138,8 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
       <span v-if="post.comment_count">{{ post.comment_count }} {{ post.comment_count === 1 ? 'comment' : 'comments' }}</span>
     </div>
 
-    <div class="actions">
+    <!-- No engagement on posts that aren't live on the wall -->
+    <div v-if="post.status === 'published'" class="actions">
       <button class="act" :class="{ on: post.reacted }" type="button" @click="feed.toggleReaction(post)">
         <svg viewBox="0 0 24 24"><path d="M7 10v11M2 12h5v9H2zM7 11l4-8a2 2 0 0 1 3 2l-1 5h5a2 2 0 0 1 2 2l-1.5 6a2 2 0 0 1-2 1.5H7" /></svg>
         Like
@@ -191,6 +193,11 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
 .tag { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #0f766e; background: #ccfbf1; padding: 2px 7px; border-radius: 999px; }
 .time { color: #94a3b8; font-size: .8rem; }
 
+.mod { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: .7rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; white-space: nowrap; }
+.mod svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mod.pending { color: #92400e; background: #fef3c7; }
+.mod.rejected { color: #b91c1c; background: #fee2e2; }
+
 .banner { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; padding: 4px 11px; border-radius: 999px; }
 .banner svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .banner.lf { color: #7c3aed; background: #ede9fe; }
@@ -209,10 +216,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
 .mtile img, .mtile.vid { width: 100%; height: 100%; max-height: 420px; object-fit: cover; display: block; }
 .media.n1 .mtile img { max-height: 480px; }
 .mtile.vid { background: #000; }
-.mtile.doc { display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: #334155; text-decoration: none; border: 1px solid #eef0f3; }
-.mtile.doc:hover { background: #f1f5f9; }
-.mtile.doc svg { flex: 0 0 auto; width: 26px; height: 26px; fill: none; stroke: #ef4444; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.mtile.doc span { font-weight: 600; font-size: .88rem; word-break: break-word; }
+.docstack { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 
 .poll { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .opt { position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 11px 14px; cursor: pointer; font: inherit; text-align: left; }

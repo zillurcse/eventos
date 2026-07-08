@@ -35,11 +35,6 @@ const placeholder = computed(() => {
   return 'Got a spark of an idea? Let the community feel your energy!'
 })
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 function pickMedia(kind: FeedAttachment['kind']) {
   pendingKind.value = kind
   if (fileInput.value) {
@@ -106,6 +101,10 @@ function reset() {
   tagInput.value = ''
 }
 
+/** Shown when the event moderates its feed and the new post starts pending. */
+const pendingNotice = ref(false)
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
 async function submit() {
   if (!canPost.value) return
   const payload: NewPostPayload = {
@@ -120,8 +119,13 @@ async function submit() {
   if (mode.value === 'looking_for' || mode.value === 'offering') {
     payload.tags = tags.value
   }
-  await feed.createPost(payload)
+  const post = await feed.createPost(payload)
   reset()
+  if (post && post.status !== 'published') {
+    pendingNotice.value = true
+    clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => { pendingNotice.value = false }, 8000)
+  }
 }
 
 const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string, icon: string }> = [
@@ -179,6 +183,11 @@ const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string
     </div>
 
     <div v-if="uploading" class="uploading">Uploading…</div>
+
+    <div v-if="pendingNotice" class="pending-note">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+      Your post was submitted and is awaiting organizer approval. It will appear on the feed once approved.
+    </div>
 
     <div class="toolbar">
       <div class="tools">
@@ -243,6 +252,8 @@ textarea:focus { border-color: var(--brand-primary); }
 .pv .pdf span { font-size: .68rem; word-break: break-word; line-height: 1.2; }
 .pvx { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 50%; background: rgba(15,23,42,.65); color: #fff; cursor: pointer; font-size: .95rem; line-height: 1; }
 .uploading { margin-top: 10px; color: #64748b; font-size: .84rem; }
+.pending-note { display: flex; align-items: center; gap: 8px; margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 14px; font-size: .85rem; }
+.pending-note svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f3; flex-wrap: wrap; }
 .tools { display: flex; align-items: center; gap: 4px; }

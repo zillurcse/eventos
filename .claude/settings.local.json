@@ -25,7 +25,16 @@
       "Bash(curl -s -o /dev/null -w \"exhibitors page HTTP %{http_code}\\\\n\" \"http://localhost:3001/exhibitors?subdomain=demo\")",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(Object.keys\\(p.scripts||{}\\).join\\(', '\\)\\)\")",
       "Bash(grep -niE 'HasUuid|primaryKey|keyType|incrementing|uuid|\\\\$table' app/Models/User.php)",
-      "Bash(docker compose exec -T api php artisan tinker '--execute= *)"
+      "Bash(docker compose exec -T api php artisan tinker '--execute= *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:8088/api/v1/events -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s http://localhost:8088/api/v1/events/__TRACKED_VAR__/feed-moderation?status=published -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(curl -s -X PATCH http://localhost:8088/api/v1/events/__TRACKED_VAR__/feed-moderation/settings -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"moderate\":false}')",
+      "Bash(curl -s -o /dev/null -w \"admin activity-feed page: %{http_code}\\\\n\" \"http://localhost:3000/org/events/019ee5b4-67cb-71c0-9952-ebdecf0f37b9/engagement/activity-feed\")",
+      "Bash(curl -s -o /dev/null -w \"event feed page: %{http_code}\\\\n\" \"http://localhost:3001/feed\")",
+      "Bash(curl -s -I -H \"Origin: http://localhost:3001\" \"http://localhost:9000/eventos/feed/15/7c360a1b-9c19-40f3-b1bc-adfe47bff010.pdf\")",
+      "Bash(grep -E \"worker.*\\(mjs|js\\)$\")",
+      "Bash(curl -s \"http://localhost:3001/_nuxt/components/feed/PdfPages.vue\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",

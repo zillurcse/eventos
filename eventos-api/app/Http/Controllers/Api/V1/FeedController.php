@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Events\NewFeedPost;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FeedPostResource;
+use App\Models\Event;
 use App\Models\FeedComment;
 use App\Models\FeedPost;
 use App\Models\FeedReaction;
@@ -30,10 +31,16 @@ class FeedController extends Controller
         ]);
 
         $query = FeedPost::where('event_id', $request->attributes->get('event_id'))
-            ->whereIn('status', ['published'])
             // Constrain the eager load to the current participant so each post
             // carries whether *this* viewer reacted (one extra query).
             ->with(['reactions' => fn ($q) => $q->where('participation_id', $pid)]);
+
+        // The wall shows only published posts; "My Posts" shows the author
+        // their own posts in every moderation state (pending / published /
+        // rejected) so they can track approval.
+        if (! $request->boolean('mine')) {
+            $query->where('status', 'published');
+        }
 
         // "Filter By" type — keyed on the post's meta.type. Legacy rows with no
         // meta are treated as plain text (only surfaced under "All").
@@ -88,17 +95,25 @@ class FeedController extends Controller
             throw ValidationException::withMessages(['body' => 'Write something or attach media.']);
         }
 
+        // Honor the organizer's moderation switch (Engagement › Manage
+        // Activity Feed): while it's on, attendee posts start `pending` and
+        // only reach the feed once approved.
+        $eventId = $request->attributes->get('event_id');
+        $moderated = (bool) data_get(Event::find($eventId)?->meta, 'feed_moderation', false);
+
         $post = FeedPost::create([
-            'event_id' => $request->attributes->get('event_id'),
+            'event_id' => $eventId,
             'author_type' => 'participation',
             'author_id' => $request->attributes->get('participation_id'),
             'body' => $data['body'] ?? '',
             'visibility' => $data['visibility'] ?? 'attendees',
-            'status' => 'published',
+            'status' => $moderated ? 'pending' : 'published',
             'meta' => $meta,
         ]);
 
-        broadcast(new NewFeedPost($post));
+        if (! $moderated) {
+            broadcast(new NewFeedPost($post));
+        }
 
         return response()->json(['data' => new FeedPostResource($post)], 201);
     }
@@ -146,9 +161,8 @@ class FeedController extends Controller
      */
     public function votePoll(string $event, string $post, Request $request): JsonResponse
     {
-        $eventId = $request->attributes->get('event_id');
         $pid = (string) $request->attributes->get('participation_id');
-        $feedPost = FeedPost::where('uuid', $post)->where('event_id', $eventId)->firstOrFail();
+        $feedPost = $this->resolvePost($request, $post);
 
         $data = $request->validate(['option_id' => ['required', 'string']]);
 
@@ -203,8 +217,7 @@ class FeedController extends Controller
     /** GET the published comments on a post, oldest first. */
     public function comments(string $event, string $post, Request $request): JsonResponse
     {
-        $eventId = $request->attributes->get('event_id');
-        $feedPost = FeedPost::where('uuid', $post)->where('event_id', $eventId)->firstOrFail();
+        $feedPost = $this->resolvePost($request, $post);
 
         $comments = FeedComment::where('post_id', $feedPost->id)
             ->where('status', 'published')
@@ -217,14 +230,13 @@ class FeedController extends Controller
 
     public function comment(string $event, string $post, Request $request): JsonResponse
     {
-        $eventId = $request->attributes->get('event_id');
-        $feedPost = FeedPost::where('uuid', $post)->where('event_id', $eventId)->firstOrFail();
+        $feedPost = $this->resolvePost($request, $post);
 
         $data = $request->validate(['body' => ['required', 'string', 'max:2000']]);
 
         $comment = FeedComment::create([
             'post_id' => $feedPost->id,
-            'event_id' => $eventId,
+            'event_id' => $feedPost->event_id,
             'author_type' => 'participation',
             'author_id' => $request->attributes->get('participation_id'),
             'body' => $data['body'],
@@ -242,9 +254,8 @@ class FeedController extends Controller
      */
     public function react(string $event, string $post, Request $request): JsonResponse
     {
-        $eventId = $request->attributes->get('event_id');
         $pid = $request->attributes->get('participation_id');
-        $feedPost = FeedPost::where('uuid', $post)->where('event_id', $eventId)->firstOrFail();
+        $feedPost = $this->resolvePost($request, $post);
 
         $data = $request->validate(['type' => ['nullable', 'in:like,love,clap,insightful']]);
 
@@ -264,7 +275,7 @@ class FeedController extends Controller
                 'reactable_type' => 'feed_post',
                 'reactable_id' => $feedPost->id,
                 'participation_id' => $pid,
-                'event_id' => $eventId,
+                'event_id' => $feedPost->event_id,
                 'type' => $data['type'] ?? 'like',
             ]);
             $feedPost->increment('reaction_count');
@@ -275,6 +286,19 @@ class FeedController extends Controller
             'reacted' => $reacted,
             'reactions' => $feedPost->fresh()->reaction_count,
         ]);
+    }
+
+    /**
+     * Resolve a post uuid within the current event, published only: pending /
+     * rejected posts aren't live on the wall, so they accept no engagement
+     * (comments, reactions, votes) even from their author.
+     */
+    protected function resolvePost(Request $request, string $uuid): FeedPost
+    {
+        return FeedPost::where('uuid', $uuid)
+            ->where('event_id', $request->attributes->get('event_id'))
+            ->where('status', 'published')
+            ->firstOrFail();
     }
 
     /** Shared comment projection (author label + avatar + timestamp). */

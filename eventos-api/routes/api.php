@@ -17,12 +17,14 @@ use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DelegateController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
+use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
 use App\Http\Controllers\Api\V1\DomainController;
 use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\FeedController;
+use App\Http\Controllers\Api\V1\FeedModerationController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FloorController;
 use App\Http\Controllers\Api\V1\BadgeDesignController;
@@ -170,6 +172,13 @@ Route::prefix('v1')->group(function () {
             // event's org GUC set by the participant middleware.
             Route::post('/uploads', [FileUploadController::class, 'store']);
             Route::get('/delegates', [DelegateController::class, 'index']);
+            // One-to-one participant chat (attendee ↔ attendee/speaker/exhibitor).
+            Route::get('/chat', [ChatController::class, 'index']);
+            Route::get('/chat/partners', [ChatController::class, 'partners']);
+            Route::post('/chat', [ChatController::class, 'open']);
+            Route::get('/chat/{conversation}/messages', [ChatController::class, 'messages']);
+            Route::post('/chat/{conversation}/messages', [ChatController::class, 'send']);
+            Route::patch('/chat/{conversation}/read', [ChatController::class, 'read']);
             Route::get('/connections', [ConnectionController::class, 'index']);
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
@@ -282,6 +291,11 @@ Route::prefix('v1')->group(function () {
             Route::post('/breakout-rooms/{room}/duplicate', [BreakoutRoomController::class, 'duplicate'])->middleware('perm:events.manage');
             Route::patch('/breakout-rooms/{room}/status', [BreakoutRoomController::class, 'setStatus'])->middleware('perm:events.manage');
             Route::delete('/breakout-rooms/{room}', [BreakoutRoomController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Activity Feed moderation (Event Engagement) ──
+            Route::get('/events/{uuid}/feed-moderation', [FeedModerationController::class, 'index'])->middleware('perm:events.view');
+            Route::patch('/events/{uuid}/feed-moderation/settings', [FeedModerationController::class, 'settings'])->middleware('perm:events.manage');
+            Route::patch('/events/{uuid}/feed-moderation/{post}', [FeedModerationController::class, 'decide'])->middleware('perm:events.manage');
 
             // ── Event people directory ("Users" section) ──
             Route::get('/events/{uuid}/participants', [ParticipantController::class, 'index'])->middleware('perm:events.view');

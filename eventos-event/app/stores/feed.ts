@@ -159,9 +159,9 @@ export const useFeedStore = defineStore('feed', {
       return res.data
     },
 
-    async createPost(payload: NewPostPayload) {
+    async createPost(payload: NewPostPayload): Promise<FeedPost | null> {
       const uuid = this.eventUuid()
-      if (!uuid) return
+      if (!uuid) return null
       const api = useApi()
       this.posting = true
       try {
@@ -176,7 +176,11 @@ export const useFeedStore = defineStore('feed', {
             tags: payload.tags ?? [],
           },
         })
-        this.posts.unshift(res.data)
+        // Moderated events return the post as `pending` — it must not appear
+        // on the wall until an organizer approves it. "My Posts" does show
+        // the author their pending/rejected posts, so insert there too.
+        if (res.data.status === 'published' || this.filter === 'mine') this.posts.unshift(res.data)
+        return res.data
       } finally {
         this.posting = false
       }

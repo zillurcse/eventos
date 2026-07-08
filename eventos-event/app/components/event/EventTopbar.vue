@@ -1,28 +1,39 @@
 <script setup lang="ts">
 const auth = useAuthStore()
 const site = useSiteStore()
+const notifications = useNotificationsStore()
+const chat = useChatStore()
 
 const menuOpen = ref(false)
+const bellOpen = ref(false)
 
-const initials = computed(() => {
-  const n = (auth.user?.name || site.name || 'U').trim()
-  const parts = n.split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U'
-})
-
-// Static utility icons for now (notifications/inbox/alerts/chat are follow-ups).
-const utilities = [
-  { key: 'bookmarks', label: 'Saved', badge: null as number | null },
-  { key: 'inbox', label: 'Inbox', badge: null },
-  { key: 'alerts', label: 'Notifications', badge: null },
-  { key: 'chat', label: 'Chat', badge: null },
-]
+const myInitials = computed(() => initials(auth.user?.name || site.name || 'U'))
 
 function closeOnOutside(e: MouseEvent) {
-  if (!(e.target as HTMLElement)?.closest?.('.user')) menuOpen.value = false
+  const t = e.target as HTMLElement
+  if (!t?.closest?.('.user')) menuOpen.value = false
+  if (!t?.closest?.('.bell-wrap')) bellOpen.value = false
 }
-onMounted(() => document.addEventListener('click', closeOnOutside))
-onBeforeUnmount(() => document.removeEventListener('click', closeOnOutside))
+
+onMounted(() => {
+  document.addEventListener('click', closeOnOutside)
+  // Signed-in chrome: live badges (bell poll + chat inbox w/ Reverb channel).
+  if (auth.user) {
+    notifications.start()
+    if (!chat.loaded) chat.fetchInbox()
+  }
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeOnOutside)
+  notifications.stop()
+})
+
+function toggleBell() {
+  bellOpen.value = !bellOpen.value
+  if (bellOpen.value) notifications.fetch()
+}
+
+const badge = (n: number) => (n > 99 ? '99+' : n)
 </script>
 
 <template>
@@ -37,21 +48,34 @@ onBeforeUnmount(() => document.removeEventListener('click', closeOnOutside))
       <div class="spacer" />
 
       <nav class="utils" aria-label="Quick actions">
-        <button v-for="u in utilities" :key="u.key" class="util" type="button" :title="u.label" :aria-label="u.label">
-          <svg v-if="u.key === 'bookmarks'" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
-          <svg v-else-if="u.key === 'inbox'" viewBox="0 0 24 24"><path d="M3 13h4l2 3h6l2-3h4M3 13l3-8h12l3 8v6H3z" /></svg>
-          <svg v-else-if="u.key === 'alerts'" viewBox="0 0 24 24"><path d="M6 16V10a6 6 0 0 1 12 0v6l2 2H4zM10 21h4" /></svg>
-          <svg v-else viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z" /></svg>
-          <span v-if="u.badge" class="dot">{{ u.badge }}</span>
+        <button class="util" type="button" title="Saved" aria-label="Saved">
+          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+        </button>
+
+        <!-- Notifications bell + dropdown panel -->
+        <span class="bell-wrap">
+          <button class="util" type="button" title="Notifications" aria-label="Notifications" @click.stop="toggleBell">
+            <svg viewBox="0 0 24 24"><path d="M6 16V10a6 6 0 0 1 12 0v6l2 2H4zM10 21h4" /></svg>
+            <span v-if="notifications.unread" class="dot">{{ badge(notifications.unread) }}</span>
+          </button>
+          <EventNotificationsPanel v-if="bellOpen" @close="bellOpen = false" />
+        </span>
+
+        <!-- Chat (slide-over drawer) -->
+        <button class="util" type="button" title="Chat" aria-label="Chat" @click="chat.toggleDrawer()">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z" /></svg>
+          <span v-if="chat.unreadTotal" class="dot">{{ badge(chat.unreadTotal) }}</span>
         </button>
       </nav>
+
+      <ChatDrawer v-if="chat.drawerOpen" />
 
       <div class="sep" />
 
       <div class="user">
         <button class="user-btn" type="button" @click.stop="menuOpen = !menuOpen">
           <span class="name">{{ auth.user?.name || 'Guest' }}</span>
-          <span class="avatar">{{ initials }}</span>
+          <span class="avatar">{{ myInitials }}</span>
           <svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
         </button>
         <div v-if="menuOpen" class="menu">
@@ -77,6 +101,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeOnOutside))
 .logo-name { font-weight: 700; color: #334155; font-size: .98rem; }
 
 .utils { display: flex; align-items: center; gap: 4px; }
+.bell-wrap { position: relative; display: inline-flex; }
 .util { position: relative; background: none; border: none; padding: 7px; border-radius: 8px; cursor: pointer; color: var(--brand-primary); line-height: 0; }
 .util:hover { background: #f1f2f6; }
 .util svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
