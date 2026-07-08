@@ -4,19 +4,11 @@ import type { Exhibitor } from '~/stores/exhibitors'
 const props = defineProps<{ exhibitor: Exhibitor }>()
 const store = useExhibitorsStore()
 
-const bookmarked = ref(false)
-const key = computed(() => `eventos:bookmark:exhibitor:${props.exhibitor.id}`)
-
-onMounted(() => {
-  if (import.meta.client) bookmarked.value = localStorage.getItem(key.value) === '1'
-})
+const bookmarks = useBookmarksStore()
+const bookmarked = computed(() => bookmarks.isOn('exhibitor', props.exhibitor.id))
 
 function toggleBookmark() {
-  bookmarked.value = !bookmarked.value
-  if (import.meta.client) {
-    if (bookmarked.value) localStorage.setItem(key.value, '1')
-    else localStorage.removeItem(key.value)
-  }
+  bookmarks.toggle('exhibitor', props.exhibitor.id)
 }
 
 function initials(name?: string | null) {

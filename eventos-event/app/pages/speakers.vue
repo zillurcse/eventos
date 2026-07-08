@@ -4,12 +4,20 @@ import type { Speaker } from '~/stores/speakers'
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const store = useSpeakersStore()
+const sessionsStore = useSessionsStore()
+const bookmarks = useBookmarksStore()
 
 const search = ref('')
 const sort = ref<'default' | 'az' | 'za'>('default')
 const category = ref<string>('')
+const savedOnly = ref(false)
 
-onMounted(() => { if (!store.loaded) store.fetchSpeakers() })
+onMounted(() => {
+  if (!store.loaded) store.fetchSpeakers()
+  // Prefetch the agenda so the profile modal's schedule renders instantly.
+  if (!sessionsStore.loaded && !sessionsStore.loading) sessionsStore.fetchSessions()
+  bookmarks.fetch()
+})
 
 const sortOptions: Array<{ key: 'az' | 'za' | 'default', label: string }> = [
   { key: 'az', label: 'By A to Z' },
@@ -20,6 +28,7 @@ const sortOptions: Array<{ key: 'az' | 'za' | 'default', label: string }> = [
 const filtered = computed<Speaker[]>(() => {
   const q = search.value.trim().toLowerCase()
   let list = store.speakers.filter((s) => {
+    if (savedOnly.value && !bookmarks.isOn('speaker', s.id)) return false
     if (category.value && s.category !== category.value) return false
     if (!q) return true
     return `${s.name} ${s.designation} ${s.company} ${s.category}`.toLowerCase().includes(q)
@@ -62,6 +71,19 @@ const filtered = computed<Speaker[]>(() => {
         </div>
       </div>
 
+      <div class="card">
+        <div class="ct">
+          <span>Bookmarks</span>
+          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+        </div>
+        <div class="opts">
+          <button type="button" class="opt" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
+            Saved only{{ bookmarks.count('speaker') ? ` (${bookmarks.count('speaker')})` : '' }}
+            <svg v-if="savedOnly" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
+          </button>
+        </div>
+      </div>
+
       <div v-if="store.categories.length" class="card">
         <div class="ct"><span>Category</span></div>
         <div class="opts">
@@ -93,6 +115,8 @@ const filtered = computed<Speaker[]>(() => {
         <SpeakersCard v-for="s in filtered" :key="s.id" :speaker="s" />
       </div>
     </section>
+
+    <SpeakersDetailModal v-if="store.selected" :key="store.selected.id" :speaker="store.selected" />
   </div>
 </template>
 

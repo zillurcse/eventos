@@ -3,9 +3,11 @@ const auth = useAuthStore()
 const site = useSiteStore()
 const notifications = useNotificationsStore()
 const chat = useChatStore()
+const presence = usePresenceStore()
 
 const menuOpen = ref(false)
 const bellOpen = ref(false)
+const savedOpen = ref(false)
 
 const myInitials = computed(() => initials(auth.user?.name || site.name || 'U'))
 
@@ -20,12 +22,14 @@ onMounted(() => {
   // Signed-in chrome: live badges (bell poll + chat inbox w/ Reverb channel).
   if (auth.user) {
     notifications.start()
+    presence.start()
     if (!chat.loaded) chat.fetchInbox()
   }
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeOnOutside)
   notifications.stop()
+  presence.stop()
 })
 
 function toggleBell() {
@@ -48,7 +52,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
       <div class="spacer" />
 
       <nav class="utils" aria-label="Quick actions">
-        <button class="util" type="button" title="Saved" aria-label="Saved">
+        <button class="util" type="button" title="Bookmarks" aria-label="Bookmarks" @click="savedOpen = true">
           <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         </button>
 
@@ -69,6 +73,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
       </nav>
 
       <ChatDrawer v-if="chat.drawerOpen" />
+      <EventBookmarksPanel v-if="savedOpen" @close="savedOpen = false" />
 
       <div class="sep" />
 

@@ -4,6 +4,7 @@ import type { AgendaSession } from '~/stores/sessions'
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const store = useSessionsStore()
+const bookmarks = useBookmarksStore()
 
 // ── Filters state ────────────────────────────────────────────────────────
 const view = ref<'list' | 'grid'>('list')
@@ -12,9 +13,11 @@ const activeTrack = ref<number | 'all'>('all')
 const selectedTags = ref<Set<string>>(new Set())
 const selectedSpeakers = ref<Set<string>>(new Set())
 const selectedDay = ref<string | null>(null)
+const savedOnly = ref(false)
 const tz = ref('UTC')
 
 onMounted(async () => {
+  bookmarks.fetch()
   if (!store.loaded) await store.fetchSessions()
   tz.value = store.eventTimezone
   buildDays()
@@ -88,6 +91,8 @@ function toggleSpeaker(id: string) {
 const filtered = computed<AgendaSession[]>(() => {
   const q = search.value.trim().toLowerCase()
   return store.sessions.filter((s) => {
+    // Bookmarks
+    if (savedOnly.value && !bookmarks.isOn('session', s.id)) return false
     // Day
     if (selectedDay.value && s.starts_at && dayKey(s.starts_at, tz.value) !== selectedDay.value) return false
     // Track
@@ -155,6 +160,15 @@ function resetSpeakers() { selectedSpeakers.value = new Set() }
           </select>
 
           <p class="afhead">Advance Filter</p>
+
+          <div class="group">
+            <div class="grouphead"><span>Bookmarks</span></div>
+            <div class="chips">
+              <button type="button" class="chip" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
+                Saved only{{ bookmarks.count('session') ? ` (${bookmarks.count('session')})` : '' }}
+              </button>
+            </div>
+          </div>
 
           <div v-if="store.tags.length" class="group">
             <div class="grouphead">

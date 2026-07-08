@@ -24,6 +24,7 @@ interface SpeakersPayload {
  * resolves to. Mirrors stores/sessions.ts — a single public GET scoped to the
  * subdomain; sort/search/category filtering is client-side over the full list.
  * Sending a connection request is a separate authed call (see connect()).
+ * `selected` drives the profile detail modal.
  */
 export const useSpeakersStore = defineStore('speakers', {
   state: () => ({
@@ -34,6 +35,7 @@ export const useSpeakersStore = defineStore('speakers', {
     error: false,
     // Local connection state keyed by speaker id (optimistic, this session).
     connected: {} as Record<string, 'pending' | 'error'>,
+    selected: null as Speaker | null,
   }),
 
   actions: {
@@ -57,6 +59,9 @@ export const useSpeakersStore = defineStore('speakers', {
         this.loading = false
       }
     },
+
+    open(speaker: Speaker) { this.selected = speaker },
+    close() { this.selected = null },
 
     /** Send a connection request to a speaker (requires being signed in). */
     async connect(speaker: Speaker) {

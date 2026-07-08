@@ -4,6 +4,9 @@ import type { Exhibitor } from '~/stores/exhibitors'
 const props = defineProps<{ exhibitor: Exhibitor }>()
 const store = useExhibitorsStore()
 
+const bookmarks = useBookmarksStore()
+const bookmarked = computed(() => bookmarks.isOn('exhibitor', props.exhibitor.id))
+
 function initials(name?: string | null) {
   const p = (name || '?').trim().split(/\s+/)
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
@@ -67,6 +70,15 @@ const socials = computed(() => Object.entries(props.exhibitor.social || {}).filt
           >
             <svg viewBox="0 0 24 24"><path :d="socialIcons[k] || socialIcons.linkedin" /></svg>
           </a>
+          <button
+            class="ic save"
+            :class="{ on: bookmarked }"
+            type="button"
+            :title="bookmarked ? 'Saved' : 'Save'"
+            @click="bookmarks.toggle('exhibitor', exhibitor.id)"
+          >
+            <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+          </button>
         </div>
 
         <section v-if="exhibitor.products.length" class="sec">
@@ -133,6 +145,9 @@ const socials = computed(() => Object.entries(props.exhibitor.social || {}).filt
 .ic { width: 40px; height: 40px; border-radius: 10px; background: #f1f5f9; color: #475569; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .ic:hover { background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); }
 .ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ic.save { border: none; cursor: pointer; font: inherit; }
+.ic.save.on { background: var(--brand-primary); color: #fff; }
+.ic.save.on svg { fill: currentColor; }
 
 .sec { margin-top: 22px; }
 .sec h3 { margin: 0 0 12px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #334155; }

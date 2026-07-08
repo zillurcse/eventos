@@ -3,19 +3,11 @@ import type { AgendaSession } from '~/stores/sessions'
 
 const props = defineProps<{ session: AgendaSession, tz: string }>()
 
-const bookmarked = ref(false)
-const storeKey = computed(() => `eventos:bookmark:session:${props.session.id}`)
-
-onMounted(() => {
-  if (import.meta.client) bookmarked.value = localStorage.getItem(storeKey.value) === '1'
-})
+const bookmarks = useBookmarksStore()
+const bookmarked = computed(() => bookmarks.isOn('session', props.session.id))
 
 function toggleBookmark() {
-  bookmarked.value = !bookmarked.value
-  if (import.meta.client) {
-    if (bookmarked.value) localStorage.setItem(storeKey.value, '1')
-    else localStorage.removeItem(storeKey.value)
-  }
+  bookmarks.toggle('session', props.session.id)
 }
 
 function fmtTime(iso: string | null) {

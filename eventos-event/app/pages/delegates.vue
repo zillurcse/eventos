@@ -4,31 +4,49 @@ import type { Delegate } from '~/stores/delegates'
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const store = useDelegatesStore()
+const bookmarks = useBookmarksStore()
 
 const search = ref('')
-const sort = ref<'default' | 'az' | 'za'>('default')
+const sort = ref<'az' | 'za'>('az')
+const savedOnly = ref(false)
 
-onMounted(() => { if (!store.loaded) store.fetchDelegates() })
+// Search/sort/pagination are server-side (the list can be huge); the input
+// is debounced so we don't fire a request per keystroke.
+let debounce: ReturnType<typeof setTimeout> | undefined
+watch(search, (q: string) => {
+  clearTimeout(debounce)
+  debounce = setTimeout(() => store.setQuery(q), 350)
+})
+watch(sort, (s: 'az' | 'za') => store.setSort(s))
 
-const sortOptions: Array<{ key: 'az' | 'za' | 'default', label: string }> = [
+// Infinite scroll: load the next page when the bottom sentinel comes into view.
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | undefined
+
+onMounted(() => {
+  if (!store.loaded) store.fetchDelegates()
+  bookmarks.fetch()
+  observer = new IntersectionObserver(
+    entries => { if (entries.some(e => e.isIntersecting) && !savedOnly.value) store.loadMore() },
+    { rootMargin: '400px' },
+  )
+  if (sentinel.value) observer.observe(sentinel.value)
+})
+onBeforeUnmount(() => {
+  clearTimeout(debounce)
+  observer?.disconnect()
+})
+
+const sortOptions: Array<{ key: 'az' | 'za', label: string }> = [
   { key: 'az', label: 'By A to Z' },
   { key: 'za', label: 'By Z to A' },
-  { key: 'default', label: 'Default' },
 ]
 
-const filtered = computed<Delegate[]>(() => {
-  const q = search.value.trim().toLowerCase()
-  let list = store.delegates.filter((d) => {
-    if (!q) return true
-    return `${d.name} ${d.job_title} ${d.company}`.toLowerCase().includes(q)
-  })
-
-  if (sort.value !== 'default') {
-    list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    if (sort.value === 'za') list.reverse()
-  }
-  return list
-})
+const filtered = computed<Delegate[]>(() =>
+  savedOnly.value
+    ? store.delegates.filter((d: Delegate) => bookmarks.isOn('delegate', d.id))
+    : store.delegates,
+)
 </script>
 
 <template>
@@ -59,6 +77,19 @@ const filtered = computed<Delegate[]>(() => {
           </button>
         </div>
       </div>
+
+      <div class="card">
+        <div class="ct">
+          <span>Bookmarks</span>
+          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+        </div>
+        <div class="opts">
+          <button type="button" class="opt" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
+            Saved only{{ bookmarks.count('delegate') ? ` (${bookmarks.count('delegate')})` : '' }}
+            <svg v-if="savedOnly" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
+          </button>
+        </div>
+      </div>
     </aside>
 
     <!-- Delegate grid -->
@@ -68,13 +99,25 @@ const filtered = computed<Delegate[]>(() => {
         <p class="sub">Attendees you can meet — connect and save the people you want to reach.</p>
       </div>
 
-      <div v-if="store.loading && !store.loaded" class="state">Loading delegates…</div>
+      <div v-if="store.loading" class="state">Loading delegates…</div>
       <div v-else-if="store.error" class="state">Couldn’t load delegates. Please try again.</div>
       <div v-else-if="!filtered.length" class="state">No delegates match your search.</div>
 
-      <div v-else class="cards">
-        <DelegatesCard v-for="d in filtered" :key="d.id" :delegate="d" />
-      </div>
+      <template v-else>
+        <div class="cards">
+          <DelegatesCard v-for="d in filtered" :key="d.id" :delegate="d" />
+        </div>
+        <div v-if="store.loadingMore" class="more-state">Loading more…</div>
+        <button
+          v-else-if="store.hasMore && !savedOnly"
+          class="more"
+          type="button"
+          @click="store.loadMore()"
+        >Load more</button>
+      </template>
+
+      <!-- Infinite-scroll sentinel (observer loads the next page near it) -->
+      <div ref="sentinel" aria-hidden="true" />
     </section>
   </div>
 </template>
@@ -105,4 +148,7 @@ const filtered = computed<Delegate[]>(() => {
 .sub { margin: 4px 0 0; color: #64748b; font-size: .9rem; }
 .state { background: #fff; border-radius: 14px; padding: 48px 0; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+.more-state { padding: 18px 0; text-align: center; color: #94a3b8; font-size: .88rem; }
+.more { display: block; margin: 18px auto 0; border: 1px solid var(--brand-primary); background: #fff; color: var(--brand-primary); border-radius: 999px; padding: 10px 28px; font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.more:hover { background: var(--brand-primary); color: #fff; }
 </style>

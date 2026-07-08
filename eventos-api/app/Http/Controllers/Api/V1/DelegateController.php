@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Participation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Redis;
 
 /**
  * Attendee-facing delegate directory ("Delegates" tab). Acts as the resolved
@@ -13,6 +15,10 @@ use Illuminate\Http\Request;
  * attendees for networking — excludes the viewer, blocked people, and anyone
  * who opted out of networking. A connection request is a separate call
  * (ConnectionController@store).
+ *
+ * Search + sort + pagination are server-side (the directory must scale to
+ * very large events, so the client never receives the full list), and each
+ * page is annotated with live online presence (see PresenceController).
  */
 class DelegateController extends Controller
 {
@@ -21,7 +27,20 @@ class DelegateController extends Controller
         $eventId = $request->attributes->get('event_id');
         $me = $request->attributes->get('participation_id');
 
-        $delegates = Participation::query()
+        $params = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'sort' => ['nullable', 'in:az,za'],
+            'page' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            // Targeted lookup (comma-separated participation uuids) — used by
+            // the bookmarks panel to resolve saved people without paging.
+            'ids' => ['nullable', 'string', 'max:8000'],
+        ]);
+
+        $page = (int) ($params['page'] ?? 1);
+        $perPage = (int) ($params['per_page'] ?? 60);
+
+        $query = Participation::query()
             ->with('contact')
             ->select('participations.*')
             ->join('contacts', 'contacts.id', '=', 'participations.contact_id')
@@ -31,17 +50,61 @@ class DelegateController extends Controller
             // Not blocked by the organizer.
             ->where(fn ($q) => $q->whereNull('participations.meta->blocked')->orWhere('participations.meta->blocked', false))
             // Discoverable: opted in, or hasn't made a choice (default visible).
-            ->where(fn ($q) => $q->whereNull('participations.networking_opt_in')->orWhere('participations.networking_opt_in', true))
-            ->orderByRaw("lower(coalesce(contacts.first_name,'')||' '||coalesce(contacts.last_name,''))")
-            ->limit(500)
-            ->get()
-            ->map(fn (Participation $p) => $this->format($p))
-            ->values();
+            ->where(fn ($q) => $q->whereNull('participations.networking_opt_in')->orWhere('participations.networking_opt_in', true));
 
-        return response()->json(['data' => $delegates]);
+        if (! empty($params['ids'])) {
+            $ids = array_slice(array_filter(array_map('trim', explode(',', $params['ids']))), 0, 200);
+            $query->whereIn('participations.uuid', $ids);
+        }
+
+        if ($term = trim($params['q'] ?? '')) {
+            $like = '%'.addcslashes($term, '%_\\').'%';
+            $query->where(fn ($w) => $w
+                ->whereRaw("coalesce(contacts.first_name,'')||' '||coalesce(contacts.last_name,'') ilike ?", [$like])
+                ->orWhereRaw("coalesce(contacts.company,'') ilike ?", [$like])
+                ->orWhereRaw("coalesce(contacts.job_title,'') ilike ?", [$like]));
+        }
+
+        $dir = ($params['sort'] ?? 'az') === 'za' ? 'desc' : 'asc';
+        $query->orderByRaw("lower(coalesce(contacts.first_name,'')||' '||coalesce(contacts.last_name,'')) {$dir}")
+            ->orderBy('participations.id'); // stable tiebreak across pages
+
+        // Fetch one extra row to derive has_more without a COUNT(*) sweep.
+        $rows = $query->offset(($page - 1) * $perPage)->limit($perPage + 1)->get();
+        $hasMore = $rows->count() > $perPage;
+        $rows = $rows->take($perPage);
+
+        $online = $this->onlineMap($eventId, $rows->pluck('id'));
+
+        return response()->json([
+            'data' => $rows
+                ->map(fn (Participation $p) => $this->format($p, $online[$p->id] ?? false))
+                ->values(),
+            'meta' => ['page' => $page, 'per_page' => $perPage, 'has_more' => $hasMore],
+        ]);
     }
 
-    private function format(Participation $p): array
+    /** participation id => currently online, in one MGET for the page. */
+    private function onlineMap(int|string $eventId, Collection $ids): array
+    {
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        try {
+            $values = Redis::mget(
+                $ids->map(fn ($id) => PresenceController::key($eventId, $id))->all(),
+            );
+        } catch (\Throwable) {
+            return []; // presence is best-effort — directory still works
+        }
+
+        return $ids->values()
+            ->mapWithKeys(fn ($id, $i) => [$id => (bool) ($values[$i] ?? false)])
+            ->all();
+    }
+
+    private function format(Participation $p, bool $online): array
     {
         $c = $p->contact;
         $meta = $p->meta ?? [];
@@ -53,6 +116,7 @@ class DelegateController extends Controller
             'company' => $c?->company ?? ($profile['company'] ?? ''),
             'job_title' => $c?->job_title ?? ($profile['designation'] ?? ''),
             'avatar_url' => $meta['avatar_url'] ?? ($profile['avatar_url'] ?? ($profile['image_url'] ?? null)),
+            'online' => $online,
         ];
     }
 }

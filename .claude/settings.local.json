@@ -34,7 +34,15 @@
       "Bash(curl -s -o /dev/null -w \"event feed page: %{http_code}\\\\n\" \"http://localhost:3001/feed\")",
       "Bash(curl -s -I -H \"Origin: http://localhost:3001\" \"http://localhost:9000/eventos/feed/15/7c360a1b-9c19-40f3-b1bc-adfe47bff010.pdf\")",
       "Bash(grep -E \"worker.*\\(mjs|js\\)$\")",
-      "Bash(curl -s \"http://localhost:3001/_nuxt/components/feed/PdfPages.vue\")"
+      "Bash(curl -s \"http://localhost:3001/_nuxt/components/feed/PdfPages.vue\")",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('package.json','utf8'\\); const p=JSON.parse\\(s\\); console.log\\(Object.keys\\(p.scripts||{}\\).join\\(' '\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/speakers/DetailModal.vue\")",
+      "Bash(curl -s \"http://localhost:3001/_nuxt/components/speakers/DetailModal.vue\")",
+      "Bash(cd \"C:/Users/zillu/.claude/projects/c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp/memory\" && grep -n \"event speakers\" MEMORY.md)",
+      "Read(//c/Users/zillu/.claude/projects/c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp/memory/**)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"panel: %{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/event/BookmarksPanel.vue\")",
+      "Bash(curl -s -o /dev/null -w \"topbar: %{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/event/EventTopbar.vue\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",

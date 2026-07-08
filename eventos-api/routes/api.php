@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BlogPostController;
+use App\Http\Controllers\Api\V1\BookmarkController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\NotificationTemplateController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\PresenceController;
 use App\Http\Controllers\Api\V1\ExhibitorController;
 use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
 use App\Http\Controllers\Api\V1\ExhibitorMemberController;
@@ -179,6 +181,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/chat/{conversation}/messages', [ChatController::class, 'messages']);
             Route::post('/chat/{conversation}/messages', [ChatController::class, 'send']);
             Route::patch('/chat/{conversation}/read', [ChatController::class, 'read']);
+            // Online-presence heartbeat (Redis TTL key; see PresenceController).
+            Route::post('/presence', [PresenceController::class, 'ping']);
+            // Cross-tab "save" bookmarks (speakers/sessions/delegates/exhibitors).
+            Route::get('/bookmarks', [BookmarkController::class, 'index']);
+            Route::post('/bookmarks', [BookmarkController::class, 'toggle']);
             Route::get('/connections', [ConnectionController::class, 'index']);
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
