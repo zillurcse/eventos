@@ -327,7 +327,7 @@ export function useExhibitorManager(eventId: string) {
 
   return {
     // list + meta
-    exhibitors, packages, filters,
+    eventId, exhibitors, packages, filters,
     // drawer / editing
     drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput,
     // sub-resources

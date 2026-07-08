@@ -6,15 +6,12 @@ const { memberForm, subSaving, subError, members, addMember, removeMember } = us
   <div>
     <div class="border border-line rounded-xl p-4 mb-4">
       <p class="font-semibold text-[.92rem] m-0 mb-2">Invite a team member</p>
-      <div class="flex flex-wrap gap-2 items-center">
-        <input v-model="memberForm.email" type="email" placeholder="Email" class="flex-[1_1_180px] m-0">
-        <input v-model="memberForm.first_name" placeholder="First name" class="flex-[1_1_120px] m-0">
-        <input v-model="memberForm.last_name" placeholder="Last name" class="flex-[1_1_120px] m-0">
-        <select v-model="memberForm.role" class="m-0" style="width:120px;">
-          <option value="staff">Staff</option>
-          <option value="admin">Admin</option>
-        </select>
-        <input v-model="memberForm.password" type="password" placeholder="Password (enables login)" class="flex-[1_1_160px] m-0">
+      <div class="flex flex-wrap gap-2 items-end">
+        <AppInput v-model="memberForm.email" type="email" placeholder="Email" class="flex-[1_1_180px]" />
+        <AppInput v-model="memberForm.first_name" placeholder="First name" class="flex-[1_1_120px]" />
+        <AppInput v-model="memberForm.last_name" placeholder="Last name" class="flex-[1_1_120px]" />
+        <AppSelect v-model="memberForm.role" :options="[{ value: 'staff', label: 'Staff' }, { value: 'admin', label: 'Admin' }]" style="width:120px;" />
+        <AppInput v-model="memberForm.password" type="password" placeholder="Password (enables login)" class="flex-[1_1_160px]" />
         <button class="btn sm" :disabled="subSaving || !memberForm.email" @click="addMember">ADD</button>
       </div>
     </div>

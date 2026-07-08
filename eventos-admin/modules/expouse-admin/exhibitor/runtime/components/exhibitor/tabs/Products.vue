@@ -6,10 +6,10 @@ const { productForm, subSaving, subError, products, addProduct, removeProduct } 
   <div>
     <div class="border border-line rounded-xl p-4 mb-4">
       <p class="font-semibold text-[.92rem] m-0 mb-2">Add a product</p>
-      <div class="flex flex-wrap gap-2 items-center">
-        <input v-model="productForm.name" placeholder="Product name" class="flex-[1_1_180px] m-0">
-        <input v-model="productForm.description" placeholder="Description" class="flex-[1_1_220px] m-0">
-        <input v-model="productForm.price" type="number" step="0.01" placeholder="Price ($)" class="flex-[0_1_120px] m-0">
+      <div class="flex flex-wrap gap-2 items-end">
+        <AppInput v-model="productForm.name" placeholder="Product name" class="flex-[1_1_180px]" />
+        <AppInput v-model="productForm.description" placeholder="Description" class="flex-[1_1_220px]" />
+        <AppInput v-model="productForm.price" type="number" step="0.01" placeholder="Price ($)" class="flex-[0_1_120px]" />
         <button class="btn sm" :disabled="subSaving || !productForm.name" @click="addProduct">ADD</button>
       </div>
     </div>

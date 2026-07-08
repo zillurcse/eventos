@@ -31,6 +31,7 @@ function onInput(e: Event) {
       :value="modelValue ?? ''"
       :placeholder="placeholder"
       :disabled="disabled"
+      v-bind="$attrs"
       class="m-0"
       :class="error ? '!border-[#dc2626] focus:!border-[#dc2626] focus:![box-shadow:0_0_0_3px_#fee2e2]' : ''"
       @input="onInput"

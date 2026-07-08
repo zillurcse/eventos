@@ -1,5 +1,6 @@
 <script setup lang="ts">
 defineProps<{
+  eventId:  string
   coverUrl: string | null
   logoUrl:  string | null
 }>()
@@ -42,6 +43,7 @@ function onLogoChange(v: string | string[] | null) {
           collection="cover"
           hint="1200×630px recommended"
           :removable="false"
+          :gallery-path="`/events/${eventId}/gallery`"
           @uploaded="emit('coverUploaded', $event)"
         />
       </div>
@@ -56,6 +58,7 @@ function onLogoChange(v: string | string[] | null) {
           :output-height="512"
           collection="logo"
           hint="512×512px recommended"
+          :gallery-path="`/events/${eventId}/gallery`"
           @update:model-value="onLogoChange"
         />
       </div>

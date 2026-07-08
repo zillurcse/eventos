@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const {
-  draft, packages, filters, editingId,
+  eventId, draft, packages, filters, editingId,
   spotlightUploading, pickSpotlight,
   tagInput, addTag, removeTag, addCta,
   error, saving, update, remove,
@@ -28,6 +28,9 @@ function onSpotlightChange(v: string | string[] | null) {
 function onSpotlightUploaded(v: { id: number, url: string }) {
   draft.spotlight_file_id = v.id
 }
+
+const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value: pkg.id, label: pkg.name })))
+const filterOptions  = computed(() => filters.value.map((f: any) => ({ value: f.id, label: f.title })))
 </script>
 
 <template>
@@ -42,23 +45,29 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
         collection="exhibitor_logo"
         card-width="285px"
         hint="285×155px recommended"
+        :gallery-path="`/events/${eventId}/gallery`"
         @update:model-value="onLogoChange"
         @uploaded="onLogoUploaded"
       />
     </div>
 
-    <label>Exhibitor Name</label>
-    <input v-model="draft.name" placeholder="Enter the exhibitor Name">
+    <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter the exhibitor Name" />
 
-    <label>Exhibitor Email</label>
-    <input :value="draft.email" type="email" readonly disabled class="bg-[#f2f3f5] text-muted cursor-not-allowed" placeholder="—">
-    <p class="muted text-[.78rem] mt-0.5 mb-1.5">The admin login email can't be changed after creation.</p>
+    <AppInput
+      :model-value="draft.email"
+      type="email"
+      label="Exhibitor Email"
+      placeholder="—"
+      disabled
+      hint="The admin login email can't be changed after creation."
+    />
 
-    <label>Package</label>
-    <select v-model="draft.package_id">
-      <option value="">Select Package</option>
-      <option v-for="pkg in packages" :key="pkg.id" :value="pkg.id">{{ pkg.name }}</option>
-    </select>
+    <AppSelect
+      v-model="draft.package_id"
+      label="Package"
+      placeholder="Select Package"
+      :options="packageOptions"
+    />
 
     <label>Mobile number</label>
     <div class="flex items-center rounded-[11px] overflow-hidden border border-[#d7dae1] my-1.5 bg-white focus-within:border-brand">
@@ -68,17 +77,9 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
       <input v-model="draft.phone" type="tel" placeholder="Enter a phone number" style="border:0;box-shadow:none;margin:0;border-radius:0;flex:1;outline:none;">
     </div>
 
-    <label>Stall No</label>
-    <select v-model="draft.stall_no">
-      <option value="">Select Stall No</option>
-      <option v-for="s in STALL_OPTIONS" :key="s" :value="s">{{ s }}</option>
-    </select>
+    <AppSelect v-model="draft.stall_no" label="Stall No" placeholder="Select Stall No" :options="STALL_OPTIONS" />
 
-    <label>Type</label>
-    <select v-model="draft.type">
-      <option value="">Select Type</option>
-      <option v-for="t in TYPE_OPTIONS" :key="t" :value="t">{{ t }}</option>
-    </select>
+    <AppSelect v-model="draft.type" label="Type" placeholder="Select Type" :options="TYPE_OPTIONS" />
 
     <!-- About (rich text) -->
     <div class="flex items-center gap-1 mt-3 mb-1">
@@ -94,34 +95,24 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
       <div ref="aboutRef" contenteditable="true" class="min-h-30 p-3 text-[.93rem] text-ink outline-none" @input="onAboutInput" />
     </div>
 
-    <label>Street address</label>
-    <input v-model="draft.street" placeholder="Enter Street address">
+    <AppInput v-model="draft.street" label="Street address" placeholder="Enter Street address" />
 
-    <label>City</label>
-    <input v-model="draft.city" placeholder="Enter City">
+    <AppInput v-model="draft.city" label="City" placeholder="Enter City" />
 
     <div class="flex gap-3">
       <div class="flex-1">
-        <label>State</label>
-        <input v-model="draft.state" placeholder="Enter State">
+        <AppInput v-model="draft.state" label="State" placeholder="Enter State" />
       </div>
       <div class="flex-1">
-        <label>ZIP code</label>
-        <input v-model="draft.zip" placeholder="Enter Zip Code">
+        <AppInput v-model="draft.zip" label="ZIP code" placeholder="Enter Zip Code" />
       </div>
     </div>
 
-    <label>Country</label>
-    <select v-model="draft.country">
-      <option value="">Select Country</option>
-      <option v-for="c in COUNTRIES" :key="c" :value="c">{{ c }}</option>
-    </select>
+    <AppSelect v-model="draft.country" label="Country" placeholder="Select Country" :options="COUNTRIES" />
 
-    <label>Location</label>
-    <input v-model="draft.location_url" placeholder="URL of the venue location">
+    <AppInput v-model="draft.location_url" label="Location" placeholder="URL of the venue location" />
 
-    <label>Website</label>
-    <input v-model="draft.website_url" placeholder="URL of the website">
+    <AppInput v-model="draft.website_url" label="Website" placeholder="URL of the website" />
 
     <!-- Custom Tags -->
     <label>Custom Tags</label>
@@ -134,11 +125,12 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
     </div>
 
     <!-- Manage Filters -->
-    <label>Manage filters</label>
-    <select v-model="draft.filter_id">
-      <option value="">Main filter title</option>
-      <option v-for="f in filters" :key="f.id" :value="f.id">{{ f.title }}</option>
-    </select>
+    <AppSelect
+      v-model="draft.filter_id"
+      label="Manage filters"
+      placeholder="Main filter title"
+      :options="filterOptions"
+    />
 
     <!-- Spotlight Banner -->
     <div class="mt-3 mb-1.5">
@@ -159,6 +151,7 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
       collection="exhibitor_spotlight"
       card-width="100%"
       hint="Spotlight banner image"
+      :gallery-path="`/events/${eventId}/gallery`"
       @update:model-value="onSpotlightChange"
       @uploaded="onSpotlightUploaded"
     />
@@ -184,14 +177,9 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 text-muted transition-transform" :class="cta.open ? 'rotate-180' : ''"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div v-if="cta.open" class="p-4 border-t border-line">
-        <label>Type</label>
-        <select v-model="cta.type">
-          <option>TEXT</option><option>LINK</option><option>BUTTON</option>
-        </select>
-        <label>Label</label>
-        <input v-model="cta.label" placeholder="Button label">
-        <label>Value / URL</label>
-        <input v-model="cta.value" placeholder="Link or text value">
+        <AppSelect v-model="cta.type" label="Type" :options="['TEXT', 'LINK', 'BUTTON']" />
+        <AppInput v-model="cta.label" label="Label" placeholder="Button label" />
+        <AppInput v-model="cta.value" label="Value / URL" placeholder="Link or text value" />
       </div>
     </div>
 
@@ -243,15 +231,9 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
 
     <!-- Flags row -->
     <div class="flex items-center gap-5 mt-4 mb-3">
-      <label class="flex items-center gap-2 m-0 cursor-pointer text-[.92rem] text-ink">
-        <input v-model="draft.rating" type="checkbox" class="w-4.25 h-4.25 m-0 accent-brand"> Rating
-      </label>
-      <label class="flex items-center gap-2 m-0 cursor-pointer text-[.92rem] text-ink">
-        <input v-model="draft.featured" type="checkbox" class="w-4.25 h-4.25 m-0 accent-brand"> Featured
-      </label>
-      <label class="flex items-center gap-2 m-0 cursor-pointer text-[.92rem] text-ink">
-        <input v-model="draft.premium" type="checkbox" class="w-4.25 h-4.25 m-0 accent-brand"> Premium
-      </label>
+      <AppCheckbox v-model="draft.rating" label="Rating" />
+      <AppCheckbox v-model="draft.featured" label="Featured" />
+      <AppCheckbox v-model="draft.premium" label="Premium" />
     </div>
 
     <!-- Contact details -->
@@ -259,17 +241,13 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
       <p class="font-semibold text-[.92rem] text-ink m-0">Contact details <span class="muted font-normal">(For internal use only)</span></p>
     </div>
 
-    <label>Full name</label>
-    <input v-model="draft.contact.full_name" placeholder="Enter Full name">
+    <AppInput v-model="draft.contact.full_name" label="Full name" placeholder="Enter Full name" />
 
-    <label>Company name</label>
-    <input v-model="draft.contact.company_name" placeholder="Enter Company name">
+    <AppInput v-model="draft.contact.company_name" label="Company name" placeholder="Enter Company name" />
 
-    <label>Position</label>
-    <input v-model="draft.contact.position" placeholder="Enter Position">
+    <AppInput v-model="draft.contact.position" label="Position" placeholder="Enter Position" />
 
-    <label>Email address</label>
-    <input v-model="draft.contact.email" type="email" placeholder="Enter Email address">
+    <AppInput v-model="draft.contact.email" type="email" label="Email address" placeholder="Enter Email address" />
 
     <label>Mobile number</label>
     <div class="flex items-center rounded-[11px] overflow-hidden border border-[#d7dae1] my-1.5 bg-white focus-within:border-brand">

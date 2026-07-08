@@ -126,7 +126,7 @@ function initials(name: string | null | undefined): string {
 }
 
 function isSessionSpeaker(sp: EventSpeaker): boolean {
-  return session.value?.speakers.some(s => s.id === sp.id) ?? false
+  return session.value?.speakers?.some(s => s.id === sp.id) ?? false
 }
 
 // End must be after start when both are set.
@@ -214,7 +214,7 @@ async function saveBasic() {
         is_allowed_to_rate: basic.is_allowed_to_rate,
       },
     })
-    session.value = res.data
+    session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
   } catch (e: any) {
     basicError.value = e?.data?.message || 'Could not save changes.'
   } finally {
@@ -243,7 +243,7 @@ async function saveStream() {
         can_session:              stream.can_session,
       },
     })
-    session.value = res.data
+    session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
   } catch (e: any) {
     streamError.value = e?.data?.message || 'Could not save stream settings.'
   } finally {
@@ -488,10 +488,16 @@ onMounted(load)
 
           <div>
             <label class="block mb-1.5">Session Logo</label>
-            <UploadButton
-              :preview="basic.logo_url"
+            <ImageField
+              :model-value="basic.logo_url"
+              :aspect="1"
+              :output-width="400"
+              :output-height="400"
               collection="logo"
-              @uploaded="basic.logo_url = $event.url"
+              card-width="160px"
+              hint="Square image recommended"
+              :gallery-path="`/events/${id}/gallery`"
+              @update:model-value="basic.logo_url = (Array.isArray($event) ? $event[0] : $event) || null"
             />
           </div>
         </div>

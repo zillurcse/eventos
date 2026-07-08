@@ -140,6 +140,7 @@ onMounted(load)
         collection="banners"
         card-width="100%"
         hint="220×140px recommended"
+        :gallery-path="`/events/${id}/gallery`"
         @update:model-value="onImageChange"
         @uploaded="onImageUploaded"
       />

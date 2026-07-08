@@ -6,9 +6,9 @@ const { docForm, subSaving, subError, documents, addDocument, removeDocument } =
   <div>
     <div class="border border-line rounded-xl p-4 mb-4">
       <p class="font-semibold text-[.92rem] m-0 mb-2">Add a document</p>
-      <div class="flex flex-wrap gap-2 items-center">
-        <input v-model="docForm.title" placeholder="Title" class="flex-[1_1_180px] m-0">
-        <input v-model="docForm.url" placeholder="https://… (link to file)" class="flex-[1_1_220px] m-0">
+      <div class="flex flex-wrap gap-2 items-end">
+        <AppInput v-model="docForm.title" placeholder="Title" class="flex-[1_1_180px]" />
+        <AppInput v-model="docForm.url" placeholder="https://… (link to file)" class="flex-[1_1_220px]" />
         <button class="btn sm" :disabled="subSaving || !docForm.title" @click="addDocument">ADD</button>
       </div>
     </div>
