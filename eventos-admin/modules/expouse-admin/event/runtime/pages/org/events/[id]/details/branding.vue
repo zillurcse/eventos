@@ -110,6 +110,7 @@ onMounted(load)
 
     <BrandingLogoAndCover
       class="mb-4"
+      :event-id="id"
       :cover-url="coverUrl"
       :logo-url="logoUrl"
       @cover-uploaded="onCoverUploaded"
@@ -118,18 +119,21 @@ onMounted(load)
 
     <BrandingCommunityBanners
       class="mb-4"
+      :event-id="id"
       :banners="banners"
       @update="onBannersUpdate"
     />
 
     <BrandingLoginPageDesign
       class="mb-4"
+      :event-id="id"
       :login="login"
       @update="onLoginUpdate"
     />
 
     <BrandingEmailHeader
       class="mb-6"
+      :event-id="id"
       :email-header-url="emailHeaderUrl"
       @uploaded="onEmailHeaderUploaded"
     />

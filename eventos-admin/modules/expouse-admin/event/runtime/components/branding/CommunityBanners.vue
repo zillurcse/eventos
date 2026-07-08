@@ -7,6 +7,7 @@ export interface BrandingBanner {
 }
 
 const props = defineProps<{
+  eventId: string
   banners: BrandingBanner[]
 }>()
 
@@ -148,6 +149,7 @@ function toggleActive(i: number) {
             collection="banner"
             hint="1036×350px recommended"
             card-width="100%"
+            :gallery-path="`/events/${eventId}/gallery`"
             @update:model-value="onImageChange"
           />
         </div>

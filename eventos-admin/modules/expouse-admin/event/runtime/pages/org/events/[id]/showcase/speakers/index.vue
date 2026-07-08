@@ -231,6 +231,7 @@ onMounted(() => { load(); loadCategories() })
     <!-- Add / Edit Drawer -->
     <SpeakerFormDrawer
       v-if="drawerOpen"
+      :event-id="id"
       :speaker="editing"
       :categories="categories"
       :saving="saving"

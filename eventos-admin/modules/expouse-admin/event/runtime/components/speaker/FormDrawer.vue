@@ -32,6 +32,7 @@ interface DraftShape {
 // when adding. The component is mounted fresh on every open (parent uses v-if),
 // so we can seed the draft once here in setup.
 const props = defineProps<{
+  eventId: string
   speaker?: (DraftShape & Record<string, any>) | null
   categories?: SpeakerCategory[]
   saving?: boolean
@@ -151,6 +152,7 @@ function save() {
           collection="avatar"
           card-width="160px"
           hint="Square image recommended"
+          :gallery-path="`/events/${eventId}/gallery`"
           @update:model-value="draft.image_url = (Array.isArray($event) ? $event[0] : $event) || null"
         />
       </FormField>

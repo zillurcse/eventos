@@ -118,7 +118,7 @@
   .menu { @apply relative; }
   .menu-btn { @apply w-10 h-10 rounded-[9px] border border-line grid place-items-center cursor-pointer text-faint; background: #f7f7fb; }
   .menu-btn:hover { @apply text-ink; background: #f0f0f5; }
-  .menu .menu-pop { @apply top-10; }
+  .menu .menu-pop { @apply top-[-150px]; }
 
   /* ── Buttons / badges ────────────────────────────────── */
   .btn { @apply inline-flex items-center gap-[7px] px-4 py-2.5 bg-brand text-white border-0 rounded-[11px] cursor-pointer text-[.92rem]; font-weight: 650; }

@@ -177,7 +177,7 @@ function view(url: string) {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    margin: 0 auto;
+    /* margin: 0 auto; */
     overflow: hidden;
 }
 .plus-icon-box {

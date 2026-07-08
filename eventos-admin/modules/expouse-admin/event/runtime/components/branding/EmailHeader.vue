@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
+  eventId: string
   emailHeaderUrl: string | null
 }>()
 
@@ -67,6 +68,7 @@ function save() {
             collection="email_header"
             hint="1200×300px recommended"
             card-width="100%"
+            :gallery-path="`/events/${eventId}/gallery`"
             @update:model-value="onImageChange"
           />
         </div>

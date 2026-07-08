@@ -6,7 +6,7 @@ export interface LoginConfig {
   website_url: string
 }
 
-const props = defineProps<{ login: LoginConfig }>()
+const props = defineProps<{ eventId: string, login: LoginConfig }>()
 const emit  = defineEmits<{ (e: 'update', v: Partial<LoginConfig>): void }>()
 
 const TYPES = [
@@ -117,6 +117,7 @@ const drawerTitle = computed(() =>
             collection="banner"
             hint="1796×1390px recommended"
             card-width="220px"
+            :gallery-path="`/events/${eventId}/gallery`"
             @update:model-value="onBannerChange"
           />
         </div>
