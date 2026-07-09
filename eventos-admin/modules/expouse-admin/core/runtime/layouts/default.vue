@@ -26,6 +26,7 @@ const nav = computed<NavItem[]>(() => {
   ]
   if (auth.isExhibitor) return [
     { to: '/exhibitor', label: 'My Booth', icon: 'store' },
+    { to: '/exhibitor/inbox', label: 'Inbox', icon: 'mail' },
     { to: '/exhibitor/products', label: 'Products', icon: 'box' },
     { to: '/exhibitor/members', label: 'Team', icon: 'users' },
   ]

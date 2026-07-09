@@ -30,7 +30,7 @@ class ExhibitorController extends Controller
     private const PROFILE_KEYS = [
         'stall_no', 'phone_code', 'phone', 'rating', 'featured', 'premium', 'about',
         'street', 'city', 'state', 'zip', 'country', 'location_url', 'website_url',
-        'tags', 'filter_id', 'spotlight_type', 'spotlight_url', 'spotlight_file_id',
+        'tags', 'filter_id', 'filter_selections', 'spotlight_type', 'spotlight_url', 'spotlight_file_id',
         'cta', 'social', 'contact', 'entitlements',
     ];
 
@@ -66,8 +66,8 @@ class ExhibitorController extends Controller
             'event' => ['required', 'string'],
             'type' => ['nullable', 'in:exhibitor,sponsor'],
             'name' => ['required', 'string', 'max:180'],
-            'email' => ['nullable', 'email'],   // exhibitor-admin login email
-            'package_id' => ['nullable', 'integer', 'exists:exhibitor_packages,id'],
+            'email' => ['required', 'email'],   // exhibitor-admin login email
+            'package_id' => ['required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['nullable', 'integer'],
         ]);
 

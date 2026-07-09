@@ -290,23 +290,42 @@ class PublicSiteController extends Controller
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
-        [$event] = $resolved;
+        [$event, $setting] = $resolved;
 
-        $list = Exhibitor::on('pgsql_admin')
+        $exhibitors = Exhibitor::on('pgsql_admin')
             ->with(['logoFile', 'products', 'documents'])
             ->where('event_id', $event->id)
             ->where('status', 'active')
             ->orderByDesc('tier_rank')
             ->orderBy('name')
-            ->get()
-            ->map(fn (Exhibitor $e) => $this->formatExhibitorFull($e))
-            ->values();
+            ->get();
+
+        // Which filter options are actually chosen by at least one booth:
+        // filterId → set of option strings. Facets not in use are hidden.
+        $usedOptions = [];
+        foreach ($exhibitors as $e) {
+            foreach (($e->profile_data['filter_selections'] ?? []) as $fid => $groups) {
+                foreach ((array) $groups as $opts) {
+                    foreach ((array) $opts as $opt) {
+                        $usedOptions[$fid][(string) $opt] = true;
+                    }
+                }
+            }
+        }
+
+        $list = $exhibitors->map(fn (Exhibitor $e) => $this->formatExhibitorFull($e))->values();
 
         return response()->json([
             'data' => [
                 'exhibitors' => $list->where('type', 'exhibitor')->values(),
                 'sponsors' => $list->where('type', 'sponsor')->values(),
                 'categories' => $list->pluck('category')->filter()->unique()->sort()->values(),
+                // Event edition year (shown under each booth's type on the card).
+                'year' => $event->starts_at?->year,
+                // The organizer's "Manage Filters" facets (title → headings → options),
+                // trimmed to only the options actually used by a booth so the attendee
+                // rail never shows a filter no exhibitor is tagged with.
+                'filters' => $this->publicFilters($setting->filters ?? [], $usedOptions),
             ],
         ]);
     }
@@ -513,7 +532,46 @@ class PublicSiteController extends Controller
                 ->filter(fn ($d) => ($d->visibility ?? 'all') === 'all')
                 ->map(fn ($d) => ['id' => $d->id, 'title' => $d->title, 'url' => $d->url])
                 ->values(),
+            // filterId → heading → chosen options (from the admin filter picker).
+            'filter_selections' => (object) ($profile['filter_selections'] ?? []),
         ];
+    }
+
+    /**
+     * Normalise the event's configured filters for the public rail: keep only
+     * id/title/headings(heading, options), and within each heading keep only
+     * options a booth actually uses. Filters/headings left with no in-use
+     * option are dropped, so the rail never shows an unused facet.
+     *
+     * @param  array<string, array<string, bool>>  $usedOptions  filterId → {option: true}
+     */
+    protected function publicFilters(array $filters, array $usedOptions = []): array
+    {
+        return collect($filters)
+            ->map(function ($f) use ($usedOptions) {
+                $fid = $f['id'] ?? '';
+                $used = $usedOptions[$fid] ?? [];
+
+                $headings = collect($f['headings'] ?? [])
+                    ->map(fn ($h) => [
+                        'heading' => $h['heading'] ?? '',
+                        'options' => array_values(array_filter(
+                            $h['options'] ?? [],
+                            fn ($o) => trim((string) $o) !== '' && isset($used[(string) $o]),
+                        )),
+                    ])
+                    ->filter(fn ($h) => count($h['options']) > 0)
+                    ->values();
+
+                return [
+                    'id' => $fid,
+                    'title' => $f['title'] ?? '',
+                    'headings' => $headings->all(),
+                ];
+            })
+            ->filter(fn ($f) => count($f['headings']) > 0)
+            ->values()
+            ->all();
     }
 
     /**

@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 defineEmits<{
-  (e: 'select', id: string): void
+  (e: 'select', conversation: ChatConversationItem): void
   (e: 'new'): void
 }>()
 
@@ -50,7 +50,7 @@ const ROLE_CLS: Record<string, string> = { speaker: 'speaker', exhibitor: 'exhib
         type="button"
         class="item"
         :class="{ active: c.id === activeId }"
-        @click="$emit('select', c.id)"
+        @click="$emit('select', c)"
       >
         <span class="av">
           <img v-if="c.with.avatar_url" :src="c.with.avatar_url" :alt="c.with.name">

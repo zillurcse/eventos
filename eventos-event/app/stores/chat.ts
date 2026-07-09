@@ -20,6 +20,10 @@ export interface ChatConversationItem {
   with: ChatPerson
   unread: number
   last_message: ChatPreview | null
+  // 'person' = participant chat thread; 'exhibitor' = a booth "Contact" thread
+  // (opens the exhibitor Contact modal instead of the in-drawer thread).
+  kind?: 'person' | 'exhibitor'
+  exhibitor_id?: string
 }
 
 export type ChatAttachmentKind = 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'
@@ -120,12 +124,54 @@ export const useChatStore = defineStore('chat', {
         const res = await api<{ me: string, profile: ChatPerson | null, data: ChatConversationItem[] }>(`/events/${uuid}/chat`)
         this.me = res.me
         this.profile = res.profile
-        this.conversations = res.data
+        this.conversations = res.data.map(c => ({ ...c, kind: 'person' as const }))
         this.loaded = true
         this.subscribe()
+        await this.syncExhibitorConversations()
       } finally {
         this.loading = false
       }
+    },
+
+    /**
+     * Merge the attendee's exhibitor "Contact" threads into the conversation
+     * list so they appear alongside participant chats. They open the Contact
+     * modal rather than the in-drawer thread.
+     */
+    async syncExhibitorConversations() {
+      const uuid = this.eventUuid()
+      if (!uuid) return
+      try {
+        const api = useApi()
+        const res = await api<{ data: Array<{ id: string, exhibitor_id: string, name: string, unread: number, last_message: ChatPreview | null }> }>(
+          `/events/${uuid}/exhibitor-conversations`,
+        )
+        const items: ChatConversationItem[] = res.data.map(c => ({
+          id: c.id,
+          kind: 'exhibitor',
+          exhibitor_id: c.exhibitor_id,
+          with: { id: c.exhibitor_id, name: c.name, role: 'exhibitor', company: '', job_title: '', avatar_url: null },
+          unread: c.unread,
+          last_message: c.last_message,
+        }))
+        // Replace the exhibitor slice, keep person threads, then order by recency.
+        const persons = this.conversations.filter(c => c.kind !== 'exhibitor')
+        this.conversations = [...persons, ...items].sort((a, b) => {
+          const ta = a.last_message?.created_at ? Date.parse(a.last_message.created_at) : 0
+          const tb = b.last_message?.created_at ? Date.parse(b.last_message.created_at) : 0
+          return tb - ta
+        })
+      } catch { /* exhibitor threads are optional */ }
+    },
+
+    /** Route a list row: participant threads open in-drawer; booths open the modal. */
+    openConversation(c: ChatConversationItem) {
+      if (c.kind === 'exhibitor' && c.exhibitor_id) {
+        this.closeDrawer()
+        useExhibitorContactStore().openFor({ id: c.exhibitor_id, name: c.with.name })
+        return
+      }
+      this.select(c.id)
     },
 
     /** Select a thread: load its history and clear its unread badge. */

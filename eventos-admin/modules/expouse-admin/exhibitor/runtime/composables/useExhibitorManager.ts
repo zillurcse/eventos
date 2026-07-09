@@ -129,6 +129,9 @@ export function useExhibitorManager(eventId: string) {
       zip: p.zip || '', country: p.country || '',
       location_url: p.location_url || '', website_url: p.website_url || '',
       tags: Array.isArray(p.tags) ? [...p.tags] : [], filter_id: p.filter_id || '',
+      filter_selections: p.filter_selections && typeof p.filter_selections === 'object'
+        ? JSON.parse(JSON.stringify(p.filter_selections))
+        : {},
       spotlight_type: p.spotlight_type || 'image',
       spotlight_url: p.spotlight_url || '', spotlight_file_id: p.spotlight_file_id ?? null,
       cta: Array.isArray(p.cta) ? p.cta.map((c: any) => ({ ...c, open: false })) : [],
@@ -167,6 +170,7 @@ export function useExhibitorManager(eventId: string) {
       state: draft.state, zip: draft.zip, country: draft.country,
       location_url: draft.location_url, website_url: draft.website_url,
       tags: draft.tags, filter_id: draft.filter_id,
+      filter_selections: JSON.parse(JSON.stringify(draft.filter_selections)),
       spotlight_type: draft.spotlight_type, spotlight_file_id: draft.spotlight_file_id,
       cta: draft.cta, social: draft.social, contact: draft.contact,
     }

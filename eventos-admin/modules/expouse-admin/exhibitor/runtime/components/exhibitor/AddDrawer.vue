@@ -9,6 +9,10 @@ function onLogoUploaded(v: { id: number, url: string }) {
 }
 
 const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value: pkg.id, label: pkg.name })))
+
+// Name, email and package are all required to create an exhibitor.
+const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim()))
+const canCreate = computed(() => !!draft.name.trim() && emailValid.value && !!draft.package_id)
 </script>
 
 <template>
@@ -30,11 +34,11 @@ const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value:
     </div>
 
     <div class="flex flex-col gap-3">
-      <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter the exhibitor Name" />
+      <AppInput v-model="draft.name" label="Exhibitor Name *" placeholder="Enter the exhibitor Name" />
 
-      <AppInput v-model="draft.email" type="email" label="Exhibitor Email" placeholder="Enter the exhibitor email" />
+      <AppInput v-model="draft.email" type="email" label="Exhibitor Email *" placeholder="Enter the exhibitor email" />
 
-      <AppSelect v-model="draft.package_id" label="Package" placeholder="Select Package" :options="packageOptions" />
+      <AppSelect v-model="draft.package_id" label="Package *" placeholder="Select Package" :options="packageOptions" />
 
       <AppSelect v-model="draft.stall_no" label="Stall No" placeholder="Select Stall No" :options="STALL_OPTIONS" />
 
@@ -74,7 +78,7 @@ const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value:
     <p v-if="error" class="error mt-2">{{ error }}</p>
 
     <div class="pt-4 mt-2">
-      <button class="btn w-full py-3 text-[.95rem] tracking-widest" :disabled="saving || !draft.name.trim()" @click="create">
+      <button class="btn w-full py-3 text-[.95rem] tracking-widest" :disabled="saving || !canCreate" @click="create">
         {{ saving ? 'CREATING…' : 'CREATE' }}
       </button>
     </div>

@@ -3,6 +3,11 @@ import type { Exhibitor } from '~/stores/exhibitors'
 
 const props = defineProps<{ exhibitor: Exhibitor }>()
 const store = useExhibitorsStore()
+const contact = useExhibitorContactStore()
+
+function openContact() {
+  contact.openFor({ id: props.exhibitor.id, name: props.exhibitor.name })
+}
 
 const bookmarks = useBookmarksStore()
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', props.exhibitor.id))
@@ -55,7 +60,11 @@ const socials = computed(() => Object.entries(props.exhibitor.social || {}).filt
         <p v-if="exhibitor.description" class="desc">{{ exhibitor.description }}</p>
 
         <div class="actions">
-          <a v-if="exhibitor.website" :href="exhibitor.website" target="_blank" rel="noopener" class="btn primary">
+          <button type="button" class="btn primary" @click="openContact">
+            <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
+            Contact
+          </button>
+          <a v-if="exhibitor.website" :href="exhibitor.website" target="_blank" rel="noopener" class="btn ghost">
             <svg viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
             Visit website
           </a>
@@ -142,6 +151,8 @@ const socials = computed(() => Object.entries(props.exhibitor.social || {}).filt
 .btn { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 10px; padding: 11px 16px; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; text-decoration: none; }
 .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .btn.primary { background: var(--brand-primary); color: #fff; }
+.btn.ghost { background: #f1f5f9; color: #475569; }
+.btn.ghost:hover { background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); }
 .ic { width: 40px; height: 40px; border-radius: 10px; background: #f1f5f9; color: #475569; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .ic:hover { background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); }
 .ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

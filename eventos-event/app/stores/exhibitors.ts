@@ -28,12 +28,27 @@ export interface Exhibitor {
   social: Record<string, string>
   products: ExhibitorProduct[]
   documents: ExhibitorDoc[]
+  // filterId → heading → chosen options (matched against EventFilter facets).
+  filter_selections: Record<string, Record<string, string[]>>
+}
+
+export interface EventFilterHeading {
+  heading: string
+  options: string[]
+}
+
+export interface EventFilter {
+  id: string
+  title: string
+  headings: EventFilterHeading[]
 }
 
 interface ExhibitorsPayload {
   exhibitors: Exhibitor[]
   sponsors: Exhibitor[]
   categories: string[]
+  filters: EventFilter[]
+  year: number | null
 }
 
 /**
@@ -47,6 +62,8 @@ export const useExhibitorsStore = defineStore('exhibitors', {
     exhibitors: [] as Exhibitor[],
     sponsors: [] as Exhibitor[],
     categories: [] as string[],
+    filters: [] as EventFilter[],
+    year: null as number | null,
     loading: false,
     loaded: false,
     error: false,
@@ -73,6 +90,8 @@ export const useExhibitorsStore = defineStore('exhibitors', {
         this.exhibitors = res.data.exhibitors
         this.sponsors = res.data.sponsors
         this.categories = res.data.categories
+        this.filters = res.data.filters ?? []
+        this.year = res.data.year ?? null
         this.loaded = true
       } catch {
         this.error = true

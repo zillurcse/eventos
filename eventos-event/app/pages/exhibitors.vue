@@ -12,6 +12,37 @@ const type = ref<'all' | 'exhibitor' | 'sponsor'>('all')
 const category = ref<string>('')
 const savedOnly = ref(false)
 
+// Attendee-chosen options per configured filter: filterId → option strings.
+const selections = reactive<Record<string, string[]>>({})
+// Which filter accordions are expanded in the rail.
+const openFilters = reactive<Record<string, boolean>>({})
+
+function toggleFilterOpen(id: string) { openFilters[id] = !openFilters[id] }
+function isOptOn(fid: string, opt: string) { return !!selections[fid]?.includes(opt) }
+function toggleOpt(fid: string, opt: string) {
+  const arr = (selections[fid] ||= [])
+  const i = arr.indexOf(opt)
+  if (i >= 0) arr.splice(i, 1)
+  else arr.push(opt)
+  if (!arr.length) delete selections[fid]
+}
+function filterOnCount(fid: string) { return selections[fid]?.length ?? 0 }
+
+// Options an exhibitor carries for a given filter, flattened across headings.
+function exhibitorOptions(e: Exhibitor, fid: string): string[] {
+  const group = e.filter_selections?.[fid]
+  return group ? Object.values(group).flat() : []
+}
+
+const anyFilterActive = computed(() => (Object.values(selections) as string[][]).some(a => a.length > 0))
+function clearAll() {
+  for (const k of Object.keys(selections)) delete selections[k]
+  category.value = ''
+  type.value = 'all'
+  savedOnly.value = false
+  search.value = ''
+}
+
 onMounted(() => {
   if (!store.loaded) store.fetchExhibitors()
   bookmarks.fetch()
@@ -35,6 +66,12 @@ const filtered = computed<Exhibitor[]>(() => {
     if (savedOnly.value && !bookmarks.isOn('exhibitor', e.id)) return false
     if (type.value !== 'all' && e.type !== type.value) return false
     if (category.value && e.category !== category.value) return false
+    // Configured filters: OR within a filter, AND across filters.
+    for (const [fid, opts] of Object.entries(selections) as [string, string[]][]) {
+      if (!opts.length) continue
+      const has = exhibitorOptions(e, fid)
+      if (!opts.some(o => has.includes(o))) return false
+    }
     if (!q) return true
     return `${e.name} ${e.category} ${e.description}`.toLowerCase().includes(q)
   })
@@ -75,6 +112,38 @@ const filtered = computed<Exhibitor[]>(() => {
           </button>
         </div>
       </div>
+
+      <!-- Configured "Manage Filters" facets -->
+      <div v-for="f in store.filters" :key="f.id" class="card">
+        <button type="button" class="ct ct-btn" @click="toggleFilterOpen(f.id)">
+          <span class="ct-title">
+            {{ f.title }}
+            <span v-if="filterOnCount(f.id)" class="cnt">{{ filterOnCount(f.id) }}</span>
+          </span>
+          <svg class="chev" :class="{ open: openFilters[f.id] }" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+        <div v-if="openFilters[f.id]" class="opts">
+          <template v-for="(h, hi) in f.headings" :key="hi">
+            <div v-if="h.heading" class="ghead">{{ h.heading }}</div>
+            <button
+              v-for="opt in h.options"
+              :key="hi + '::' + opt"
+              type="button"
+              class="opt"
+              :class="{ on: isOptOn(f.id, opt) }"
+              @click="toggleOpt(f.id, opt)"
+            >
+              {{ opt }}
+              <svg v-if="isOptOn(f.id, opt)" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <button v-if="anyFilterActive || category || type !== 'all' || savedOnly || search" type="button" class="clear" @click="clearAll">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        Clear all filters
+      </button>
 
       <div class="card">
         <div class="ct">
@@ -163,6 +232,16 @@ const filtered = computed<Exhibitor[]>(() => {
 .opt { display: flex; align-items: center; justify-content: space-between; border: 1px solid transparent; background: none; border-radius: 10px; padding: 11px 12px; cursor: pointer; font: inherit; font-size: .9rem; color: #475569; text-align: left; }
 .opt:hover { background: #f7f8fa; }
 .opt.on { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); border-color: color-mix(in srgb, var(--brand-primary) 35%, #fff); color: var(--brand-primary); font-weight: 600; }
+
+/* Collapsible filter facets */
+.ct-btn { width: 100%; border: none; background: none; cursor: pointer; padding: 4px 6px; border-bottom: none; font: inherit; font-weight: 600; }
+.ct-title { display: inline-flex; align-items: center; gap: 8px; color: #334155; }
+.cnt { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand-primary); color: #fff; font-size: .68rem; font-weight: 700; }
+.chev { transition: transform .18s ease; }
+.chev.open { transform: rotate(180deg); }
+.ghead { padding: 8px 6px 2px; color: #94a3b8; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.clear { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; border: none; background: none; cursor: pointer; color: var(--brand-primary); font: inherit; font-size: .85rem; font-weight: 600; padding: 2px 6px; }
+.clear svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .chk { width: 17px; height: 17px; fill: none; stroke: var(--brand-primary); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .main { min-width: 0; }

@@ -140,7 +140,7 @@ function sender(mine: boolean): Sender {
               {{ chat.conversations.length ? 'No matches.' : 'No conversations yet — start one with the pencil above.' }}
             </div>
 
-            <button v-for="c in shown" :key="c.id" type="button" class="row" @click="chat.select(c.id)">
+            <button v-for="c in shown" :key="c.id" type="button" class="row" @click="chat.openConversation(c)">
               <span class="av">
                 <img v-if="c.with.avatar_url" :src="c.with.avatar_url" :alt="c.with.name">
                 <template v-else>{{ initials(c.with.name) }}</template>

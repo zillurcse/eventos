@@ -14,6 +14,8 @@ export interface Draft {
   street: string; city: string; state: string; zip: string; country: string
   location_url: string; website_url: string
   tags: string[]; filter_id: string
+  // Selections against the event's "Manage Filters": filterId → heading → chosen options.
+  filter_selections: Record<string, Record<string, string[]>>
   spotlight_type: 'image' | 'video'; spotlight_url: string; spotlight_file_id: number | null
   cta: CtaItem[]; social: Social; contact: Contact
 }
@@ -52,7 +54,7 @@ export function freshDraft(): Draft {
     about: '',
     street: '', city: '', state: '', zip: '', country: '',
     location_url: '', website_url: '',
-    tags: [], filter_id: '',
+    tags: [], filter_id: '', filter_selections: {},
     spotlight_type: 'image', spotlight_url: '', spotlight_file_id: null,
     cta: [],
     social: { facebook: '', linkedin: '', twitter: '', instagram: '', whatsapp: '', youtube: '' },

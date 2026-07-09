@@ -36,6 +36,8 @@ use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\LoungeController;
+use App\Http\Controllers\Api\V1\ExhibitorContactController;
+use App\Http\Controllers\Api\V1\ExhibitorInboxController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -160,6 +162,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/members', [ExhibitorSelfMemberController::class, 'store']);
             Route::delete('/members/{member}', [ExhibitorSelfMemberController::class, 'destroy']);
             Route::post('/members/{member}/password', [ExhibitorSelfMemberController::class, 'password']);
+
+            // Contact inbox: attendee messages + meeting requests, assign a member.
+            Route::get('/inbox/conversations', [ExhibitorInboxController::class, 'conversations']);
+            Route::get('/inbox/conversations/{conversation}/messages', [ExhibitorInboxController::class, 'messages']);
+            Route::post('/inbox/conversations/{conversation}/messages', [ExhibitorInboxController::class, 'reply']);
+            Route::get('/inbox/meeting-requests', [ExhibitorInboxController::class, 'meetingRequests']);
+            Route::patch('/inbox/meeting-requests/{request}', [ExhibitorInboxController::class, 'respondMeeting']);
         });
 
         // ── Attendee context: networking & feed (§6.5, §6.6) ──
@@ -193,6 +202,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/lounge', [MeetingController::class, 'lounge']);
             Route::post('/meetings', [MeetingController::class, 'store']);
             Route::patch('/meetings/{meeting}', [MeetingController::class, 'respond']);
+            // Attendee → exhibitor "Contact" (Chat + Meet). Recipient is a booth;
+            // the exhibitor admin later assigns a member (handled in the admin).
+            Route::get('/exhibitor-conversations', [ExhibitorContactController::class, 'conversations']);
+            Route::get('/exhibitors/{exhibitor}/thread', [ExhibitorContactController::class, 'thread']);
+            Route::post('/exhibitors/{exhibitor}/messages', [ExhibitorContactController::class, 'sendMessage']);
+            Route::get('/exhibitors/{exhibitor}/meeting-requests', [ExhibitorContactController::class, 'meetingRequests']);
+            Route::post('/exhibitors/{exhibitor}/meeting-requests', [ExhibitorContactController::class, 'requestMeeting']);
             // Networking-lounge tables (live video tables + join).
             Route::get('/lounge/tables', [LoungeController::class, 'tables']);
             Route::post('/lounge/tables/{table}/join', [LoungeController::class, 'join']);

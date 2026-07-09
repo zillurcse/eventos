@@ -25,7 +25,7 @@ const mobileThread = computed(() => !!chat.activeId)
         :conversations="chat.conversations"
         :active-id="chat.activeId"
         :loading="chat.loading"
-        @select="chat.select($event)"
+        @select="chat.openConversation($event)"
         @new="pickerOpen = true"
       />
 

@@ -52,6 +52,8 @@ class ResolveExhibitorAdmin
         DB::statement("set app.current_organization = '{$exhibitor->organization_id}'");
 
         $request->attributes->set('exhibitor_id', $exhibitor->id);
+        // The acting member — used to attribute replies / assignments.
+        $request->attributes->set('exhibitor_member_id', $member->id);
 
         return $next($request);
     }
