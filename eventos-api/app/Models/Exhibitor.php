@@ -65,6 +65,11 @@ class Exhibitor extends Model
         return $this->hasMany(ExhibitorProject::class);
     }
 
+    public function leads(): HasMany
+    {
+        return $this->hasMany(ExhibitorLead::class);
+    }
+
     public function booths(): HasMany
     {
         return $this->hasMany(Booth::class);
