@@ -96,7 +96,7 @@ const filtered = computed<Delegate[]>(() =>
     <section class="main">
       <div class="head">
         <h1>Delegates</h1>
-        <p class="sub">Attendees you can meet — connect and save the people you want to reach.</p>
+        <p class="sub">Other attendees at this event.</p>
       </div>
 
       <div v-if="store.loading" class="state">Loading delegates…</div>

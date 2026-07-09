@@ -9,7 +9,7 @@ const emptyLabel = computed(() => {
   if (feed.search.trim()) return 'No posts match your search.'
   if (feed.filter === 'mine') return 'You haven’t posted anything yet.'
   if (feed.filter !== 'all') return 'No posts of this type yet.'
-  return 'No posts yet — start the conversation above.'
+  return 'No posts yet.'
 })
 </script>
 
@@ -18,7 +18,7 @@ const emptyLabel = computed(() => {
     <div class="col">
       <div class="head">
         <h1>Event Feed</h1>
-        <p class="sub">Announcements and conversation from attendees and organizers.</p>
+        <p class="sub">Posts from attendees and organizers.</p>
       </div>
 
       <FeedComposer />

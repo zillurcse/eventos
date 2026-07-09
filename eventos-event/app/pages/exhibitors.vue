@@ -198,7 +198,7 @@ const filtered = computed<Exhibitor[]>(() => {
     <section class="main">
       <div class="head">
         <h1>Exhibitors</h1>
-        <p class="sub">Browse the booths — explore products, grab brochures, and visit the companies you care about.</p>
+        <p class="sub">Exhibitors and sponsors at this event.</p>
       </div>
 
       <div v-if="store.loading && !store.loaded" class="state">Loading exhibitors…</div>

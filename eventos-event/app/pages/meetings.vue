@@ -34,7 +34,7 @@ const emptyText = computed(() => ({
     <div class="head">
       <div>
         <h1>Meetings</h1>
-        <p class="sub">Request one-to-one meetings and manage the requests you receive.</p>
+        <p class="sub">Your meeting requests.</p>
       </div>
       <button type="button" class="new" @click="showModal = true">
         <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>

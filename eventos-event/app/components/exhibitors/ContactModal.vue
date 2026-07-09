@@ -9,9 +9,9 @@ const pickedSlot = ref('')
 const sentToast = ref('')
 
 const quickReplies = [
-  'Hi! I\'d love to learn more about what you do.',
-  'Could you share a brochure or product details?',
-  'Can we schedule a quick demo?',
+  'Hi, I’d like to know more about your company.',
+  'Can you share a brochure or product info?',
+  'Can we schedule a demo?',
 ]
 
 // Reset the composer whenever a new exhibitor is opened.
@@ -50,7 +50,7 @@ async function sendMeeting() {
     subject.value = ''
     agenda.value = ''
     pickedSlot.value = ''
-    flash('Meeting request sent — the exhibitor will assign a team member.')
+    flash('Meeting request sent.')
   }
 }
 
@@ -96,7 +96,7 @@ function statusLabel(s: string) {
               {{ m.body }}
             </div>
           </template>
-          <div v-else class="hint">Start the conversation — your message goes to the exhibitor’s team.</div>
+          <div v-else class="hint">Send a message to this exhibitor’s team.</div>
         </div>
 
         <div class="composer">
@@ -147,7 +147,7 @@ function statusLabel(s: string) {
                 @click="pickedSlot = pickedSlot === s ? '' : s"
               >{{ fmtSlot(s) }}</button>
             </div>
-            <p v-else class="hint sm">No slots configured for this day — send your request and the exhibitor will propose a time.</p>
+            <p v-else class="hint sm">No slots for this day. The exhibitor will propose a time.</p>
           </div>
 
           <label class="lbl">Subject <span class="opt">(optional)</span></label>

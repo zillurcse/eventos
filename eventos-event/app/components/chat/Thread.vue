@@ -90,7 +90,7 @@ const lastSeenIndex = computed(() => {
 
       <div ref="scroller" class="scroll">
         <div v-if="loading" class="note">Loading messages…</div>
-        <div v-else-if="!messages.length" class="note">No messages yet — say hello 👋</div>
+        <div v-else-if="!messages.length" class="note">No messages yet.</div>
 
         <template v-for="(m, i) in messages" :key="m.id">
           <div v-if="showDay(i)" class="day"><span>{{ dayLabel(m.created_at) }}</span></div>

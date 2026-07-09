@@ -118,7 +118,7 @@ function resetSpeakers() { selectedSpeakers.value = new Set() }
   <div>
     <div class="head">
       <h1>Sessions</h1>
-      <p class="sub">Browse the full agenda — filter by day, track, tags or speaker.</p>
+      <p class="sub">The event agenda.</p>
     </div>
 
     <!-- Day selector -->

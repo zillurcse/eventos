@@ -16,9 +16,9 @@ const toast = ref('')
 const sending = ref(false)
 
 const quick = [
-  'Hi! I’d love to connect and stay in touch.',
-  'Great meeting you — let’s network!',
-  'I’d like to explore how we might collaborate.',
+  'Hi, I’d like to connect.',
+  'Good to meet you at the event.',
+  'Keen to see if we can work together.',
 ]
 
 interface Lounge { enabled: boolean, dates: string[], slots: Record<string, string[]>, busy: Array<{ date: string, slot: string }> }
@@ -116,12 +116,12 @@ async function sendMeeting() {
       <section v-if="store.connectTab === 'connect'" class="pane">
         <div v-if="status === 'pending'" class="sent">
           <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
-          Connection request sent. You can message them once they accept.
+          Connection request sent.
         </div>
 
         <template v-else>
           <label class="lbl">Add a note <span class="opt">(optional)</span></label>
-          <textarea v-model="message" maxlength="500" rows="3" placeholder="Say hello and why you’d like to connect…" />
+          <textarea v-model="message" maxlength="500" rows="3" placeholder="Add a message…" />
           <div class="quick">
             <button v-for="q in quick" :key="q" type="button" class="chip" @click="message = q">{{ q }}</button>
           </div>

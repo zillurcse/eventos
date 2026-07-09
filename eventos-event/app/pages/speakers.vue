@@ -104,7 +104,7 @@ const filtered = computed<Speaker[]>(() => {
     <section class="main">
       <div class="head">
         <h1>Speakers</h1>
-        <p class="sub">Meet the voices on stage — connect and save the ones you want to follow.</p>
+        <p class="sub">Speakers at this event.</p>
       </div>
 
       <div v-if="store.loading && !store.loaded" class="state">Loading speakers…</div>

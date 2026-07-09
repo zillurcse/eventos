@@ -60,7 +60,7 @@ watch(id, load)
       <div v-if="loading" class="state">Loading…</div>
 
       <div v-else-if="isSelf" class="state">
-        <p class="big">This is your own QR code 🙂</p>
+        <p class="big">This is your own QR code.</p>
         <NuxtLink to="/delegates" class="btn ghost">Browse delegates</NuxtLink>
       </div>
 
@@ -80,7 +80,7 @@ watch(id, load)
           {{ [person.job_title, person.company].filter(Boolean).join(' · ') }}
         </p>
 
-        <p v-if="state !== 'sent'" class="lead">You scanned {{ (person.name || 'this attendee') }}’s code — send a connection request?</p>
+        <p v-if="state !== 'sent'" class="lead">Send a connection request to {{ person.name || 'this attendee' }}?</p>
 
         <div v-if="state === 'sent'" class="done">
           <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>

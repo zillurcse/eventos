@@ -33,7 +33,7 @@ function downloadAll() {
         <div class="list">
           <div v-if="briefcase.loading && !briefcase.items.length" class="note">Loading…</div>
           <div v-else-if="!briefcase.items.length" class="note">
-            Your briefcase is empty. Add brochures and files from exhibitor pages.
+            No files yet. Add brochures from exhibitor pages.
           </div>
 
           <div v-for="it in briefcase.items" :key="it.id" class="row">

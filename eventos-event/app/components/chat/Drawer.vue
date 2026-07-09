@@ -137,7 +137,7 @@ function sender(mine: boolean): Sender {
           <div class="list">
             <div v-if="chat.loading && !chat.conversations.length" class="note">Loading conversations…</div>
             <div v-else-if="!shown.length" class="note">
-              {{ chat.conversations.length ? 'No matches.' : 'No conversations yet — start one with the pencil above.' }}
+              {{ chat.conversations.length ? 'No matches.' : 'No conversations yet.' }}
             </div>
 
             <button v-for="c in shown" :key="c.id" type="button" class="row" @click="chat.openConversation(c)">
@@ -148,7 +148,7 @@ function sender(mine: boolean): Sender {
               <span class="mid">
                 <span class="name">{{ c.with.name }}</span>
                 <span v-if="c.with.role !== 'attendee'" class="role">{{ c.with.role }}</span>
-                <span class="preview">{{ c.last_message ? c.last_message.body : 'Say hello 👋' }}</span>
+                <span class="preview">{{ c.last_message ? c.last_message.body : 'No messages yet' }}</span>
               </span>
               <span class="side">
                 <span class="date">{{ c.last_message ? listDate(c.last_message.created_at) : '' }}</span>
@@ -172,7 +172,7 @@ function sender(mine: boolean): Sender {
 
           <div ref="scroller" class="msgs">
             <div v-if="chat.messagesLoading" class="note">Loading messages…</div>
-            <div v-else-if="!chat.messages.length" class="note">No messages yet — say hello 👋</div>
+            <div v-else-if="!chat.messages.length" class="note">No messages yet.</div>
 
             <div v-for="m in chat.messages" :key="m.id" class="msg">
               <span class="mav">

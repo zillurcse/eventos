@@ -45,7 +45,7 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
   <div class="page">
     <div class="head">
       <h1>Lounge</h1>
-      <p class="sub">Pull up a chair and network face-to-face at a live video table.</p>
+      <p class="sub">Join a live video table to network.</p>
     </div>
 
     <div class="tabs">

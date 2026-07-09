@@ -42,7 +42,7 @@ const ROLE_CLS: Record<string, string> = { speaker: 'speaker', exhibitor: 'exhib
     <div class="list">
       <div v-if="loading && !conversations.length" class="note">Loading conversations…</div>
       <div v-else-if="!shown.length" class="note">
-        {{ conversations.length ? 'No matches.' : 'No conversations yet — start one with New chat.' }}
+        {{ conversations.length ? 'No matches.' : 'No conversations yet.' }}
       </div>
 
       <button
@@ -63,7 +63,7 @@ const ROLE_CLS: Record<string, string> = { speaker: 'speaker', exhibitor: 'exhib
           </span>
           <span class="preview" :class="{ unread: c.unread }">
             <template v-if="c.last_message">{{ c.last_message.mine ? 'You: ' : '' }}{{ c.last_message.body }}</template>
-            <template v-else>Say hello 👋</template>
+            <template v-else>No messages yet</template>
           </span>
         </span>
         <span class="side">

@@ -58,7 +58,7 @@ onMounted(() => { if (!rooms.loaded) rooms.fetchRooms() })
   <div>
     <div class="head">
       <h1>Rooms</h1>
-      <p class="sub">Join live breakout rooms — networking lounges, workshops and demos over video.</p>
+      <p class="sub">Live breakout rooms over video.</p>
     </div>
 
     <div v-if="rooms.loading && !rooms.loaded" class="state">Loading rooms…</div>

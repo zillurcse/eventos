@@ -149,9 +149,9 @@ onBeforeUnmount(() => { for (const m of media.value) URL.revokeObjectURL(m.previ
 
 // ── Modes ────────────────────────────────────────────────────────────────────
 const placeholder = computed(() => {
-  if (mode.value === 'looking_for') return 'What are you looking for? e.g. a co-founder, investors, a mentor…'
-  if (mode.value === 'offering') return 'What are you offering? e.g. mentorship, a demo, free consulting…'
-  return 'Got a spark of an idea? Let the community feel your energy!'
+  if (mode.value === 'looking_for') return 'What are you looking for?'
+  if (mode.value === 'offering') return 'What are you offering?'
+  return 'Share something with the event'
 })
 
 function setMode(m: Mode) { mode.value = mode.value === m ? 'compose' : m }
