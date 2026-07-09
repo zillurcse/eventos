@@ -69,6 +69,43 @@ class ExhibitorSelfMemberController extends Controller
         return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }
 
+    /** Modules a staff member can be granted access to (the team ACL). */
+    public const MODULES = ['products', 'documents', 'projects', 'leads', 'meetings'];
+
+    /** Update a member's role + per-module access (ACL). Admins get everything. */
+    public function update(Request $request, int $member): JsonResponse
+    {
+        $m = ExhibitorMember::with('contact')
+            ->where('exhibitor_id', $request->attributes->get('exhibitor_id'))
+            ->where('id', $member)
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'role' => ['sometimes', Rule::in(['admin', 'staff'])],
+            'is_lead_capturer' => ['sometimes', 'boolean'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['boolean'],
+        ]);
+
+        $update = [];
+        if (array_key_exists('role', $data)) {
+            $update['role'] = $data['role'];
+        }
+        if (array_key_exists('is_lead_capturer', $data)) {
+            $update['is_lead_capturer'] = $data['is_lead_capturer'];
+        }
+        if (array_key_exists('permissions', $data)) {
+            // Keep only known modules.
+            $update['permissions'] = collect(self::MODULES)
+                ->mapWithKeys(fn ($k) => [$k => (bool) ($data['permissions'][$k] ?? false)])
+                ->all();
+        }
+
+        $m->update($update);
+
+        return response()->json(['data' => new ExhibitorMemberResource($m->fresh('contact'))]);
+    }
+
     public function destroy(Request $request, int $member): JsonResponse
     {
         ExhibitorMember::where('exhibitor_id', $request->attributes->get('exhibitor_id'))

@@ -331,6 +331,35 @@ class PublicSiteController extends Controller
     }
 
     /**
+     * GET /api/v1/public/exhibitors/{uuid} — a single booth's full profile for
+     * the exhibitor details page (banner, about, projects, members, contact,
+     * CTA, map, brochures). Public read; active exhibitors only.
+     */
+    public function exhibitor(Request $request, string $uuid): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $exhibitor = Exhibitor::on('pgsql_admin')
+            ->with(['logoFile', 'products', 'documents', 'projects', 'members.contact'])
+            ->where('event_id', $event->id)
+            ->where('status', 'active')
+            ->where('uuid', $uuid)
+            ->first();
+
+        if (! $exhibitor) {
+            return response()->json(['message' => 'Exhibitor not found.'], 404);
+        }
+
+        return response()->json(['data' => $this->formatExhibitorDetail($exhibitor)]);
+    }
+
+    /**
      * GET /api/v1/public/sessions — the attendee-facing agenda ("Sessions" tab)
      * for the event this subdomain resolves to. Public read (published events
      * only). Returns the full session list (with speakers, track, room, tags,
@@ -535,6 +564,59 @@ class PublicSiteController extends Controller
             // filterId → heading → chosen options (from the admin filter picker).
             'filter_selections' => (object) ($profile['filter_selections'] ?? []),
         ];
+    }
+
+    /** The full booth profile for the exhibitor details page. */
+    protected function formatExhibitorDetail(Exhibitor $e): array
+    {
+        $profile = $e->profile_data ?? [];
+        $contact = $profile['contact'] ?? [];
+
+        $phone = trim(($contact['phone_code'] ?? '').' '.($contact['phone'] ?? ''))
+            ?: trim(($profile['phone_code'] ?? '').' '.($profile['phone'] ?? ''));
+        $address = implode(', ', array_filter([
+            $profile['street'] ?? null, $profile['city'] ?? null,
+            $profile['state'] ?? null, $profile['country'] ?? null,
+        ]));
+
+        return array_merge($this->formatExhibitorFull($e), [
+            'about' => $profile['about'] ?? ($e->description ?? ''),
+            'can_rate' => (bool) ($profile['rating'] ?? false),
+            'spotlight' => [
+                'type' => $profile['spotlight_type'] ?? 'image',
+                'url' => $profile['spotlight_url'] ?? null,
+            ],
+            'contact' => [
+                'phone' => $phone ?: null,
+                'email' => $contact['email'] ?? $e->email,
+                'full_name' => $contact['full_name'] ?? null,
+                'position' => $contact['position'] ?? null,
+                'company_name' => $contact['company_name'] ?? null,
+            ],
+            'cta' => array_values(array_filter(
+                (array) ($profile['cta'] ?? []),
+                fn ($c) => is_array($c) && (($c['label'] ?? '') !== '' || ($c['value'] ?? '') !== ''),
+            )),
+            'location' => [
+                'address' => $address ?: null,
+                'url' => $profile['location_url'] ?? null,
+            ],
+            'members' => $e->members->map(function ($m) {
+                $c = $m->contact;
+
+                return [
+                    'name' => $c ? trim(($c->first_name ?? '').' '.($c->last_name ?? '')) : 'Member',
+                    'designation' => $c?->job_title ?: ucfirst((string) $m->role),
+                    'company' => $c?->company,
+                    'avatar_url' => $this->fileUrl($c?->photo_file_id) ?? ($c?->profile_data['avatar_url'] ?? null),
+                ];
+            })->values(),
+            'projects' => $e->projects->map(fn ($p) => [
+                'name' => $p->name,
+                'description' => $p->description,
+                'image_url' => ($p->meta['image_url'] ?? null) ?: $this->fileUrl($p->meta['image_file_id'] ?? null),
+            ])->values(),
+        ]);
     }
 
     /**

@@ -4,6 +4,7 @@ const site = useSiteStore()
 const notifications = useNotificationsStore()
 const chat = useChatStore()
 const presence = usePresenceStore()
+const briefcase = useBriefcaseStore()
 
 const menuOpen = ref(false)
 const bellOpen = ref(false)
@@ -24,6 +25,7 @@ onMounted(() => {
     notifications.start()
     presence.start()
     if (!chat.loaded) chat.fetchInbox()
+    briefcase.fetch()
   }
 })
 onBeforeUnmount(() => {
@@ -56,6 +58,12 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
           <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         </button>
 
+        <!-- Briefcase (saved files) -->
+        <button class="util" type="button" title="Briefcase" aria-label="Briefcase" @click="briefcase.toggleDrawer()">
+          <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
+          <span v-if="briefcase.count" class="dot">{{ badge(briefcase.count) }}</span>
+        </button>
+
         <!-- Notifications bell + dropdown panel -->
         <span class="bell-wrap">
           <button class="util" type="button" title="Notifications" aria-label="Notifications" @click.stop="toggleBell">
@@ -73,6 +81,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
       </nav>
 
       <ChatDrawer v-if="chat.drawerOpen" />
+      <EventBriefcaseDrawer v-if="briefcase.drawerOpen" />
       <EventBookmarksPanel v-if="savedOpen" @close="savedOpen = false" />
 
       <div class="sep" />

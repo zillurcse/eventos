@@ -22,7 +22,7 @@ const meta = computed(() => store.year ? String(store.year) : '')
 </script>
 
 <template>
-  <article class="card" @click="store.open(exhibitor)">
+  <article class="card" @click="navigateTo(`/exhibitor/${exhibitor.id}`)">
     <!-- Logo tile with a hover "Contact" veil -->
     <div class="logo">
       <img v-if="exhibitor.logo_url" :src="exhibitor.logo_url" :alt="exhibitor.name">

@@ -42,7 +42,8 @@
       "Read(//c/Users/zillu/.claude/projects/c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp/memory/**)",
       "Bash(docker exec *)",
       "Bash(curl -s -o /dev/null -w \"panel: %{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/event/BookmarksPanel.vue\")",
-      "Bash(curl -s -o /dev/null -w \"topbar: %{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/event/EventTopbar.vue\")"
+      "Bash(curl -s -o /dev/null -w \"topbar: %{http_code}\\\\n\" \"http://localhost:3001/_nuxt/components/event/EventTopbar.vue\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8088/api/v1/events/x/briefcase)"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\OneDrive\\Desktop\\myinfo\\eventmanagementapp\\pages\\org\\events\\[id]\\showcase",

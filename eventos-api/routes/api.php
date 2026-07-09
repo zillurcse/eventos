@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BookmarkController;
+use App\Http\Controllers\Api\V1\BriefcaseController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
@@ -51,6 +52,7 @@ use App\Http\Controllers\Api\V1\ExhibitorMemberController;
 use App\Http\Controllers\Api\V1\ExhibitorPackageController;
 use App\Http\Controllers\Api\V1\ExhibitorProductController;
 use App\Http\Controllers\Api\V1\ExhibitorProjectController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfCatalogController;
 use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
 use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
@@ -88,6 +90,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/sessions', [PublicSiteController::class, 'sessions']);
     Route::get('/public/speakers', [PublicSiteController::class, 'speakers']);
     Route::get('/public/exhibitors', [PublicSiteController::class, 'exhibitors']);
+    Route::get('/public/exhibitors/{uuid}', [PublicSiteController::class, 'exhibitor']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
@@ -157,11 +160,25 @@ Route::prefix('v1')->group(function () {
             Route::get('/booth', [ExhibitorSpaceController::class, 'showBooth']);
             Route::match(['put', 'patch'], '/booth', [ExhibitorSpaceController::class, 'updateBooth']);
 
-            // Team management (invite teammates, give them logins).
+            // Team management (invite teammates, give them logins) + ACL.
             Route::get('/members', [ExhibitorSelfMemberController::class, 'index']);
             Route::post('/members', [ExhibitorSelfMemberController::class, 'store']);
+            Route::match(['put', 'patch'], '/members/{member}', [ExhibitorSelfMemberController::class, 'update']);
             Route::delete('/members/{member}', [ExhibitorSelfMemberController::class, 'destroy']);
             Route::post('/members/{member}/password', [ExhibitorSelfMemberController::class, 'password']);
+
+            // Self-service catalog: documents, projects, products.
+            Route::get('/documents', [ExhibitorSelfCatalogController::class, 'documents']);
+            Route::post('/documents', [ExhibitorSelfCatalogController::class, 'storeDocument']);
+            Route::delete('/documents/{document}', [ExhibitorSelfCatalogController::class, 'destroyDocument']);
+            Route::get('/projects', [ExhibitorSelfCatalogController::class, 'projects']);
+            Route::post('/projects', [ExhibitorSelfCatalogController::class, 'storeProject']);
+            Route::match(['put', 'patch'], '/projects/{project}', [ExhibitorSelfCatalogController::class, 'updateProject']);
+            Route::delete('/projects/{project}', [ExhibitorSelfCatalogController::class, 'destroyProject']);
+            Route::get('/products', [ExhibitorSelfCatalogController::class, 'products']);
+            Route::post('/products', [ExhibitorSelfCatalogController::class, 'storeProduct']);
+            Route::match(['put', 'patch'], '/products/{product}', [ExhibitorSelfCatalogController::class, 'updateProduct']);
+            Route::delete('/products/{product}', [ExhibitorSelfCatalogController::class, 'destroyProduct']);
 
             // Contact inbox: attendee messages + meeting requests, assign a member.
             Route::get('/inbox/conversations', [ExhibitorInboxController::class, 'conversations']);
@@ -195,6 +212,10 @@ Route::prefix('v1')->group(function () {
             // Cross-tab "save" bookmarks (speakers/sessions/delegates/exhibitors).
             Route::get('/bookmarks', [BookmarkController::class, 'index']);
             Route::post('/bookmarks', [BookmarkController::class, 'toggle']);
+            // Personal "Briefcase" of saved files (exhibitor brochures, docs…).
+            Route::get('/briefcase', [BriefcaseController::class, 'index']);
+            Route::post('/briefcase', [BriefcaseController::class, 'store']);
+            Route::delete('/briefcase/{item}', [BriefcaseController::class, 'destroy']);
             Route::get('/connections', [ConnectionController::class, 'index']);
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);

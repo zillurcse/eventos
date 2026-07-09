@@ -13,6 +13,7 @@ class ExhibitorMemberResource extends JsonResource
             'id' => $this->id,
             'role' => $this->role,
             'is_lead_capturer' => (bool) $this->is_lead_capturer,
+            'permissions' => (object) ($this->permissions ?? []),
             'contact' => $this->whenLoaded('contact', fn () => [
                 'name' => trim(($this->contact->first_name ?? '').' '.($this->contact->last_name ?? '')) ?: null,
                 'email' => $this->contact->email,

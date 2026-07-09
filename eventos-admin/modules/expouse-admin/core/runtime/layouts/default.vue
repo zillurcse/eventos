@@ -28,7 +28,10 @@ const nav = computed<NavItem[]>(() => {
     { to: '/exhibitor', label: 'My Booth', icon: 'store' },
     { to: '/exhibitor/inbox', label: 'Inbox', icon: 'mail' },
     { to: '/exhibitor/products', label: 'Products', icon: 'box' },
+    { to: '/exhibitor/documents', label: 'Documents', icon: 'clipboard' },
+    { to: '/exhibitor/projects', label: 'Projects', icon: 'layers' },
     { to: '/exhibitor/members', label: 'Team', icon: 'users' },
+    { to: '/exhibitor/acl', label: 'Access Control', icon: 'shield' },
   ]
   return []
 })

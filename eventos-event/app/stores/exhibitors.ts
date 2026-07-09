@@ -51,6 +51,38 @@ interface ExhibitorsPayload {
   year: number | null
 }
 
+export interface ExhibitorMemberCard {
+  name: string
+  designation: string
+  company: string | null
+  avatar_url: string | null
+}
+
+export interface ExhibitorProject {
+  name: string
+  description: string | null
+  image_url: string | null
+}
+
+export interface ExhibitorCta {
+  id?: string
+  type: string
+  label: string
+  value: string
+}
+
+/** Full booth profile for the details page (GET /public/exhibitors/{id}). */
+export interface ExhibitorDetail extends Exhibitor {
+  about: string
+  can_rate: boolean
+  spotlight: { type: 'image' | 'video', url: string | null }
+  contact: { phone: string | null, email: string | null, full_name: string | null, position: string | null, company_name: string | null }
+  cta: ExhibitorCta[]
+  location: { address: string | null, url: string | null }
+  members: ExhibitorMemberCard[]
+  projects: ExhibitorProject[]
+}
+
 /**
  * The public exhibitor & sponsor directory ("Exhibitors" tab) for the event
  * this subdomain resolves to. Mirrors stores/speakers.ts — a single public GET
@@ -68,6 +100,11 @@ export const useExhibitorsStore = defineStore('exhibitors', {
     loaded: false,
     error: false,
     selected: null as Exhibitor | null,
+
+    // Details page (pages/exhibitor/[id].vue).
+    detail: null as ExhibitorDetail | null,
+    detailLoading: false,
+    detailError: false,
   }),
 
   getters: {
@@ -102,5 +139,26 @@ export const useExhibitorsStore = defineStore('exhibitors', {
 
     open(exhibitor: Exhibitor) { this.selected = exhibitor },
     close() { this.selected = null },
+
+    /** Load one booth's full profile for the details page. */
+    async fetchDetail(id: string) {
+      const sub = useEventSubdomain()
+      if (!sub) { this.detailError = true; return }
+
+      this.detailLoading = true
+      this.detailError = false
+      this.detail = null
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: ExhibitorDetail }>(`${apiBase}/public/exhibitors/${id}`, {
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.detail = res.data
+      } catch {
+        this.detailError = true
+      } finally {
+        this.detailLoading = false
+      }
+    },
   },
 })

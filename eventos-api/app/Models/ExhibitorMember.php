@@ -23,6 +23,7 @@ class ExhibitorMember extends Model
     }
 
     protected $casts = [
+        'permissions' => 'array',
         'meta' => 'array',
         'settings' => 'array',
         'data' => 'array',

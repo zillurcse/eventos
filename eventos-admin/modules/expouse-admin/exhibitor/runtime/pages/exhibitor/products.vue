@@ -10,11 +10,16 @@ const creating = ref(false)
 
 async function load() {
   try {
-    const space = (await api<any>('/exhibitor/space')).data
-    products.value = space.products ?? []
+    products.value = (await api<any>('/exhibitor/products')).data
   } catch (e: any) {
     if (e?.response?.status === 403) suspended.value = true
   }
+}
+
+async function remove(p: any) {
+  if (!confirm(`Remove "${p.name}"?`)) return
+  await api(`/exhibitor/products/${p.id}`, { method: 'DELETE' })
+  await load()
 }
 
 async function create() {
@@ -66,13 +71,14 @@ onMounted(load)
       <div class="card">
         <table>
           <thead>
-            <tr><th>Product</th><th>Description</th><th>Price</th></tr>
+            <tr><th>Product</th><th>Description</th><th>Price</th><th /></tr>
           </thead>
           <tbody>
             <tr v-for="p in products" :key="p.id">
               <td><strong>{{ p.name }}</strong></td>
               <td class="muted">{{ p.description || '—' }}</td>
               <td>{{ money(p.price_cents) }}</td>
+              <td class="whitespace-nowrap"><button class="btn sm danger" @click="remove(p)">Remove</button></td>
             </tr>
           </tbody>
         </table>
