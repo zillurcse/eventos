@@ -119,6 +119,8 @@ const filtered = computed<Delegate[]>(() =>
       <!-- Infinite-scroll sentinel (observer loads the next page near it) -->
       <div ref="sentinel" aria-hidden="true" />
     </section>
+
+    <DelegatesConnectModal />
   </div>
 </template>
 

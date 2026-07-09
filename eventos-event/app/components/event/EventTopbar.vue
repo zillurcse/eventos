@@ -9,6 +9,7 @@ const briefcase = useBriefcaseStore()
 const menuOpen = ref(false)
 const bellOpen = ref(false)
 const savedOpen = ref(false)
+const qrOpen = ref(false)
 
 const myInitials = computed(() => initials(auth.user?.name || site.name || 'U'))
 
@@ -83,6 +84,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
       <ChatDrawer v-if="chat.drawerOpen" />
       <EventBriefcaseDrawer v-if="briefcase.drawerOpen" />
       <EventBookmarksPanel v-if="savedOpen" @close="savedOpen = false" />
+      <EventQrModal v-if="qrOpen" @close="qrOpen = false" />
 
       <div class="sep" />
 
@@ -97,6 +99,10 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
             <strong>{{ auth.user?.name }}</strong>
             <small>{{ auth.user?.email }}</small>
           </div>
+          <button type="button" class="menu-item" @click="qrOpen = true; menuOpen = false">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 14v.01M17 21h.01M21 17v4h-4" /></svg>
+            My QR Code
+          </button>
           <a href="#" class="menu-item" @click.prevent="auth.logout()">Logout</a>
         </div>
       </div>
@@ -132,8 +138,9 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
 .menu { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; box-shadow: 0 12px 30px rgba(15,23,42,.12); min-width: 220px; overflow: hidden; }
 .menu-head { padding: 12px 14px; border-bottom: 1px solid #f1f2f6; display: flex; flex-direction: column; gap: 2px; }
 .menu-head small { color: #94a3b8; }
-.menu-item { display: block; padding: 11px 14px; color: #334155; font-weight: 600; }
+.menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px; color: #334155; font: inherit; font-weight: 600; text-align: left; border: none; background: none; cursor: pointer; }
 .menu-item:hover { background: #f7f8fa; color: var(--brand-primary); }
+.menu-item svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 @media (max-width: 720px) {
   .logo-name { display: none; }

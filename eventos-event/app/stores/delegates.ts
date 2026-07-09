@@ -31,6 +31,10 @@ export const useDelegatesStore = defineStore('delegates', {
     // Bumped per fetch so a slow stale response can't clobber a newer one.
     seq: 0,
     connected: {} as Record<string, 'pending' | 'error'>,
+
+    // Connect modal (opened from a delegate card's Connect action).
+    connectTarget: null as Delegate | null,
+    connectTab: 'connect' as 'connect' | 'meet',
   }),
 
   actions: {
@@ -94,17 +98,29 @@ export const useDelegatesStore = defineStore('delegates', {
       }
     },
 
-    /** Send a connection request to a delegate. */
-    async connect(delegate: Delegate) {
+    /** Send a connection request to a delegate (optionally with a message). */
+    async connect(delegate: Delegate, message?: string): Promise<boolean> {
       const uuid = useSiteStore().event?.uuid
-      if (!uuid) return
+      if (!uuid) return false
       this.connected[delegate.id] = 'pending'
       try {
         const api = useApi()
-        await api(`/events/${uuid}/connections`, { method: 'POST', body: { to: delegate.id } })
+        await api(`/events/${uuid}/connections`, {
+          method: 'POST',
+          body: { to: delegate.id, message: message || undefined },
+        })
+        return true
       } catch {
         this.connected[delegate.id] = 'error'
+        return false
       }
     },
+
+    // ── Connect modal ────────────────────────────────────────────────────
+    openConnect(delegate: Delegate, tab: 'connect' | 'meet' = 'connect') {
+      this.connectTarget = delegate
+      this.connectTab = tab
+    },
+    closeConnect() { this.connectTarget = null },
   },
 })

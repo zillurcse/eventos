@@ -159,6 +159,54 @@ export const useFeedStore = defineStore('feed', {
       return res.data
     },
 
+    /**
+     * Upload one media file with live progress (XHR — $fetch can't report upload
+     * progress). Returns the started XHR (so the caller can abort) plus a promise
+     * that resolves with the uploaded media. Same auth/subdomain headers as useApi.
+     */
+    uploadMediaProgress(file: File, onProgress: (pct: number) => void): { xhr: XMLHttpRequest, promise: Promise<UploadedMedia> } {
+      const uuid = this.eventUuid()
+      const { public: { apiBase } } = useRuntimeConfig()
+      const auth = useAuthStore()
+      const sub = useEventSubdomain()
+      const xhr = new XMLHttpRequest()
+
+      const promise = new Promise<UploadedMedia>((resolve, reject) => {
+        if (!uuid) { reject(new Error('No event context')); return }
+        const form = new FormData()
+        form.append('file', file)
+        form.append('collection', 'feed')
+
+        xhr.open('POST', `${apiBase}/events/${uuid}/uploads`)
+        xhr.setRequestHeader('Accept', 'application/json')
+        if (auth.token) xhr.setRequestHeader('Authorization', `Bearer ${auth.token}`)
+        if (sub) xhr.setRequestHeader('X-Event-Subdomain', sub)
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText).data as UploadedMedia) }
+            catch { reject(new Error('Unexpected server response.')) }
+          } else {
+            if (xhr.status === 401) auth.logout()
+            let msg = 'Upload failed. Please try again.'
+            try {
+              const j = JSON.parse(xhr.responseText)
+              msg = j.errors?.file?.[0] || j.message || msg
+            } catch { /* keep default */ }
+            reject(new Error(msg))
+          }
+        }
+        xhr.onerror = () => reject(new Error('Network error during upload.'))
+        xhr.onabort = () => reject(new DOMException('aborted', 'AbortError'))
+        xhr.send(form)
+      })
+
+      return { xhr, promise }
+    },
+
     async createPost(payload: NewPostPayload): Promise<FeedPost | null> {
       const uuid = this.eventUuid()
       if (!uuid) return null

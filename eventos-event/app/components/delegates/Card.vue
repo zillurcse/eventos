@@ -61,8 +61,7 @@ const subtitle = computed(() => {
           :class="{ on: connectState === 'pending' }"
           type="button"
           :title="connectState === 'pending' ? 'Request sent' : 'Connect'"
-          :disabled="connectState === 'pending'"
-          @click="store.connect(delegate)"
+          @click="store.openConnect(delegate)"
         >
           <svg v-if="connectState === 'pending'" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
           <svg v-else viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" /></svg>

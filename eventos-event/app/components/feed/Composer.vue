@@ -9,8 +9,6 @@ const mode = ref<Mode>('compose')
 
 const body = ref('')
 const visibility = ref<FeedPost['visibility']>('attendees')
-const attachments = ref<FeedAttachment[]>([])
-const uploading = ref(false)
 
 // Poll
 const pollOptions = ref<string[]>(['', ''])
@@ -20,54 +18,145 @@ const allowMultiple = ref(false)
 const tags = ref<string[]>([])
 const tagInput = ref('')
 
-const fileInput = ref<HTMLInputElement | null>(null)
-const pendingKind = ref<FeedAttachment['kind']>('image')
+// ── Media upload ─────────────────────────────────────────────────────────────
+type Kind = 'image' | 'video' | 'pdf'
 
-const ACCEPT: Record<FeedAttachment['kind'], string> = {
-  image: 'image/*',
-  video: 'video/mp4,video/webm,video/quicktime',
-  pdf: 'application/pdf',
+interface MediaItem {
+  id: string
+  kind: Kind
+  name: string
+  preview: string        // object URL for an instant local preview
+  status: 'uploading' | 'done' | 'error'
+  progress: number
+  url?: string           // remote URL once uploaded
+  error?: string
+  xhr?: XMLHttpRequest
 }
 
+// Client-side guardrails — mirror the server so users get instant feedback and
+// oversized/wrong files never hit the network (defense in depth).
+const MAX_ITEMS = 10
+const LIMITS: Record<Kind, { mimes: string[], maxMB: number }> = {
+  image: { mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], maxMB: 12 },
+  video: { mimes: ['video/mp4', 'video/webm', 'video/quicktime'], maxMB: 80 },
+  pdf: { mimes: ['application/pdf'], maxMB: 20 },
+}
+const ACCEPT_MEDIA = [...LIMITS.image.mimes, ...LIMITS.video.mimes].join(',')
+const ACCEPT_PDF = 'application/pdf'
+
+const media = ref<MediaItem[]>([])
+const errors = ref<string[]>([])
+const dragging = ref(false)
+let dragDepth = 0
+
+const fileInput = ref<HTMLInputElement | null>(null)
+let pickAccept = ACCEPT_MEDIA
+
+function kindOf(file: File): Kind | null {
+  if (LIMITS.image.mimes.includes(file.type)) return 'image'
+  if (LIMITS.video.mimes.includes(file.type)) return 'video'
+  if (LIMITS.pdf.mimes.includes(file.type)) return 'pdf'
+  return null
+}
+
+function flashError(msg: string) {
+  errors.value.push(msg)
+  setTimeout(() => { errors.value.shift() }, 5000)
+}
+
+function pick(accept: string) {
+  pickAccept = accept
+  if (fileInput.value) {
+    fileInput.value.accept = accept
+    fileInput.value.value = ''
+    fileInput.value.click()
+  }
+}
+
+function onInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  addFiles(input.files)
+  input.value = ''
+}
+
+function addFiles(list: FileList | null) {
+  if (!list?.length) return
+  for (const file of Array.from(list)) {
+    if (media.value.length >= MAX_ITEMS) { flashError(`You can attach up to ${MAX_ITEMS} files.`); break }
+    const kind = kindOf(file)
+    if (!kind) { flashError(`“${file.name}” isn’t a supported type — use an image, video or PDF.`); continue }
+    const lim = LIMITS[kind]
+    if (file.size > lim.maxMB * 1024 * 1024) { flashError(`“${file.name}” is too large — ${kind} must be under ${lim.maxMB} MB.`); continue }
+    startUpload(file, kind)
+  }
+}
+
+function startUpload(file: File, kind: Kind) {
+  const item = reactive<MediaItem>({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    kind,
+    name: file.name,
+    preview: URL.createObjectURL(file),
+    status: 'uploading',
+    progress: 0,
+  })
+  media.value.push(item)
+
+  const { xhr, promise } = feed.uploadMediaProgress(file, (pct) => { item.progress = pct })
+  item.xhr = xhr
+  promise
+    .then((uploaded) => { item.url = uploaded.url; item.status = 'done'; item.progress = 100 })
+    .catch((err: any) => {
+      if (err?.name === 'AbortError') return // user removed it mid-flight
+      item.status = 'error'
+      item.error = err?.message || 'Upload failed.'
+    })
+}
+
+function removeItem(item: MediaItem) {
+  if (item.status === 'uploading') item.xhr?.abort()
+  URL.revokeObjectURL(item.preview)
+  media.value = media.value.filter(m => m.id !== item.id)
+}
+
+function retry(item: MediaItem) {
+  // Re-pick is simplest; just drop the failed tile and let the user re-add.
+  removeItem(item)
+  pick(ACCEPT_MEDIA)
+}
+
+// Drag & drop over the whole composer.
+function onDragEnter(e: DragEvent) {
+  if (!e.dataTransfer?.types.includes('Files')) return
+  dragDepth++
+  dragging.value = true
+}
+function onDragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (dragDepth === 0) dragging.value = false
+}
+function onDrop(e: DragEvent) {
+  dragDepth = 0
+  dragging.value = false
+  addFiles(e.dataTransfer?.files ?? null)
+}
+
+const uploadingCount = computed(() => media.value.filter(m => m.status === 'uploading').length)
+const doneAttachments = computed<FeedAttachment[]>(() =>
+  media.value.filter(m => m.status === 'done' && m.url).map(m => ({ kind: m.kind, url: m.url!, name: m.name })))
+
+onBeforeUnmount(() => { for (const m of media.value) URL.revokeObjectURL(m.preview) })
+
+// ── Modes ────────────────────────────────────────────────────────────────────
 const placeholder = computed(() => {
   if (mode.value === 'looking_for') return 'What are you looking for? e.g. a co-founder, investors, a mentor…'
   if (mode.value === 'offering') return 'What are you offering? e.g. mentorship, a demo, free consulting…'
   return 'Got a spark of an idea? Let the community feel your energy!'
 })
 
-function pickMedia(kind: FeedAttachment['kind']) {
-  pendingKind.value = kind
-  if (fileInput.value) {
-    fileInput.value.accept = ACCEPT[kind]
-    fileInput.value.value = ''
-    fileInput.value.click()
-  }
-}
-
-async function onFiles(e: Event) {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  if (!files.length) return
-  uploading.value = true
-  try {
-    for (const file of files) {
-      const media = await feed.uploadMedia(file)
-      attachments.value.push({ kind: pendingKind.value, url: media.url, name: media.filename })
-    }
-  } catch {
-    // surfaced via the disabled/empty state; keep it quiet
-  } finally {
-    uploading.value = false
-  }
-}
-
-function removeAttachment(i: number) { attachments.value.splice(i, 1) }
-
 function setMode(m: Mode) { mode.value = mode.value === m ? 'compose' : m }
-
 function addPollOption() { if (pollOptions.value.length < 8) pollOptions.value.push('') }
 function removePollOption(i: number) { if (pollOptions.value.length > 2) pollOptions.value.splice(i, 1) }
-
 function addTag() {
   const t = tagInput.value.trim().replace(/,$/, '')
   if (t && !tags.value.includes(t) && tags.value.length < 12) tags.value.push(t)
@@ -79,29 +168,29 @@ const postType = computed<FeedType>(() => {
   if (mode.value === 'poll') return 'poll'
   if (mode.value === 'looking_for') return 'looking_for'
   if (mode.value === 'offering') return 'offering'
-  if (attachments.value.length) return attachments.value[0]!.kind
-  return 'text'
+  return doneAttachments.value[0]?.kind ?? 'text'
 })
 
 const validPollOptions = computed(() => pollOptions.value.map(o => o.trim()).filter(Boolean))
 
 const canPost = computed(() => {
-  if (feed.posting || uploading.value) return false
+  if (feed.posting || uploadingCount.value > 0) return false
   if (mode.value === 'poll') return validPollOptions.value.length >= 2 && !!body.value.trim()
-  return !!body.value.trim() || attachments.value.length > 0
+  return !!body.value.trim() || doneAttachments.value.length > 0
 })
 
 function reset() {
   mode.value = 'compose'
   body.value = ''
-  attachments.value = []
+  for (const m of media.value) URL.revokeObjectURL(m.preview)
+  media.value = []
+  errors.value = []
   pollOptions.value = ['', '']
   allowMultiple.value = false
   tags.value = []
   tagInput.value = ''
 }
 
-/** Shown when the event moderates its feed and the new post starts pending. */
 const pendingNotice = ref(false)
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -111,14 +200,11 @@ async function submit() {
     type: postType.value,
     body: body.value,
     visibility: visibility.value,
-    attachments: attachments.value,
+    attachments: doneAttachments.value,
   }
-  if (mode.value === 'poll') {
-    payload.poll = { options: validPollOptions.value, allow_multiple: allowMultiple.value }
-  }
-  if (mode.value === 'looking_for' || mode.value === 'offering') {
-    payload.tags = tags.value
-  }
+  if (mode.value === 'poll') payload.poll = { options: validPollOptions.value, allow_multiple: allowMultiple.value }
+  if (mode.value === 'looking_for' || mode.value === 'offering') payload.tags = tags.value
+
   const post = await feed.createPost(payload)
   reset()
   if (post && post.status !== 'published') {
@@ -127,21 +213,19 @@ async function submit() {
     noticeTimer = setTimeout(() => { pendingNotice.value = false }, 8000)
   }
 }
-
-const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string, icon: string }> = [
-  { kind: 'image', label: 'Photo', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
-  { kind: 'video', label: 'Video', icon: 'M3 6h13v12H3zM16 10l5-3v10l-5-3z' },
-  { kind: 'pdf', label: 'PDF', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6' },
-]
 </script>
 
 <template>
-  <div class="composer">
+  <div
+    class="composer"
+    :class="{ dragging }"
+    @dragenter.prevent="onDragEnter"
+    @dragover.prevent
+    @dragleave="onDragLeave"
+    @drop.prevent="onDrop"
+  >
     <div class="row">
-      <span class="me">
-        <img v-if="false" src="" alt="">
-        <template v-else>{{ initials(auth.user?.name) }}</template>
-      </span>
+      <span class="me">{{ initials(auth.user?.name) }}</span>
       <textarea v-model="body" rows="2" :placeholder="placeholder" />
     </div>
 
@@ -158,31 +242,50 @@ const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string
       </div>
     </div>
 
-    <!-- Networking tags (looking for / offering) -->
+    <!-- Networking tags -->
     <div v-if="mode === 'looking_for' || mode === 'offering'" class="panel">
       <div class="panel-head">{{ mode === 'looking_for' ? 'Looking for' : 'Offering' }} — add tags</div>
       <div class="tagbox">
         <span v-for="(t, i) in tags" :key="t" class="tagchip">{{ t }}<button type="button" @click="removeTag(i)">×</button></span>
-        <input
-          v-model="tagInput"
-          type="text"
-          placeholder="Type a tag and press Enter"
-          @keyup.enter="addTag"
-        >
+        <input v-model="tagInput" type="text" placeholder="Type a tag and press Enter" @keyup.enter="addTag">
       </div>
     </div>
 
-    <!-- Attachment previews -->
-    <div v-if="attachments.length" class="previews">
-      <div v-for="(a, i) in attachments" :key="a.url" class="pv">
-        <img v-if="a.kind === 'image'" :src="a.url" alt="">
-        <video v-else-if="a.kind === 'video'" :src="a.url" muted />
-        <div v-else class="pdf"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4" /></svg><span>{{ a.name || 'PDF' }}</span></div>
-        <button class="pvx" type="button" title="Remove" @click="removeAttachment(i)">×</button>
+    <!-- Media previews -->
+    <div v-if="media.length" class="media-grid">
+      <div v-for="m in media" :key="m.id" class="tile" :class="[m.kind, { error: m.status === 'error' }]">
+        <img v-if="m.kind === 'image'" :src="m.preview" alt="">
+        <video v-else-if="m.kind === 'video'" :src="m.preview" muted playsinline />
+        <div v-else class="pdf">
+          <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4" /></svg>
+          <span>{{ m.name }}</span>
+        </div>
+
+        <!-- video play badge -->
+        <span v-if="m.kind === 'video' && m.status === 'done'" class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span>
+
+        <!-- uploading overlay with a progress ring -->
+        <div v-if="m.status === 'uploading'" class="ovl">
+          <div class="ring" :style="{ '--p': m.progress }"><span>{{ m.progress }}%</span></div>
+        </div>
+
+        <!-- error overlay -->
+        <div v-else-if="m.status === 'error'" class="ovl err" @click="retry(m)">
+          <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+          <small>Failed — retry</small>
+        </div>
+
+        <button class="tx" type="button" title="Remove" @click="removeItem(m)">×</button>
       </div>
     </div>
 
-    <div v-if="uploading" class="uploading">Uploading…</div>
+    <!-- validation errors -->
+    <div v-if="errors.length" class="errs">
+      <p v-for="(e, i) in errors" :key="i" class="errline">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+        {{ e }}
+      </p>
+    </div>
 
     <div v-if="pendingNotice" class="pending-note">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
@@ -191,8 +294,12 @@ const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string
 
     <div class="toolbar">
       <div class="tools">
-        <button v-for="t in tools" :key="t.kind" class="tool" type="button" :title="t.label" @click="pickMedia(t.kind)">
-          <svg viewBox="0 0 24 24"><path :d="t.icon" /></svg>
+        <button class="tool" type="button" title="Photo or video" @click="pick(ACCEPT_MEDIA)">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" /></svg>
+          <span class="tlabel">Photo / Video</span>
+        </button>
+        <button class="tool" type="button" title="PDF" @click="pick(ACCEPT_PDF)">
+          <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6" /></svg>
         </button>
         <span class="sep" />
         <button class="tool" :class="{ on: mode === 'poll' }" type="button" title="Poll" @click="setMode('poll')">
@@ -212,20 +319,28 @@ const tools: Array<{ kind: 'image' | 'video' | 'pdf', mode?: Mode, label: string
           <option value="public">Public</option>
         </select>
         <button class="post" type="button" :disabled="!canPost" @click="submit">
-          {{ feed.posting ? 'Posting…' : 'Post' }}
+          <svg v-if="uploadingCount" class="spin" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg>
+          {{ feed.posting ? 'Posting…' : uploadingCount ? 'Uploading…' : 'Post' }}
         </button>
       </div>
     </div>
 
-    <input ref="fileInput" type="file" multiple class="hidden" @change="onFiles">
+    <!-- Drag & drop overlay -->
+    <div v-if="dragging" class="dropzone">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></svg>
+      <strong>Drop to upload</strong>
+      <small>Images, videos or PDF</small>
+    </div>
+
+    <input ref="fileInput" type="file" multiple class="hidden" @change="onInput">
   </div>
 </template>
 
 <style scoped>
-.composer { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.composer { position: relative; background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); transition: box-shadow .15s; }
+.composer.dragging { box-shadow: 0 0 0 2px var(--brand-primary); }
 .row { display: flex; gap: 12px; }
-.me { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; background: var(--brand-primary); color: #fff; font-weight: 700; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
-.me img { width: 100%; height: 100%; object-fit: cover; }
+.me { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; background: var(--brand-primary); color: #fff; font-weight: 700; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; }
 textarea { flex: 1; border: 1px solid #e2e8f0; border-radius: 12px; padding: 11px 14px; font: inherit; font-size: .95rem; resize: vertical; outline: none; color: #334155; min-height: 48px; }
 textarea:focus { border-color: var(--brand-primary); }
 
@@ -244,28 +359,57 @@ textarea:focus { border-color: var(--brand-primary); }
 .tagchip button { border: none; background: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; }
 .tagbox input { flex: 1; min-width: 160px; border: none; outline: none; font: inherit; font-size: .86rem; padding: 6px 4px; }
 
-.previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.pv { position: relative; width: 108px; height: 108px; border-radius: 10px; overflow: hidden; border: 1px solid #eef0f3; background: #f4f5f8; }
-.pv img, .pv video { width: 100%; height: 100%; object-fit: cover; }
-.pv .pdf { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; padding: 8px; color: #64748b; text-align: center; }
-.pv .pdf svg { width: 26px; height: 26px; fill: none; stroke: #ef4444; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.pv .pdf span { font-size: .68rem; word-break: break-word; line-height: 1.2; }
-.pvx { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 50%; background: rgba(15,23,42,.65); color: #fff; cursor: pointer; font-size: .95rem; line-height: 1; }
-.uploading { margin-top: 10px; color: #64748b; font-size: .84rem; }
+/* ── Media grid ── */
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin-top: 14px; }
+.tile { position: relative; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; border: 1px solid #eef0f3; background: #f4f5f8; }
+.tile.error { border-color: #fecaca; }
+.tile img, .tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .pdf { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; padding: 10px; color: #64748b; text-align: center; }
+.tile .pdf svg { width: 30px; height: 30px; fill: none; stroke: #ef4444; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tile .pdf span { font-size: .68rem; word-break: break-word; line-height: 1.2; max-height: 2.4em; overflow: hidden; }
+
+.play { position: absolute; inset: 0; margin: auto; width: 40px; height: 40px; border-radius: 50%; background: rgba(15,23,42,.55); display: grid; place-items: center; pointer-events: none; }
+.play svg { width: 20px; height: 20px; fill: #fff; margin-left: 2px; }
+
+.ovl { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(15,23,42,.55); }
+.ring { position: relative; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(#fff calc(var(--p, 0) * 1%), rgba(255,255,255,.3) 0); }
+.ring::before { content: ''; position: absolute; width: 38px; height: 38px; border-radius: 50%; background: rgba(15,23,42,.85); }
+.ring span { position: relative; color: #fff; font-size: .64rem; font-weight: 800; }
+.ovl.err { flex-direction: column; gap: 5px; background: rgba(153,27,27,.72); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ovl.err svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ovl.err small { color: #fff; font-size: .7rem; font-weight: 700; }
+
+.tx { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border: none; border-radius: 50%; background: rgba(15,23,42,.7); color: #fff; cursor: pointer; font-size: 1rem; line-height: 1; z-index: 2; }
+.tx:hover { background: rgba(15,23,42,.9); }
+
+.errs { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.errline { display: flex; align-items: center; gap: 7px; margin: 0; color: #b91c1c; font-size: .82rem; }
+.errline svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
 .pending-note { display: flex; align-items: center; gap: 8px; margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 14px; font-size: .85rem; }
 .pending-note svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f3; flex-wrap: wrap; }
 .tools { display: flex; align-items: center; gap: 4px; }
-.tool { width: 38px; height: 38px; border: none; background: none; border-radius: 10px; color: var(--brand-primary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.tool { height: 38px; padding: 0 10px; border: none; background: none; border-radius: 10px; color: var(--brand-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: .82rem; font-weight: 600; }
 .tool:hover { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); }
 .tool.on { background: var(--brand-primary); color: #fff; }
 .tool svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tlabel { white-space: nowrap; }
+@media (max-width: 560px) { .tlabel { display: none; } }
 .sep { width: 1px; height: 22px; background: #e2e8f0; margin: 0 4px; }
 
 .right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .vis { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font: inherit; font-size: .84rem; color: #475569; background: #fff; }
-.post { background: var(--brand-primary); color: #fff; border: none; border-radius: 999px; padding: 9px 26px; font-weight: 700; cursor: pointer; }
+.post { display: inline-flex; align-items: center; gap: 7px; background: var(--brand-primary); color: #fff; border: none; border-radius: 999px; padding: 9px 26px; font-weight: 700; cursor: pointer; }
 .post:disabled { opacity: .5; cursor: default; }
+.spin { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.dropzone { position: absolute; inset: 0; z-index: 5; border-radius: 14px; background: color-mix(in srgb, var(--brand-primary) 8%, #fff); border: 2px dashed var(--brand-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--brand-primary); pointer-events: none; }
+.dropzone svg { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dropzone strong { font-size: 1rem; }
+.dropzone small { font-size: .8rem; opacity: .8; }
+
 .hidden { display: none; }
 </style>
