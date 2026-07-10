@@ -5,6 +5,7 @@ const api = useApi()
 
 interface RequestLine {
   id: string
+  order_number: string
   name: string
   unit: string | null
   image: string | null
@@ -72,7 +73,8 @@ const step = ref<1 | 2>(1)
 const catalog = ref<CatalogItem[]>([])
 const categories = ref<{ id: number, name: string }[]>([])
 const basket = reactive<Record<number, number>>({})
-const original = reactive<Record<number, number>>({})
+/** How much of each item this booth has ordered before, across all its orders. */
+const ordered = reactive<Record<number, number>>({})
 const modalSearch = ref('')
 const modalCategory = ref<number | ''>('')
 const submitting = ref(false)
@@ -85,7 +87,7 @@ const filteredCatalog = computed(() => catalog.value.filter((i) => {
 const basketLines = computed(() => catalog.value.filter(i => (basket[i.id] ?? 0) > 0))
 const basketTotal = computed(() => basketLines.value.reduce((s, i) => s + i.rate * basket[i.id], 0))
 const basketCurrency = computed(() => basketLines.value[0]?.currency || '')
-const hasChanges = computed(() => catalog.value.some(i => (basket[i.id] ?? 0) !== (original[i.id] ?? 0)))
+const hasChanges = computed(() => basketLines.value.length > 0)
 
 async function openModal() {
   modalOpen.value = true
@@ -99,7 +101,8 @@ async function openModal() {
     ])
     catalog.value = cat.data
     categories.value = cats.data
-    for (const i of catalog.value) { basket[i.id] = i.added; original[i.id] = i.added }
+    // Each submission is a fresh order, so the basket starts empty every time.
+    for (const i of catalog.value) { basket[i.id] = 0; ordered[i.id] = i.added }
   } catch { /* */ }
 }
 function closeModal() { modalOpen.value = false }
@@ -107,9 +110,7 @@ function inc(i: CatalogItem) { basket[i.id] = (basket[i.id] ?? 0) + 1 }
 function dec(i: CatalogItem) { basket[i.id] = Math.max(0, (basket[i.id] ?? 0) - 1) }
 
 async function submit() {
-  const items = catalog.value
-    .filter(i => (basket[i.id] ?? 0) !== (original[i.id] ?? 0) || (basket[i.id] ?? 0) > 0)
-    .map(i => ({ service_item_id: i.id, quantity: basket[i.id] ?? 0 }))
+  const items = basketLines.value.map(i => ({ service_item_id: i.id, quantity: basket[i.id] }))
   if (!items.length) return
   submitting.value = true
   try {
@@ -156,7 +157,10 @@ onMounted(load)
             <tr v-if="loading && !rows.length"><td colspan="7" class="py-10 text-center muted">Loading…</td></tr>
             <tr v-else-if="!rows.length"><td colspan="7" class="py-12 text-center muted">No services requested yet. Click <strong>Add Services</strong> to get started.</td></tr>
             <tr v-for="l in rows" :key="l.id">
-              <td><strong class="text-ink">{{ l.name }}</strong></td>
+              <td>
+                <strong class="text-ink">{{ l.name }}</strong>
+                <div v-if="l.order_number" class="muted text-[.74rem]">#{{ l.order_number }}</div>
+              </td>
               <td class="text-brand">{{ l.unit || '—' }}</td>
               <td>{{ money(l.currency, l.unit_price) }}</td>
               <td>{{ l.quantity }}</td>
@@ -220,7 +224,7 @@ onMounted(load)
               <div class="thumb">
                 <img v-if="i.image" :src="i.image" :alt="i.name">
                 <AppIcon v-else name="briefcase" class="w-6 h-6 text-muted" />
-                <span v-if="original[i.id] > 0" class="added">ADDED: {{ original[i.id] }}</span>
+                <span v-if="ordered[i.id] > 0" class="added">ORDERED: {{ ordered[i.id] }}</span>
               </div>
               <div class="min-w-0 flex-1">
                 <div class="font-bold text-ink">{{ i.name }}</div>

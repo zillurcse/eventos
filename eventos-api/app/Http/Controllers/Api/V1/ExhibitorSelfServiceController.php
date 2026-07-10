@@ -7,6 +7,7 @@ use App\Http\Resources\ServiceRequestResource;
 use App\Models\Exhibitor;
 use App\Models\ServiceCategory;
 use App\Models\ServiceItem;
+use App\Models\ServiceOrder;
 use App\Models\ServiceRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,19 +15,22 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Exhibitor-admin "Request Service" area (§6.3). The booth browses the event's
- * Services catalogue (service_items, owned by the organizer) and orders items;
- * each order is a service_requests row. The active exhibitor is resolved by
- * ResolveExhibitorAdmin (tenant GUC = its org).
+ * Services catalogue (service_items, owned by the organizer) and submits a
+ * basket; each submission becomes one service_orders row with a service_requests
+ * line per item. The organizer reviews those on Services › Requested Services.
+ * The active exhibitor is resolved by ResolveExhibitorAdmin (tenant GUC = its org).
  */
 class ExhibitorSelfServiceController extends Controller
 {
-    /** The event's active catalogue, annotated with the booth's current quantities. */
+    /** The event's active catalogue, annotated with how much the booth already ordered. */
     public function catalog(Request $request): JsonResponse
     {
         $exhibitor = $this->exhibitor($request);
 
         $requested = ServiceRequest::where('exhibitor_id', $exhibitor->id)
-            ->pluck('quantity', 'service_item_id');
+            ->selectRaw('service_item_id, SUM(quantity) AS ordered')
+            ->groupBy('service_item_id')
+            ->pluck('ordered', 'service_item_id');
 
         $items = ServiceItem::with('category')
             ->where('event_id', $exhibitor->event_id)
@@ -69,7 +73,7 @@ class ExhibitorSelfServiceController extends Controller
     {
         $exhibitor = $this->exhibitor($request);
 
-        $query = ServiceRequest::with('serviceItem.category')
+        $query = ServiceRequest::with(['serviceItem.category', 'serviceOrder:id,uuid,order_number'])
             ->where('exhibitor_id', $exhibitor->id);
 
         if ($term = trim((string) $request->query('search'))) {
@@ -95,7 +99,7 @@ class ExhibitorSelfServiceController extends Controller
         ]);
     }
 
-    /** Submit a basket: upsert one request line per item (0 quantity removes it). */
+    /** Submit a basket: one new order, with a request line per item ordered. */
     public function store(Request $request): JsonResponse
     {
         $exhibitor = $this->exhibitor($request);
@@ -106,48 +110,54 @@ class ExhibitorSelfServiceController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:0', 'max:9999'],
         ]);
 
-        // Only items that belong to this booth's event may be ordered.
+        // Only active items belonging to this booth's event may be ordered.
         $valid = ServiceItem::where('event_id', $exhibitor->event_id)
             ->where('is_active', true)
             ->whereIn('id', collect($data['items'])->pluck('service_item_id'))
             ->get()
             ->keyBy('id');
 
-        DB::transaction(function () use ($data, $valid, $exhibitor) {
-            foreach ($data['items'] as $line) {
+        $lines = collect($data['items'])
+            ->filter(fn (array $line) => $line['quantity'] > 0 && $valid->has($line['service_item_id']))
+            ->values();
+
+        abort_if($lines->isEmpty(), 422, 'No orderable services in this request.');
+
+        DB::transaction(function () use ($lines, $valid, $exhibitor) {
+            $order = ServiceOrder::create([
+                'organization_id' => $exhibitor->organization_id,
+                'event_id' => $exhibitor->event_id,
+                'exhibitor_id' => $exhibitor->id,
+                'order_number' => ServiceOrder::nextOrderNumber(),
+                'submitted_at' => now(),
+            ]);
+
+            foreach ($lines as $line) {
                 $item = $valid->get($line['service_item_id']);
-                if (! $item) {
-                    continue;
-                }
 
-                if ($line['quantity'] < 1) {
-                    ServiceRequest::where('exhibitor_id', $exhibitor->id)
-                        ->where('service_item_id', $item->id)
-                        ->delete();
-
-                    continue;
-                }
-
-                ServiceRequest::updateOrCreate(
-                    ['exhibitor_id' => $exhibitor->id, 'service_item_id' => $item->id],
-                    [
-                        'organization_id' => $exhibitor->organization_id,
-                        'event_id' => $exhibitor->event_id,
-                        'quantity' => $line['quantity'],
-                        'unit_price' => $item->rate,
-                        'currency' => $item->currency,
-                        'status' => 'pending',
-                    ],
-                );
+                ServiceRequest::create([
+                    'organization_id' => $exhibitor->organization_id,
+                    'event_id' => $exhibitor->event_id,
+                    'exhibitor_id' => $exhibitor->id,
+                    'service_order_id' => $order->id,
+                    'service_item_id' => $item->id,
+                    'quantity' => $line['quantity'],
+                    'unit_price' => $item->rate,
+                    'currency' => $item->currency,
+                    'status' => 'pending',
+                ]);
             }
         });
 
         return $this->index($request);
     }
 
+    /** Change a line's quantity — only while the organizer has not decided on it. */
     public function update(Request $request, string $serviceRequest): JsonResponse
     {
         $model = $this->find($request, $serviceRequest);
+
+        abort_unless($model->status === 'pending', 422, 'This service has already been reviewed.');
 
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:9999'],
@@ -158,9 +168,21 @@ class ExhibitorSelfServiceController extends Controller
         return response()->json(['data' => new ServiceRequestResource($model->load('serviceItem.category'))]);
     }
 
+    /** Remove a line; the order goes with it once its last line is gone. */
     public function destroy(Request $request, string $serviceRequest): JsonResponse
     {
-        $this->find($request, $serviceRequest)->delete();
+        $model = $this->find($request, $serviceRequest);
+
+        abort_unless($model->status === 'pending', 422, 'This service has already been reviewed.');
+
+        DB::transaction(function () use ($model) {
+            $orderId = $model->service_order_id;
+            $model->delete();
+
+            if (! ServiceRequest::where('service_order_id', $orderId)->exists()) {
+                ServiceOrder::whereKey($orderId)->delete();
+            }
+        });
 
         return response()->json(['message' => 'Service request removed.']);
     }

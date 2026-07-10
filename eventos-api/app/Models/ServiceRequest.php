@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * An exhibitor's request for one catalogue service_item (§ Services). Scoped to
- * its org via RLS and to its booth via exhibitor_id.
+ * One line of an exhibitor's service order: a request for a single catalogue
+ * service_item (§ Services). Scoped to its org via RLS and to its booth via
+ * exhibitor_id. The organizer approves/rejects lines individually, which is
+ * what lets the parent ServiceOrder read as "partial".
  */
 class ServiceRequest extends Model
 {
-    use BelongsToOrganization, SoftDeletes, HasUuid;
+    use BelongsToOrganization, HasUuid, SoftDeletes;
 
     protected $guarded = [];
 
@@ -29,6 +31,11 @@ class ServiceRequest extends Model
     public function exhibitor(): BelongsTo
     {
         return $this->belongsTo(Exhibitor::class);
+    }
+
+    public function serviceOrder(): BelongsTo
+    {
+        return $this->belongsTo(ServiceOrder::class);
     }
 
     public function event(): BelongsTo

@@ -13,6 +13,7 @@ class ServiceRequestResource extends JsonResource
 
         return [
             'id' => $this->uuid,
+            'order_number' => $this->whenLoaded('serviceOrder', fn () => $this->serviceOrder->order_number),
             'service_item_id' => $this->service_item_id,
             'name' => $item?->title,
             'unit' => $item?->unit,

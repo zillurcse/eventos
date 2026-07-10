@@ -63,6 +63,7 @@ use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\ServiceCategoryController;
 use App\Http\Controllers\Api\V1\ServiceController;
+use App\Http\Controllers\Api\V1\ServiceOrderController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
@@ -429,6 +430,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/events/{uuid}/services', [ServiceController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/services/{group}', [ServiceController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/services/{group}', [ServiceController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Requested services: exhibitor orders the organizer reviews ──
+            Route::get('/events/{uuid}/service-orders', [ServiceOrderController::class, 'index'])->middleware('perm:events.view');
+            Route::get('/service-orders/{order}', [ServiceOrderController::class, 'show'])->middleware('perm:events.view');
+            Route::get('/service-orders/{order}/pdf', [ServiceOrderController::class, 'pdf'])->middleware('perm:events.view');
+            Route::patch('/service-orders/{order}', [ServiceOrderController::class, 'update'])->middleware('perm:events.manage');
+            Route::patch('/service-requests/{line}', [ServiceOrderController::class, 'updateLine'])->middleware('perm:events.manage');
 
             // ── Floor plans (floor.expouse canvas editor) ──
             Route::get('/events/{uuid}/floors', [FloorController::class, 'index'])->middleware('perm:events.view');
