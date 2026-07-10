@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConnectionController;
+use App\Http\Controllers\Api\V1\ContestController;
 use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DelegateController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
@@ -64,6 +65,7 @@ use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\TicketTypeController;
 use App\Http\Controllers\Api\V1\TrackController;
 use App\Http\Controllers\Api\V1\VenueController;
@@ -335,6 +337,20 @@ Route::prefix('v1')->group(function () {
             Route::post('/breakout-rooms/{room}/duplicate', [BreakoutRoomController::class, 'duplicate'])->middleware('perm:events.manage');
             Route::patch('/breakout-rooms/{room}/status', [BreakoutRoomController::class, 'setStatus'])->middleware('perm:events.manage');
             Route::delete('/breakout-rooms/{room}', [BreakoutRoomController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Contests (Event Engagement) ──
+            Route::get('/events/{uuid}/contests', [ContestController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/contests', [ContestController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/contests/{contest}', [ContestController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/contests/{contest}', [ContestController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/contests/{contest}', [ContestController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Surveys (Event Engagement) ──
+            Route::get('/events/{uuid}/surveys', [SurveyController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/surveys', [SurveyController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/surveys/{survey}', [SurveyController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/surveys/{survey}', [SurveyController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/surveys/{survey}', [SurveyController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Activity Feed moderation (Event Engagement) ──
             Route::get('/events/{uuid}/feed-moderation', [FeedModerationController::class, 'index'])->middleware('perm:events.view');

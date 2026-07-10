@@ -192,7 +192,10 @@ class BreakoutRoomController extends Controller
 
         $out = [];
         foreach ($columns as $col) {
-            if ($partial && ! $request->has($col)) {
+            // Omit columns the request never sent so the DB's own DEFAULT
+            // applies (e.g. provider/recording_enabled) instead of an explicit
+            // NULL, which would violate their NOT NULL constraints.
+            if (! $request->has($col)) {
                 continue;
             }
             $out[$col] = $data[$col] ?? $request->input($col);

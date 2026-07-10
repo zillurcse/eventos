@@ -41,13 +41,15 @@ function freshDraft(): DraftShape {
 
 const draft = reactive<DraftShape>(freshDraft())
 
-const filtered = computed(() => {
-  const q = search.value.toLowerCase().trim()
-  if (!q) return posts.value
-  return posts.value.filter((p: BlogPost) =>
-    [p.title, p.excerpt ?? ''].some(f => f.toLowerCase().includes(q)),
-  )
-})
+const columns = [
+  { key: 'post', label: 'Post' },
+  { key: 'status', label: 'Status' },
+  { key: 'published', label: 'Published', align: 'right' as const },
+]
+
+function searchText(p: BlogPost) {
+  return `${p.title} ${p.excerpt ?? ''}`
+}
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -139,93 +141,100 @@ onMounted(load)
 
     <div class="card">
       <div class="flex items-center justify-between gap-4 mb-4">
-        <input v-model="search" placeholder="Search posts…" class="m-0 max-w-[260px]">
+        <SearchInput v-model="search" placeholder="Search posts…" class="max-w-80" />
         <button class="btn" @click="openAdd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           NEW POST
         </button>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>POST</th>
-            <th>STATUS</th>
-            <th>PUBLISHED</th>
-            <th class="text-right">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="p in filtered" :key="p.id">
-            <td>
-              <div class="flex items-center gap-3">
-                <div class="w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-[#f3f4f6] border border-line flex items-center justify-center text-muted text-[.7rem]">
-                  <img v-if="p.cover_url" :src="p.cover_url" :alt="p.title" class="w-full h-full object-cover">
-                  <span v-else>No img</span>
-                </div>
-                <div class="min-w-0">
-                  <div class="font-semibold text-ink leading-tight truncate max-w-[360px]">{{ p.title }}</div>
-                  <div class="muted text-[.8rem] truncate max-w-[360px]">{{ p.excerpt || '—' }}</div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <button
-                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[.75rem] font-semibold cursor-pointer border-0"
-                :class="p.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-[#f1f1f5] text-muted'"
-                :title="p.status === 'published' ? 'Click to unpublish' : 'Click to publish'"
-                @click="togglePublish(p)"
-              >{{ p.status === 'published' ? 'Published' : 'Draft' }}</button>
-            </td>
-            <td class="text-[.86rem] text-muted">{{ fmtDate(p.published_at) }}</td>
-            <td class="text-right whitespace-nowrap">
-              <button class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-brand" title="Edit" @click="openEdit(p)">✎</button>
-              <button class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]" title="Remove" @click="removePost(p)">🗑</button>
-            </td>
-          </tr>
+      <DataTable
+        :items="posts"
+        :columns="columns"
+        :search="search"
+        :search-text="searchText"
+        row-key="id"
+        storage-key="content-hub-blog"
+      >
+        <template #cell-post="{ row }">
+          <div class="flex items-center gap-3">
+            <div class="w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-[#f3f4f6] border border-line flex items-center justify-center text-muted text-[.7rem]">
+              <img v-if="row.cover_url" :src="row.cover_url" :alt="row.title" class="w-full h-full object-cover">
+              <span v-else>No img</span>
+            </div>
+            <div class="min-w-0">
+              <div class="font-semibold text-ink leading-tight truncate max-w-[360px]">{{ row.title }}</div>
+              <div class="muted text-[.8rem] truncate max-w-[360px]">{{ row.excerpt || '—' }}</div>
+            </div>
+          </div>
+        </template>
 
-          <tr v-if="!filtered.length">
-            <td colspan="4" class="muted text-center py-8">
-              {{ search ? 'No posts match your search.' : 'No blog posts yet. Click NEW POST to write one.' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #cell-status="{ row }">
+          <button
+            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[.75rem] font-semibold cursor-pointer border-0"
+            :class="row.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-[#f1f1f5] text-muted'"
+            :title="row.status === 'published' ? 'Click to unpublish' : 'Click to publish'"
+            @click="togglePublish(row)"
+          >{{ row.status === 'published' ? 'Published' : 'Draft' }}</button>
+        </template>
+
+        <template #cell-published="{ row }">
+          <span class="text-[.86rem] text-muted">{{ fmtDate(row.published_at) }}</span>
+        </template>
+
+        <template #actions="{ row }">
+          <button class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-brand" title="Edit" @click="openEdit(row)">✎</button>
+          <button class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]" title="Remove" @click="removePost(row)">🗑</button>
+        </template>
+
+        <template #empty>
+          <span class="muted">No blog posts yet. Click <strong>NEW POST</strong> to write one.</span>
+        </template>
+      </DataTable>
     </div>
 
     <!-- Add / Edit drawer -->
     <Drawer v-if="drawerOpen" :title="editingId ? 'Edit Blog Post' : 'New Blog Post'" @close="drawerOpen = false">
       <div class="mb-5">
-        <label class="block mb-1.5">Cover Image</label>
-        <UploadButton
-          :preview="draft.cover_url"
-          collection="cover"
-          @uploaded="(v: any) => { draft.cover_file_id = v.id; draft.cover_url = v.url }"
+        <FormField label="Cover Image">
+          <ImageField
+            :model-value="draft.cover_url"
+            :aspect="16 / 9"
+            :output-width="1200"
+            :output-height="675"
+            collection="cover"
+            card-width="300px"
+            :gallery-path="`/events/${id}/gallery`"
+            hint="Recommended 16:9, shown in listings and social shares."
+            @update:model-value="draft.cover_url = (Array.isArray($event) ? $event[0] : $event) || null"
+            @uploaded="(v: any) => draft.cover_file_id = v.id"
+          />
+        </FormField>
+      </div>
+
+      <div class="mb-4">
+        <AppInput v-model="draft.title" label="Title" required placeholder="Post title" />
+      </div>
+
+      <div class="mb-4">
+        <AppTextarea v-model="draft.excerpt" label="Excerpt" :rows="2" placeholder="Short summary shown in listings…" hint="A one or two line teaser for the post." />
+      </div>
+
+      <div class="mb-4">
+        <AppTextarea v-model="draft.body" label="Content" :rows="10" placeholder="Write your article…" />
+      </div>
+
+      <div class="mb-1">
+        <AppSelect
+          v-model="draft.status"
+          label="Status"
+          :options="[{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }]"
         />
       </div>
 
-      <label>
-        Title
-        <span class="text-[#dc2626] ml-0.5">*</span>
-      </label>
-      <input v-model="draft.title" placeholder="Post title">
-
-      <label>Excerpt</label>
-      <textarea v-model="draft.excerpt" rows="2" placeholder="Short summary shown in listings…" />
-      <p class="muted text-[.82rem] -mt-2 mb-4">A one or two line teaser for the post.</p>
-
-      <label>Content</label>
-      <textarea v-model="draft.body" rows="10" placeholder="Write your article…" />
-
-      <label>Status</label>
-      <select v-model="draft.status">
-        <option value="draft">Draft</option>
-        <option value="published">Published</option>
-      </select>
-
       <p v-if="error" class="error mt-3">{{ error }}</p>
 
-      <div class="modal-actions">
+      <div class="modal-actions border-t border-line pt-4 mt-5">
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
         <button class="btn" :disabled="!draft.title.trim() || saving" @click="saveDraft">
           {{ saving ? 'Saving…' : editingId ? 'UPDATE' : 'CREATE' }}

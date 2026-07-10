@@ -7,7 +7,6 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
 const api = useApi()
-const { upload } = useUpload()
 const id = route.params.id as string
 
 const TYPES: [string, string][] = [
@@ -16,10 +15,10 @@ const TYPES: [string, string][] = [
   ['vip', 'VIP Room'], ['interview', 'Interview Room'], ['panel', 'Panel Discussion'],
   ['ama', 'AMA Session'], ['custom', 'Custom Type'],
 ]
-const ACCESS: { key: string, title: string, desc: string }[] = [
-  { key: 'anyone', title: 'Anyone', desc: 'Open — any event attendee can join.' },
-  { key: 'coded', title: 'Coded',  desc: 'Requires an access code to enter.' },
-  { key: 'hidden', title: 'Hidden', desc: 'Unlisted — reachable by direct link / invite only.' },
+const ACCESS: { key: string, title: string, desc: string, icon: string }[] = [
+  { key: 'anyone', title: 'Anyone', desc: 'Open — any event attendee can join.', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z' },
+  { key: 'coded', title: 'Coded', desc: 'Requires an access code to enter.', icon: 'M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z M6 11V7a6 6 0 0 1 12 0v4 M5 11h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9Z' },
+  { key: 'hidden', title: 'Hidden', desc: 'Unlisted — reachable by direct link / invite only.', icon: 'M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.8 21.8 0 0 1 5.06-6.06 M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-2.16 3.19 M14.12 14.12a3 3 0 1 1-4.24-4.24 M1 1l22 22' },
 ]
 const typeLabel = (k: string) => TYPES.find(([v]) => v === k)?.[1] || k
 
@@ -100,13 +99,6 @@ function openEdit(r: Room) {
   error.value = ''; drawer.open = true
 }
 
-async function uploadPoster(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  try { const r = await upload(file, { collection: 'breakout_room_poster' }); form.poster_url = r.url }
-  catch { toast.error('Could not upload poster.') }
-}
-
 async function save() {
   if (!form.name.trim()) { error.value = 'Please enter a room name.'; return }
   if (form.access_type === 'coded' && !form.access_code.trim()) {
@@ -180,7 +172,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div>
     <div class="card">
       <div class="flex items-start justify-between gap-4 flex-wrap mb-3">
         <div>
@@ -191,20 +183,29 @@ onMounted(load)
       </div>
 
       <!-- Status filter -->
-      <div class="flex gap-1.5 mb-4">
+      <div class="inline-flex bg-[#f7f7fa] border border-line rounded-xl p-1 gap-1 mb-4">
         <button
           v-for="f in (['all', 'draft', 'published', 'archived'] as const)" :key="f"
-          class="px-3 py-1 rounded-full text-[.8rem] font-medium capitalize transition-colors"
-          :class="filter === f ? 'bg-[#6352e7] text-white' : 'bg-[#f1f1f5] text-muted hover:text-ink'"
+          class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold capitalize transition-colors"
+          :class="filter === f ? 'bg-[#6352e7] text-white' : 'text-muted hover:text-ink'"
           @click="filter = f"
         >{{ f }}</button>
       </div>
 
-      <div v-if="loading" class="muted text-center py-12">Loading rooms…</div>
+      <div v-if="loading" class="flex items-center justify-center gap-2.5 py-14 text-muted text-[.88rem]">
+        <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Loading rooms…
+      </div>
 
       <template v-else>
-        <div v-if="!shown.length" class="text-muted text-[.86rem] border border-dashed border-line rounded-xl p-8 text-center">
-          No {{ filter === 'all' ? '' : filter }} rooms yet.
+        <div v-if="!shown.length" class="text-center py-13 px-5">
+          <div class="w-13.5 h-13.5 rounded-[14px] bg-[#f3f0ff] text-[#6352e7] grid place-items-center mx-auto mb-3.5">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+          </div>
+          <p class="muted m-0">No {{ filter === 'all' ? '' : filter }} rooms yet.</p>
         </div>
 
         <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))">
@@ -254,84 +255,98 @@ onMounted(load)
     <Drawer v-if="drawer.open" :title="`${drawer.mode === 'create' ? 'Create' : 'Edit'} breakout room`" @close="drawer.open = false">
       <!-- Name -->
       <div class="mb-4">
-        <label class="block mb-1.5">Room Name <span class="text-[#dc2626]">*</span></label>
-        <input v-model="form.name" placeholder="e.g. Product Deep-Dive" class="m-0">
+        <AppInput v-model="form.name" label="Room Name" required placeholder="e.g. Product Deep-Dive" />
       </div>
 
       <!-- Description -->
       <div class="mb-4">
-        <label class="block mb-1.5">Room Description</label>
-        <textarea v-model="form.description" rows="3" placeholder="What happens in this room?" class="m-0 w-full"></textarea>
+        <AppTextarea v-model="form.description" label="Room Description" :rows="3" placeholder="What happens in this room?" />
       </div>
 
       <!-- Purpose + Type -->
       <div class="flex gap-3 mb-4 flex-wrap">
         <div class="flex-1 min-w-[160px]">
-          <label class="block mb-1.5">Room Purpose</label>
-          <select v-model="form.purpose" class="m-0 w-full">
-            <option value="single">Single Session</option>
-            <option value="multiple">Multiple Sessions</option>
-          </select>
+          <AppSelect
+            v-model="form.purpose"
+            label="Room Purpose"
+            :options="[{ value: 'single', label: 'Single Session' }, { value: 'multiple', label: 'Multiple Sessions' }]"
+          />
         </div>
         <div class="flex-1 min-w-[160px]">
-          <label class="block mb-1.5">Room Type</label>
-          <select v-model="form.type" class="m-0 w-full">
-            <option v-for="[v, l] in TYPES" :key="v" :value="v">{{ l }}</option>
-          </select>
+          <AppSelect
+            v-model="form.type"
+            label="Room Type"
+            :options="TYPES.map(([value, label]) => ({ value, label }))"
+          />
         </div>
       </div>
 
       <!-- Schedule -->
       <div class="flex gap-3 mb-4 flex-wrap">
         <div class="flex-1 min-w-[160px]">
-          <label class="block mb-1.5">Start date &amp; time</label>
-          <input v-model="form.starts_at" type="datetime-local" class="m-0 w-full">
+          <FormField label="Start date &amp; time">
+            <input v-model="form.starts_at" type="datetime-local" class="m-0 w-full">
+          </FormField>
         </div>
         <div class="flex-1 min-w-[160px]">
-          <label class="block mb-1.5">End date &amp; time</label>
-          <input v-model="form.ends_at" type="datetime-local" class="m-0 w-full">
+          <FormField label="End date &amp; time">
+            <input v-model="form.ends_at" type="datetime-local" class="m-0 w-full">
+          </FormField>
         </div>
       </div>
 
       <!-- Access -->
       <div class="mb-4">
-        <label class="block mb-1.5">Who can join the room</label>
-        <div class="flex flex-col gap-2">
-          <label
-            v-for="a in ACCESS" :key="a.key"
-            class="flex items-start gap-2.5 border rounded-xl p-2.5 cursor-pointer transition-colors"
-            :class="form.access_type === a.key ? 'border-[#6352e7] bg-[#f7f6ff]' : 'border-line'"
-          >
-            <input v-model="form.access_type" type="radio" :value="a.key" class="accent-[#6352e7] mt-0.5">
-            <span>
-              <span class="font-medium text-ink text-[.9rem]">{{ a.title }}</span>
-              <span class="block text-[.78rem] text-muted">{{ a.desc }}</span>
-            </span>
-          </label>
-        </div>
-        <div v-if="form.access_type === 'coded'" class="mt-2">
-          <label class="block mb-1.5">Access Code <span class="text-[#dc2626]">*</span></label>
-          <input v-model="form.access_code" placeholder="e.g. EXPO2026" class="m-0 max-w-[240px]">
+        <FormField label="Who can join the room">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <label
+              v-for="a in ACCESS" :key="a.key"
+              class="relative flex flex-col gap-2 border rounded-xl p-3 cursor-pointer transition-colors"
+              :class="form.access_type === a.key ? 'border-[#6352e7] bg-[#f7f6ff]' : 'border-line hover:border-[#c9c4f5]'"
+            >
+              <input v-model="form.access_type" type="radio" :value="a.key" class="sr-only">
+              <div class="flex items-center justify-between">
+                <span
+                  class="w-8 h-8 rounded-lg grid place-items-center shrink-0 transition-colors"
+                  :class="form.access_type === a.key ? 'bg-[#6352e7] text-white' : 'bg-[#f1f1f5] text-muted'"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="a.icon"/></svg>
+                </span>
+                <span
+                  class="w-4.5 h-4.5 rounded-full border-2 grid place-items-center shrink-0"
+                  :class="form.access_type === a.key ? 'bg-[#6352e7] border-[#6352e7]' : 'bg-white border-[#d7dae1]'"
+                >
+                  <svg v-if="form.access_type === a.key" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </span>
+              </div>
+              <span class="font-semibold text-ink text-[.88rem]">{{ a.title }}</span>
+              <span class="text-[.78rem] text-muted leading-snug">{{ a.desc }}</span>
+            </label>
+          </div>
+        </FormField>
+        <div v-if="form.access_type === 'coded'" class="mt-3 max-w-60">
+          <AppInput v-model="form.access_code" label="Access Code" required placeholder="e.g. EXPO2026" />
         </div>
       </div>
 
       <!-- Capacity -->
-      <div class="mb-4">
-        <label class="block mb-1.5">Capacity <span class="muted text-[.78rem]">(optional)</span></label>
-        <input v-model.number="form.capacity" type="number" min="1" placeholder="Unlimited" class="m-0 max-w-[160px]">
+      <div class="mb-4 max-w-40">
+        <AppInput v-model.number="form.capacity" type="number" label="Capacity" hint="Leave blank for unlimited" min="1" placeholder="Unlimited" />
       </div>
 
       <!-- Poster -->
       <div class="mb-5">
-        <label class="block mb-1.5">Session Poster Image</label>
-        <div class="rounded-lg overflow-hidden border border-line bg-[#f7f8fa] aspect-[2/1] max-w-[320px] flex items-center justify-center">
-          <img v-if="form.poster_url" :src="form.poster_url" class="w-full h-full object-cover">
-          <span v-else class="text-muted text-[.84rem]">No poster</span>
-        </div>
-        <label class="btn ghost mt-2 text-[.8rem] inline-flex cursor-pointer">
-          <input type="file" accept="image/*" class="hidden" @change="uploadPoster">
-          {{ form.poster_url ? 'Replace poster' : 'Upload poster' }}
-        </label>
+        <FormField label="Session Poster Image">
+          <ImageField
+            :model-value="form.poster_url"
+            :aspect="2"
+            collection="breakout_room_poster"
+            card-width="320px"
+            :gallery-path="`/events/${id}/gallery`"
+            hint="Recommended 2:1 poster image."
+            @update:model-value="form.poster_url = (Array.isArray($event) ? $event[0] : $event) || null"
+          />
+        </FormField>
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>
