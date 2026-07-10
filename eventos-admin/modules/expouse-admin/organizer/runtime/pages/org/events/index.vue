@@ -152,7 +152,7 @@ onMounted(load)
 
       <div class="mt-3">
         <label>Event name</label>
-        <input v-model="form.name" placeholder="e.g. AI Expo 2026">
+        <input v-model="form.name" placeholder="e.g. Tech Expo 2026">
       </div>
 
       <div>

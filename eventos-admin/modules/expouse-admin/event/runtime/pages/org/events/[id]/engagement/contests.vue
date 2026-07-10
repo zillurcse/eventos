@@ -434,7 +434,7 @@ onMounted(load)
 
         <div class="flex gap-3 mb-4 flex-wrap">
           <div class="flex-1 min-w-35">
-            <AppInput v-model.number="form.character_limit" type="number" label="Character Limit" hint="Minimum characters per post" min="0" />
+            <AppInput v-model.number="form.character_limit" type="number" label="Character Limit" hint="Maximum characters per post" min="1" />
           </div>
           <div class="flex-1 min-w-35">
             <AppInput

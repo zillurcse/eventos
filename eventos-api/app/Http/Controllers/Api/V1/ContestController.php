@@ -104,7 +104,7 @@ class ContestController extends Controller
 
         return [
             'title' => [$req, 'string', 'max:200'],
-            'contest_type' => ['nullable', Rule::in(self::TYPES)],
+            'contest_type' => ['sometimes', Rule::in(self::TYPES)],
             'description' => ['nullable', 'string', 'max:5000'],
             'description_file_url' => ['nullable', 'string', 'max:2000'],
             'description_file_name' => ['nullable', 'string', 'max:255'],
@@ -118,7 +118,7 @@ class ContestController extends Controller
             'allow_photos' => ['nullable', 'boolean'],
             'allow_videos' => ['nullable', 'boolean'],
             'allow_selfie' => ['nullable', 'boolean'],
-            'winner_chooser' => ['nullable', Rule::in(self::WINNER_CHOOSERS)],
+            'winner_chooser' => ['sometimes', Rule::in(self::WINNER_CHOOSERS)],
             'winner_number' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'winning_points' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'equal_points_distribution' => ['nullable', 'boolean'],

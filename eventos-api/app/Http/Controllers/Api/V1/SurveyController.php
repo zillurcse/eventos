@@ -29,7 +29,7 @@ class SurveyController extends Controller
         $event = Event::where('uuid', $uuid)->firstOrFail();
 
         $surveys = Survey::where('event_id', $event->id)
-            ->with('form.fields')
+            ->with('form.fields.options')
             ->orderByDesc('id')
             ->get();
 

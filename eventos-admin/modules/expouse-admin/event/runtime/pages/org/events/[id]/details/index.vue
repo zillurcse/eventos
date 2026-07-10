@@ -130,7 +130,7 @@ onMounted(load)
         <AppInput
           v-model="form.name"
           label="Event Title"
-          placeholder="e.g. AI Expo 2026"
+          placeholder="e.g. Tech Expo 2026"
           required
         />
 
