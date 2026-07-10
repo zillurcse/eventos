@@ -31,19 +31,32 @@ export const COUNTRIES     = ['Bangladesh','United States','United Kingdom','UAE
 export const EXHIBITOR_TABS = ['Details','Members','Documents','Projects','Products','Permissions']
 export const EXHIBITOR_LIMIT = 50
 
-export const ALL_FEATURES = [
-  { key: 'teams',          label: 'Teams' },
-  { key: 'projects',       label: 'Projects' },
-  { key: 'products',       label: 'Products' },
-  { key: 'documents',      label: 'Documents' },
-  { key: 'videos',         label: 'Videos' },
-  { key: 'cta',            label: 'CTA' },
-  { key: 'meetings',       label: 'Meetings' },
-  { key: 'lounge',         label: 'Lounge' },
-  { key: 'lead_analytics', label: 'Lead Analytics' },
-  { key: 'lead_export',    label: 'Lead Export' },
-  { key: 'analytics',      label: 'Analytics' },
+// `countable: false` → on/off toggle only (no quantity limit stepper).
+// Keep the Leads keys in sync with the Exhibitor Packages catalogue
+// (showcase/packages.vue) so entitlements and package defaults line up.
+export const ALL_FEATURES: { key: string; label: string; countable?: boolean }[] = [
+  { key: 'teams',             label: 'Teams' },
+  { key: 'projects',          label: 'Projects' },
+  { key: 'products',          label: 'Products' },
+  { key: 'documents',         label: 'Documents' },
+  { key: 'videos',            label: 'Videos' },
+  { key: 'cta',               label: 'CTA' },
+  { key: 'meetings',          label: 'Meetings' },
+  { key: 'lounge',            label: 'Lounge' },
+  // Leads — on/off only.
+  { key: 'all_leads',          label: 'All Leads',          countable: false },
+  { key: 'team_connections',   label: 'Team Connections',   countable: false },
+  { key: 'recommended_leads',  label: 'Recommended Leads',  countable: false },
+  { key: 'lead_qualification', label: 'Lead Qualification', countable: false },
+  { key: 'lead_analytics',     label: 'Leads Analytics',    countable: false },
+  { key: 'lead_export',        label: 'Lead Export',        countable: false },
+  { key: 'analytics',         label: 'Analytics',          countable: false },
 ]
+
+/** Whether a feature carries a numeric limit (vs a plain on/off toggle). */
+export function featureCountable(key: string) {
+  return ALL_FEATURES.find(f => f.key === key)?.countable !== false
+}
 
 export function freshDraft(): Draft {
   return {

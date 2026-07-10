@@ -32,6 +32,14 @@ class UserResource extends JsonResource
                 'status' => $em->exhibitor?->status,
                 'organization' => $em->exhibitor?->organization?->name,
                 'event' => $em->exhibitor?->event?->name,
+                // Enabled Showcase feature keys (profile_data.entitlements) — the
+                // exhibitor-admin SPA hides/guards features accordingly. Empty =
+                // never configured, so the SPA treats it as "all allowed".
+                'entitlements' => collect($em->exhibitor?->profile_data['entitlements'] ?? [])
+                    ->filter(fn ($f) => is_array($f) && ($f['enabled'] ?? false))
+                    ->map(fn ($f) => $f['key'] ?? null)
+                    ->filter()
+                    ->values(),
             ])->values(),
         ];
     }

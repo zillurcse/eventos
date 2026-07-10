@@ -12,7 +12,7 @@ const { entitlements, subSaving, subError, savePermissions } = useExhibitorConte
         :class="{ 'bg-brand-soft border-brand/20': f.enabled }"
       >
         <AppCheckbox v-model="f.enabled" :label="featureLabel(f.key)" class="flex-1 [&_span]:font-medium" />
-        <div class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white">
+        <div v-if="featureCountable(f.key)" class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white">
           <button class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer" @click="f.limit = Math.max(0, f.limit - 1)">−</button>
           <span class="w-8 h-9 flex items-center justify-center text-[.91rem] font-semibold border-x border-[#d7dae1] select-none">{{ f.limit }}</span>
           <button class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer" @click="f.limit++">+</button>

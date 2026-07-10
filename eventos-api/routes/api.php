@@ -54,7 +54,9 @@ use App\Http\Controllers\Api\V1\ExhibitorPackageController;
 use App\Http\Controllers\Api\V1\ExhibitorProductController;
 use App\Http\Controllers\Api\V1\ExhibitorProjectController;
 use App\Http\Controllers\Api\V1\ExhibitorSelfCatalogController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfLeadController;
 use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfServiceController;
 use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PublicSiteController;
@@ -188,6 +190,21 @@ Route::prefix('v1')->group(function () {
             Route::post('/inbox/conversations/{conversation}/messages', [ExhibitorInboxController::class, 'reply']);
             Route::get('/inbox/meeting-requests', [ExhibitorInboxController::class, 'meetingRequests']);
             Route::patch('/inbox/meeting-requests/{request}', [ExhibitorInboxController::class, 'respondMeeting']);
+
+            // Lead capture CRM: list/filter, edit rating/status/notes, export.
+            Route::get('/leads', [ExhibitorSelfLeadController::class, 'index']);
+            Route::post('/leads', [ExhibitorSelfLeadController::class, 'store']);
+            Route::post('/leads/export', [ExhibitorSelfLeadController::class, 'export']);
+            Route::match(['put', 'patch'], '/leads/{lead}', [ExhibitorSelfLeadController::class, 'update']);
+            Route::delete('/leads/{lead}', [ExhibitorSelfLeadController::class, 'destroy']);
+
+            // Request Service: browse the event catalogue + manage the booth's orders.
+            Route::get('/services/catalog', [ExhibitorSelfServiceController::class, 'catalog']);
+            Route::get('/services/categories', [ExhibitorSelfServiceController::class, 'categories']);
+            Route::get('/services/requests', [ExhibitorSelfServiceController::class, 'index']);
+            Route::post('/services/requests', [ExhibitorSelfServiceController::class, 'store']);
+            Route::match(['put', 'patch'], '/services/requests/{serviceRequest}', [ExhibitorSelfServiceController::class, 'update']);
+            Route::delete('/services/requests/{serviceRequest}', [ExhibitorSelfServiceController::class, 'destroy']);
         });
 
         // ── Attendee context: networking & feed (§6.5, §6.6) ──

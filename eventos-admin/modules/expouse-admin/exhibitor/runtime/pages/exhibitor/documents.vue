@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', title: 'Documents', subtitle: 'Brochures & files shown on your booth' })
+definePageMeta({ middleware: 'exhibitor', feature: 'documents', title: 'Documents', subtitle: 'Brochures & files shown on your booth' })
 
 const api = useApi()
 const documents = ref<any[]>([])

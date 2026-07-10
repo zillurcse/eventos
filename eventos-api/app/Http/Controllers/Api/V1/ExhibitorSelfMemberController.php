@@ -69,8 +69,8 @@ class ExhibitorSelfMemberController extends Controller
         return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }
 
-    /** Modules a staff member can be granted access to (the team ACL). */
-    public const MODULES = ['products', 'documents', 'projects', 'leads', 'meetings'];
+    /** Permissions a staff member can be granted (the team ACL). */
+    public const MODULES = ['scan_badges', 'view_all_leads', 'edit_lead_notes', 'export_leads', 'manage_team'];
 
     /** Update a member's role + per-module access (ACL). Admins get everything. */
     public function update(Request $request, int $member): JsonResponse

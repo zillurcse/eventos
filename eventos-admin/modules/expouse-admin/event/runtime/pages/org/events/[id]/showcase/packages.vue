@@ -34,10 +34,14 @@ const ALL_FEATURES: { key: string; label: string; countable?: boolean }[] = [
   { key: 'cta',               label: 'CTA' },
   { key: 'meetings',          label: 'Meetings' },
   { key: 'lounge',            label: 'Lounge' },
-  { key: 'teams_connections', label: "Team's Connections", countable: false },
-  { key: 'recommended_leads', label: 'Recommended leads',  countable: false },
-  { key: 'lead_analytics',    label: 'Lead Analytics',      countable: false },
-  { key: 'lead_export',       label: 'Lead Export',         countable: false },
+  // Leads — on/off only. Keep in sync with the exhibitor entitlements
+  // catalogue (exhibitor/runtime/utils/exhibitor.ts ALL_FEATURES).
+  { key: 'all_leads',          label: 'All Leads',          countable: false },
+  { key: 'team_connections',   label: 'Team Connections',   countable: false },
+  { key: 'recommended_leads',  label: 'Recommended Leads',  countable: false },
+  { key: 'lead_qualification', label: 'Lead Qualification', countable: false },
+  { key: 'lead_analytics',     label: 'Leads Analytics',    countable: false },
+  { key: 'lead_export',        label: 'Lead Export',         countable: false },
   { key: 'analytics',         label: 'Analytics',           countable: false },
 ]
 
