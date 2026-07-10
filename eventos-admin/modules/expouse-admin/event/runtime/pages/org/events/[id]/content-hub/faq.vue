@@ -146,9 +146,13 @@ onMounted(load)
         </div>
       </div>
 
-      <p v-else class="muted text-[.86rem] py-10 text-center">
-        No questions yet. Click <strong>+ ADD QUESTION</strong> to get started.
-      </p>
+      <div v-else class="text-center py-13 px-5">
+        <div class="w-13.5 h-13.5 rounded-[14px] bg-[#f3f0ff] text-[#6352e7] grid place-items-center mx-auto mb-3.5">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+        </div>
+        <p class="muted m-0 mb-3">No questions yet. Add your first FAQ to help attendees.</p>
+        <button class="btn" @click="openAdd">+ ADD QUESTION</button>
+      </div>
     </div>
 
     <!-- Add / Edit drawer -->
@@ -157,19 +161,15 @@ onMounted(load)
       :title="editingId ? 'Edit Question' : 'Add Question'"
       @close="drawerOpen = false"
     >
-      <label>
-        Question
-        <span class="text-[#dc2626] ml-0.5">*</span>
-      </label>
-      <input v-model="draft.question" placeholder="e.g. What time do doors open?">
+      <div class="mb-4">
+        <AppInput v-model="draft.question" label="Question" required placeholder="e.g. What time do doors open?" />
+      </div>
 
-      <label>
-        Answer
-        <span class="text-[#dc2626] ml-0.5">*</span>
-      </label>
-      <textarea v-model="draft.answer" rows="6" placeholder="Write the answer attendees will see…" />
+      <div class="mb-1">
+        <AppTextarea v-model="draft.answer" label="Answer" required :rows="6" placeholder="Write the answer attendees will see…" />
+      </div>
 
-      <div class="modal-actions">
+      <div class="modal-actions border-t border-line pt-4 mt-5">
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
         <button class="btn" :disabled="!draft.question.trim() || !draft.answer.trim()" @click="saveDraft">
           {{ editingId ? 'UPDATE' : 'ADD' }}

@@ -115,7 +115,7 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="max-w-[1200px]">
+  <div>
     <!-- ── Header ─────────────────────────────────────────────────────── -->
     <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
       <div>
@@ -147,18 +147,23 @@ onMounted(() => load())
         </button>
       </div>
 
-      <div class="relative">
-        <svg viewBox="0 0 24 24" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-        <input v-model="search" type="search" placeholder="Search posts…" class="m-0 pl-9 w-[260px] bg-white">
-      </div>
+      <SearchInput v-model="search" placeholder="Search posts…" class="max-w-65" />
     </div>
 
     <!-- ── Body ───────────────────────────────────────────────────────── -->
-    <div v-if="loading" class="muted text-center py-16 card">Loading posts…</div>
+    <div v-if="loading" class="card flex items-center justify-center gap-2.5 py-16 text-muted text-[.88rem]">
+      <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+        <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Loading posts…
+    </div>
 
-    <div v-else-if="!posts.length" class="card text-center py-14">
-      <div class="text-3xl mb-2">🗂️</div>
-      <div class="text-muted text-[.9rem]">{{ emptyLabel }}</div>
+    <div v-else-if="!posts.length" class="card text-center py-13 px-5">
+      <div class="w-13.5 h-13.5 rounded-[14px] bg-[#f3f0ff] text-[#6352e7] grid place-items-center mx-auto mb-3.5">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <p class="muted m-0">{{ emptyLabel }}</p>
     </div>
 
     <template v-else>

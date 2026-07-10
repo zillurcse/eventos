@@ -153,9 +153,13 @@ onMounted(load)
         </div>
       </div>
 
-      <p v-else class="muted text-[.86rem] py-10 text-center">
-        No testimonials yet. Click <strong>+ ADD TESTIMONIAL</strong> to get started.
-      </p>
+      <div v-else class="text-center py-13 px-5">
+        <div class="w-13.5 h-13.5 rounded-[14px] bg-[#f3f0ff] text-[#6352e7] grid place-items-center mx-auto mb-3.5">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <p class="muted m-0 mb-3">No testimonials yet. Add a quote from an attendee or sponsor.</p>
+        <button class="btn" @click="openAdd">+ ADD TESTIMONIAL</button>
+      </div>
     </div>
 
     <!-- Add / Edit drawer -->
@@ -165,54 +169,56 @@ onMounted(load)
       @close="drawerOpen = false"
     >
       <div class="mb-5">
-        <label class="block mb-1.5">Photo</label>
-        <UploadButton
-          :preview="draft.avatar_url"
-          collection="avatar"
-          @uploaded="(v: any) => { draft.avatar_file_id = v.id; draft.avatar_url = v.url }"
-        />
+        <FormField label="Photo">
+          <ImageField
+            :model-value="draft.avatar_url"
+            :aspect="1"
+            :output-width="400"
+            :output-height="400"
+            collection="avatar"
+            card-width="120px"
+            hint="Square image recommended"
+            :gallery-path="`/events/${id}/gallery`"
+            @update:model-value="draft.avatar_url = (Array.isArray($event) ? $event[0] : $event) || null"
+            @uploaded="(v: any) => draft.avatar_file_id = v.id"
+          />
+        </FormField>
       </div>
 
-      <label>
-        Name
-        <span class="text-[#dc2626] ml-0.5">*</span>
-      </label>
-      <input v-model="draft.name" placeholder="Full name">
+      <div class="mb-4">
+        <AppInput v-model="draft.name" label="Name" required placeholder="Full name" />
+      </div>
 
-      <div class="flex gap-3">
+      <div class="mb-4 flex gap-3">
         <div class="flex-1">
-          <label>Role</label>
-          <input v-model="draft.role" placeholder="e.g. Attendee">
+          <AppInput v-model="draft.role" label="Role" placeholder="e.g. Attendee" />
         </div>
         <div class="flex-1">
-          <label>Company</label>
-          <input v-model="draft.company" placeholder="e.g. Acme Inc">
+          <AppInput v-model="draft.company" label="Company" placeholder="e.g. Acme Inc" />
         </div>
       </div>
 
-      <label>
-        Quote
-        <span class="text-[#dc2626] ml-0.5">*</span>
-      </label>
-      <textarea v-model="draft.quote" rows="5" placeholder="What did they say about your event?" />
-
-      <label>Rating</label>
-      <div class="flex items-center gap-1 mb-4 text-2xl">
-        <button
-          v-for="n in 5" :key="n"
-          type="button"
-          class="bg-transparent border-0 cursor-pointer p-0 leading-none"
-          :class="n <= draft.rating ? 'text-[#f59e0b]' : 'text-[#d1d5db]'"
-          @click="draft.rating = (draft.rating === n ? n - 1 : n)"
-        >★</button>
+      <div class="mb-4">
+        <AppTextarea v-model="draft.quote" label="Quote" required :rows="5" placeholder="What did they say about your event?" />
       </div>
 
-      <label class="flex items-center gap-3 cursor-pointer select-none mb-2">
-        <input v-model="draft.featured" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-        <span class="text-[.93rem] font-medium text-ink">Featured testimonial</span>
-      </label>
+      <div class="mb-4">
+        <FormField label="Rating">
+          <div class="flex items-center gap-1 text-2xl">
+            <button
+              v-for="n in 5" :key="n"
+              type="button"
+              class="bg-transparent border-0 cursor-pointer p-0 leading-none"
+              :class="n <= draft.rating ? 'text-[#f59e0b]' : 'text-[#d1d5db]'"
+              @click="draft.rating = (draft.rating === n ? n - 1 : n)"
+            >★</button>
+          </div>
+        </FormField>
+      </div>
 
-      <div class="modal-actions">
+      <AppCheckbox v-model="draft.featured" label="Featured testimonial" description="Highlighted above other testimonials" />
+
+      <div class="modal-actions border-t border-line pt-4 mt-5">
         <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
         <button class="btn" :disabled="!draft.name.trim() || !draft.quote.trim()" @click="saveDraft">
           {{ editingId ? 'UPDATE' : 'ADD' }}
