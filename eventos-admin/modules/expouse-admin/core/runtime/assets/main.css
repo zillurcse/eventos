@@ -159,7 +159,7 @@
   .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
 
   /* ── DataTable ───────────────────────────────────────── */
-  .dt-wrap { @apply rounded-xl border border-line overflow-hidden bg-white; }
+  .dt-wrap { @apply rounded-xl border border-line  bg-white; }
   .dt-wrap table { @apply w-full; }
   .dt-wrap thead th { @apply py-3 border-b border-line; background: #f7f8fa; font-size: .7rem; }
   .dt-wrap tbody td { @apply py-3.5; }
