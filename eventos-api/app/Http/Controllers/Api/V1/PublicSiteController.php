@@ -473,6 +473,77 @@ class PublicSiteController extends Controller
         return response()->json(['data' => $rooms]);
     }
 
+    /**
+     * GET /api/v1/public/sessions/{uuid}/zoom-signature — mint a Zoom Meeting
+     * SDK signature so a "zoom"-hosted session can render *inside* the event
+     * page via the Web SDK (Zoom pages can't be iframed). The meeting number and
+     * passcode are parsed from the organizer's stored Zoom link; the signature
+     * is a short-lived HS256 JWT signed with the server-side SDK secret. Role 0
+     * (attendee). Public read, scoped to the published event by subdomain.
+     */
+    public function zoomSignature(Request $request, string $uuid): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $session = Session::on('pgsql_admin')
+            ->where('event_id', $event->id)
+            ->where('uuid', $uuid)
+            ->first();
+
+        if (! $session) {
+            return response()->json(['message' => 'Session not found.'], 404);
+        }
+
+        $meta = $session->meta ?? [];
+
+        if (($meta['who_will_host'] ?? null) !== 'zoom') {
+            return response()->json(['message' => 'This session is not hosted on Zoom.'], 422);
+        }
+
+        // Meeting number (digits after /j/) and passcode (pwd=) from the link.
+        $link = (string) ($meta['stream_link'] ?? '');
+        if (! preg_match('#/j/(\d+)#', $link, $m)) {
+            return response()->json(['message' => 'No valid Zoom meeting link is configured for this session.'], 422);
+        }
+        $meetingNumber = $m[1];
+        $password = preg_match('/[?&]pwd=([^&]+)/', $link, $pm) ? urldecode($pm[1]) : '';
+
+        $sdkKey = config('services.zoom.sdk_key');
+        $sdkSecret = config('services.zoom.sdk_secret');
+        if (! $sdkKey || ! $sdkSecret) {
+            return response()->json(['message' => 'Zoom is not configured on the server.'], 503);
+        }
+
+        // Zoom Meeting SDK signature = HS256 JWT (role 0 = attendee), valid ~2h.
+        $iat = time() - 30;
+        $exp = $iat + 60 * 60 * 2;
+        $b64 = fn (string $d): string => rtrim(strtr(base64_encode($d), '+/', '-_'), '=');
+        $segments = $b64(json_encode(['alg' => 'HS256', 'typ' => 'JWT']))
+            .'.'.$b64(json_encode([
+                'appKey' => $sdkKey,
+                'sdkKey' => $sdkKey,
+                'mn' => $meetingNumber,
+                'role' => 0,
+                'iat' => $iat,
+                'exp' => $exp,
+                'tokenExp' => $exp,
+            ]));
+        $signature = $segments.'.'.$b64(hash_hmac('sha256', $segments, $sdkSecret, true));
+
+        return response()->json(['data' => [
+            'signature' => $signature,
+            'sdk_key' => $sdkKey,
+            'meeting_number' => $meetingNumber,
+            'password' => $password,
+        ]]);
+    }
+
     /** A speaker card projection (mirrors SpeakerController::format). */
     protected function formatSpeaker(Participation $p): array
     {

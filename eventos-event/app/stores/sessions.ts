@@ -38,6 +38,13 @@ export interface AgendaSession {
   is_stream: boolean
   stream_link: string | null
   on_demand_recording_link: string | null
+  who_will_host: string | null
+  vimeo_live_id: string | null
+  can_live_chat: boolean
+  can_qa: boolean
+  can_live_polls: boolean
+  can_attendee_list: boolean
+  can_session: boolean
   track: SessionTrack | null
   speakers: SessionSpeaker[]
 }
@@ -69,6 +76,7 @@ export const useSessionsStore = defineStore('sessions', {
     tags: (s): string[] => s.data?.tags ?? [],
     speakerOptions: (s) => s.data?.speakers ?? [],
     eventTimezone: (s): string => s.data?.event.timezone || 'UTC',
+    eventUuid: (s): string | null => s.data?.event.uuid ?? null,
   },
 
   actions: {

@@ -66,6 +66,8 @@ use App\Http\Controllers\Api\V1\ServiceCategoryController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServiceOrderController;
 use App\Http\Controllers\Api\V1\SessionController;
+use App\Http\Controllers\Api\V1\SessionEngagementController;
+use App\Http\Controllers\Api\V1\SessionPollController;
 use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SurveyController;
@@ -97,6 +99,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/exhibitors', [PublicSiteController::class, 'exhibitors']);
     Route::get('/public/exhibitors/{uuid}', [PublicSiteController::class, 'exhibitor']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
+    Route::get('/public/sessions/{uuid}/zoom-signature', [PublicSiteController::class, 'zoomSignature']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
     // Public form rendering + submission (the form uuid is the render token).
@@ -220,6 +223,16 @@ Route::prefix('v1')->group(function () {
             // event's org GUC set by the participant middleware.
             Route::post('/uploads', [FileUploadController::class, 'store']);
             Route::get('/delegates', [DelegateController::class, 'index']);
+            // Live-session engagement panel (attendee watch page): group chat,
+            // Q&A, polls and the attendees list, all scoped to one session.
+            Route::get('/sessions/{sessionUuid}/chat', [SessionEngagementController::class, 'chatIndex']);
+            Route::post('/sessions/{sessionUuid}/chat', [SessionEngagementController::class, 'chatSend']);
+            Route::get('/sessions/{sessionUuid}/questions', [SessionEngagementController::class, 'questionIndex']);
+            Route::post('/sessions/{sessionUuid}/questions', [SessionEngagementController::class, 'questionAsk']);
+            Route::post('/sessions/{sessionUuid}/questions/{message}/upvote', [SessionEngagementController::class, 'questionUpvote']);
+            Route::get('/sessions/{sessionUuid}/polls', [SessionEngagementController::class, 'pollIndex']);
+            Route::post('/sessions/{sessionUuid}/polls/{poll}/vote', [SessionEngagementController::class, 'pollVote']);
+            Route::get('/sessions/{sessionUuid}/attendees', [SessionEngagementController::class, 'attendees']);
             // One-to-one participant chat (attendee ↔ attendee/speaker/exhibitor).
             Route::get('/chat', [ChatController::class, 'index']);
             Route::get('/chat/partners', [ChatController::class, 'partners']);
@@ -320,7 +333,12 @@ Route::prefix('v1')->group(function () {
                 Route::match(['put', 'patch'], '/sessions/{uuid}', [SessionController::class, 'update']);
                 Route::match(['put', 'patch'], '/sessions/{uuid}/stream', [SessionController::class, 'updateStream']);
                 Route::delete('/sessions/{uuid}', [SessionController::class, 'destroy']);
+                // Live poll authoring for a session (attendees vote from the watch page).
+                Route::post('/sessions/{uuid}/polls', [SessionPollController::class, 'store']);
+                Route::match(['put', 'patch'], '/session-polls/{poll}', [SessionPollController::class, 'update']);
+                Route::delete('/session-polls/{poll}', [SessionPollController::class, 'destroy']);
             });
+            Route::get('/sessions/{uuid}/polls', [SessionPollController::class, 'index'])->middleware('perm:events.view');
             Route::post('/sessions/{uuid}/speakers', [SessionController::class, 'addSpeaker'])->middleware('perm:speakers.manage');
             Route::delete('/sessions/{uuid}/speakers/{participation}', [SessionController::class, 'removeSpeaker'])->middleware('perm:speakers.manage');
 

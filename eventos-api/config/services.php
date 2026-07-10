@@ -48,4 +48,14 @@ return [
         'token_ttl' => (int) env('LIVEKIT_TOKEN_TTL', 3600),
     ],
 
+    /*
+    | Zoom Meeting SDK — lets a "zoom"-hosted session embed inside the event
+    | page via the Web SDK (Zoom pages refuse to be iframed). Create a "Meeting
+    | SDK" app at marketplace.zoom.us to get the Client ID (SDK Key) + secret.
+    */
+    'zoom' => [
+        'sdk_key' => env('ZOOM_SDK_KEY'),
+        'sdk_secret' => env('ZOOM_SDK_SECRET'),
+    ],
+
 ];

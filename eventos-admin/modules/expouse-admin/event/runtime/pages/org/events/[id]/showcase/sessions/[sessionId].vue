@@ -96,6 +96,17 @@ const stream = reactive({
   can_session:              false,
 })
 
+// Host-aware label/placeholder/help for the stream link field.
+const HOST_LINK: Record<string, { label: string; placeholder: string; hint: string }> = {
+  youtube: { label: 'YouTube Live Link', placeholder: 'https://www.youtube.com/live/…', hint: 'Paste your YouTube live or watch URL — it plays embedded on the event page.' },
+  jitsi:   { label: 'Jitsi Room or Link (optional)', placeholder: 'Leave blank to auto-create a private room', hint: 'Free open-source video that runs embedded on the event page. Leave blank to auto-generate a room, or paste a meet.jit.si link/room name.' },
+  zoom:    { label: 'Zoom Link',         placeholder: 'https://zoom.us/j/…', hint: 'Embeds inside the event page via the Zoom Web SDK (needs Zoom keys configured on the server).' },
+  meet:    { label: 'Google Meet Link',  placeholder: 'https://meet.google.com/abc-defg-hij', hint: 'Attendees open Meet in a new tab — Google Meet can’t be embedded.' },
+  rtmp:    { label: 'Player URL',        placeholder: 'https://…', hint: 'The public player URL for your RTMP stream.' },
+  self:    { label: 'Stream Link',       placeholder: 'https://…', hint: 'The public URL where attendees watch the stream.' },
+}
+const hostLink = computed(() => HOST_LINK[stream.who_will_host] ?? HOST_LINK.self)
+
 const basicSaving  = ref(false)
 const streamSaving = ref(false)
 const basicError   = ref('')
@@ -615,24 +626,32 @@ onMounted(load)
               <label class="block mb-1.5">Who will host?</label>
               <select v-model="stream.who_will_host" class="m-0 w-full max-w-xs">
                 <option value="self">Self-hosted</option>
+                <option value="youtube">YouTube</option>
+                <option value="vimeo">Vimeo</option>
+                <option value="jitsi">Jitsi (in-page video)</option>
                 <option value="zoom">Zoom</option>
+                <option value="meet">Google Meet</option>
                 <option value="rtmp">RTMP</option>
               </select>
             </div>
 
-            <div class="mb-4">
-              <label class="block mb-1.5">Stream Link</label>
-              <input v-model="stream.stream_link" type="url" placeholder="https://…" class="m-0">
+            <!-- Vimeo uses a numeric Live ID; every other host uses a link. -->
+            <div v-if="stream.who_will_host === 'vimeo'" class="mb-4">
+              <label class="block mb-1.5">Vimeo Live ID</label>
+              <input v-model="stream.vimeo_live_id" placeholder="e.g. 123456789" class="m-0">
+              <p class="muted text-[.8rem] mt-1.5 mb-0">The numeric ID of your Vimeo live event — it embeds on the event page.</p>
             </div>
 
-            <div class="mb-4">
-              <label class="block mb-1.5">On-Demand Recording Link</label>
-              <input v-model="stream.on_demand_recording_link" type="url" placeholder="https://…" class="m-0">
+            <div v-else class="mb-4">
+              <label class="block mb-1.5">{{ hostLink.label }}</label>
+              <input v-model="stream.stream_link" type="url" :placeholder="hostLink.placeholder" class="m-0">
+              <p class="muted text-[.8rem] mt-1.5 mb-0">{{ hostLink.hint }}</p>
             </div>
 
             <div>
-              <label class="block mb-1.5">Vimeo Live ID</label>
-              <input v-model="stream.vimeo_live_id" placeholder="e.g. 123456789" class="m-0">
+              <label class="block mb-1.5">On-Demand Recording Link</label>
+              <input v-model="stream.on_demand_recording_link" type="url" placeholder="https://…" class="m-0">
+              <p class="muted text-[.8rem] mt-1.5 mb-0">Optional. Shown as a replay after the session ends.</p>
             </div>
           </div>
 

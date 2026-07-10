@@ -123,8 +123,8 @@ const extraSpeakers = computed(() => Math.max(0, props.session.speakers.length -
         </div>
       </div>
 
-      <a v-if="phase === 'live' && liveLink" :href="liveLink" target="_blank" rel="noopener" class="cta live">Join Live</a>
-      <a v-else-if="replayLink" :href="replayLink" target="_blank" rel="noopener" class="cta">Replay</a>
+      <NuxtLink v-if="phase === 'live' && liveLink" :to="`/session/${session.id}`" class="cta live">Join Live</NuxtLink>
+      <NuxtLink v-else-if="replayLink" :to="`/session/${session.id}`" class="cta">Replay</NuxtLink>
       <span v-else-if="phase === 'upcoming'" class="cta ghost">Upcoming</span>
     </div>
   </article>

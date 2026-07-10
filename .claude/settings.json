@@ -13,7 +13,8 @@
       "PowerShell(curl.exe -s -o NUL -w \"GET /pages/exhibitor/members.vue -> HTTP %{http_code}`n\" \"http://localhost:3000/_nuxt/pages/exhibitor/members.vue?macro=true\")",
       "PowerShell(curl.exe -s -o NUL -w \"GET /_nuxt/app/pages/exhibitor/members.vue -> HTTP %{http_code}`n\" \"http://localhost:3000/_nuxt/app/pages/exhibitor/members.vue?macro=true\")",
       "PowerShell(docker compose -f \"c:\\\\Users\\\\zillu\\\\OneDrive\\\\Desktop\\\\myinfo\\\\eventmanagementapp\\\\docker-compose.yml\" exec -T admin npm install vue-sonner 2>&1)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:3001/session/019f0dd2-0a7f-722a-841f-2e1f154d345b?subdomain=aiexpo\" -H \"Host: localhost\" --max-time 40)"
     ],
     "additionalDirectories": [
       "c:\\Users\\zillu\\.claude\\projects\\c--Users-zillu-OneDrive-Desktop-myinfo-eventmanagementapp\\memory"

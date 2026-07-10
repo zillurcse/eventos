@@ -139,7 +139,7 @@ class SessionController extends Controller
 
         $request->validate([
             'is_stream'                => ['nullable', 'boolean'],
-            'who_will_host'            => ['nullable', 'in:self,zoom,rtmp'],
+            'who_will_host'            => ['nullable', 'in:self,zoom,rtmp,youtube,meet,vimeo,jitsi'],
             'stream_link'              => ['nullable', 'string', 'max:500'],
             'on_demand_recording_link' => ['nullable', 'string', 'max:500'],
             'vimeo_live_id'            => ['nullable', 'string', 'max:250'],

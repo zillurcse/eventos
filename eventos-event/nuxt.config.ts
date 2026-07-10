@@ -18,6 +18,10 @@ export default defineNuxtConfig({
       // Platform apex for subdomain → event resolution (see useEventSubdomain).
       // Each event is served at <subdomain>.<eventBaseDomain>, e.g. edu.expouse.test.
       eventBaseDomain: 'expouse.test',
+      // Jitsi server for embedded in-page video sessions (host = "jitsi").
+      // Public server by default; point at a self-hosted instance for
+      // privacy/scale via NUXT_PUBLIC_JITSI_DOMAIN.
+      jitsiDomain: 'meet.jit.si',
       reverb: {
         key: 'eventos-key',
         host: 'localhost',
