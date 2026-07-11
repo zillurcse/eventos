@@ -7,6 +7,7 @@ interface SpeakerRow {
   company: string
   category: string
   image_url: string | null
+  has_login: boolean
 }
 
 defineProps<{
@@ -17,6 +18,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'edit', s: SpeakerRow): void
   (e: 'remove', s: SpeakerRow): void
+  (e: 'login', s: SpeakerRow): void
 }>()
 
 const columns = [
@@ -57,6 +59,12 @@ function initials(name: string): string {
 
     <template #cell-email="{ row }">
       <span class="text-muted text-[.88rem]">{{ row.email }}</span>
+      <!-- A speaker with no login can't sign in to the event site, which means
+           they can't take the stage on their own session. -->
+      <span
+        v-if="!row.has_login"
+        class="block mt-0.5 text-[.7rem] font-semibold uppercase tracking-wide text-[#b45309]"
+      >No login</span>
     </template>
 
     <template #cell-designation="{ row }">
@@ -68,6 +76,14 @@ function initials(name: string): string {
     </template>
 
     <template #actions="{ row }">
+      <button
+        class="bg-transparent border-0 cursor-pointer p-1.5 align-middle"
+        :class="row.has_login ? 'text-[#5f6b7a] hover:text-brand' : 'text-[#b45309] hover:opacity-70'"
+        :title="row.has_login ? 'Reset login password' : 'Create a login so they can host their session'"
+        @click="emit('login', row)"
+      >
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+      </button>
       <button
         class="bg-transparent border-0 cursor-pointer p-1.5 text-[#5f6b7a] hover:text-brand align-middle"
         title="Edit"

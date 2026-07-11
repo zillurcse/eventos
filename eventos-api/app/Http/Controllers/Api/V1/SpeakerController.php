@@ -201,6 +201,62 @@ class SpeakerController extends Controller
         return response()->json(null, 204);
     }
 
+    /**
+     * Give a speaker a login (or reset it).
+     *
+     * A speaker is created as a contact + participation with no User, so until
+     * this runs they cannot sign in to the event site at all — which also means
+     * they cannot take the stage on their own session (the host is identified by
+     * their signed-in participation). Mirrors the exhibitor reset-password flow:
+     * auto-generate a password or set one explicitly, and return it once so the
+     * organizer can pass it on.
+     */
+    public function resetPassword(Request $request, string $uuid, string $participationUuid): JsonResponse
+    {
+        $event = Event::where('uuid', $uuid)->firstOrFail();
+
+        $participation = Participation::with('contact')
+            ->where('uuid', $participationUuid)
+            ->where('event_id', $event->id)
+            ->where('role', 'speaker')
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'mode' => ['required', 'in:auto,manual'],
+            'password' => ['required_if:mode,manual', 'nullable', 'string', 'min:8'],
+        ]);
+
+        $contact = $participation->contact;
+        if (! $contact?->email) {
+            throw ValidationException::withMessages([
+                'speaker' => 'This speaker has no email address to attach a login to.',
+            ]);
+        }
+
+        $password = $data['mode'] === 'auto'
+            ? Str::password(14, symbols: false)
+            : $data['password'];
+
+        // Identity lives on the migrator connection (users are not tenant-scoped).
+        $user = User::on('pgsql_admin')->firstOrNew(['email' => $contact->email]);
+        $user->name = $contact->fullName() ?: $contact->email;
+        $user->password = $password;               // hashed by the model cast
+        $user->email_verified_at ??= now();
+        $user->save();
+
+        // Link the contact to the login, otherwise ResolveParticipant can't find
+        // this participation when they sign in.
+        if ($contact->user_id !== $user->id) {
+            $contact->user_id = $user->id;
+            $contact->save();
+        }
+
+        return response()->json(['data' => [
+            'email' => $contact->email,
+            'password' => $password,   // shown once, never stored in the clear
+        ]]);
+    }
+
     private function format(Participation $p): array
     {
         $profile = $p->profile_data ?? [];
@@ -209,6 +265,7 @@ class SpeakerController extends Controller
             'id'                     => $p->uuid,
             'name'                   => $p->contact->fullName(),
             'email'                  => $p->contact->email,
+            'has_login'              => ! empty($p->contact->user_id),
             'designation'            => $profile['designation'] ?? '',
             'company'                => $profile['company'] ?? '',
             'category'               => $profile['category'] ?? '',

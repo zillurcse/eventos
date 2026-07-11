@@ -37,6 +37,18 @@ const when = computed(() => {
   })
 })
 
+// A booth meeting reads differently from a delegate one: incoming means the
+// exhibitor's team assigned it to you, not that someone wants to meet you.
+const relation = computed(() => {
+  const m = props.meeting
+  if (m.source === 'exhibitor') {
+    return m.direction === 'incoming'
+      ? `Assigned to you${m.exhibitor ? ` · ${m.exhibitor}` : ''}`
+      : `You requested this${m.exhibitor ? ` · ${m.exhibitor}` : ''}`
+  }
+  return m.direction === 'incoming' ? 'Wants to meet you' : 'You invited'
+})
+
 const badge = computed(() => {
   const m = props.meeting
   if (m.status === 'confirmed') return { label: 'Approved', cls: 'ok' }
@@ -57,11 +69,12 @@ const badge = computed(() => {
         <span v-else class="ini">{{ initials(person?.name) }}</span>
       </div>
       <div class="meta">
-        <h3 class="name">{{ person?.name || 'Attendee' }}</h3>
+        <h3 class="name">
+          {{ person?.name || 'Attendee' }}
+          <span v-if="meeting.source === 'exhibitor'" class="booth">Booth</span>
+        </h3>
         <p v-if="subtitle" class="role">{{ subtitle }}</p>
-        <span class="dir" :class="meeting.direction">
-          {{ meeting.direction === 'incoming' ? 'Wants to meet you' : 'You invited' }}
-        </span>
+        <span class="dir" :class="meeting.direction">{{ relation }}</span>
       </div>
       <span class="badge" :class="badge.cls">{{ badge.label }}</span>
     </div>
@@ -98,6 +111,7 @@ const badge = computed(() => {
 .name { margin: 0; font-size: .98rem; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .role { margin: 2px 0 0; color: #64748b; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dir { display: inline-block; margin-top: 6px; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: #94a3b8; }
+.booth { margin-left: 7px; padding: 2px 7px; border-radius: 999px; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; vertical-align: middle; color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 12%, #fff); }
 
 .badge { flex: 0 0 auto; font-size: .68rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
 .badge.ok { background: #e6f9f0; color: #16a34a; }

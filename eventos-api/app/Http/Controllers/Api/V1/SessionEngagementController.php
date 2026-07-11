@@ -557,7 +557,9 @@ class SessionEngagementController extends Controller
         $uid = $this->participationId($request) % 1000000000 ?: 1;
         $ttl = max(300, (int) ($cfg['token_ttl'] ?? 7200));
 
-        $token = (new AccessToken2($appId, $cert, $channel, (string) $uid, time() + $ttl))
+        // $ttl is a lifetime in seconds, not a deadline — Agora derives the
+        // deadline from the token's own issue timestamp.
+        $token = (new AccessToken2($appId, $cert, $channel, (string) $uid, $ttl))
             ->grant(AccessToken2::PRIVILEGE_JOIN_CHANNEL, $ttl);
 
         if ($isHost) {

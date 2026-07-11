@@ -78,10 +78,18 @@ class Session extends Model
     }
 
     /**
-     * Who may moderate this session's chat / Q&A / polls: anyone on the stage
-     * (the session_speaker pivot — speaker, moderator, panelist or keynote) plus
-     * the organization's event staff, who can step into any room. The single
-     * source of truth for every moderation check on the attendee side.
+     * Who may host / moderate this session — the single source of truth for the
+     * attendee side (chat, Q&A, polls, and the Agora/Jitsi stage):
+     *
+     *   1. anyone on the stage: the session_speaker pivot (speaker, moderator,
+     *      panelist or keynote);
+     *   2. the event's own staff, i.e. a participation explicitly marked staff;
+     *   3. an organizer — someone with an active Membership in the event's
+     *      organization. They can step into any room of any event they run.
+     *
+     * (3) matters: an organizer attending their own event signs in as an
+     * ordinary participation (role=attendee), so without this an event's own
+     * owner could not take the stage or clear a spam message.
      */
     public function isModeratedBy(?Participation $participation): bool
     {
@@ -93,8 +101,27 @@ class Session extends Model
             return true;
         }
 
-        return $this->speakers()
-            ->where('participations.id', $participation->id)
+        if ($this->speakers()->where('participations.id', $participation->id)->exists()) {
+            return true;
+        }
+
+        return $this->isOrganizer($participation);
+    }
+
+    /** Does this participation's person run the organization behind this event? */
+    private function isOrganizer(Participation $participation): bool
+    {
+        $userId = $participation->contact?->user_id;
+
+        if (! $userId) {
+            return false;
+        }
+
+        // Identity lives on the migrator connection (it is not tenant-scoped).
+        return Membership::on('pgsql_admin')
+            ->where('organization_id', $this->organization_id)
+            ->where('user_id', $userId)
+            ->where('status', 'active')
             ->exists();
     }
 

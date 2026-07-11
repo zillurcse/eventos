@@ -378,6 +378,9 @@ Route::prefix('v1')->group(function () {
                 Route::post('/events/{uuid}/speakers', [SpeakerController::class, 'store']);
                 Route::match(['put', 'patch'], '/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'update']);
                 Route::delete('/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'destroy']);
+                // Give a speaker a login so they can sign in to the event site
+                // and take the stage on their own session.
+                Route::post('/events/{uuid}/speakers/{participation}/reset-password', [SpeakerController::class, 'resetPassword']);
             });
 
             // ── Event advertisements (AD Managements) ──

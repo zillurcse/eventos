@@ -6,12 +6,15 @@ use App\Http\Controllers\Concerns\NormalizesTimestamps;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventSetting;
+use App\Models\ExhibitorMeetingRequest;
+use App\Models\ExhibitorMember;
 use App\Models\Meeting;
 use App\Models\Participation;
 use App\Services\Notifications\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * Meetings — one-to-one OR group (architecture §6.5). The organizer is the
@@ -39,7 +42,82 @@ class MeetingController extends Controller
             ->map(fn (Meeting $m) => $this->format($m, $me))
             ->values();
 
+        // Booth meetings (attendee ↔ exhibitor) live in their own table, but to
+        // the person in either seat they are simply "my meetings" — so they
+        // belong on this tab alongside the delegate ones. Same status vocabulary,
+        // so they bucket into Pending/Approved/Rejected unchanged.
+        $meetings = $meetings
+            ->concat($this->exhibitorMeetings($request, (int) $me))
+            ->sortByDesc('created_at')
+            ->values();
+
         return response()->json(['data' => $meetings]);
+    }
+
+    /**
+     * The booth meetings this viewer is in — either because they requested one
+     * (as an attendee) or because their booth assigned one to them (as a member
+     * of the exhibitor's team).
+     *
+     * @return \Illuminate\Support\Collection<int,array<string,mixed>>
+     */
+    private function exhibitorMeetings(Request $request, int $me): Collection
+    {
+        $eventId = (int) $request->attributes->get('event_id');
+
+        $participation = Participation::find($me);
+
+        // The exhibitor_members rows for this person, if they staff any booth.
+        $myMemberIds = $participation?->contact_id
+            ? ExhibitorMember::where('contact_id', $participation->contact_id)->pluck('id')
+            : collect();
+
+        $requests = ExhibitorMeetingRequest::with(['exhibitor', 'participation.contact', 'assignedMember.contact'])
+            ->where('event_id', $eventId)
+            ->where(fn ($q) => $q
+                ->where('participation_id', $me)                       // I asked for it
+                ->orWhereIn('assigned_member_id', $myMemberIds))       // it was assigned to me
+            ->latest('id')
+            ->get();
+
+        return $requests->map(fn (ExhibitorMeetingRequest $r) => $this->formatExhibitorMeeting($r, $me));
+    }
+
+    /**
+     * Shape a booth meeting like a delegate one, so the Meetings tab can render
+     * both from a single list. `source` lets the UI badge it as a booth meeting.
+     */
+    private function formatExhibitorMeeting(ExhibitorMeetingRequest $r, int $me): array
+    {
+        // From the attendee's seat the request points out to the booth; from the
+        // assigned member's seat it points in at them.
+        $direction = (int) $r->participation_id === $me ? 'outgoing' : 'incoming';
+
+        $counterpart = $direction === 'outgoing'
+            ? ['name' => $r->exhibitor->name ?? 'Exhibitor', 'company' => '', 'job_title' => 'Exhibitor', 'avatar_url' => null]
+            : $this->person($r->participation);
+
+        return [
+            'id' => $r->uuid,
+            'title' => $r->subject,
+            'agenda' => $r->agenda,
+            'type' => 'one_on_one',
+            'status' => $r->status,
+            'direction' => $direction,
+            'my_rsvp' => $r->status === 'confirmed' ? 'accepted' : 'pending',
+            // Booth meetings are answered by the exhibitor team in their own
+            // panel (Inbox → Meeting Requests), never from this tab.
+            'can_respond' => false,
+            'starts_at' => $r->starts_at?->toIso8601String(),
+            'ends_at' => $r->ends_at?->toIso8601String(),
+            'date' => $r->meta['lounge_date'] ?? null,
+            'slot' => $r->meta['lounge_slot'] ?? null,
+            'counterpart' => $counterpart,
+            'participants' => [],
+            'source' => 'exhibitor',
+            'exhibitor' => $r->exhibitor->name ?? null,
+            'created_at' => $r->created_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -272,6 +350,9 @@ class MeetingController extends Controller
                 'role' => $p->pivot->role,
                 'rsvp' => $p->pivot->rsvp,
             ])->values(),
+            'source' => 'delegate',
+            'exhibitor' => null,
+            'created_at' => $m->created_at?->toIso8601String(),
         ];
     }
 

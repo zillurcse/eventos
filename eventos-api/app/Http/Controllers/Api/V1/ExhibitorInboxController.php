@@ -9,6 +9,7 @@ use App\Models\ExhibitorMeetingRequest;
 use App\Models\ExhibitorMember;
 use App\Models\ExhibitorMessage;
 use App\Services\Notifications\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -108,25 +109,14 @@ class ExhibitorInboxController extends Controller
     public function meetingRequests(Request $request): JsonResponse
     {
         $exhibitorId = (int) $request->attributes->get('exhibitor_id');
+        $memberId = (int) $request->attributes->get('exhibitor_member_id');
 
         $requests = ExhibitorMeetingRequest::with(['participation.contact', 'assignedMember.contact'])
             ->where('exhibitor_id', $exhibitorId)
             ->latest('id')
             ->get()
-            ->map(fn (ExhibitorMeetingRequest $r) => [
-                'id' => $r->uuid,
-                'status' => $r->status,
-                'subject' => $r->subject,
-                'agenda' => $r->agenda,
-                'starts_at' => $r->starts_at?->toIso8601String(),
-                'ends_at' => $r->ends_at?->toIso8601String(),
-                'date' => $r->meta['lounge_date'] ?? null,
-                'slot' => $r->meta['lounge_slot'] ?? null,
-                'attendee' => $this->attendee($r),
-                'assigned_to' => $this->memberName($r->assignedMember),
-                'assigned_member_id' => $r->assigned_member_id,
-                'created_at' => $r->created_at?->toIso8601String(),
-            ])->values();
+            ->map(fn (ExhibitorMeetingRequest $r) => $this->requestPayload($r, $memberId))
+            ->values();
 
         return response()->json(['data' => $requests]);
     }
@@ -138,6 +128,7 @@ class ExhibitorInboxController extends Controller
     public function respondMeeting(Request $request, string $request_uuid, NotificationService $notifications): JsonResponse
     {
         $exhibitorId = (int) $request->attributes->get('exhibitor_id');
+        $actingMemberId = (int) $request->attributes->get('exhibitor_member_id');
 
         $data = $request->validate([
             'action' => ['required', 'in:assign,decline'],
@@ -158,7 +149,9 @@ class ExhibitorInboxController extends Controller
                 ['title' => 'Meeting declined', 'body' => $this->bookName($req).' declined your meeting request.'],
             );
 
-            return response()->json(['data' => $this->requestPayload($req->fresh(['assignedMember.contact', 'participation.contact']))]);
+            return response()->json(['data' => $this->requestPayload(
+                $req->fresh(['assignedMember.contact', 'participation.contact']), $actingMemberId,
+            )]);
         }
 
         // Assign — the member must belong to this exhibitor.
@@ -178,7 +171,25 @@ class ExhibitorInboxController extends Controller
             ['title' => 'Meeting confirmed', 'body' => $this->bookName($req).' confirmed your meeting with '.$this->memberName($member).'.'],
         );
 
-        return response()->json(['data' => $this->requestPayload($req->fresh(['assignedMember.contact', 'participation.contact']))]);
+        // The assignee only ever saw the booth-wide "New meeting request" fan-out
+        // at request time, which says nothing about who owns it. Tell them the
+        // meeting is now theirs — this is the notification they act on.
+        if ($member->contact_id) {
+            $notifications->notify(
+                'contact', (int) $member->contact_id, $req->organization_id, $req->event_id,
+                'exhibitor.meeting_assigned',
+                [
+                    'title' => 'Meeting assigned to you',
+                    'body' => $this->attendeeName($req).'’s meeting'.$this->whenLabel($req).' is now yours.',
+                    'exhibitor_id' => $req->exhibitor->uuid ?? null,
+                    'meeting_request_id' => $req->uuid,
+                ],
+            );
+        }
+
+        return response()->json(['data' => $this->requestPayload(
+            $req->fresh(['assignedMember.contact', 'participation.contact']), $actingMemberId,
+        )]);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -219,6 +230,26 @@ class ExhibitorInboxController extends Controller
         return $model->exhibitor->name ?? 'The exhibitor';
     }
 
+    private function attendeeName($model): string
+    {
+        return $this->attendee($model)['name'];
+    }
+
+    /** " on 2 Aug, 10:30 – 11:00" when the attendee picked a lounge slot. */
+    private function whenLabel(ExhibitorMeetingRequest $r): string
+    {
+        $date = $r->meta['lounge_date'] ?? null;
+        $slot = $r->meta['lounge_slot'] ?? null;
+
+        if (! $date) {
+            return '';
+        }
+
+        $when = Carbon::parse($date)->format('j M');
+
+        return ' on '.$when.($slot ? ', '.str_replace('-', ' – ', $slot) : '');
+    }
+
     private function formatMessage(ExhibitorMessage $m): array
     {
         return [
@@ -231,18 +262,25 @@ class ExhibitorInboxController extends Controller
         ];
     }
 
-    private function requestPayload(ExhibitorMeetingRequest $r): array
+    /**
+     * @param int $memberId the member currently signed in — lets the SPA tell
+     *                      "assigned to me" apart from the rest of the queue.
+     */
+    private function requestPayload(ExhibitorMeetingRequest $r, int $memberId = 0): array
     {
         return [
             'id' => $r->uuid,
             'status' => $r->status,
             'subject' => $r->subject,
             'agenda' => $r->agenda,
+            'starts_at' => $r->starts_at?->toIso8601String(),
+            'ends_at' => $r->ends_at?->toIso8601String(),
             'date' => $r->meta['lounge_date'] ?? null,
             'slot' => $r->meta['lounge_slot'] ?? null,
             'attendee' => $this->attendee($r),
             'assigned_to' => $this->memberName($r->assignedMember),
             'assigned_member_id' => $r->assigned_member_id,
+            'mine' => $memberId > 0 && (int) $r->assigned_member_id === $memberId,
             'created_at' => $r->created_at?->toIso8601String(),
         ];
     }

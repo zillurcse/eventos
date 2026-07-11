@@ -41,9 +41,17 @@ class AccessToken2
 
     private int $salt;
 
-    /** @var array<int,int> privilege => unix expiry */
+    /**
+     * @var array<int,int> privilege => lifetime in SECONDS FROM ISSUE
+     *
+     * Agora expiries are durations, not absolute epoch times: the server
+     * computes the deadline itself as issueTs + expire. Passing a unix
+     * timestamp here produces a token Agora rejects outright with
+     * CAN_NOT_GET_GATEWAY_SERVER / "invalid token".
+     */
     private array $privileges = [];
 
+    /** @param int $expire token lifetime in seconds from now (NOT a timestamp) */
     public function __construct(
         private string $appId,
         private string $appCertificate,
@@ -55,10 +63,10 @@ class AccessToken2
         $this->salt = random_int(1, 99999999);
     }
 
-    /** Grant a privilege until $ttl seconds from now. */
+    /** Grant a privilege for $ttl seconds from issue. */
     public function grant(int $privilege, int $ttl): self
     {
-        $this->privileges[$privilege] = $this->issueTs + $ttl;
+        $this->privileges[$privilege] = $ttl;
 
         return $this;
     }
@@ -75,9 +83,12 @@ class AccessToken2
             return null;
         }
 
-        // Two-step HMAC chain seeded from the certificate.
-        $signing = hash_hmac('sha256', self::uint32($this->issueTs), $this->appCertificate, true);
-        $signing = hash_hmac('sha256', self::uint32($this->salt), $signing, true);
+        // Two-step HMAC chain. Note the argument order: the certificate is the
+        // *message* and the packed timestamp is the *key* — hash_hmac takes
+        // ($algo, $data, $key), and Agora signs it this way round. Swapping them
+        // still produces a well-formed token that Agora rejects as invalid.
+        $signing = hash_hmac('sha256', $this->appCertificate, self::uint32($this->issueTs), true);
+        $signing = hash_hmac('sha256', $signing, self::uint32($this->salt), true);
 
         $payload = self::str($this->appId)
             .self::uint32($this->issueTs)

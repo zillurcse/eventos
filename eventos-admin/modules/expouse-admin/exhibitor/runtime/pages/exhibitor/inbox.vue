@@ -86,6 +86,19 @@ async function respond(r: any, action: 'assign' | 'decline') {
 }
 
 const pendingCount = computed(() => requests.value.filter(r => r.status === 'requested').length)
+
+// The queue is booth-wide, so a member assigned a meeting had no way to pick it
+// out. `mine` comes from the API (the request's assignee == the signed-in member).
+const meetingScope = ref<'mine' | 'all'>('all')
+const mineCount = computed(() => requests.value.filter(r => r.mine).length)
+const visibleRequests = computed(() => meetingScope.value === 'mine'
+  ? requests.value.filter(r => r.mine)
+  : requests.value)
+
+// Land on "Assigned to me" when they have any — that's what they came to see.
+watch(mineCount, (n, prev) => {
+  if (!prev && n) meetingScope.value = 'mine'
+}, { immediate: true })
 const unreadCount = computed(() => conversations.value.reduce((n, c) => n + (c.unread || 0), 0))
 
 // ── Live-ish refresh (admin SPA has no WebSocket; poll while visible) ─────
@@ -185,22 +198,48 @@ onMounted(() => { loadConversations(); loadRequests(); loadMembers() })
 
       <!-- ── Meeting Requests ── -->
       <div v-else class="flex flex-col gap-3">
-        <div v-if="!requests.length" class="card"><p class="muted">No meeting requests yet.</p></div>
+        <!-- The queue is the whole booth's, so let a member narrow it to theirs. -->
+        <div class="flex items-center gap-1.5">
+          <button
+            class="px-3 py-1.5 rounded-[999px] text-[.82rem] font-semibold border"
+            :class="meetingScope === 'mine' ? 'bg-brand text-white border-brand' : 'bg-white text-muted border-line hover:text-ink'"
+            @click="meetingScope = 'mine'"
+          >Assigned to me <span v-if="mineCount">({{ mineCount }})</span></button>
+          <button
+            class="px-3 py-1.5 rounded-[999px] text-[.82rem] font-semibold border"
+            :class="meetingScope === 'all' ? 'bg-brand text-white border-brand' : 'bg-white text-muted border-line hover:text-ink'"
+            @click="meetingScope = 'all'"
+          >All requests <span v-if="requests.length">({{ requests.length }})</span></button>
+        </div>
 
-        <div v-for="r in requests" :key="r.id" class="card">
+        <div v-if="!visibleRequests.length" class="card">
+          <p class="muted">
+            {{ meetingScope === 'mine' ? 'No meetings are assigned to you yet.' : 'No meeting requests yet.' }}
+          </p>
+        </div>
+
+        <div
+          v-for="r in visibleRequests"
+          :key="r.id"
+          class="card"
+          :class="{ 'border-brand bg-[#faf9ff]': r.mine }"
+        >
           <div class="flex items-start justify-between gap-4 flex-wrap">
             <div class="min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <strong class="text-ink">{{ r.attendee.name }}</strong>
                 <span v-if="r.attendee.company" class="muted text-[.82rem]">{{ r.attendee.company }}</span>
                 <span class="badge" :class="{ active: r.status === 'confirmed', danger: r.status === 'declined' }">{{ statusLabel(r.status) }}</span>
+                <span v-if="r.mine" class="badge active">Yours</span>
               </div>
               <p v-if="r.subject" class="mt-1 text-[.92rem] font-semibold text-ink">{{ r.subject }}</p>
               <p v-if="r.agenda" class="mt-0.5 text-[.86rem] text-muted">{{ r.agenda }}</p>
               <p v-if="r.date" class="mt-1 text-[.82rem] text-muted">
                 Preferred: {{ r.date }}<template v-if="r.slot"> · {{ fmtSlot(r.slot) }}</template>
               </p>
-              <p v-if="r.assigned_to" class="mt-1 text-[.82rem] text-brand font-semibold">Assigned to {{ r.assigned_to }}</p>
+              <p v-if="r.assigned_to" class="mt-1 text-[.82rem] text-brand font-semibold">
+                {{ r.mine ? 'Assigned to you' : `Assigned to ${r.assigned_to}` }}
+              </p>
             </div>
 
             <div v-if="r.status === 'requested'" class="flex items-center gap-2 shrink-0">

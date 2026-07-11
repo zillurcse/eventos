@@ -28,6 +28,11 @@ export interface Meeting {
   slot: string | null   // lounge slot, HH:MM-HH:MM
   counterpart: MeetingPerson | null
   participants: MeetingParticipant[]
+  // A booth meeting (attendee ↔ exhibitor) rather than a delegate one. Answered
+  // by the exhibitor team in their own panel, so can_respond is always false.
+  source: 'delegate' | 'exhibitor'
+  exhibitor: string | null
+  created_at: string | null
 }
 
 export interface MeetingRequest {

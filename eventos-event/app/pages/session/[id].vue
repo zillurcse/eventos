@@ -309,6 +309,11 @@ async function startAgora() {
   const s = session.value
   if (!s) return
 
+  // Our uid is the participation id, so a client left behind in the channel by
+  // an earlier attempt would collide with this one (UID_CONFLICT). Always start
+  // from a clean slate — a retry after a failed camera grab lands here.
+  await stopAgora()
+
   agoraState.value = 'loading'
   agoraError.value = ''
   try {
@@ -352,18 +357,46 @@ async function startAgora() {
 
     agoraState.value = 'joined'
   } catch (e: any) {
+    // The camera/mic grab happens AFTER we are already in the channel, so a
+    // host whose device is busy or blocked would otherwise stay in it holding
+    // their uid. Leave before surfacing the error, or the retry collides.
+    await stopAgora()
     agoraState.value = 'error'
-    agoraError.value = e?.data?.message || e?.message || 'Could not join the video session.'
+    agoraError.value = agoraErrorMessage(e)
   }
 }
 
+/** Turn an AgoraRTCError into something a speaker can act on. */
+function agoraErrorMessage(e: any): string {
+  const code = e?.code || e?.name || ''
+
+  if (code === 'PERMISSION_DENIED' || code === 'NotAllowedError') {
+    return 'Your browser blocked access to the camera and microphone. Allow them for this site, then try again.'
+  }
+  if (code === 'DEVICE_NOT_FOUND' || code === 'NotFoundError') {
+    return 'No camera or microphone was found on this device.'
+  }
+  if (code === 'NOT_READABLE' || code === 'NotReadableError' || code === 'TRACK_IS_DISABLED') {
+    return 'Your camera or microphone is already in use by another app or tab. Close it, then try again.'
+  }
+  if (code === 'UID_CONFLICT') {
+    return 'You are already in this session in another tab or window. Close it, then try again.'
+  }
+
+  return e?.data?.message || e?.message || 'Could not join the video session.'
+}
+
 async function stopAgora() {
+  const client = agoraClient
+  agoraClient = null // drop the handle first, so a re-entrant call can't leave twice
+
   try {
     for (const t of agoraTracks) { t.stop?.(); t.close?.() }
     agoraTracks = []
-    await agoraClient?.leave?.()
+    client?.removeAllListeners?.()
+    await client?.leave?.()
   } catch { /* already gone */ }
-  agoraClient = null
+
   agoraState.value = 'idle'
   agoraLiveNow.value = false
 }
