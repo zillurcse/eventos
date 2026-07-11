@@ -81,6 +81,7 @@ hydrate({})
 // Tick every cell of a column / row at once (quality-of-life helpers).
 function setColumn(role: string, value: boolean) { OPERATIONS.forEach(op => (func[op.key][role] = value)) }
 function columnAll(role: string) { return OPERATIONS.every(op => func[op.key]?.[role]) }
+function columnSome(role: string) { return OPERATIONS.some(op => func[op.key]?.[role]) }
 
 async function load() {
   loading.value = true
@@ -117,40 +118,41 @@ onMounted(load)
       <p class="muted text-[.86rem] mt-0.5 mb-0">Categories &amp; assign User authentication for each type of user in web/Mobile App.</p>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Sections</th>
-          <th v-for="r in ROLES" :key="r.key" class="text-center">
-            <div class="flex flex-col items-center gap-1">
-              <span>{{ r.label }}</span>
-              <input
-                type="checkbox" class="w-4 h-4 m-0 accent-brand cursor-pointer"
-                :checked="columnAll(r.key)" title="Toggle all"
-                @change="setColumn(r.key, ($event.target as HTMLInputElement).checked)"
-              >
-            </div>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="op in OPERATIONS" :key="op.key">
-          <td class="text-ink">{{ op.label }}</td>
-          <td v-for="r in ROLES" :key="r.key" class="text-center">
-            <input v-model="func[op.key][r.key]" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand cursor-pointer rounded">
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="rounded-xl border border-line overflow-hidden">
+      <table class="m-0!">
+        <thead>
+          <tr>
+            <th>Sections</th>
+            <th v-for="r in ROLES" :key="r.key" class="text-center">
+              <div class="flex flex-col items-center gap-1.5">
+                <span>{{ r.label }}</span>
+                <AppCheckbox
+                  size="sm" title="Toggle all"
+                  :model-value="columnAll(r.key)"
+                  :indeterminate="!columnAll(r.key) && columnSome(r.key)"
+                  @update:model-value="setColumn(r.key, $event)"
+                />
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="op in OPERATIONS" :key="op.key" class="hover:bg-[#f8f9fc] transition-colors">
+            <td class="text-ink">{{ op.label }}</td>
+            <td v-for="r in ROLES" :key="r.key" class="text-center">
+              <AppCheckbox v-model="func[op.key][r.key]" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- ── Moderation ────────────────────────────────────────────────── -->
     <div class="border-t border-line mt-6 pt-5">
       <h2 class="section-title m-0">Moderation</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-3">Moderate user entries to maintain a healthy feed.</p>
       <div class="flex items-center gap-6 flex-wrap">
-        <label v-for="m in MODERATION" :key="m.key" class="flex items-center gap-2 m-0 cursor-pointer text-[.92rem] text-ink">
-          <input v-model="moderation[m.key]" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand rounded"> {{ m.label }}
-        </label>
+        <AppCheckbox v-for="m in MODERATION" :key="m.key" v-model="moderation[m.key]" :label="m.label" />
       </div>
     </div>
 

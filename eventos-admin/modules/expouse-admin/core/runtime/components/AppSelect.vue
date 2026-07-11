@@ -36,7 +36,7 @@ function onChange(e: Event) {
     <label v-if="label" class="block mb-1.5">
       {{ label }}<span v-if="required" class="text-[#dc2626] ml-0.5">*</span>
     </label>
-    <div class="w-full my-1.5 bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5">
+    <div class="w-full bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5">
       <select
         :value="modelValue ?? ''"
         :disabled="disabled"

@@ -104,7 +104,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div>
     <!-- Meeting permission matrix -->
     <div class="card mb-4">
       <h2 class="font-bold text-base text-[#1a1a2e] m-0">
@@ -124,12 +124,10 @@ onMounted(load)
           <tr v-for="(r, i) in ROLES" :key="r.key" :class="Number(i) % 2 ? 'bg-white' : 'bg-[#f7f7f9]'">
             <td class="text-[.9rem] text-ink py-3 pl-3 rounded-l-lg">{{ r.label }}</td>
             <td v-for="c in ROLES" :key="c.key" class="text-center py-3" :class="c.key === 'sponsor' ? 'rounded-r-lg' : ''">
-              <input
+              <AppCheckbox
                 v-model="permissions[r.key][c.key]"
-                type="checkbox"
-                class="w-5 h-5 accent-[#6352e7] cursor-pointer align-middle"
                 :aria-label="`${r.label} can send meetings to ${c.label}`"
-              >
+              />
             </td>
           </tr>
         </tbody>
@@ -150,7 +148,7 @@ onMounted(load)
           role="switch"
           :aria-checked="intelligent"
           class="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-150"
-          :class="intelligent ? 'bg-[#6352e7]' : 'bg-[#d1d5db]'"
+          :class="intelligent ? 'bg-brand' : 'bg-[#d1d5db]'"
           @click="intelligent = !intelligent"
         >
           <span
@@ -167,7 +165,7 @@ onMounted(load)
       <p class="muted text-[.86rem] mt-1 mb-4">Attendees will be able to schedule meetings for the selected slot duration.</p>
       <div class="flex gap-8">
         <label v-for="d in SLOT_DURATIONS" :key="d" class="flex items-center gap-2 text-[.9rem] text-ink m-0 cursor-pointer">
-          <input v-model.number="slotDuration" type="radio" :value="d" class="w-4 h-4 m-0 accent-[#6352e7]">
+          <input v-model.number="slotDuration" type="radio" :value="d" class="w-4 h-4 m-0 accent-brand">
           {{ d }} Minutes
         </label>
       </div>

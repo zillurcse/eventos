@@ -76,7 +76,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div>
     <div class="mb-4">
       <h2 class="section-title m-0">Notification</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">
@@ -97,12 +97,10 @@ onMounted(load)
           <tr v-for="(a, i) in ACTIONS" :key="a.key" :class="Number(i) % 2 ? 'bg-white' : 'bg-[#f7f7f9]'">
             <td class="text-[.9rem] text-ink py-3 pl-3 rounded-l-lg">{{ a.label }}</td>
             <td v-for="c in CHANNELS" :key="c.key" class="text-center py-3" :class="c.key === 'sms' ? 'rounded-r-lg' : ''">
-              <input
+              <AppCheckbox
                 v-model="matrix[a.key][c.key]"
-                type="checkbox"
-                class="w-5 h-5 accent-[#6352e7] cursor-pointer align-middle"
                 :aria-label="`${a.label} – ${c.label}`"
-              >
+              />
             </td>
           </tr>
         </tbody>

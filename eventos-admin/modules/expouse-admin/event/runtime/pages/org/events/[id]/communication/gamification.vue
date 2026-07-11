@@ -61,7 +61,6 @@ const award = reactive({ title: '', description: '' })
 
 const saving = ref(false)
 const saved = ref(false)
-const descRef = ref<HTMLElement | null>(null)
 
 function seedScores(values: Record<string, number> = {}) {
   for (const a of ALL_ACTIONS) {
@@ -76,19 +75,9 @@ async function load() {
     seedScores(res.data.scores || {})
     award.title = res.data.award_title || ''
     award.description = res.data.award_description || ''
-    nextTick(() => { if (descRef.value) descRef.value.innerHTML = award.description })
   } catch {
     seedScores()
   }
-}
-
-function fmtDesc(cmd: string) {
-  document.execCommand(cmd, false)
-  if (descRef.value) award.description = descRef.value.innerHTML
-}
-
-function onDescInput() {
-  if (descRef.value) award.description = descRef.value.innerHTML
 }
 
 async function save() {
@@ -115,12 +104,12 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div>
     <!-- Header card with the master toggle -->
     <div class="card mb-4">
       <div class="flex items-start justify-between gap-4">
         <div>
-          <h2 class="font-bold text-base text-[#1a1a2e] m-0">
+          <h2 class="font-bold text-base text-ink m-0">
             Gamification
             <span v-if="saved" class="badge active ml-2">saved ✓</span>
           </h2>
@@ -134,7 +123,7 @@ onMounted(load)
           role="switch"
           :aria-checked="enabled"
           class="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-150"
-          :class="enabled ? 'bg-[#6352e7]' : 'bg-[#d1d5db]'"
+          :class="enabled ? 'bg-brand' : 'bg-[#d1d5db]'"
           @click="enabled = !enabled"
         >
           <span
@@ -148,15 +137,19 @@ onMounted(load)
     <template v-if="enabled">
       <!-- Score matrix -->
       <div class="card mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-base text-ink m-0">Point Scoring</h3>
+          <span class="badge">{{ ALL_ACTIONS.length }} actions</span>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-0">
           <div v-for="(col, ci) in [LEFT_ACTIONS, RIGHT_ACTIONS]" :key="ci">
             <div class="flex items-center justify-between pb-2 mb-1 border-b border-line">
-              <span class="text-[.8rem] font-bold text-[#1a1a2e]">When an attendee</span>
-              <span class="text-[.8rem] font-bold text-[#1a1a2e]">Score</span>
+              <span class="text-[.76rem] font-bold text-muted uppercase tracking-wide">When an attendee</span>
+              <span class="text-[.76rem] font-bold text-muted uppercase tracking-wide">Score</span>
             </div>
             <div
               v-for="a in col" :key="a.key"
-              class="flex items-center justify-between gap-3 py-2 border-b border-[#f1f1f5] last:border-0"
+              class="flex items-center justify-between gap-3 py-2 px-1 -mx-1 rounded-lg border-b border-[#f1f1f5] last:border-0 hover:bg-[#f8f9fc] transition-colors"
             >
               <label :for="`sc-${a.key}`" class="text-[.86rem] text-ink m-0">{{ a.label }}</label>
               <input
@@ -164,7 +157,7 @@ onMounted(load)
                 v-model.number="scores[a.key]"
                 type="number"
                 min="0"
-                class="m-0 w-20 text-center"
+                class="m-0 w-16 text-center font-semibold"
               >
             </div>
           </div>
@@ -173,28 +166,14 @@ onMounted(load)
 
       <!-- Award -->
       <div class="card mb-5">
-        <h3 class="font-bold text-base text-[#1a1a2e] m-0 mb-1">Award</h3>
+        <h3 class="font-bold text-base text-ink m-0 mb-1">Award</h3>
         <p class="muted text-[.84rem] m-0 mb-4">Award will appear at the event login page.</p>
 
-        <label>Title</label>
-        <input v-model="award.title" placeholder="Enter Title">
+        <AppInput v-model="award.title" label="Title" placeholder="Enter Title" />
 
-        <label>Description</label>
-        <div class="border border-line rounded-xl overflow-hidden my-1.5">
-          <div class="flex items-center gap-0.5 px-3 py-2 bg-[#f7f8fa] border-b border-line">
-            <button type="button" class="w-7 h-7 font-bold text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('bold')">B</button>
-            <button type="button" class="w-7 h-7 italic text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('italic')">I</button>
-            <button type="button" class="w-7 h-7 underline text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('underline')">U</button>
-            <button type="button" class="w-7 h-7 line-through text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('strikeThrough')">S</button>
-          </div>
-          <div
-            ref="descRef"
-            contenteditable="true"
-            class="min-h-40 p-3 text-[.93rem] text-ink outline-none"
-            data-placeholder="Gamification description here"
-            @input="onDescInput"
-          />
-        </div>
+        <FormField label="Description" class="mt-3">
+          <SessionDescriptionEditor v-model="award.description"  />
+        </FormField>
       </div>
     </template>
 
@@ -205,11 +184,3 @@ onMounted(load)
     </div>
   </div>
 </template>
-
-<style scoped>
-[contenteditable][data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  color: #9ca3af;
-  font-style: italic;
-}
-</style>

@@ -39,12 +39,17 @@ interface DraftShape {
 
 const VIDEO_PLATFORMS = ['Youtube', 'Vimeo', 'Facebook', 'Other']
 
+const CTA_TYPES = [
+  { value: 'image', label: 'Image' },
+  { value: 'video', label: 'Video' },
+  { value: 'text', label: 'Text' },
+]
+
 const ctas = ref<Cta[]>([])
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
 const error = ref('')
-const descRef = ref<HTMLElement | null>(null)
 
 function freshDraft(): DraftShape {
   return {
@@ -84,7 +89,6 @@ function openAdd() {
   editingId.value = null
   error.value = ''
   drawerOpen.value = true
-  syncDescEditor()
 }
 
 function openEdit(c: Cta) {
@@ -101,30 +105,18 @@ function openEdit(c: Cta) {
   editingId.value = c.id
   error.value = ''
   drawerOpen.value = true
-  syncDescEditor()
 }
 
-// Push the current description HTML into the contenteditable surface once it
-// is mounted (drawer is v-if, so wait a tick).
-function syncDescEditor() {
-  nextTick(() => {
-    if (descRef.value && descRef.value.innerHTML !== draft.description) {
-      descRef.value.innerHTML = draft.description
-    }
-  })
+function setType(t: string | number) {
+  draft.type = t as CtaType
 }
 
-watch(() => draft.type, (t: CtaType) => {
-  if (t === 'text') syncDescEditor()
-})
-
-function fmtDesc(cmd: string) {
-  document.execCommand(cmd, false)
-  if (descRef.value) draft.description = descRef.value.innerHTML
+function setBannerUrl(v: string | string[] | null) {
+  draft.image_url = (Array.isArray(v) ? v[0] : v) || null
 }
 
-function onDescInput() {
-  if (descRef.value) draft.description = descRef.value.innerHTML
+function onBannerUploaded(v: { id: number, url: string }) {
+  draft.image_file_id = v.id
 }
 
 function addVideo() {
@@ -195,7 +187,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[860px]">
+  <div>
     <div class="mb-4">
       <h2 class="section-title m-0">CTA</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Sponsor calls-to-action shown across your event website and app.</p>
@@ -226,7 +218,7 @@ onMounted(load)
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span class="font-semibold text-ink truncate">{{ c.title || 'Untitled CTA' }}</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[.72rem] font-semibold bg-[#f3f0ff] text-[#6352e7]">{{ typeBadge(c.type) }}</span>
+              <span class="badge">{{ typeBadge(c.type) }}</span>
             </div>
             <div class="muted text-[.82rem] truncate">{{ summary(c) }}</div>
           </div>
@@ -242,96 +234,75 @@ onMounted(load)
 
     <!-- Add / Edit drawer -->
     <Drawer v-if="drawerOpen" :title="editingId ? 'Edit CTA' : 'Add CTA'" @close="drawerOpen = false">
-      <label>Select CTA Type</label>
-      <select v-model="draft.type">
-        <option value="image">Image</option>
-        <option value="video">Video</option>
-        <option value="text">Text</option>
-      </select>
-
-      <!-- IMAGE -->
-      <template v-if="draft.type === 'image'">
-        <label class="mt-4">Sponsor CTA</label>
-        <input v-model="draft.title" placeholder="CTA Title">
-
-        <label>CTA Button Label</label>
-        <input v-model="draft.button_label" placeholder="CTA Button Label">
-
-        <label>CTA Button Link</label>
-        <input v-model="draft.button_link" placeholder="CTA Button Link">
-
-        <label>
-          CTA Banner
-          <span class="text-[#dc2626] ml-0.5">*</span>
-        </label>
-        <UploadButton
-          :preview="draft.image_url ?? undefined"
-          collection="ctas"
-          @uploaded="(v: any) => { draft.image_file_id = v.id; draft.image_url = v.url }"
+     <div class="flex flex-col gap-3">
+        <AppSelect
+          :model-value="draft.type" label="Select CTA Type" :options="CTA_TYPES"
+          @update:model-value="setType"
         />
-        <p class="muted text-[.82rem] -mt-2 mb-4">Recommended size 320×200 px.</p>
-      </template>
 
-      <!-- VIDEO -->
-      <template v-else-if="draft.type === 'video'">
-        <div class="flex items-center justify-between mt-4 mb-1.5">
-          <label class="m-0">CTA Videos</label>
-          <button type="button" class="text-[#6352e7] text-[.84rem] font-semibold bg-transparent border-0 cursor-pointer" @click="addVideo">
-            ADD VIDEO LINK
-          </button>
-        </div>
+        <!-- IMAGE -->
+        <template v-if="draft.type === 'image'">
+          <AppInput v-model="draft.title" label="Sponsor CTA" placeholder="CTA Title" />
+          <AppInput v-model="draft.button_label" label="CTA Button Label" placeholder="CTA Button Label" />
+          <AppInput v-model="draft.button_link" label="CTA Button Link" placeholder="CTA Button Link" />
 
-        <div v-for="(v, i) in draft.videos" :key="i" class="mb-3">
-          <div class="relative border border-line rounded-xl p-3">
-            <button
-              type="button"
-              class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[#dc2626] text-white text-xs leading-none flex items-center justify-center cursor-pointer border-0"
-              title="Remove"
-              @click="removeVideo(i)"
-            >×</button>
-            <div class="flex gap-2">
-              <select v-model="v.platform" class="m-0 w-[130px] shrink-0">
-                <option v-for="p in VIDEO_PLATFORMS" :key="p" :value="p">{{ p }}</option>
-              </select>
-              <input v-model="v.url" class="m-0 flex-1" placeholder="Enter URL">
+          <FormField label="CTA Banner" required hint="Recommended size 320×200 px.">
+            <ImageField
+              :model-value="draft.image_url"
+              :aspect="1.6"
+              :output-width="320"
+              :output-height="200"
+              collection="ctas"
+              card-width="240px"
+              :gallery-path="`/events/${id}/gallery`"
+              @update:model-value="setBannerUrl"
+              @uploaded="onBannerUploaded"
+            />
+          </FormField>
+        </template>
+
+        <!-- VIDEO -->
+        <template v-else-if="draft.type === 'video'">
+          <div class="flex items-center justify-between mt-4 mb-1.5">
+            <label class="m-0">CTA Videos</label>
+            <button type="button" class="text-brand text-[.84rem] font-semibold bg-transparent border-0 cursor-pointer" @click="addVideo">
+              ADD VIDEO LINK
+            </button>
+          </div>
+
+          <div v-for="(v, i) in draft.videos" :key="i" class="mb-3">
+            <div class="relative border border-line rounded-xl p-3">
+              <button
+                type="button"
+                class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[#dc2626] text-white text-xs leading-none flex items-center justify-center cursor-pointer border-0"
+                title="Remove"
+                @click="removeVideo(i)"
+              >×</button>
+              <div class="flex gap-2">
+                <AppSelect v-model="v.platform" :options="VIDEO_PLATFORMS" class="w-36 shrink-0" />
+                <AppInput v-model="v.url" class="flex-1" placeholder="Enter URL" />
+              </div>
+              <AppInput v-model="v.caption" class="mt-2" placeholder="Enter Video Caption" />
             </div>
-            <input v-model="v.caption" class="m-0 mt-2" placeholder="Enter Video Caption">
           </div>
-        </div>
 
-        <p v-if="!draft.videos.length" class="muted text-[.84rem] py-2">
-          No videos yet. Click <strong>ADD VIDEO LINK</strong>.
-        </p>
-      </template>
+          <p v-if="!draft.videos.length" class="muted text-[.84rem] py-2">
+            No videos yet. Click <strong>ADD VIDEO LINK</strong>.
+          </p>
+        </template>
 
-      <!-- TEXT -->
-      <template v-else>
-        <label class="mt-4">Sponsor CTA</label>
-        <input v-model="draft.title" placeholder="CTA Title">
+        <!-- TEXT -->
+        <template v-else>
+          <AppInput v-model="draft.title" label="Sponsor CTA" placeholder="CTA Title" />
 
-        <label>Description</label>
-        <div class="border border-line rounded-xl overflow-hidden my-1.5">
-          <div class="flex items-center gap-0.5 px-3 py-2 bg-[#f7f8fa] border-b border-line">
-            <button type="button" class="w-7 h-7 font-bold text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('bold')">B</button>
-            <button type="button" class="w-7 h-7 italic text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('italic')">I</button>
-            <button type="button" class="w-7 h-7 underline text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('underline')">U</button>
-            <button type="button" class="w-7 h-7 line-through text-ink hover:bg-line rounded text-[.9rem]" @click="fmtDesc('strikeThrough')">S</button>
-          </div>
-          <div
-            ref="descRef"
-            contenteditable="true"
-            class="min-h-40 p-3 text-[.93rem] text-ink outline-none"
-            data-placeholder="Let's write an awesome story!"
-            @input="onDescInput"
-          />
-        </div>
+          <FormField label="Description">
+            <SessionDescriptionEditor v-model="draft.description" />
+          </FormField>
 
-        <label>CTA Button Label</label>
-        <input v-model="draft.button_label" placeholder="CTA Button Label">
-
-        <label>CTA Button Link</label>
-        <input v-model="draft.button_link" placeholder="CTA Button Link">
-      </template>
+          <AppInput v-model="draft.button_label" label="CTA Button Label" placeholder="CTA Button Label" />
+          <AppInput v-model="draft.button_link" label="CTA Button Link" placeholder="CTA Button Link" />
+        </template>
+     </div>
 
       <p v-if="error" class="error mt-3">{{ error }}</p>
 
@@ -344,11 +315,3 @@ onMounted(load)
     </Drawer>
   </div>
 </template>
-
-<style scoped>
-[contenteditable][data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  color: #9ca3af;
-  font-style: italic;
-}
-</style>
