@@ -43,6 +43,7 @@ class SessionResource extends JsonResource
             'can_live_polls'           => $meta['can_live_polls'] ?? false,
             'can_attendee_list'        => $meta['can_attendee_list'] ?? false,
             'can_session'              => $meta['can_session'] ?? false,
+            'qa_moderation'            => $meta['qa_moderation'] ?? false,
 
             'track'    => new TrackResource($this->whenLoaded('track')),
             'room'     => new RoomResource($this->whenLoaded('room')),

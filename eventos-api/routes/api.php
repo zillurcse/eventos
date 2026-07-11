@@ -74,6 +74,7 @@ use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\TicketTypeController;
 use App\Http\Controllers\Api\V1\TrackController;
 use App\Http\Controllers\Api\V1\VenueController;
+use App\Http\Controllers\Api\V1\VideoSettingsController;
 use App\Http\Controllers\HealthController;
 use Illuminate\Support\Facades\Route;
 
@@ -233,6 +234,22 @@ Route::prefix('v1')->group(function () {
             Route::get('/sessions/{sessionUuid}/polls', [SessionEngagementController::class, 'pollIndex']);
             Route::post('/sessions/{sessionUuid}/polls/{poll}/vote', [SessionEngagementController::class, 'pollVote']);
             Route::get('/sessions/{sessionUuid}/attendees', [SessionEngagementController::class, 'attendees']);
+            // Embedded Jitsi join details — the host is issued a moderator JWT,
+            // so the room starts without anyone logging in to meet.jit.si.
+            Route::get('/sessions/{sessionUuid}/jitsi-token', [SessionEngagementController::class, 'jitsiToken']);
+            // Embedded Agora broadcast — the host's token carries publish
+            // privileges, an attendee's is join-only.
+            Route::get('/sessions/{sessionUuid}/agora-token', [SessionEngagementController::class, 'agoraToken']);
+            // Host moderation, live from the watch page. Every one of these
+            // re-checks Session::isModeratedBy server-side — the client's
+            // can_moderate flag only decides what UI to draw.
+            Route::patch('/sessions/{sessionUuid}/messages/{message}', [SessionEngagementController::class, 'messageModerate']);
+            Route::delete('/sessions/{sessionUuid}/messages/{message}', [SessionEngagementController::class, 'messageDestroy']);
+            Route::post('/sessions/{sessionUuid}/polls', [SessionEngagementController::class, 'pollStore']);
+            Route::patch('/sessions/{sessionUuid}/polls/{poll}', [SessionEngagementController::class, 'pollUpdate']);
+            Route::delete('/sessions/{sessionUuid}/polls/{poll}', [SessionEngagementController::class, 'pollDestroy']);
+            Route::post('/sessions/{sessionUuid}/mutes', [SessionEngagementController::class, 'muteStore']);
+            Route::delete('/sessions/{sessionUuid}/mutes/{participation}', [SessionEngagementController::class, 'muteDestroy']);
             // One-to-one participant chat (attendee ↔ attendee/speaker/exhibitor).
             Route::get('/chat', [ChatController::class, 'index']);
             Route::get('/chat/partners', [ChatController::class, 'partners']);
@@ -305,6 +322,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/events/{uuid}/domain', [DomainController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/events/{uuid}/domain', [DomainController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/domain/verify', [DomainController::class, 'verify'])->middleware('perm:events.manage');
+            // ── Video settings (the event's own Jitsi/JaaS signing credentials) ──
+            Route::get('/events/{uuid}/video', [VideoSettingsController::class, 'show'])->middleware('perm:events.view');
+            Route::match(['put', 'patch'], '/events/{uuid}/video', [VideoSettingsController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events', [EventController::class, 'store'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/events/{uuid}', [EventController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/publish', [EventController::class, 'publish'])->middleware('perm:events.manage');
@@ -337,8 +357,13 @@ Route::prefix('v1')->group(function () {
                 Route::post('/sessions/{uuid}/polls', [SessionPollController::class, 'store']);
                 Route::match(['put', 'patch'], '/session-polls/{poll}', [SessionPollController::class, 'update']);
                 Route::delete('/session-polls/{poll}', [SessionPollController::class, 'destroy']);
+                // Organizer-side moderation of what attendees posted in a session
+                // (the host does the same live, from the watch page).
+                Route::match(['put', 'patch'], '/session-messages/{message}', [SessionPollController::class, 'messageUpdate']);
+                Route::delete('/session-messages/{message}', [SessionPollController::class, 'messageDestroy']);
             });
             Route::get('/sessions/{uuid}/polls', [SessionPollController::class, 'index'])->middleware('perm:events.view');
+            Route::get('/sessions/{uuid}/messages', [SessionPollController::class, 'messages'])->middleware('perm:events.view');
             Route::post('/sessions/{uuid}/speakers', [SessionController::class, 'addSpeaker'])->middleware('perm:speakers.manage');
             Route::delete('/sessions/{uuid}/speakers/{participation}', [SessionController::class, 'removeSpeaker'])->middleware('perm:speakers.manage');
 

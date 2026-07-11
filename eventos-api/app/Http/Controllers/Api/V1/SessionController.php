@@ -132,31 +132,63 @@ class SessionController extends Controller
         return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
     }
 
-    /** Update streaming & engagement settings stored in meta. */
+    /**
+     * Update streaming & engagement settings (meta) plus the broadcast state.
+     *
+     * `status` is a real column, not meta: it's the organizer's manual override
+     * of the schedule — "go live now" / "we're done" — which the attendee watch
+     * page honours ahead of starts_at/ends_at.
+     */
     public function updateStream(string $uuid, Request $request): JsonResponse
     {
         $session = Session::where('uuid', $uuid)->firstOrFail();
 
+        // Links are sometimes pasted percent-encoded ("?" as %3F, "=" as %3D),
+        // which is still a valid URL but hides the query string — a YouTube
+        // watch link then can't be recognised and silently degrades to an
+        // "open in a new tab" button. Normalise before storing.
+        $request->merge(array_filter([
+            'stream_link' => $this->decodeLink($request->input('stream_link')),
+            'on_demand_recording_link' => $this->decodeLink($request->input('on_demand_recording_link')),
+        ], fn ($v) => $v !== null));
+
+        // Jitsi and Agora take a bare room/channel name rather than a URL, so
+        // only the hosts that genuinely need a URL are validated as one —
+        // otherwise a typo'd link silently reaches attendees as a dead player.
+        $urlHosts = ['zoom', 'youtube', 'meet', 'rtmp', 'self'];
+        $needsUrl = in_array($request->input('who_will_host'), $urlHosts, true);
+
         $request->validate([
             'is_stream'                => ['nullable', 'boolean'],
-            'who_will_host'            => ['nullable', 'in:self,zoom,rtmp,youtube,meet,vimeo,jitsi'],
-            'stream_link'              => ['nullable', 'string', 'max:500'],
-            'on_demand_recording_link' => ['nullable', 'string', 'max:500'],
-            'vimeo_live_id'            => ['nullable', 'string', 'max:250'],
+            'who_will_host'            => ['nullable', 'in:self,zoom,rtmp,youtube,meet,vimeo,jitsi,agora'],
+            'stream_link'              => ['nullable', 'string', 'max:500', ...($needsUrl ? ['url'] : [])],
+            'on_demand_recording_link' => ['nullable', 'string', 'max:500', 'url'],
+            'vimeo_live_id'            => ['nullable', 'string', 'max:250', 'regex:/^\d+$/'],
+            'status'                   => ['nullable', 'in:scheduled,live,ended,canceled'],
             'can_live_chat'            => ['nullable', 'boolean'],
             'can_qa'                   => ['nullable', 'boolean'],
             'can_live_polls'           => ['nullable', 'boolean'],
             'can_attendee_list'        => ['nullable', 'boolean'],
             'can_session'              => ['nullable', 'boolean'],
+            // Hold questions for host approval before attendees see them.
+            'qa_moderation'            => ['nullable', 'boolean'],
+        ], [
+            'vimeo_live_id.regex' => 'The Vimeo Live ID is the numeric event id, e.g. 123456789.',
         ]);
 
-        $session->update([
+        $update = [
             'meta' => array_merge($session->meta ?? [], $request->only([
                 'is_stream', 'who_will_host', 'stream_link', 'on_demand_recording_link',
                 'vimeo_live_id', 'can_live_chat', 'can_qa', 'can_live_polls',
-                'can_attendee_list', 'can_session',
+                'can_attendee_list', 'can_session', 'qa_moderation',
             ])),
-        ]);
+        ];
+
+        if ($request->filled('status')) {
+            $update['status'] = $request->input('status');
+        }
+
+        $session->update($update);
 
         return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
     }
@@ -227,5 +259,29 @@ class SessionController extends Controller
             'documents.*.name'    => ['required_with:documents', 'string', 'max:250'],
             'documents.*.url'     => ['required_with:documents', 'string', 'max:2000'],
         ];
+    }
+
+    /**
+     * Undo percent-encoding on a pasted stream link. A copied URL sometimes
+     * arrives with its query string escaped ("watch%3Fv%3Dabc" instead of
+     * "watch?v=abc"): still a valid URL, so validation passes, but the video id
+     * is now invisible to the player and the session degrades to an "open in a
+     * new tab" link. Only decodes when the result is still an http(s) URL, so a
+     * legitimately-encoded path segment isn't mangled.
+     */
+    private function decodeLink(mixed $link): ?string
+    {
+        if (! is_string($link) || $link === '') {
+            return null;
+        }
+
+        $link = trim($link);
+        if (! preg_match('/%(3F|3D|26)/i', $link)) {
+            return $link;
+        }
+
+        $decoded = urldecode($link);
+
+        return preg_match('#^https?://#i', $decoded) ? $decoded : $link;
     }
 }

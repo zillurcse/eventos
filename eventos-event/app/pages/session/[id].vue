@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AgendaSession } from '~/stores/sessions'
+import type { PanelAttendee, PanelMessage, Poll } from '~/composables/useSessionPanel'
 
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
@@ -16,7 +17,7 @@ onMounted(async () => {
 })
 
 const session = computed<AgendaSession | null>(
-  () => store.sessions.find(s => s.id === id.value) ?? null,
+  () => store.sessions.find((s: AgendaSession) => s.id === id.value) ?? null,
 )
 
 const tz = computed(() => session.value?.timezone || store.eventTimezone || 'UTC')
@@ -27,23 +28,52 @@ let ticker: ReturnType<typeof setInterval> | null = null
 onMounted(() => { ticker = setInterval(() => (now.value = Date.now()), 15_000) })
 onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
 
+// Streams never start exactly on the minute: hosts open the room early and run
+// over. So the player opens a little before the scheduled start and lingers
+// after the scheduled end, and the organizer's manual status always wins over
+// the clock — that's the "Go live" / "End" button on their side.
+const PRE_ROLL_MS = 15 * 60_000
+const POST_ROLL_MS = 30 * 60_000
+// A session with no end time isn't over the instant it starts; assume a
+// sensible slot length rather than flipping straight to "ended".
+const ASSUMED_LENGTH_MS = 2 * 60 * 60_000
+
 const phase = computed<'live' | 'ended' | 'upcoming'>(() => {
   const s = session.value
   if (!s) return 'ended'
+
+  if (s.status === 'live') return 'live'
+  if (s.status === 'ended' || s.status === 'canceled') return 'ended'
+
   const start = s.starts_at ? new Date(s.starts_at).getTime() : null
-  const end = s.ends_at ? new Date(s.ends_at).getTime() : null
-  if (start && end) {
-    if (now.value < start) return 'upcoming'
-    if (now.value > end) return 'ended'
-    return 'live'
-  }
-  if (start && now.value < start) return 'upcoming'
-  return 'ended'
+  if (!start) return 'ended'
+
+  const end = s.ends_at ? new Date(s.ends_at).getTime() : start + ASSUMED_LENGTH_MS
+
+  if (now.value < start - PRE_ROLL_MS) return 'upcoming'
+  if (now.value > end + POST_ROLL_MS) return 'ended'
+  return 'live'
 })
 
 // ── Stream/embed resolution ────────────────────────────────────────────────
+/**
+ * A pasted link sometimes arrives percent-encoded (`?` as %3F, `=` as %3D),
+ * which hides the query string from the patterns below and silently demotes an
+ * embeddable video to an "open in a new tab" link. Decode before matching.
+ */
+function decodeLink(url: string): string {
+  const u = url.trim()
+  if (!/%[0-9a-f]{2}/i.test(u)) return u
+  try {
+    return decodeURIComponent(u)
+  } catch {
+    return u
+  }
+}
+
 function youtubeId(url: string | null): string | null {
   if (!url) return null
+  const u = decodeLink(url)
   const patterns = [
     /youtu\.be\/([\w-]{11})/,
     /[?&]v=([\w-]{11})/,
@@ -52,9 +82,23 @@ function youtubeId(url: string | null): string | null {
     /youtube\.com\/shorts\/([\w-]{11})/,
   ]
   for (const p of patterns) {
-    const m = url.match(p)
+    const m = u.match(p)
     if (m?.[1]) return m[1]
   }
+  return null
+}
+
+/** The player src for a YouTube link, or null if it isn't embeddable. */
+function youtubeEmbed(url: string | null, autoplay: boolean): string | null {
+  const id = youtubeId(url)
+  const auto = autoplay ? '&autoplay=1' : ''
+  if (id) return `https://www.youtube.com/embed/${id}?rel=0${auto}`
+
+  // "Whatever is live on this channel right now" — YouTube embeds that by
+  // channel id, so a /channel/UC…/live URL still plays in-page.
+  const channel = decodeLink(url ?? '').match(/youtube\.com\/channel\/(UC[\w-]{10,})/i)
+  if (channel?.[1]) return `https://www.youtube.com/embed/live_stream?channel=${channel[1]}${auto}`
+
   return null
 }
 
@@ -64,12 +108,21 @@ const HOST_LABEL: Record<string, string> = {
 
 type Player =
   | { kind: 'iframe', src: string, note?: string }
+  | { kind: 'video', src: string, live: boolean }
   | { kind: 'zoom' }
   | { kind: 'jitsi' }
+  | { kind: 'agora' }
   | { kind: 'join', url: string, label: string }
   | { kind: 'replay', url: string }
   | { kind: 'upcoming' }
   | { kind: 'none' }
+
+// A self-hosted or RTMP stream is delivered as an HLS playlist (or a plain
+// file); those play inline in a <video>, they are not links to open in a tab.
+function mediaUrl(url: string | null): string | null {
+  if (!url) return null
+  return /\.(m3u8|mpd|mp4|webm|ogv|ogg)(\?.*)?$/i.test(url.trim()) ? url.trim() : null
+}
 
 const player = computed<Player>(() => {
   const s = session.value
@@ -77,12 +130,17 @@ const player = computed<Player>(() => {
 
   if (phase.value === 'live' && s.is_stream) {
     if (s.who_will_host === 'youtube') {
-      const yid = youtubeId(s.stream_link)
-      if (yid) return { kind: 'iframe', src: `https://www.youtube.com/embed/${yid}?autoplay=1&rel=0` }
+      const src = youtubeEmbed(s.stream_link, true)
+      if (src) return { kind: 'iframe', src }
     }
     if (s.who_will_host === 'zoom' && s.stream_link) return { kind: 'zoom' }
     if (s.who_will_host === 'jitsi') return { kind: 'jitsi' }
+    if (s.who_will_host === 'agora') return { kind: 'agora' }
     if (s.vimeo_live_id) return { kind: 'iframe', src: `https://vimeo.com/event/${s.vimeo_live_id}/embed` }
+
+    const live = mediaUrl(s.stream_link)
+    if (live) return { kind: 'video', src: live, live: true }
+
     if (s.stream_link) {
       const host = s.who_will_host || ''
       const label = host === 'youtube' ? 'Watch on YouTube' : `Join on ${HOST_LABEL[host] || 'Live Stream'}`
@@ -90,13 +148,18 @@ const player = computed<Player>(() => {
     }
   }
 
+  // A recording must never pre-empt the countdown — an upcoming session that
+  // carries last year's replay link should still show "starts in…".
+  if (phase.value === 'upcoming') return { kind: 'upcoming' }
+
   if (s.on_demand_recording_link) {
-    const rid = youtubeId(s.on_demand_recording_link)
-    if (rid) return { kind: 'iframe', src: `https://www.youtube.com/embed/${rid}?rel=0`, note: 'Recording' }
+    const replay = youtubeEmbed(s.on_demand_recording_link, false)
+    if (replay) return { kind: 'iframe', src: replay, note: 'Recording' }
+    const file = mediaUrl(s.on_demand_recording_link)
+    if (file) return { kind: 'video', src: file, live: false }
     return { kind: 'replay', url: s.on_demand_recording_link }
   }
 
-  if (phase.value === 'upcoming') return { kind: 'upcoming' }
   return { kind: 'none' }
 })
 
@@ -144,20 +207,13 @@ async function stopZoom() {
 }
 
 // ── Jitsi External API ─────────────────────────────────────────────────────
-const { public: { jitsiDomain: defaultJitsiDomain } } = useRuntimeConfig()
+// Room + JWT come from the API (see jitsiToken), not from runtime config.
 const jitsiRoot = ref<HTMLElement | null>(null)
 const jitsiState = ref<'idle' | 'loading' | 'joined' | 'error'>('idle')
 const jitsiError = ref('')
 const jitsiTabUrl = ref('')
 let jitsiApi: any = null
 
-function resolveJitsi(s: AgendaSession): { domain: string, room: string } {
-  const raw = (s.stream_link || '').trim()
-  const url = raw.match(/^https?:\/\/([^/]+)\/(.+)$/i)
-  if (url) return { domain: url[1]!, room: decodeURIComponent(url[2]!.replace(/\/+$/, '')) }
-  if (raw && !raw.includes('/')) return { domain: String(defaultJitsiDomain), room: raw }
-  return { domain: String(defaultJitsiDomain), room: `expouse-${s.id}` }
-}
 function loadJitsi(domain: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const w = window as any
@@ -178,26 +234,50 @@ async function startJitsi() {
   jitsiState.value = 'loading'
   jitsiError.value = ''
   try {
-    const { domain, room } = resolveJitsi(s)
-    jitsiTabUrl.value = `https://${domain}/${encodeURIComponent(room)}`
+    // The server resolves the room and signs a JWT: the session host joins as
+    // moderator (so the room actually starts), everyone else as a guest.
+    const { data } = await api<any>(`/events/${store.eventUuid}/sessions/${s.id}/jitsi-token`)
+    const domain: string = data.domain
+    const room: string = data.room
+    const isHost: boolean = !!data.is_moderator
+
+    jitsiTabUrl.value = `https://${domain}/${room.split('/').map(encodeURIComponent).join('/')}`
+
     const Api = await loadJitsi(domain)
     await nextTick()
     const el = jitsiRoot.value
     if (!el) throw new Error('Player container not ready.')
+
     jitsiApi = new Api(domain, {
       roomName: room,
+      jwt: data.jwt || undefined,
       parentNode: el,
       width: '100%',
       height: '100%',
-      userInfo: { displayName: auth.user?.name || 'Guest' },
-      configOverwrite: { prejoinPageEnabled: false, disableDeepLinking: true },
+      userInfo: { displayName: data.display_name || auth.user?.name || 'Guest' },
+      configOverwrite: {
+        // `prejoinPageEnabled` is the legacy key; current Jitsi reads
+        // `prejoinConfig`. Send both so we land in the room either way.
+        prejoinPageEnabled: false,
+        prejoinConfig: { enabled: false },
+        disableDeepLinking: true,
+        // An attendee is watching, not presenting: don't grab their camera or
+        // mic (that's the "enable microphone and camera access" nag), and give
+        // them a viewer's toolbar rather than a full conferencing one.
+        startWithAudioMuted: !isHost,
+        startWithVideoMuted: !isHost,
+        disableInitialGUM: !isHost,
+        toolbarButtons: isHost
+          ? undefined
+          : ['fullscreen', 'hangup', 'tileview', 'chat', 'raisehand', 'settings'],
+      },
       interfaceConfigOverwrite: { MOBILE_APP_PROMO: false },
     })
     jitsiState.value = 'joined'
     jitsiApi.addListener?.('readyToClose', () => { jitsiState.value = 'idle' })
   } catch (e: any) {
     jitsiState.value = 'error'
-    jitsiError.value = e?.message || 'Could not start the video session.'
+    jitsiError.value = e?.data?.message || e?.message || 'Could not start the video session.'
   }
 }
 function stopJitsi() {
@@ -206,15 +286,158 @@ function stopJitsi() {
   jitsiState.value = 'idle'
 }
 
-// Drive the embeds off the resolved player kind; reset when switching sessions.
-function syncEmbed(kind: string) {
-  if (kind === 'zoom') startZoom()
-  else if (kind === 'jitsi') startJitsi()
+// ── Agora (broadcast: host publishes, everyone else subscribes) ────────────
+const agoraRoot = ref<HTMLElement | null>(null)
+const agoraState = ref<'idle' | 'loading' | 'joined' | 'error'>('idle')
+const agoraError = ref('')
+const agoraRole = ref<'host' | 'audience'>('audience')
+const agoraLiveNow = ref(false) // is a host actually publishing right now?
+const agoraMicOn = ref(true)
+const agoraCamOn = ref(true)
+let agoraClient: any = null
+let agoraTracks: any[] = []
+
+/** Put a remote (or our own) video track into the stage element. */
+function playInStage(track: any) {
+  const el = agoraRoot.value
+  if (el && track) track.play(el, { fit: 'contain' })
 }
-watch(() => player.value.kind, syncEmbed)
-watch(id, () => { stopZoom(); stopJitsi() })
-onMounted(() => syncEmbed(player.value.kind))
-onBeforeUnmount(() => { stopZoom(); stopJitsi() })
+
+async function startAgora() {
+  if (!import.meta.client) return
+  if (agoraState.value === 'loading' || agoraState.value === 'joined') return
+  const s = session.value
+  if (!s) return
+
+  agoraState.value = 'loading'
+  agoraError.value = ''
+  try {
+    // The server decides the role and bakes it into the token's privileges —
+    // an attendee's token simply cannot publish.
+    const { data } = await api<any>(`/events/${store.eventUuid}/sessions/${s.id}/agora-token`)
+    agoraRole.value = data.role
+
+    const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
+    AgoraRTC.setLogLevel(3) // warnings and errors only
+
+    agoraClient = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' })
+    await agoraClient.setClientRole(data.role === 'host' ? 'host' : 'audience')
+
+    // Subscribe to whoever is on stage. Audience members never publish, so this
+    // is how an attendee sees the host.
+    agoraClient.on('user-published', async (user: any, mediaType: 'video' | 'audio') => {
+      await agoraClient.subscribe(user, mediaType)
+      if (mediaType === 'video') {
+        agoraLiveNow.value = true
+        await nextTick()
+        playInStage(user.videoTrack)
+      } else {
+        user.audioTrack?.play()
+      }
+    })
+    agoraClient.on('user-unpublished', (_user: any, mediaType: string) => {
+      if (mediaType === 'video') agoraLiveNow.value = false
+    })
+
+    await agoraClient.join(data.app_id, data.channel, data.token, data.uid)
+
+    if (data.role === 'host') {
+      const [mic, cam] = await AgoraRTC.createMicrophoneAndCameraTracks()
+      agoraTracks = [mic, cam]
+      await agoraClient.publish(agoraTracks)
+      agoraLiveNow.value = true
+      await nextTick()
+      playInStage(cam)
+    }
+
+    agoraState.value = 'joined'
+  } catch (e: any) {
+    agoraState.value = 'error'
+    agoraError.value = e?.data?.message || e?.message || 'Could not join the video session.'
+  }
+}
+
+async function stopAgora() {
+  try {
+    for (const t of agoraTracks) { t.stop?.(); t.close?.() }
+    agoraTracks = []
+    await agoraClient?.leave?.()
+  } catch { /* already gone */ }
+  agoraClient = null
+  agoraState.value = 'idle'
+  agoraLiveNow.value = false
+}
+
+// Host-only stage controls.
+async function toggleAgoraMic() {
+  const mic = agoraTracks[0]
+  if (!mic) return
+  agoraMicOn.value = !agoraMicOn.value
+  await mic.setEnabled(agoraMicOn.value)
+}
+async function toggleAgoraCam() {
+  const cam = agoraTracks[1]
+  if (!cam) return
+  agoraCamOn.value = !agoraCamOn.value
+  await cam.setEnabled(agoraCamOn.value)
+}
+
+// ── Inline video (self-hosted / RTMP output / recording file) ──────────────
+const videoEl = ref<HTMLVideoElement | null>(null)
+const videoError = ref('')
+let hls: { destroy?: () => void } | null = null
+
+function stopVideo() {
+  try { hls?.destroy?.() } catch { /* already torn down */ }
+  hls = null
+}
+
+async function startVideo(src: string) {
+  if (!import.meta.client) return
+  stopVideo()
+  videoError.value = ''
+  await nextTick()
+  const el = videoEl.value
+  if (!el) return
+
+  // Safari plays HLS natively; every other browser needs hls.js.
+  const isHls = /\.m3u8(\?.*)?$/i.test(src)
+  if (isHls && !el.canPlayType('application/vnd.apple.mpegurl')) {
+    try {
+      const Hls = (await import('hls.js')).default
+      if (Hls.isSupported()) {
+        const instance = new Hls({ lowLatencyMode: true })
+        instance.loadSource(src)
+        instance.attachMedia(el)
+        instance.on(Hls.Events.ERROR, (_e: unknown, data: { fatal: boolean }) => {
+          if (data.fatal) videoError.value = 'The stream could not be loaded.'
+        })
+        hls = instance
+        return
+      }
+    } catch {
+      videoError.value = 'The stream could not be loaded.'
+      return
+    }
+  }
+  el.src = src
+}
+
+// Drive the embeds off the resolved player; reset when switching sessions.
+function syncEmbed(p: Player) {
+  if (p.kind === 'zoom') startZoom()
+  else if (p.kind === 'jitsi') startJitsi()
+  else if (p.kind === 'agora') startAgora()
+  else if (p.kind === 'video') startVideo(p.src)
+}
+watch(player, (p, prev) => {
+  // Re-attach only when the player actually changes, not on every tick.
+  if (prev && p.kind === prev.kind && (p.kind !== 'video' || p.src === (prev as { src?: string }).src)) return
+  syncEmbed(p)
+})
+watch(id, () => { stopZoom(); stopJitsi(); stopVideo(); stopAgora() })
+onMounted(() => syncEmbed(player.value))
+onBeforeUnmount(() => { stopZoom(); stopJitsi(); stopVideo(); stopAgora() })
 
 // ── Formatting ─────────────────────────────────────────────────────────────
 function fmtTime(iso: string | null) {
@@ -313,15 +536,36 @@ watch(enabledTabs, (tabs) => {
   if (tabs.length && !tabs.some(t => t.key === activeTab.value)) activeTab.value = tabs[0]!.key
 }, { immediate: true })
 
-const otherSessions = computed(() =>
-  store.sessions.filter(s => s.id !== id.value).slice(0, 30),
-)
+// Sessions tab: every other session, with its own live/upcoming/ended state so
+// an attendee can see what's on right now and hop straight to it.
+function phaseOf(s: AgendaSession): 'live' | 'ended' | 'upcoming' {
+  const start = s.starts_at ? new Date(s.starts_at).getTime() : null
+  const end = s.ends_at ? new Date(s.ends_at).getTime() : null
+  if (start && now.value < start) return 'upcoming'
+  if (end && now.value > end) return 'ended'
+  return start ? 'live' : 'ended'
+}
+type SessionPhase = 'live' | 'ended' | 'upcoming'
+interface SessionEntry { session: AgendaSession, phase: SessionPhase }
+const PHASE_RANK: Record<SessionPhase, number> = { live: 0, upcoming: 1, ended: 2 }
+
+const otherSessions = computed<SessionEntry[]>(() => {
+  const entries: SessionEntry[] = store.sessions
+    .filter((s: AgendaSession) => s.id !== id.value)
+    .map((s: AgendaSession) => ({ session: s, phase: phaseOf(s) }))
+
+  return entries
+    .sort((a: SessionEntry, b: SessionEntry) => PHASE_RANK[a.phase] - PHASE_RANK[b.phase])
+    .slice(0, 40)
+})
 function goToSession(sid: string) { router.push(`/session/${sid}`) }
 
 // ── Live panel data (Chat / Q&A / Polls / Attendees) ───────────────────────
 const {
   chat, questions, polls, attendees, attendeeMeta,
+  canModerate, isMuted, qaModeration, pendingCount,
   bind, loaderFor, sendChat, askQuestion, upvoteQuestion, votePoll,
+  moderate, removeMessage, createPoll, updatePoll, deletePoll, toggleMute,
 } = useSessionPanel()
 
 const chatInput = ref('')
@@ -369,6 +613,75 @@ function pct(o: { votes: number }, p: { total_votes: number }) {
   return p.total_votes ? Math.round((o.votes / p.total_votes) * 100) : 0
 }
 
+// ── Host moderation ────────────────────────────────────────────────────────
+// The server decides all of this (it re-checks on every write); `canModerate`
+// only tells us whether to draw the controls.
+const pinnedChat = computed<PanelMessage[]>(() => chat.value.filter((m: PanelMessage) => m.is_pinned))
+
+async function confirmRemove(m: PanelMessage, kind: 'chat' | 'qa') {
+  const what = kind === 'chat' ? 'message' : 'question'
+  if (!confirm(`Delete this ${what}? Attendees will no longer see it.`)) return
+  await removeMessage(m, kind)
+}
+
+// A poll's per-option bars only render once the host reveals results (or the
+// poll closes); until then attendees just see that they voted.
+function pollBarsVisible(p: Poll) {
+  return p.results_visible && (!!p.my_vote || p.status === 'closed' || canModerate.value)
+}
+
+// Host poll composer — two blank options is the minimum the API accepts.
+const composerOpen = ref(false)
+const draftQuestion = ref('')
+const draftOptions = ref<string[]>(['', ''])
+const draftShowResults = ref(true)
+const savingPoll = ref(false)
+
+function addDraftOption() { if (draftOptions.value.length < 8) draftOptions.value.push('') }
+function removeDraftOption(i: number) { if (draftOptions.value.length > 2) draftOptions.value.splice(i, 1) }
+function resetComposer() {
+  draftQuestion.value = ''
+  draftOptions.value = ['', '']
+  draftShowResults.value = true
+  composerOpen.value = false
+}
+const canLaunchPoll = computed(() =>
+  !!draftQuestion.value.trim() && draftOptions.value.filter((o: string) => o.trim()).length >= 2,
+)
+async function launchPoll(status: 'live' | 'draft') {
+  if (!canLaunchPoll.value || savingPoll.value) return
+  savingPoll.value = true
+  try {
+    await createPoll({
+      question: draftQuestion.value.trim(),
+      options: draftOptions.value.map((o: string) => o.trim()).filter(Boolean),
+      status,
+      show_results: draftShowResults.value,
+    })
+    resetComposer()
+  } finally {
+    savingPoll.value = false
+  }
+}
+async function confirmDeletePoll(p: Poll) {
+  if (!confirm('Delete this poll and every vote cast on it?')) return
+  await deletePoll(p.id)
+}
+
+// Attendees tab: search, and mute for the host.
+const attendeeSearch = ref('')
+const shownAttendees = computed<PanelAttendee[]>(() => {
+  const q = attendeeSearch.value.trim().toLowerCase()
+  if (!q) return attendees.value
+  return attendees.value.filter((a: PanelAttendee) =>
+    a.name.toLowerCase().includes(q) || (a.headline ?? '').toLowerCase().includes(q),
+  )
+})
+async function confirmMute(a: PanelAttendee) {
+  if (!a.is_muted && !confirm(`Mute ${a.name}? They can still watch and vote, but can't post in this session.`)) return
+  await toggleMute(a)
+}
+
 const speakers = computed(() => session.value?.speakers ?? [])
 const sponsors = computed(() => session.value?.sponsors ?? [])
 </script>
@@ -399,6 +712,52 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
               allowfullscreen
               referrerpolicy="strict-origin-when-cross-origin"
             />
+            <div v-else-if="player.kind === 'agora'" class="fill">
+              <div ref="agoraRoot" class="fill" />
+
+              <!-- Nothing on the wire yet: the host hasn't gone on camera. -->
+              <div v-if="agoraState === 'joined' && !agoraLiveNow" class="placeholder over">
+                <span class="dot" />
+                <p class="ph-title">Waiting for the host</p>
+                <p class="ph-sub">The video will appear here as soon as they go on camera.</p>
+              </div>
+              <div v-else-if="agoraState !== 'joined'" class="placeholder over">
+                <template v-if="agoraState === 'error'">
+                  <p class="ph-title">Couldn’t join the video</p>
+                  <p class="ph-sub">{{ agoraError }}</p>
+                  <button class="btn danger" @click="startAgora">Try again</button>
+                </template>
+                <template v-else><span class="dot" /><p class="ph-title">Connecting…</p></template>
+              </div>
+
+              <!-- Only a host is publishing, so only a host gets these. -->
+              <div v-if="agoraState === 'joined' && agoraRole === 'host'" class="stagebar">
+                <button class="sbtn" :class="{ off: !agoraMicOn }" @click="toggleAgoraMic">
+                  {{ agoraMicOn ? 'Mute' : 'Unmute' }}
+                </button>
+                <button class="sbtn" :class="{ off: !agoraCamOn }" @click="toggleAgoraCam">
+                  {{ agoraCamOn ? 'Stop video' : 'Start video' }}
+                </button>
+                <button class="sbtn danger" @click="stopAgora">Leave stage</button>
+              </div>
+            </div>
+            <div v-else-if="player.kind === 'video'" class="fill">
+              <!-- Browsers only allow autoplay when muted, so a live stream
+                   starts muted; a recording waits for the viewer to hit play. -->
+              <video
+                ref="videoEl"
+                class="fill"
+                controls
+                playsinline
+                :autoplay="player.live"
+                :muted="player.live"
+              />
+              <div v-if="videoError" class="placeholder over">
+                <p class="ph-title">Couldn’t play this stream</p>
+                <p class="ph-sub">{{ videoError }}</p>
+                <a :href="player.src" target="_blank" rel="noopener" class="btn danger">Open the stream directly</a>
+              </div>
+            </div>
             <div v-else-if="player.kind === 'zoom'" class="fill">
               <div ref="zoomRoot" class="fill" />
               <div v-if="zoomState !== 'joined'" class="placeholder over">
@@ -552,25 +911,61 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
               v-for="t in enabledTabs" :key="t.key" type="button"
               class="ptab" :class="{ on: activeTab === t.key }"
               @click="activeTab = t.key"
-            >{{ t.label }}</button>
+            >
+              {{ t.label }}
+              <!-- Questions waiting on the host shouldn't need the tab open to be noticed. -->
+              <span v-if="t.key === 'qa' && canModerate && pendingCount" class="tbadge">{{ pendingCount }}</span>
+            </button>
           </div>
 
           <!-- CHAT -->
           <div v-if="activeTab === 'chat'" class="chat">
+            <!-- What the host pinned stays put, above the scroll. -->
+            <div v-if="pinnedChat.length" class="pinstrip">
+              <div v-for="m in pinnedChat" :key="m.id" class="pinrow">
+                <svg class="pinico" viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 6 3 3H7l3-3-1-6z" /></svg>
+                <span class="pintext"><b>{{ m.author }}:</b> {{ m.body }}</span>
+                <button v-if="canModerate" class="pinx" title="Unpin" @click="moderate(m, { is_pinned: false }, 'chat')">×</button>
+              </div>
+            </div>
+
             <div ref="chatBody" class="chat-scroll">
               <p v-if="!chat.length" class="empty">No chats yet.<br>Type something to start.</p>
-              <div v-for="m in chat" :key="m.id" class="cmsg" :class="{ mine: m.is_mine }">
+              <div
+                v-for="m in chat" :key="m.id"
+                class="cmsg" :class="{ mine: m.is_mine, hidden: m.is_hidden }"
+              >
                 <span class="cav">
                   <img v-if="m.author_image" :src="m.author_image" :alt="m.author">
                   <template v-else>{{ initials(m.author) }}</template>
                 </span>
                 <div class="cbub">
-                  <span class="cwho">{{ m.is_mine ? 'You' : m.author }}</span>
+                  <span class="cwho">
+                    {{ m.is_mine ? 'You' : m.author }}
+                    <span v-if="m.is_hidden" class="flag">Hidden</span>
+                  </span>
                   <span class="ctext">{{ m.body }}</span>
+
+                  <!-- Host tools, plus "delete my own" for everyone else. -->
+                  <div v-if="canModerate || m.can_delete" class="mtools">
+                    <template v-if="canModerate">
+                      <button class="mbtn" :class="{ on: m.is_pinned }" :title="m.is_pinned ? 'Unpin' : 'Pin'" @click="moderate(m, { is_pinned: !m.is_pinned }, 'chat')">
+                        {{ m.is_pinned ? 'Unpin' : 'Pin' }}
+                      </button>
+                      <button class="mbtn" :title="m.is_hidden ? 'Show to attendees' : 'Hide from attendees'" @click="moderate(m, { is_hidden: !m.is_hidden }, 'chat')">
+                        {{ m.is_hidden ? 'Unhide' : 'Hide' }}
+                      </button>
+                    </template>
+                    <button v-if="m.can_delete" class="mbtn danger" title="Delete" @click="confirmRemove(m, 'chat')">Delete</button>
+                  </div>
                 </div>
               </div>
             </div>
-            <form class="pinput" @submit.prevent="submitChat">
+
+            <p v-if="isMuted" class="mutedbar">
+              The host has muted you for this session. You can still watch and vote.
+            </p>
+            <form v-else class="pinput" @submit.prevent="submitChat">
               <input v-model="chatInput" type="text" placeholder="Type a message" maxlength="1000">
               <button type="submit" :disabled="!chatInput.trim()" aria-label="Send">
                 <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
@@ -580,20 +975,64 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
 
           <!-- Q&A -->
           <div v-else-if="activeTab === 'qa'" class="qa">
-            <form class="pinput solid" @submit.prevent="submitQuestion">
+            <p v-if="isMuted" class="mutedbar solid">
+              The host has muted you for this session.
+            </p>
+            <form v-else class="pinput solid" @submit.prevent="submitQuestion">
               <input v-model="qaInput" type="text" placeholder="Ask a question…" maxlength="500">
               <button type="submit" :disabled="!qaInput.trim()">Ask</button>
             </form>
+            <p v-if="qaModeration && !canModerate" class="modnote">
+              Questions are reviewed by the host before everyone sees them.
+            </p>
+
             <div class="qlist">
               <p v-if="!questions.length" class="empty">No questions yet.<br>Be the first to ask.</p>
-              <div v-for="q in questions" :key="q.id" class="qrow">
-                <button class="qvote" :class="{ on: q.voted }" @click="upvoteQuestion(q.id)">
+              <div
+                v-for="q in questions" :key="q.id"
+                class="qrow"
+                :class="{ hidden: q.is_hidden, pending: q.status === 'pending', answered: q.is_answered }"
+              >
+                <button
+                  class="qvote" :class="{ on: q.voted }"
+                  :disabled="q.status !== 'published' || q.is_hidden"
+                  @click="upvoteQuestion(q.id)"
+                >
                   <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
                   <span>{{ q.upvotes }}</span>
                 </button>
                 <div class="qbody">
                   <span class="qtext">{{ q.body }}</span>
-                  <span class="qwho">{{ q.is_mine ? 'You' : q.author }}</span>
+                  <span class="qwho">
+                    {{ q.is_mine ? 'You' : q.author }}
+                    <span v-if="q.is_pinned" class="flag brand">Pinned</span>
+                    <span v-if="q.is_answered" class="flag ok">Answered</span>
+                    <span v-if="q.status === 'pending'" class="flag warn">Awaiting host</span>
+                    <span v-if="q.status === 'rejected'" class="flag">Rejected</span>
+                    <span v-if="q.is_hidden" class="flag">Hidden</span>
+                  </span>
+
+                  <div v-if="canModerate || q.can_delete" class="mtools">
+                    <template v-if="canModerate">
+                      <!-- Pre-moderation: a pending question is a decision, not a row. -->
+                      <template v-if="q.status === 'pending'">
+                        <button class="mbtn ok" @click="moderate(q, { status: 'published' }, 'qa')">Approve</button>
+                        <button class="mbtn danger" @click="moderate(q, { status: 'rejected' }, 'qa')">Reject</button>
+                      </template>
+                      <template v-else>
+                        <button class="mbtn" :class="{ on: q.is_answered }" @click="moderate(q, { is_answered: !q.is_answered }, 'qa')">
+                          {{ q.is_answered ? 'Reopen' : 'Answered' }}
+                        </button>
+                        <button class="mbtn" :class="{ on: q.is_pinned }" @click="moderate(q, { is_pinned: !q.is_pinned }, 'qa')">
+                          {{ q.is_pinned ? 'Unpin' : 'Pin' }}
+                        </button>
+                        <button class="mbtn" @click="moderate(q, { is_hidden: !q.is_hidden }, 'qa')">
+                          {{ q.is_hidden ? 'Unhide' : 'Hide' }}
+                        </button>
+                      </template>
+                    </template>
+                    <button v-if="q.can_delete" class="mbtn danger" @click="confirmRemove(q, 'qa')">Delete</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -601,22 +1040,72 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
 
           <!-- POLLS -->
           <div v-else-if="activeTab === 'polls'" class="polls">
-            <p v-if="!polls.length" class="empty">No polls yet.</p>
-            <div v-for="p in polls" :key="p.id" class="poll">
-              <div class="pq">{{ p.question }}</div>
+            <!-- Host composes a poll and launches it mid-session. -->
+            <template v-if="canModerate">
+              <button v-if="!composerOpen" class="newpoll" @click="composerOpen = true">+ New poll</button>
+              <div v-else class="composer">
+                <label class="clab">Question</label>
+                <input v-model="draftQuestion" class="cin" placeholder="What do you want to ask?" maxlength="300">
+
+                <label class="clab">Options</label>
+                <div v-for="(_, i) in draftOptions" :key="i" class="crow">
+                  <input v-model="draftOptions[i]" class="cin" :placeholder="`Option ${i + 1}`" maxlength="200">
+                  <button v-if="draftOptions.length > 2" class="cx" title="Remove" @click="removeDraftOption(i)">×</button>
+                </div>
+                <button v-if="draftOptions.length < 8" class="cadd" @click="addDraftOption">+ Add option</button>
+
+                <label class="ccheck">
+                  <input v-model="draftShowResults" type="checkbox">
+                  <span>Show results to attendees while voting is open</span>
+                </label>
+
+                <div class="cbtns">
+                  <button class="mbtn" @click="resetComposer">Cancel</button>
+                  <button class="mbtn" :disabled="!canLaunchPoll || savingPoll" @click="launchPoll('draft')">Save draft</button>
+                  <button class="mbtn go" :disabled="!canLaunchPoll || savingPoll" @click="launchPoll('live')">
+                    {{ savingPoll ? 'Launching…' : 'Launch' }}
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <p v-if="!polls.length" class="empty">
+              {{ canModerate ? 'No polls yet — create one above.' : 'No polls yet.' }}
+            </p>
+
+            <div v-for="p in polls" :key="p.id" class="poll" :class="{ draft: p.status === 'draft' }">
+              <div class="phead">
+                <span class="pq">{{ p.question }}</span>
+                <span class="pstat" :class="p.status">{{ p.status }}</span>
+              </div>
+
               <button
                 v-for="o in p.options" :key="o.id"
                 class="popt" :class="{ picked: p.my_vote === o.id }"
-                :disabled="!p.is_active"
+                :disabled="!p.is_active || isMuted"
                 @click="votePoll(p.id, o.id)"
               >
-                <span v-if="p.my_vote || !p.is_active" class="pbar" :style="{ width: pct(o, p) + '%' }" />
+                <span v-if="pollBarsVisible(p)" class="pbar" :style="{ width: pct(o, p) + '%' }" />
                 <span class="pot">{{ o.text }}</span>
-                <span v-if="p.my_vote || !p.is_active" class="ppc">{{ pct(o, p) }}%</span>
+                <span v-if="pollBarsVisible(p)" class="ppc">{{ pct(o, p) }}%</span>
               </button>
+
               <div class="pmeta">
                 {{ p.total_votes }} vote{{ p.total_votes === 1 ? '' : 's' }}
-                <template v-if="!p.is_active"> · closed</template>
+                <template v-if="p.status === 'closed'"> · closed</template>
+                <template v-else-if="!p.results_visible"> · results hidden until the host closes it</template>
+              </div>
+
+              <!-- Host runs the lifecycle: launch → close → reopen, reveal, delete. -->
+              <div v-if="canModerate" class="mtools wrap">
+                <button v-if="p.status !== 'live'" class="mbtn go" @click="updatePoll(p.id, { status: 'live' })">
+                  {{ p.status === 'draft' ? 'Launch' : 'Reopen' }}
+                </button>
+                <button v-else class="mbtn" @click="updatePoll(p.id, { status: 'closed' })">Close voting</button>
+                <button class="mbtn" @click="updatePoll(p.id, { show_results: !p.show_results })">
+                  {{ p.show_results ? 'Hide results' : 'Show results' }}
+                </button>
+                <button class="mbtn danger" @click="confirmDeletePoll(p)">Delete</button>
               </div>
             </div>
           </div>
@@ -626,25 +1115,40 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             <div class="atthead">
               <span class="live-dot" /> {{ attendeeMeta.online }} online · {{ attendeeMeta.total }} total
             </div>
-            <p v-if="!attendees.length" class="empty">No attendees to show.</p>
-            <div v-for="a in attendees" :key="a.id" class="arow">
+            <input v-model="attendeeSearch" class="asearch" type="search" placeholder="Search attendees…">
+
+            <p v-if="!shownAttendees.length" class="empty">
+              {{ attendeeSearch ? 'No one matches that search.' : 'No attendees to show.' }}
+            </p>
+            <div v-for="a in shownAttendees" :key="a.id" class="arow">
               <span class="aav">
                 <img v-if="a.image_url" :src="a.image_url" :alt="a.name">
                 <template v-else>{{ initials(a.name) }}</template>
                 <i v-if="a.online" class="ondot" />
               </span>
               <div class="ainfo">
-                <span class="aname">{{ a.name }}<span v-if="a.is_speaker" class="sbadge">Speaker</span></span>
+                <span class="aname">
+                  {{ a.name }}
+                  <span v-if="a.is_speaker" class="sbadge">Speaker</span>
+                  <span v-if="a.is_muted" class="flag">Muted</span>
+                </span>
                 <span v-if="a.headline" class="ahl">{{ a.headline }}</span>
               </div>
+              <button
+                v-if="canModerate && !a.is_speaker"
+                class="mbtn" :class="{ danger: !a.is_muted }"
+                :title="a.is_muted ? 'Let them post again' : 'Stop them posting in this session'"
+                @click="confirmMute(a)"
+              >{{ a.is_muted ? 'Unmute' : 'Mute' }}</button>
             </div>
           </div>
 
           <!-- SESSIONS -->
           <div v-else class="pbody slist">
-            <button v-for="s in otherSessions" :key="s.id" class="srow" @click="goToSession(s.id)">
-              <span class="stime">{{ fmtTime(s.starts_at) }}</span>
-              <span class="stitle">{{ s.title }}</span>
+            <button v-for="e in otherSessions" :key="e.session.id" class="srow" @click="goToSession(e.session.id)">
+              <span class="stime">{{ fmtTime(e.session.starts_at) }}</span>
+              <span class="stitle">{{ e.session.title }}</span>
+              <span class="sphase" :class="e.phase">{{ e.phase === 'live' ? 'LIVE' : e.phase }}</span>
             </button>
             <p v-if="!otherSessions.length" class="empty">No other sessions.</p>
           </div>
@@ -748,6 +1252,7 @@ hr { border: none; border-top: 1px solid #eef0f3; margin: 18px 0; }
 .ptabs { display: flex; gap: 2px; padding: 10px 10px 0; border-bottom: 1px solid #eef0f3; overflow-x: auto; }
 .ptab { flex: 0 0 auto; border: none; background: none; color: #94a3b8; font: inherit; font-weight: 700; font-size: .74rem; text-transform: uppercase; letter-spacing: .4px; padding: 10px 12px; border-bottom: 2px solid transparent; cursor: pointer; }
 .ptab.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+.tbadge { display: inline-block; margin-left: 4px; min-width: 15px; padding: 0 4px; border-radius: 999px; background: #ef4444; color: #fff; font-size: .62rem; font-weight: 800; line-height: 15px; text-align: center; }
 .pbody { flex: 1; overflow-y: auto; padding: 14px; }
 
 .slist { display: flex; flex-direction: column; gap: 6px; }
@@ -815,4 +1320,79 @@ hr { border: none; border-top: 1px solid #eef0f3; margin: 18px 0; }
 
 .preopen { position: fixed; right: 18px; bottom: 18px; width: 52px; height: 52px; border-radius: 50%; border: none; background: var(--brand-primary); color: #fff; cursor: pointer; box-shadow: 0 8px 24px rgba(99,82,231,.4); z-index: 20; display: flex; align-items: center; justify-content: center; }
 .preopen svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Agora host stage controls, floating over the video. */
+.stagebar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 8px; padding: 7px; border-radius: 999px; background: rgba(11,16,32,.78); backdrop-filter: blur(6px); z-index: 3; }
+.sbtn { border: 1px solid rgba(255,255,255,.22); background: transparent; color: #fff; border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 700; font-size: .78rem; cursor: pointer; white-space: nowrap; }
+.sbtn:hover { background: rgba(255,255,255,.12); }
+.sbtn.off { background: #f59e0b; border-color: #f59e0b; color: #1e293b; }
+.sbtn.danger { background: #ef4444; border-color: #ef4444; }
+
+/* ── Moderation ──────────────────────────────────────────────────────────
+   Host controls stay quiet until you hover the row they belong to, so an
+   attendee-facing panel doesn't turn into a control surface for everyone. */
+.mtools { display: flex; gap: 5px; margin-top: 5px; opacity: 0; transition: opacity .12s; }
+.mtools.wrap { flex-wrap: wrap; opacity: 1; margin-top: 9px; }
+.cmsg:hover .mtools, .qrow:hover .mtools, .mtools:focus-within { opacity: 1; }
+.mbtn { flex: 0 0 auto; border: 1px solid #e2e8f0; background: #fff; color: #64748b; border-radius: 7px; padding: 3px 8px; font: inherit; font-weight: 700; font-size: .68rem; cursor: pointer; white-space: nowrap; }
+.mbtn:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+.mbtn:disabled { opacity: .45; cursor: default; }
+.mbtn.on { border-color: var(--brand-primary); color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 8%, #fff); }
+.mbtn.danger:hover { border-color: #ef4444; color: #ef4444; }
+.mbtn.ok:hover { border-color: #16a34a; color: #16a34a; }
+.mbtn.go { border-color: var(--brand-primary); background: var(--brand-primary); color: #fff; }
+.mbtn.go:hover { opacity: .9; color: #fff; }
+
+/* Small status chips: hidden / pending / answered / muted. */
+.flag { display: inline-block; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 2px 5px; border-radius: 4px; margin-left: 5px; background: #e2e8f0; color: #475569; }
+.flag.warn { background: #fef3c7; color: #b45309; }
+.flag.ok { background: #dcfce7; color: #15803d; }
+.flag.brand { background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); }
+
+/* Hidden rows stay in the host's list, visibly de-emphasised. */
+.cmsg.hidden .ctext, .qrow.hidden .qtext { opacity: .5; text-decoration: line-through; }
+.qrow.pending { background: #fffbeb; border-radius: 10px; padding: 8px; margin: -8px -8px 0; }
+.qrow.answered .qtext { opacity: .65; }
+
+.mutedbar { margin: 0; padding: 11px 14px; border-top: 1px solid #eef0f3; background: #fef2f2; color: #b91c1c; font-size: .78rem; font-weight: 600; text-align: center; }
+.mutedbar.solid { border-top: none; border-bottom: 1px solid #eef0f3; }
+.modnote { margin: 0; padding: 8px 14px; background: #f8fafc; color: #64748b; font-size: .74rem; border-bottom: 1px solid #eef0f3; }
+
+/* Pinned strip above the chat scroll. */
+.pinstrip { border-bottom: 1px solid #eef0f3; background: color-mix(in srgb, var(--brand-primary) 5%, #fff); padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.pinrow { display: flex; align-items: center; gap: 7px; }
+.pinico { width: 13px; height: 13px; flex: 0 0 auto; fill: none; stroke: var(--brand-primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pintext { flex: 1; font-size: .78rem; color: #334155; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
+.pinx { flex: 0 0 auto; border: none; background: none; color: #94a3b8; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px; }
+.pinx:hover { color: #ef4444; }
+
+/* Host poll composer. */
+.newpoll { width: 100%; border: 1px dashed #cbd5e1; background: #fff; color: var(--brand-primary); border-radius: 10px; padding: 10px; font: inherit; font-weight: 800; font-size: .8rem; cursor: pointer; margin-bottom: 12px; }
+.newpoll:hover { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 5%, #fff); }
+.composer { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin-bottom: 14px; background: #fcfcfd; }
+.clab { display: block; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; margin: 8px 0 5px; }
+.clab:first-child { margin-top: 0; }
+.cin { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: .82rem; outline: none; }
+.cin:focus { border-color: var(--brand-primary); }
+.crow { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+.cx { flex: 0 0 auto; border: none; background: none; color: #94a3b8; font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0 3px; }
+.cx:hover { color: #ef4444; }
+.cadd { border: none; background: none; color: var(--brand-primary); font: inherit; font-weight: 700; font-size: .75rem; cursor: pointer; padding: 2px 0; }
+.ccheck { display: flex; align-items: center; gap: 7px; margin: 10px 0 12px; font-size: .76rem; color: #475569; cursor: pointer; }
+.cbtns { display: flex; gap: 6px; justify-content: flex-end; }
+
+.phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.poll.draft { border-style: dashed; background: #fcfcfd; }
+.pstat { flex: 0 0 auto; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 2px 6px; border-radius: 4px; background: #e2e8f0; color: #475569; }
+.pstat.live { background: #fee2e2; color: #b91c1c; }
+.pstat.draft { background: #fef3c7; color: #b45309; }
+
+.asearch { width: 100%; border: 1px solid #e2e8f0; border-radius: 999px; padding: 7px 13px; font: inherit; font-size: .82rem; outline: none; margin-bottom: 6px; }
+.asearch:focus { border-color: var(--brand-primary); }
+.arow .mbtn { margin-left: auto; }
+
+.srow { align-items: center; }
+.sphase { flex: 0 0 auto; margin-left: auto; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 2px 6px; border-radius: 4px; background: #e2e8f0; color: #475569; }
+.sphase.live { background: #ef4444; color: #fff; }
+.sphase.upcoming { background: #dbeafe; color: #1d4ed8; }
 </style>

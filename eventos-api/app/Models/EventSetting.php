@@ -34,6 +34,7 @@ class EventSetting extends Model
         'meeting' => 'array',
         'lounge' => 'array',
         'communication' => 'array',
+        'video' => 'array',
         'mobile_access_panel' => 'array',
         'sender' => 'array',
         'registration_open' => 'datetime',

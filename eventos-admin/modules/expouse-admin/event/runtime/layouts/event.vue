@@ -45,6 +45,7 @@ const sections = computed<any[]>(() => [
     { label: 'Login Setup', to: r('settings') },
     { label: 'Form Builder', to: r('settings/forms') },
     { label: 'Domain', to: r('settings/domain') },
+    { label: 'Video', to: r('settings/video') },
     { label: 'SEO & Meta Data', to: r('settings/seo') },
   ] },
   { key: 'showcase', label: 'Showcase Arena', svg: I.showcase, children: [

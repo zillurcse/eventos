@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
@@ -46,8 +47,34 @@ interface Session {
   can_live_polls: boolean
   can_attendee_list: boolean
   can_session: boolean
+  qa_moderation: boolean
   track: Track | null
   speakers: SessionSpeaker[]
+}
+
+interface PollOption { id: string; text: string; votes: number }
+
+interface Poll {
+  id: number
+  question: string
+  options: PollOption[]
+  total_votes: number
+  status: 'draft' | 'live' | 'closed'
+  is_active: boolean
+  show_results: boolean
+}
+
+interface PanelMessage {
+  id: number
+  kind: 'chat' | 'question'
+  body: string
+  author: string
+  upvotes: number
+  status: 'published' | 'pending' | 'rejected'
+  is_hidden: boolean
+  is_pinned: boolean
+  is_answered: boolean
+  created_at: string | null
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -55,7 +82,7 @@ interface Session {
 const session       = ref<Session | null>(null)
 const tracks        = ref<Track[]>([])
 const eventSpeakers = ref<EventSpeaker[]>([])
-const activeTab     = ref<'basic' | 'stream'>('basic')
+const activeTab     = ref<'basic' | 'stream' | 'engagement'>('basic')
 const loading       = ref(true)
 const tagInput      = ref('')
 
@@ -85,6 +112,8 @@ const basic = reactive({
 // Stream form state
 const stream = reactive({
   is_stream:                false,
+  // Manual override of the schedule-driven player ("go live now" / "we're done").
+  status:                   'scheduled' as Session['status'],
   who_will_host:            'self' as string,
   stream_link:              '',
   on_demand_recording_link: '',
@@ -94,11 +123,13 @@ const stream = reactive({
   can_live_polls:           false,
   can_attendee_list:        false,
   can_session:              false,
+  qa_moderation:            false,
 })
 
 // Host-aware label/placeholder/help for the stream link field.
 const HOST_LINK: Record<string, { label: string; placeholder: string; hint: string }> = {
   youtube: { label: 'YouTube Live Link', placeholder: 'https://www.youtube.com/live/…', hint: 'Paste your YouTube live or watch URL — it plays embedded on the event page.' },
+  agora:   { label: 'Agora Channel (optional)', placeholder: 'Leave blank to auto-create a channel', hint: 'Broadcast video embedded on the event page: the speaker goes on camera, attendees watch. Best for a large audience. Needs an App ID + Certificate in Settings › Video.' },
   jitsi:   { label: 'Jitsi Room or Link (optional)', placeholder: 'Leave blank to auto-create a private room', hint: 'Free open-source video that runs embedded on the event page. Leave blank to auto-generate a room, or paste a meet.jit.si link/room name.' },
   zoom:    { label: 'Zoom Link',         placeholder: 'https://zoom.us/j/…', hint: 'Embeds inside the event page via the Zoom Web SDK (needs Zoom keys configured on the server).' },
   meet:    { label: 'Google Meet Link',  placeholder: 'https://meet.google.com/abc-defg-hij', hint: 'Attendees open Meet in a new tab — Google Meet can’t be embedded.' },
@@ -106,6 +137,10 @@ const HOST_LINK: Record<string, { label: string; placeholder: string; hint: stri
   self:    { label: 'Stream Link',       placeholder: 'https://…', hint: 'The public URL where attendees watch the stream.' },
 }
 const hostLink = computed(() => HOST_LINK[stream.who_will_host] ?? HOST_LINK.self)
+
+// Agora takes a channel name and Jitsi a room name — neither is a URL, so the
+// browser must not demand one (the API validates the same way).
+const hostLinkIsUrl = computed(() => !['agora', 'jitsi'].includes(stream.who_will_host))
 
 const basicSaving  = ref(false)
 const streamSaving = ref(false)
@@ -184,6 +219,7 @@ async function load() {
 
     // Populate stream form
     stream.is_stream                = s.is_stream ?? false
+    stream.status                   = s.status ?? 'scheduled'
     stream.who_will_host            = s.who_will_host ?? 'self'
     stream.stream_link              = s.stream_link ?? ''
     stream.on_demand_recording_link = s.on_demand_recording_link ?? ''
@@ -193,10 +229,133 @@ async function load() {
     stream.can_live_polls           = s.can_live_polls ?? false
     stream.can_attendee_list        = s.can_attendee_list ?? false
     stream.can_session              = s.can_session ?? false
+    stream.qa_moderation            = s.qa_moderation ?? false
   } catch { /* */ } finally {
     loading.value = false
   }
 }
+
+// ── Engagement: polls + chat/Q&A moderation ──────────────────────────────────
+// The host moderates in the moment from the attendee watch page; this is the
+// organizer's side — author polls before the session, clean up during or after.
+
+const polls        = ref<Poll[]>([])
+const messages     = ref<PanelMessage[]>([])
+const modKind      = ref<'question' | 'chat'>('question')
+const engLoading   = ref(false)
+const pollSaving   = ref(false)
+
+const pollDraft = reactive({
+  question:     '',
+  options:      ['', ''] as string[],
+  show_results: true,
+})
+const composerOpen = ref(false)
+
+const canSavePoll = computed(() =>
+  !!pollDraft.question.trim() && pollDraft.options.filter(o => o.trim()).length >= 2,
+)
+
+async function loadEngagement() {
+  engLoading.value = true
+  try {
+    const [pollRes, msgRes] = await Promise.all([
+      api<any>(`/sessions/${sessionId}/polls`),
+      api<any>(`/sessions/${sessionId}/messages?kind=${modKind.value}`),
+    ])
+    polls.value    = pollRes.data
+    messages.value = msgRes.data
+  } catch { /* */ } finally {
+    engLoading.value = false
+  }
+}
+
+function resetPollDraft() {
+  pollDraft.question = ''
+  pollDraft.options = ['', '']
+  pollDraft.show_results = true
+  composerOpen.value = false
+}
+
+// A poll saved here starts as a draft unless the organizer launches it outright,
+// so writing the agenda's polls in advance never leaks them to attendees.
+async function savePoll(status: 'draft' | 'live') {
+  if (!canSavePoll.value || pollSaving.value) return
+  pollSaving.value = true
+  try {
+    await api(`/sessions/${sessionId}/polls`, {
+      method: 'POST',
+      body: {
+        question:     pollDraft.question.trim(),
+        options:      pollDraft.options.map(o => o.trim()).filter(Boolean),
+        status,
+        show_results: pollDraft.show_results,
+      },
+    })
+    resetPollDraft()
+    await loadEngagement()
+    toast.success(status === 'live' ? 'Poll launched' : 'Poll saved as draft')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save the poll.')
+  } finally {
+    pollSaving.value = false
+  }
+}
+
+async function patchPoll(p: Poll, patch: Record<string, unknown>, note: string) {
+  try {
+    await api(`/session-polls/${p.id}`, { method: 'PATCH', body: patch })
+    await loadEngagement()
+    toast.success(note)
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update the poll.')
+  }
+}
+
+async function deletePoll(p: Poll) {
+  if (!confirm('Delete this poll and every vote cast on it?')) return
+  try {
+    await api(`/session-polls/${p.id}`, { method: 'DELETE' })
+    await loadEngagement()
+    toast.success('Poll deleted')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not delete the poll.')
+  }
+}
+
+async function patchMessage(m: PanelMessage, patch: Record<string, unknown>, note: string) {
+  try {
+    await api(`/session-messages/${m.id}`, { method: 'PATCH', body: patch })
+    await loadEngagement()
+    toast.success(note)
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update the message.')
+  }
+}
+
+async function deleteMessage(m: PanelMessage) {
+  if (!confirm('Delete this message? Attendees will no longer see it.')) return
+  try {
+    await api(`/session-messages/${m.id}`, { method: 'DELETE' })
+    await loadEngagement()
+    toast.success('Message deleted')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not delete the message.')
+  }
+}
+
+function addPollOption() { if (pollDraft.options.length < 8) pollDraft.options.push('') }
+function removePollOption(i: number) { if (pollDraft.options.length > 2) pollDraft.options.splice(i, 1) }
+
+function pct(o: PollOption, p: Poll) {
+  return p.total_votes ? Math.round((o.votes / p.total_votes) * 100) : 0
+}
+
+const pendingCount = computed(() => messages.value.filter(m => m.status === 'pending').length)
+
+// Load the engagement data lazily — only when the organizer opens that tab.
+watch(activeTab, (t) => { if (t === 'engagement') loadEngagement() })
+watch(modKind, () => { if (activeTab.value === 'engagement') loadEngagement() })
 
 // ── Save basic ────────────────────────────────────────────────────────────────
 
@@ -226,8 +385,10 @@ async function saveBasic() {
       },
     })
     session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
+    toast.success('Session details saved')
   } catch (e: any) {
     basicError.value = e?.data?.message || 'Could not save changes.'
+    toast.error(basicError.value)
   } finally {
     basicSaving.value = false
   }
@@ -243,6 +404,7 @@ async function saveStream() {
       method: 'PUT',
       body: {
         is_stream:                stream.is_stream,
+        status:                   stream.status,
         who_will_host:            stream.who_will_host,
         stream_link:              stream.stream_link || null,
         on_demand_recording_link: stream.on_demand_recording_link || null,
@@ -252,11 +414,14 @@ async function saveStream() {
         can_live_polls:           stream.can_live_polls,
         can_attendee_list:        stream.can_attendee_list,
         can_session:              stream.can_session,
+        qa_moderation:            stream.qa_moderation,
       },
     })
     session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
+    toast.success('Stream settings saved')
   } catch (e: any) {
     streamError.value = e?.data?.message || 'Could not save stream settings.'
+    toast.error(streamError.value)
   } finally {
     streamSaving.value = false
   }
@@ -391,6 +556,13 @@ onMounted(load)
             : 'border-transparent text-muted hover:text-ink'"
           @click="activeTab = 'stream'"
         >Stream</button>
+        <button
+          class="px-4 py-2.5 text-[.9rem] font-medium border-b-2 -mb-px transition-colors"
+          :class="activeTab === 'engagement'
+            ? 'border-brand text-brand'
+            : 'border-transparent text-muted hover:text-ink'"
+          @click="activeTab = 'engagement'"
+        >Engagement</button>
       </div>
 
       <!-- ── Basic Details Tab ───────────────────────────────────────────── -->
@@ -628,6 +800,7 @@ onMounted(load)
                 <option value="self">Self-hosted</option>
                 <option value="youtube">YouTube</option>
                 <option value="vimeo">Vimeo</option>
+                <option value="agora">Agora (in-page broadcast)</option>
                 <option value="jitsi">Jitsi (in-page video)</option>
                 <option value="zoom">Zoom</option>
                 <option value="meet">Google Meet</option>
@@ -644,7 +817,7 @@ onMounted(load)
 
             <div v-else class="mb-4">
               <label class="block mb-1.5">{{ hostLink.label }}</label>
-              <input v-model="stream.stream_link" type="url" :placeholder="hostLink.placeholder" class="m-0">
+              <input v-model="stream.stream_link" :type="hostLinkIsUrl ? 'url' : 'text'" :placeholder="hostLink.placeholder" class="m-0">
               <p class="muted text-[.8rem] mt-1.5 mb-0">{{ hostLink.hint }}</p>
             </div>
 
@@ -655,8 +828,25 @@ onMounted(load)
             </div>
           </div>
 
-          <!-- Engagement options -->
+          <!-- Broadcast state -->
           <div class="card mb-5 p-5">
+            <h3 class="font-semibold text-[.9rem] text-ink mb-1 m-0">Broadcast State</h3>
+            <p class="muted text-[.83rem] mt-0 mb-4">
+              By schedule, the player opens 15 minutes before the start time and stays up
+              30 minutes past the end. Override it here when you run early or late.
+            </p>
+            <select v-model="stream.status" class="m-0 w-full max-w-xs">
+              <option value="scheduled">Follow the schedule</option>
+              <option value="live">Live now — open the player</option>
+              <option value="ended">Ended — show the replay</option>
+              <option value="canceled">Canceled</option>
+            </select>
+          </div>
+        </template>
+
+        <!-- Engagement options apply to any session, streamed or in-person —
+             an on-site talk still wants Q&A and polls. -->
+        <div class="card mb-5 p-5">
             <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Engagement Options</h3>
             <div class="flex flex-col gap-4">
               <label class="flex items-start gap-3 cursor-pointer select-none">
@@ -671,6 +861,17 @@ onMounted(load)
                 <div>
                   <div class="font-medium text-ink text-[.93rem]">Q&amp;A</div>
                   <div class="muted text-[.8rem]">Let attendees submit and upvote questions.</div>
+                </div>
+              </label>
+              <!-- Pre-moderation only means anything if Q&A is on at all. -->
+              <label v-if="stream.can_qa" class="flex items-start gap-3 cursor-pointer select-none ml-8 pl-0">
+                <input v-model="stream.qa_moderation" type="checkbox" class="w-4.5 h-4.5 m-0 mt-0.5 accent-brand shrink-0">
+                <div>
+                  <div class="font-medium text-ink text-[.93rem]">Review questions before they appear</div>
+                  <div class="muted text-[.8rem]">
+                    Questions wait in a pending queue until the session host approves them.
+                    The asker still sees their own while it waits.
+                  </div>
                 </div>
               </label>
               <label class="flex items-start gap-3 cursor-pointer select-none">
@@ -696,7 +897,6 @@ onMounted(load)
               </label>
             </div>
           </div>
-        </template>
 
         <p v-if="streamError" class="error mb-3">{{ streamError }}</p>
 
@@ -704,6 +904,172 @@ onMounted(load)
           <button class="btn" :disabled="streamSaving" @click="saveStream">
             {{ streamSaving ? 'Saving…' : 'SAVE STREAM SETTINGS' }}
           </button>
+        </div>
+      </div>
+
+      <!-- ── Engagement Tab ──────────────────────────────────────────────── -->
+      <div v-else-if="activeTab === 'engagement'" class="max-w-2xl">
+
+        <!-- Polls -->
+        <div class="card mb-5 p-5">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="font-semibold text-[.9rem] text-ink m-0">Live Polls</h3>
+            <button v-if="!composerOpen" class="btn sm" @click="composerOpen = true">+ NEW POLL</button>
+          </div>
+          <p class="muted text-[.83rem] mt-0 mb-4">
+            Attendees vote from the session watch page. A draft stays hidden until you or the host launches it.
+          </p>
+
+          <!-- Composer -->
+          <div v-if="composerOpen" class="border border-line rounded-xl p-4 mb-5 bg-[#fcfcfd]">
+            <div class="mb-3">
+              <label class="block mb-1.5">Question</label>
+              <input v-model="pollDraft.question" placeholder="What do you want to ask?" maxlength="300" class="m-0">
+            </div>
+
+            <label class="block mb-1.5">Options</label>
+            <div v-for="(_, i) in pollDraft.options" :key="i" class="flex items-center gap-2 mb-2">
+              <input v-model="pollDraft.options[i]" :placeholder="`Option ${i + 1}`" maxlength="200" class="m-0 flex-1">
+              <button
+                v-if="pollDraft.options.length > 2"
+                class="text-muted hover:text-[#dc2626] px-1 leading-none text-lg"
+                title="Remove option"
+                @click="removePollOption(i)"
+              >×</button>
+            </div>
+            <button v-if="pollDraft.options.length < 8" class="text-brand text-[.8rem] font-medium mb-4" @click="addPollOption">
+              + Add option
+            </button>
+
+            <label class="flex items-center gap-3 cursor-pointer select-none mb-4">
+              <input v-model="pollDraft.show_results" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
+              <span class="text-[.88rem] text-ink">Show results to attendees while voting is open</span>
+            </label>
+
+            <div class="flex justify-end gap-2">
+              <button class="btn ghost sm" @click="resetPollDraft">Cancel</button>
+              <button class="btn ghost sm" :disabled="!canSavePoll || pollSaving" @click="savePoll('draft')">Save draft</button>
+              <button class="btn sm" :disabled="!canSavePoll || pollSaving" @click="savePoll('live')">
+                {{ pollSaving ? 'Launching…' : 'Launch now' }}
+              </button>
+            </div>
+          </div>
+
+          <p v-if="engLoading && !polls.length" class="muted text-[.84rem]">Loading…</p>
+          <p v-else-if="!polls.length" class="muted text-[.84rem]">No polls for this session yet.</p>
+
+          <div v-for="p in polls" :key="p.id" class="border border-line rounded-xl p-4 mb-3">
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <span class="font-semibold text-[.9rem] text-ink">{{ p.question }}</span>
+              <span
+                class="shrink-0 text-[.62rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded"
+                :class="{
+                  'bg-[#fee2e2] text-[#b91c1c]': p.status === 'live',
+                  'bg-[#fef3c7] text-[#b45309]': p.status === 'draft',
+                  'bg-[#e2e8f0] text-[#475569]': p.status === 'closed',
+                }"
+              >{{ p.status }}</span>
+            </div>
+
+            <div v-for="o in p.options" :key="o.id" class="relative border border-line rounded-lg px-3 py-2 mb-1.5 overflow-hidden">
+              <span class="absolute left-0 top-0 bottom-0 bg-brand-soft transition-[width]" :style="{ width: pct(o, p) + '%' }" />
+              <span class="relative flex items-center justify-between text-[.85rem] text-ink">
+                <span>{{ o.text }}</span>
+                <span class="font-bold text-brand">{{ pct(o, p) }}% · {{ o.votes }}</span>
+              </span>
+            </div>
+
+            <div class="muted text-[.76rem] mt-2">
+              {{ p.total_votes }} vote{{ p.total_votes === 1 ? '' : 's' }}
+              <template v-if="!p.show_results && p.status !== 'closed'"> · results hidden from attendees</template>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button
+                v-if="p.status !== 'live'"
+                class="btn sm"
+                @click="patchPoll(p, { status: 'live' }, p.status === 'draft' ? 'Poll launched' : 'Poll reopened')"
+              >{{ p.status === 'draft' ? 'Launch' : 'Reopen' }}</button>
+              <button v-else class="btn ghost sm" @click="patchPoll(p, { status: 'closed' }, 'Voting closed')">Close voting</button>
+              <button
+                class="btn ghost sm"
+                @click="patchPoll(p, { show_results: !p.show_results }, p.show_results ? 'Results hidden' : 'Results shown')"
+              >{{ p.show_results ? 'Hide results' : 'Show results' }}</button>
+              <button class="btn ghost sm text-[#dc2626]" @click="deletePoll(p)">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Moderation -->
+        <div class="card mb-5 p-5">
+          <h3 class="font-semibold text-[.9rem] text-ink m-0 mb-1">Moderation</h3>
+          <p class="muted text-[.83rem] mt-0 mb-4">
+            Everything attendees posted in this session, including what's hidden or awaiting approval.
+            The host can do all of this live from the watch page too.
+          </p>
+
+          <div class="flex gap-1 border-b border-line mb-4">
+            <button
+              class="px-3 py-2 text-[.85rem] font-medium border-b-2 -mb-px transition-colors"
+              :class="modKind === 'question' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'"
+              @click="modKind = 'question'"
+            >
+              Q&amp;A
+              <span v-if="pendingCount" class="ml-1 px-1.5 rounded-full bg-[#dc2626] text-white text-[.62rem] font-bold">{{ pendingCount }}</span>
+            </button>
+            <button
+              class="px-3 py-2 text-[.85rem] font-medium border-b-2 -mb-px transition-colors"
+              :class="modKind === 'chat' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'"
+              @click="modKind = 'chat'"
+            >Chat</button>
+          </div>
+
+          <p v-if="engLoading && !messages.length" class="muted text-[.84rem]">Loading…</p>
+          <p v-else-if="!messages.length" class="muted text-[.84rem]">
+            Nothing posted here yet.
+          </p>
+
+          <div
+            v-for="m in messages" :key="m.id"
+            class="flex items-start gap-3 py-3 border-b border-line last:border-0"
+            :class="{ 'opacity-60': m.is_hidden || m.status === 'rejected' }"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="text-[.88rem] text-ink leading-snug" :class="{ 'line-through': m.is_hidden }">{{ m.body }}</div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <span class="muted text-[.76rem]">{{ m.author }}</span>
+                <span v-if="m.kind === 'question'" class="muted text-[.76rem]">· {{ m.upvotes }} upvote{{ m.upvotes === 1 ? '' : 's' }}</span>
+                <span v-if="m.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
+                <span v-if="m.status === 'rejected'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Rejected</span>
+                <span v-if="m.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>
+                <span v-if="m.is_pinned" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-brand-soft text-brand">Pinned</span>
+                <span v-if="m.is_answered" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#dcfce7] text-[#15803d]">Answered</span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-1.5 shrink-0">
+              <template v-if="m.status === 'pending'">
+                <button class="btn sm" @click="patchMessage(m, { status: 'published' }, 'Question approved')">Approve</button>
+                <button class="btn ghost sm text-[#dc2626]" @click="patchMessage(m, { status: 'rejected' }, 'Question rejected')">Reject</button>
+              </template>
+              <template v-else>
+                <button
+                  v-if="m.kind === 'question'"
+                  class="btn ghost sm"
+                  @click="patchMessage(m, { is_answered: !m.is_answered }, m.is_answered ? 'Question reopened' : 'Marked as answered')"
+                >{{ m.is_answered ? 'Reopen' : 'Answered' }}</button>
+                <button
+                  class="btn ghost sm"
+                  @click="patchMessage(m, { is_pinned: !m.is_pinned }, m.is_pinned ? 'Unpinned' : 'Pinned')"
+                >{{ m.is_pinned ? 'Unpin' : 'Pin' }}</button>
+                <button
+                  class="btn ghost sm"
+                  @click="patchMessage(m, { is_hidden: !m.is_hidden }, m.is_hidden ? 'Message restored' : 'Message hidden')"
+                >{{ m.is_hidden ? 'Unhide' : 'Hide' }}</button>
+              </template>
+              <button class="btn ghost sm text-[#dc2626]" @click="deleteMessage(m)">Delete</button>
+            </div>
+          </div>
         </div>
       </div>
     </template>
