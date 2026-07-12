@@ -25,6 +25,7 @@ let observer: IntersectionObserver | undefined
 
 onMounted(() => {
   if (!store.loaded) store.fetchDelegates()
+  if (!store.similarLoaded) store.fetchSimilar()
   bookmarks.fetch()
   observer = new IntersectionObserver(
     entries => { if (entries.some(e => e.isIntersecting) && !savedOnly.value) store.loadMore() },
@@ -94,6 +95,9 @@ const filtered = computed<Delegate[]>(() =>
 
     <!-- Delegate grid -->
     <section class="main">
+      <!-- People who share my designation / company — above the directory. -->
+      <DelegatesSimilarStrip />
+
       <div class="head">
         <h1>Delegates</h1>
         <p class="sub">Other attendees at this event.</p>

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Concerns\HandlesMeetingLocation;
 use App\Http\Controllers\Concerns\NormalizesTimestamps;
 use App\Http\Controllers\Controller;
+use App\Models\Event;
 use App\Models\Exhibitor;
 use App\Models\ExhibitorConversation;
 use App\Models\ExhibitorMeetingRequest;
@@ -23,7 +25,7 @@ use Illuminate\Http\Request;
  */
 class ExhibitorContactController extends Controller
 {
-    use NormalizesTimestamps;
+    use HandlesMeetingLocation, NormalizesTimestamps;
 
     /** GET /events/{event}/exhibitors/{exhibitor}/thread — my chat with this booth. */
     public function thread(Request $request, string $event, string $exhibitor): JsonResponse
@@ -151,10 +153,13 @@ class ExhibitorContactController extends Controller
         $eventId = (int) $request->attributes->get('event_id');
         $orgId = (int) $request->attributes->get('organization_id');
         $exh = $this->resolveExhibitor($request, $exhibitor);
+        $eventModel = Event::findOrFail($eventId);
 
         $data = $request->validate([
             'subject' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string', 'max:1000'],
+            // Venue/hybrid: say where — the booth number, a hall, a meeting room.
+            'location' => $this->meetingLocationRules($eventModel),
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'date' => ['nullable', 'date_format:Y-m-d', 'required_with:slot'],
@@ -176,6 +181,7 @@ class ExhibitorContactController extends Controller
             'status' => 'requested',
             'subject' => $data['subject'] ?? null,
             'agenda' => $data['agenda'] ?? null,
+            'location' => $this->meetingLocationValue($eventModel, $data['location'] ?? null),
             'starts_at' => $data['starts_at'] ?? null,
             'ends_at' => $data['ends_at'] ?? null,
             'meta' => $meta,
@@ -259,6 +265,7 @@ class ExhibitorContactController extends Controller
             'status' => $r->status,
             'subject' => $r->subject,
             'agenda' => $r->agenda,
+            'location' => $r->location,
             'starts_at' => $r->starts_at?->toIso8601String(),
             'ends_at' => $r->ends_at?->toIso8601String(),
             'date' => $r->meta['lounge_date'] ?? null,

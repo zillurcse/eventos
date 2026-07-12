@@ -224,6 +224,8 @@ Route::prefix('v1')->group(function () {
             // event's org GUC set by the participant middleware.
             Route::post('/uploads', [FileUploadController::class, 'store']);
             Route::get('/delegates', [DelegateController::class, 'index']);
+            // "People like you" strip above the directory (same designation/company).
+            Route::get('/delegates/similar', [DelegateController::class, 'similar']);
             // Live-session engagement panel (attendee watch page): group chat,
             // Q&A, polls and the attendees list, all scoped to one session.
             Route::get('/sessions/{sessionUuid}/chat', [SessionEngagementController::class, 'chatIndex']);

@@ -4,9 +4,15 @@ const contact = useExhibitorContactStore()
 const draft = ref('')
 const subject = ref('')
 const agenda = ref('')
+const place = ref('')
 const pickedDate = ref('')
 const pickedSlot = ref('')
 const sentToast = ref('')
+const meetError = ref('')
+
+// In-person / hybrid events meet somewhere physical; online ones don't.
+const needsLocation = computed(() => contact.lounge?.location_required === true)
+const placeOptions = computed<string[]>(() => contact.lounge?.locations ?? [])
 
 const quickReplies = [
   'Hi, I’d like to know more about your company.',
@@ -19,12 +25,18 @@ watch(() => contact.target?.id, () => {
   draft.value = ''
   subject.value = ''
   agenda.value = ''
+  place.value = ''
   pickedDate.value = contact.lounge?.dates?.[0] ?? ''
   pickedSlot.value = ''
   sentToast.value = ''
+  meetError.value = ''
 })
 watch(() => contact.lounge, (l) => {
   if (l && !pickedDate.value) pickedDate.value = l.dates?.[0] ?? ''
+  // One place on offer is not a choice — pre-select it.
+  if (l?.location_required && !place.value && l.locations?.length === 1) {
+    place.value = l.locations[0] ?? ''
+  }
 })
 
 const slotsForDay = computed(() => contact.lounge?.slots?.[pickedDate.value] ?? [])
@@ -40,9 +52,19 @@ async function send() {
 }
 
 async function sendMeeting() {
+  meetError.value = ''
+
+  if (needsLocation.value && !place.value.trim()) {
+    meetError.value = placeOptions.value.length
+      ? 'Choose where you want to meet.'
+      : 'Enter where you want to meet, e.g. Hall 4.'
+    return
+  }
+
   const ok = await contact.requestMeeting({
     subject: subject.value,
     agenda: agenda.value,
+    location: needsLocation.value ? place.value.trim() : undefined,
     date: pickedDate.value || undefined,
     slot: pickedSlot.value || undefined,
   })
@@ -156,6 +178,30 @@ function statusLabel(s: string) {
           <label class="lbl">What would you like to discuss? <span class="opt">(optional)</span></label>
           <textarea v-model="agenda" class="in" rows="3" maxlength="1000" placeholder="Add a short agenda…" />
 
+          <!-- Meeting location — in-person / hybrid events only. The organizer's
+               places are quick-fills; you can always type somewhere else. -->
+          <template v-if="needsLocation">
+            <label class="lbl">Meeting location</label>
+            <div v-if="placeOptions.length" class="places">
+              <button
+                v-for="p in placeOptions"
+                :key="p"
+                type="button"
+                class="place"
+                :class="{ on: place === p }"
+                @click="place = place === p ? '' : p"
+              >{{ p }}</button>
+            </div>
+            <input
+              v-model="place"
+              class="in"
+              maxlength="180"
+              :placeholder="placeOptions.length ? 'Or type another place…' : 'e.g. Hall 4, Booth B12'"
+            >
+          </template>
+
+          <p v-if="meetError" class="err sm">{{ meetError }}</p>
+
           <!-- Existing requests -->
           <div v-if="contact.requests.length" class="reqs">
             <label class="lbl">Your requests</label>
@@ -163,6 +209,7 @@ function statusLabel(s: string) {
               <div class="req-main">
                 <strong>{{ r.subject || 'Meeting request' }}</strong>
                 <span v-if="r.date" class="req-when">{{ r.date }}<template v-if="r.slot"> · {{ fmtSlot(r.slot) }}</template></span>
+                <span v-if="r.location" class="req-where">📍 {{ r.location }}</span>
               </div>
               <span class="pill" :class="r.status">{{ statusLabel(r.status) }}<template v-if="r.assigned_to"> · {{ r.assigned_to }}</template></span>
             </div>
@@ -236,11 +283,18 @@ function statusLabel(s: string) {
 .slot.on { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); font-weight: 700; }
 .slot.busy { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
 
+.places { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.place { border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 8px 13px; font: inherit; font-size: .82rem; color: #475569; cursor: pointer; }
+.place.on { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); font-weight: 700; }
+
+.err.sm { margin: 8px 0 0; }
+
 .reqs { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .req { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #eef0f3; border-radius: 10px; padding: 10px 12px; }
 .req-main { display: flex; flex-direction: column; min-width: 0; }
 .req-main strong { font-size: .86rem; color: #1e293b; }
 .req-when { font-size: .78rem; color: #64748b; }
+.req-where { font-size: .78rem; color: #64748b; }
 .pill { font-size: .72rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #f1f5f9; color: #475569; white-space: nowrap; }
 .pill.confirmed { background: #dcfce7; color: #15803d; }
 .pill.assigned { background: color-mix(in srgb, var(--brand-primary) 14%, #fff); color: var(--brand-primary); }

@@ -25,6 +25,24 @@ const saving = ref(false)
 const saved = ref(false)
 const restrictionOpen = ref(false)
 
+// Meeting locations — where one-to-one meetings physically happen ("Hall 4").
+// Only meaningful on a venue/hybrid event; an online one has nowhere to meet.
+const eventFormat = ref('venue')
+const isPhysical = computed(() => eventFormat.value === 'venue' || eventFormat.value === 'hybrid')
+const locations = ref<string[]>([])
+const newLocation = ref('')
+
+function addLocation() {
+  const name = newLocation.value.trim()
+  if (!name || locations.value.includes(name)) { newLocation.value = ''; return }
+  locations.value.push(name)
+  newLocation.value = ''
+}
+
+function removeLocation(name: string) {
+  locations.value = locations.value.filter(l => l !== name)
+}
+
 function buildPerms(values: Partial<PermMatrix> = {}): PermMatrix {
   const out = {} as PermMatrix
   for (const r of ROLES) {
@@ -62,8 +80,14 @@ async function load() {
     Object.assign(permissions, buildPerms(m.permissions || {}))
     Object.assign(restrictions, buildRestrictions(m.restrictions || {}))
     intelligent.value = !!m.intelligent
+    locations.value = Array.isArray(m.locations) ? m.locations.filter((l: unknown) => typeof l === 'string') : []
     if (SLOT_DURATIONS.includes(Number(m.slot_duration))) slotDuration.value = Number(m.slot_duration)
   } catch { /* keep defaults */ }
+
+  try {
+    const ev = await api<{ data: { format?: string } }>(`/events/${id}`)
+    eventFormat.value = ev.data.format || 'venue'
+  } catch { /* assume in-person */ }
 }
 
 async function save() {
@@ -86,6 +110,7 @@ async function save() {
           intelligent: intelligent.value,
           slot_duration: slotDuration.value,
           restrictions: restr,
+          locations: locations.value,
         },
       },
     })
@@ -168,6 +193,43 @@ onMounted(load)
           <input v-model.number="slotDuration" type="radio" :value="d" class="w-4 h-4 m-0 accent-brand">
           {{ d }} Minutes
         </label>
+      </div>
+    </div>
+
+    <!-- Meeting locations — in-person / hybrid events only -->
+    <div v-if="isPhysical" class="card mb-4">
+      <h3 class="font-bold text-base text-[#1a1a2e] m-0">Meeting Locations</h3>
+      <p class="muted text-[.86rem] mt-1 mb-4">
+        Where one-to-one meetings take place, e.g. <em>Hall 4</em>. Attendees pick one of these when they
+        request a meeting. Leave the list empty to let them type their own place.
+      </p>
+
+      <div v-if="locations.length" class="flex flex-wrap gap-2 mb-3">
+        <span
+          v-for="l in locations"
+          :key="l"
+          class="inline-flex items-center gap-2 rounded-full border border-line bg-[#f7f7f9] py-1.5 pl-3.5 pr-2 text-[.85rem] text-ink"
+        >
+          {{ l }}
+          <button
+            type="button"
+            class="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-white hover:text-[#dc2626]"
+            :aria-label="`Remove ${l}`"
+            @click="removeLocation(l)"
+          >×</button>
+        </span>
+      </div>
+
+      <div class="flex gap-2">
+        <input
+          v-model="newLocation"
+          type="text"
+          maxlength="180"
+          placeholder="e.g. Hall 4"
+          class="m-0 max-w-xs"
+          @keydown.enter.prevent="addLocation"
+        >
+        <button class="btn ghost shrink-0" type="button" @click="addLocation">ADD</button>
       </div>
     </div>
 

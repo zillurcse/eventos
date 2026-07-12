@@ -17,6 +17,8 @@ export interface Meeting {
   id: string
   title: string | null
   agenda: string | null
+  // Where the two of you meet, on a venue/hybrid event ("Hall 4"). Null online.
+  location: string | null
   type: 'one_on_one' | 'group'
   status: 'requested' | 'confirmed' | 'declined' | 'canceled' | 'completed'
   direction: 'incoming' | 'outgoing'
@@ -39,6 +41,8 @@ export interface MeetingRequest {
   to: string           // counterpart participation uuid
   title?: string
   agenda?: string
+  location?: string    // required on a venue/hybrid event
+
   starts_at?: string
   ends_at?: string
   date?: string        // lounge slot day, YYYY-MM-DD
@@ -102,6 +106,7 @@ export const useMeetingsStore = defineStore('meetings', {
             invitees: [req.to],
             title: req.title || null,
             agenda: req.agenda || null,
+            location: req.location || null,
             starts_at: req.starts_at || null,
             ends_at: req.ends_at || null,
             date: req.date || null,

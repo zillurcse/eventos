@@ -86,6 +86,11 @@ const badge = computed(() => {
         <svg viewBox="0 0 24 24"><path d="M7 4v3M17 4v3M4 9h16M5 7h14v13H5z" /></svg>
         {{ when }}
       </p>
+      <!-- In-person / hybrid events: where to actually turn up. -->
+      <p v-if="meeting.location" class="when">
+        <svg viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.6" /></svg>
+        {{ meeting.location }}
+      </p>
     </div>
 
     <!-- Incoming pending → approve / reject -->

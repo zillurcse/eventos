@@ -237,6 +237,9 @@ onMounted(() => { loadConversations(); loadRequests(); loadMembers() })
               <p v-if="r.date" class="mt-1 text-[.82rem] text-muted">
                 Preferred: {{ r.date }}<template v-if="r.slot"> · {{ fmtSlot(r.slot) }}</template>
               </p>
+              <p v-if="r.location" class="mt-1 text-[.82rem] text-muted">
+                Location: {{ r.location }}
+              </p>
               <p v-if="r.assigned_to" class="mt-1 text-[.82rem] text-brand font-semibold">
                 {{ r.mine ? 'Assigned to you' : `Assigned to ${r.assigned_to}` }}
               </p>

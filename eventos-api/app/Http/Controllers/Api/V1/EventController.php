@@ -207,6 +207,10 @@ class EventController extends Controller
             'meeting.permissions.*.sponsor' => ['sometimes', 'boolean'],
             'meeting.intelligent' => ['sometimes', 'boolean'],
             'meeting.slot_duration' => ['sometimes', 'integer', 'in:10,15,30'],
+            // Places a meeting can be held on a venue/hybrid event ("Hall 4").
+            // Empty list = attendees type their own.
+            'meeting.locations' => ['sometimes', 'array', 'max:50'],
+            'meeting.locations.*' => ['string', 'max:180'],
             'meeting.restrictions' => ['sometimes', 'array'],
             'meeting.restrictions.*.requests' => ['sometimes', 'integer', 'min:0', 'max:100000'],
             'meeting.restrictions.*.confirmed' => ['sometimes', 'integer', 'min:0', 'max:100000'],

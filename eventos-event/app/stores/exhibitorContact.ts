@@ -14,6 +14,7 @@ export interface ExhibitorMeetingRequest {
   status: 'requested' | 'assigned' | 'confirmed' | 'declined' | 'canceled'
   subject: string | null
   agenda: string | null
+  location: string | null
   starts_at: string | null
   ends_at: string | null
   date: string | null
@@ -28,6 +29,9 @@ export interface LoungeInfo {
   dates: string[]
   slots: Record<string, string[]>
   busy: Array<{ date: string, slot: string }>
+  format: string                // venue | online | hybrid
+  location_required: boolean    // true on a venue/hybrid event
+  locations: string[]           // places the organizer allows, e.g. ["Hall 4"]
 }
 
 interface ContactTarget { id: string, name: string }
@@ -185,7 +189,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
       } catch { /* */ }
     },
 
-    async requestMeeting(payload: { subject?: string, agenda?: string, date?: string, slot?: string }): Promise<boolean> {
+    async requestMeeting(payload: { subject?: string, agenda?: string, location?: string, date?: string, slot?: string }): Promise<boolean> {
       const uuid = this.eventUuid()
       if (!uuid || !this.target || this.requesting) return false
       this.requesting = true
@@ -197,6 +201,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
           { method: 'POST', body: {
             subject: payload.subject || null,
             agenda: payload.agenda || null,
+            location: payload.location || null,
             date: payload.date || null,
             slot: payload.slot || null,
           } },

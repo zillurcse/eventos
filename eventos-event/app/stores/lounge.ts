@@ -9,6 +9,9 @@ export interface LoungeAvailability {
   dates: string[]
   slots: Record<string, string[]>
   busy: LoungeBusy[]
+  format: string                // venue | online | hybrid
+  location_required: boolean    // true on a venue/hybrid event
+  locations: string[]           // places the organizer allows, e.g. ["Hall 4"]
 }
 
 /**

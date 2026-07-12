@@ -52,11 +52,18 @@ trait SeedsEventContent
         $tz = $event->timezone ?: 'UTC';
 
         // --- Logins (password = "password") -----------------------------------
-        $alex = $this->attendee($org, $event, 'Alex Rivera', "alex@{$emailDomain}", $tz);
-        $sam = $this->attendee($org, $event, 'Sam Chen', "sam@{$emailDomain}", $tz);
-        $this->attendee($org, $event, 'Jordan Blake', "jordan@{$emailDomain}", $tz);
-        $this->attendee($org, $event, 'Taylor Reed', "taylor@{$emailDomain}", $tz);
+        // The four logins deliberately overlap on designation and company, so
+        // whichever one you sign in as, the Delegates tab's "Similar profiles"
+        // strip has something to show: Alex and Sam share a title, Alex and
+        // Jordan share a company.
+        $alex = $this->attendee($org, $event, 'Alex Rivera', "alex@{$emailDomain}", $tz, 'Head of Product', 'Acme Robotics', 15);
+        $sam = $this->attendee($org, $event, 'Sam Chen', "sam@{$emailDomain}", $tz, 'Head of Product', 'Northwind Software', 16);
+        $this->attendee($org, $event, 'Jordan Blake', "jordan@{$emailDomain}", $tz, 'Data Scientist', 'Acme Robotics', 17);
+        $this->attendee($org, $event, 'Taylor Reed', "taylor@{$emailDomain}", $tz, 'Data Scientist', 'Globex AI', 18);
         $this->host($org, $event, 'Nadia Osei', "host@{$emailDomain}", $tz);
+
+        // --- Delegate directory ----------------------------------------------
+        $this->seedDelegates($org, $event, $tz, $emailDomain);
 
         // --- Speakers ---------------------------------------------------------
         $speakerSpecs = [
@@ -129,9 +136,12 @@ trait SeedsEventContent
             ],
         );
 
+        // --- Meeting locations (venue/hybrid events meet somewhere physical) ---
+        $places = $this->seedMeetingLocations($event);
+
         // --- Meetings (Today + Upcoming for the widget) -----------------------
-        $this->meeting($org, $event, $alex, $sam, 'Intro chat with Sam', $now->copy()->addHours(2));
-        $this->meeting($org, $event, $alex, $sam, 'Partnership sync', $now->copy()->addDays(2)->setTime(14, 0));
+        $this->meeting($org, $event, $alex, $sam, 'Intro chat with Sam', $now->copy()->addHours(2), $places[0] ?? null);
+        $this->meeting($org, $event, $alex, $sam, 'Partnership sync', $now->copy()->addDays(2)->setTime(14, 0), $places[1] ?? null);
 
         // --- Breakout rooms (ROOMS tab — LiveKit/webrtc) ----------------------
         $roomSpecs = [
@@ -215,9 +225,21 @@ trait SeedsEventContent
         );
     }
 
-    /** A user + contact + attendee participation. Login password = "password". */
-    private function attendee(Organization $org, Event $event, string $name, string $email, string $tz = 'UTC'): Participation
-    {
+    /**
+     * A user + contact + attendee participation. Login password = "password".
+     * The job title / company feed the delegate directory and its "Similar
+     * profiles" matching; the avatar index picks a pravatar portrait.
+     */
+    private function attendee(
+        Organization $org,
+        Event $event,
+        string $name,
+        string $email,
+        string $tz = 'UTC',
+        ?string $jobTitle = null,
+        ?string $company = null,
+        ?int $avatar = null,
+    ): Participation {
         $user = User::updateOrCreate(
             ['email' => $email],
             ['name' => $name, 'password' => 'password', 'email_verified_at' => now(), 'timezone' => $tz],
@@ -226,13 +248,54 @@ trait SeedsEventContent
         [$first, $last] = $this->splitName($name);
         $contact = Contact::updateOrCreate(
             ['organization_id' => $org->id, 'email' => $email],
-            ['user_id' => $user->id, 'first_name' => $first, 'last_name' => $last],
+            [
+                'user_id' => $user->id,
+                'first_name' => $first,
+                'last_name' => $last,
+                'job_title' => $jobTitle,
+                'company' => $company,
+            ],
         );
 
         return Participation::updateOrCreate(
             ['event_id' => $event->id, 'contact_id' => $contact->id, 'role' => 'attendee'],
-            ['organization_id' => $org->id, 'status' => 'confirmed', 'networking_opt_in' => true],
+            [
+                'organization_id' => $org->id,
+                'status' => 'confirmed',
+                'networking_opt_in' => true,
+                'meta' => $avatar ? ['avatar_url' => $this->avatar($avatar)] : null,
+            ],
         );
+    }
+
+    /**
+     * A directory of attendees to browse and connect with. Titles and companies
+     * repeat on purpose — "Similar profiles" is only interesting when several
+     * people share a designation ("Data Scientist") or an employer ("Acme
+     * Robotics"), and the strip ranks an exact title+company match above either
+     * one alone.
+     */
+    private function seedDelegates(Organization $org, Event $event, string $tz, string $emailDomain): void
+    {
+        $roster = [
+            ['Maya Fernandez', 'Head of Product', 'Globex AI', 20],
+            ['Idris Khan', 'Data Scientist', 'Acme Robotics', 21],
+            ['Lena Vogel', 'Data Scientist', 'Northwind Software', 22],
+            ['Omar Haddad', 'Machine Learning Engineer', 'Acme Robotics', 23],
+            ['Grace Liu', 'Machine Learning Engineer', 'DeepScale Labs', 24],
+            ['Tom Whitfield', 'Head of Product', 'Acme Robotics', 25],
+            ['Ana Costa', 'CTO', 'LaunchPad Ventures', 26],
+            ['Ravi Menon', 'Data Scientist', 'Globex AI', 27],
+            ['Sofia Bergman', 'UX Researcher', 'Studio Kaizen', 28],
+            ['Daniel Okoye', 'Machine Learning Engineer', 'Northwind Software', 29],
+            ['Hana Sato', 'CTO', 'Nova Robotics', 30],
+            ['Peter Novak', 'UX Researcher', 'Globex AI', 31],
+        ];
+
+        foreach ($roster as [$name, $jobTitle, $company, $avatar]) {
+            $handle = str_replace(' ', '.', mb_strtolower($name));
+            $this->attendee($org, $event, $name, "{$handle}@{$emailDomain}", $tz, $jobTitle, $company, $avatar);
+        }
     }
 
     /**
@@ -325,8 +388,31 @@ trait SeedsEventContent
         }
     }
 
+    /**
+     * The places one-to-one meetings can be held in (Admin → Communication →
+     * Meetings). Only venue/hybrid events have a floor to meet on; an online
+     * event gets none and its meetings stay location-less.
+     *
+     * @return string[] the seeded places, empty for an online event
+     */
+    private function seedMeetingLocations(Event $event): array
+    {
+        if (! in_array($event->format, ['venue', 'hybrid'], true)) {
+            return [];
+        }
+
+        $places = ['Hall 4', 'Meeting Room 2', 'Networking Lounge', 'Cafe Terrace'];
+
+        $setting = EventSetting::firstOrNew(['event_id' => $event->id]);
+        $setting->organization_id = $event->organization_id;
+        $setting->meeting = array_merge((array) $setting->meeting, ['locations' => $places]);
+        $setting->save();
+
+        return $places;
+    }
+
     /** A confirmed one-on-one meeting between two attendees. */
-    private function meeting(Organization $org, Event $event, Participation $host, Participation $guest, string $title, \DateTimeInterface $start): void
+    private function meeting(Organization $org, Event $event, Participation $host, Participation $guest, string $title, \DateTimeInterface $start, ?string $location = null): void
     {
         $meeting = Meeting::updateOrCreate(
             ['event_id' => $event->id, 'title' => $title],
@@ -334,6 +420,7 @@ trait SeedsEventContent
                 'organization_id' => $org->id,
                 'organizer_participation_id' => $host->id,
                 'type' => 'one_on_one',
+                'location' => $location,
                 'starts_at' => $start,
                 'ends_at' => (clone $start)->modify('+30 minutes'),
                 'status' => 'confirmed',

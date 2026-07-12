@@ -10,6 +10,7 @@ const status = computed(() => (target.value ? store.connected[target.value.id] :
 const message = ref('')
 const subject = ref('')
 const agenda = ref('')
+const place = ref('')
 const pickedDate = ref('')
 const pickedSlot = ref('')
 const toast = ref('')
@@ -21,11 +22,23 @@ const quick = [
   'Keen to see if we can work together.',
 ]
 
-interface Lounge { enabled: boolean, dates: string[], slots: Record<string, string[]>, busy: Array<{ date: string, slot: string }> }
+interface Lounge {
+  enabled: boolean
+  dates: string[]
+  slots: Record<string, string[]>
+  busy: Array<{ date: string, slot: string }>
+  location_required: boolean
+  locations: string[]
+}
 const lounge = ref<Lounge | null>(null)
+
+// A venue/hybrid event meets somewhere physical, so the request must say where.
+const needsLocation = computed(() => lounge.value?.location_required === true)
+const placeOptions = computed<string[]>(() => lounge.value?.locations ?? [])
 
 watch(target, (t) => {
   message.value = ''; subject.value = ''; agenda.value = ''
+  place.value = ''
   pickedSlot.value = ''; pickedDate.value = ''; toast.value = ''
   lounge.value = null
   if (t) loadLounge()
@@ -39,6 +52,10 @@ async function loadLounge() {
     const res = await api<{ data: Lounge }>(`/events/${uuid}/lounge`, { query: { with: target.value.id } })
     lounge.value = res.data
     pickedDate.value = res.data.dates?.[0] ?? ''
+    // One place on offer is not a choice — pre-select it.
+    if (res.data.location_required && res.data.locations?.length === 1) {
+      place.value = res.data.locations[0] ?? ''
+    }
   } catch { /* lounge optional */ }
 }
 
@@ -74,12 +91,19 @@ async function openChat() {
 
 async function sendMeeting() {
   if (!target.value || sending.value) return
+
+  if (needsLocation.value && !place.value.trim()) {
+    flash(placeOptions.value.length ? 'Choose where you want to meet.' : 'Enter where you want to meet, e.g. Hall 4.')
+    return
+  }
+
   sending.value = true
   try {
     const ok = await meetings.request({
       to: target.value.id,
       title: subject.value || undefined,
       agenda: agenda.value || undefined,
+      location: needsLocation.value ? place.value.trim() : undefined,
       date: pickedDate.value || undefined,
       slot: pickedSlot.value || undefined,
     })
@@ -167,6 +191,28 @@ async function sendMeeting() {
           <input v-model="subject" class="in" placeholder="e.g. Coffee & intro" maxlength="200">
           <label class="lbl">Agenda <span class="opt">(optional)</span></label>
           <textarea v-model="agenda" class="in" rows="3" maxlength="1000" placeholder="What would you like to discuss?" />
+
+          <!-- Meeting location — in-person / hybrid events only. The organizer's
+               places are quick-fills; you can always type somewhere else. -->
+          <template v-if="needsLocation">
+            <label class="lbl">Meeting location</label>
+            <div v-if="placeOptions.length" class="days">
+              <button
+                v-for="p in placeOptions"
+                :key="p"
+                type="button"
+                class="day"
+                :class="{ on: place === p }"
+                @click="place = place === p ? '' : p"
+              >{{ p }}</button>
+            </div>
+            <input
+              v-model="place"
+              class="in"
+              maxlength="180"
+              :placeholder="placeOptions.length ? 'Or type another place…' : 'e.g. Hall 4, Meeting Room 2'"
+            >
+          </template>
         </div>
 
         <div class="foot end">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Concerns\HandlesMeetingLocation;
 use App\Http\Controllers\Concerns\NormalizesTimestamps;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
@@ -27,7 +28,7 @@ use Illuminate\Support\Collection;
  */
 class MeetingController extends Controller
 {
-    use NormalizesTimestamps;
+    use HandlesMeetingLocation, NormalizesTimestamps;
 
     public function index(Request $request): JsonResponse
     {
@@ -101,6 +102,7 @@ class MeetingController extends Controller
             'id' => $r->uuid,
             'title' => $r->subject,
             'agenda' => $r->agenda,
+            'location' => $r->location,
             'type' => 'one_on_one',
             'status' => $r->status,
             'direction' => $direction,
@@ -121,9 +123,10 @@ class MeetingController extends Controller
     }
 
     /**
-     * Bookable lounge slots for this event + which of them are already taken by
-     * me and (optionally, via ?with=<uuid>) the person I'm about to invite, so
-     * the booking picker can offer only the free ones.
+     * Everything the booking picker needs: the bookable lounge slots for this
+     * event, which of them are already taken by me and (optionally, via
+     * ?with=<uuid>) the person I'm about to invite, and — on a venue/hybrid
+     * event — where the meeting may take place.
      * GET /events/{event}/lounge
      */
     public function lounge(Request $request): JsonResponse
@@ -161,6 +164,11 @@ class MeetingController extends Controller
             'dates' => $this->loungeDates($event),
             'slots' => $this->effectiveSlots($event, $lounge),
             'busy' => $busy,
+            // Where the meeting happens. On an online event there is nowhere to
+            // be, so the picker hides the field entirely.
+            'format' => $event->format,
+            'location_required' => $this->isPhysicalEvent($event),
+            'locations' => $this->meetingLocationOptions((int) $eventId),
         ]]);
     }
 
@@ -170,9 +178,14 @@ class MeetingController extends Controller
         $orgId = $request->attributes->get('organization_id');
         $me = $request->attributes->get('participation_id');
 
+        $event = Event::findOrFail($eventId);
+
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string', 'max:1000'],
+            // Required on a venue/hybrid event: the two of them have to meet
+            // somewhere ("Hall 4"). Ignored on an online event.
+            'location' => $this->meetingLocationRules($event),
             'type' => ['nullable', 'in:one_on_one,group'],
             'max_participants' => ['nullable', 'integer', 'min:2'],
             'starts_at' => ['nullable', 'date'],
@@ -200,7 +213,6 @@ class MeetingController extends Controller
         $meta = null;
 
         if (! empty($data['slot']) && ! empty($data['date'])) {
-            $event = Event::findOrFail($eventId);
             $effective = $this->effectiveSlots($event, $this->loungeConfig($eventId));
 
             abort_unless(
@@ -227,6 +239,7 @@ class MeetingController extends Controller
             'organizer_participation_id' => $me,
             'title' => $data['title'] ?? null,
             'agenda' => $data['agenda'] ?? null,
+            'location' => $this->meetingLocationValue($event, $data['location'] ?? null),
             'type' => $data['type'] ?? 'one_on_one',
             'max_participants' => $data['max_participants'] ?? null,
             'starts_at' => $startsAt,
@@ -335,6 +348,7 @@ class MeetingController extends Controller
             'id' => $m->uuid,
             'title' => $m->title,
             'agenda' => $m->agenda,
+            'location' => $m->location,
             'type' => $m->type,
             'status' => $m->status,
             'direction' => $direction,

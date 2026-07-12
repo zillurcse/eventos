@@ -9,6 +9,11 @@ export interface Delegate {
   online: boolean
 }
 
+/** A delegate who shares my designation and/or company; `match` says which. */
+export interface SimilarDelegate extends Delegate {
+  match: string
+}
+
 /**
  * The delegate (attendee) directory ("Delegates" tab). Authenticated + scoped
  * to the event via useApi() → `/events/{uuid}/delegates`. Search, sort and
@@ -31,6 +36,11 @@ export const useDelegatesStore = defineStore('delegates', {
     // Bumped per fetch so a slow stale response can't clobber a newer one.
     seq: 0,
     connected: {} as Record<string, 'pending' | 'error'>,
+
+    // "People like you" strip — same designation and/or company as me.
+    similar: [] as SimilarDelegate[],
+    similarLoading: false,
+    similarLoaded: false,
 
     // Connect modal (opened from a delegate card's Connect action).
     connectTarget: null as Delegate | null,
@@ -81,6 +91,28 @@ export const useDelegatesStore = defineStore('delegates', {
       if (this.sort === sort) return
       this.sort = sort
       await this.fetchDelegates()
+    },
+
+    /**
+     * The people who share my job title and/or company. Independent of the
+     * directory's search/sort — it's about me, not about the query — so it is
+     * fetched once and never re-filtered client-side.
+     */
+    async fetchSimilar() {
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid || this.similarLoading) return
+
+      this.similarLoading = true
+      try {
+        const api = useApi()
+        const res = await api<{ data: SimilarDelegate[] }>(`/events/${uuid}/delegates/similar`)
+        this.similar = res.data
+        this.similarLoaded = true
+      } catch {
+        this.similar = [] // best-effort: the directory below still works
+      } finally {
+        this.similarLoading = false
+      }
     },
 
     /** Resolve specific delegates by id (bookmarks panel) — no paging. */

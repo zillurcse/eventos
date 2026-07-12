@@ -14,6 +14,7 @@ const selected = ref<Delegate | null>(null)
 const title = ref('')
 const agenda = ref('')
 const startsAt = ref('')
+const location = ref('')
 const errorMsg = ref('')
 
 // ── Lounge slot picker state ──────────────────────────────────────────────
@@ -41,6 +42,14 @@ const slotDates = computed<string[]>(() => {
 // Are we booking into lounge slots, or falling back to a free-form time?
 const useSlots = computed(() => !!avail.value?.enabled && slotDates.value.length > 0)
 
+// A venue/hybrid event puts the two of you in a room together, so the request
+// has to say where ("Hall 4"). Online events have nowhere to be — field hidden.
+const needsLocation = computed(() => avail.value?.location_required === true)
+
+// The organizer can publish the places meetings may be held in; when they have,
+// the requester picks one of them rather than typing a free-form spot.
+const locationOptions = computed<string[]>(() => avail.value?.locations ?? [])
+
 const busyKeys = computed<Set<string>>(() =>
   new Set((avail.value?.busy ?? []).map(b => `${b.date}|${b.slot}`)))
 
@@ -67,12 +76,17 @@ async function choose(d: Delegate) {
   step.value = 'form'
   selectedDate.value = ''
   selectedSlot.value = ''
+  location.value = ''
   errorMsg.value = ''
 
   loadingSlots.value = true
   avail.value = await lounge.fetchFor(d.id)
   loadingSlots.value = false
   selectedDate.value = slotDates.value[0] ?? ''
+  // One place on offer is not a choice — pre-select it.
+  if (needsLocation.value && locationOptions.value.length === 1) {
+    location.value = locationOptions.value[0] ?? ''
+  }
 }
 
 function pickSlot(slot: string) {
@@ -89,10 +103,18 @@ async function submit() {
     return
   }
 
+  if (needsLocation.value && !location.value.trim()) {
+    errorMsg.value = locationOptions.value.length
+      ? 'Choose where you want to meet.'
+      : 'Enter where you want to meet, e.g. Hall 4.'
+    return
+  }
+
   const ok = await meetings.request({
     to: selected.value.id,
     title: title.value.trim() || undefined,
     agenda: agenda.value.trim() || undefined,
+    location: needsLocation.value ? location.value.trim() : undefined,
     ...(useSlots.value
       ? { date: selectedDate.value, slot: selectedSlot.value }
       : { starts_at: startsAt.value ? new Date(startsAt.value).toISOString() : undefined }),
@@ -168,6 +190,29 @@ async function submit() {
           <span>Agenda <em>(optional)</em></span>
           <textarea v-model="agenda" rows="3" maxlength="1000" placeholder="Add a note for the invitee" />
         </label>
+
+        <!-- Meeting location — in-person / hybrid events only. The organizer's
+             places are quick-fills; you can always type somewhere else. -->
+        <div v-if="needsLocation" class="field">
+          <span>Meeting location</span>
+
+          <div v-if="locationOptions.length" class="places">
+            <button
+              v-for="p in locationOptions" :key="p" type="button" class="place"
+              :class="{ on: location === p }"
+              @click="location = location === p ? '' : p"
+            >
+              <svg viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" /><circle cx="12" cy="10" r="2.6" /></svg>
+              {{ p }}
+            </button>
+          </div>
+
+          <input
+            v-model="location" type="text" maxlength="180"
+            :class="{ spaced: locationOptions.length }"
+            :placeholder="locationOptions.length ? 'Or type another place…' : 'e.g. Hall 4, Meeting Room 2'"
+          >
+        </div>
 
         <!-- Lounge slot picker -->
         <div v-if="loadingSlots" class="field"><span>Pick a time</span><p class="hint">Loading available slots…</p></div>
@@ -257,6 +302,13 @@ async function submit() {
 .date { flex: 0 0 auto; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 8px 12px; font: inherit; font-size: .8rem; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap; }
 .date:hover { border-color: var(--brand-primary); }
 .date.on { border-color: var(--brand-primary); color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, #fff); }
+
+.places { display: flex; flex-wrap: wrap; gap: 8px; }
+.field input.spaced { margin-top: 8px; }
+.place { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 8px 13px; font: inherit; font-size: .82rem; font-weight: 600; color: #334155; cursor: pointer; }
+.place:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+.place.on { border-color: var(--brand-primary); background: var(--brand-primary); color: #fff; }
+.place svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .slot { border: 1px solid #e2e8f0; background: #fff; border-radius: 9px; padding: 9px 6px; font: inherit; font-size: .8rem; font-weight: 600; color: #334155; cursor: pointer; }

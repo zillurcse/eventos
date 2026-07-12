@@ -273,6 +273,7 @@ class ExhibitorInboxController extends Controller
             'status' => $r->status,
             'subject' => $r->subject,
             'agenda' => $r->agenda,
+            'location' => $r->location,
             'starts_at' => $r->starts_at?->toIso8601String(),
             'ends_at' => $r->ends_at?->toIso8601String(),
             'date' => $r->meta['lounge_date'] ?? null,
