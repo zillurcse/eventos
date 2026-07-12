@@ -44,17 +44,34 @@ const cards = computed(() => {
   ]
 })
 
+const search = ref('')
+const adColumns = [
+  { key: 'title', label: 'Ad', sortable: true },
+  { key: 'placement', label: 'Placement' },
+  { key: 'is_active', label: 'Status' },
+  { key: 'impressions', label: 'Impressions', align: 'right' as const, sortable: true },
+  { key: 'clicks', label: 'Clicks', align: 'right' as const, sortable: true },
+  { key: 'ctr', label: 'CTR', align: 'right' as const, sortable: true },
+]
+function adSearchText(a: AdRow) { return `${a.title} ${PLACEMENT_LABEL[a.placement] ?? a.placement}` }
+
 onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div class="max-w-275">
     <div class="mb-4">
       <h2 class="section-title m-0">Ad Insights</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Advertising performance across your event.</p>
     </div>
 
-    <div v-if="loading" class="card muted text-center py-12">Loading insights…</div>
+    <div v-if="loading" class="card flex items-center justify-center gap-2.5 py-12 text-muted text-[.88rem]">
+      <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+        <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      Loading insights…
+    </div>
 
     <template v-else-if="data">
       <!-- Summary cards -->
@@ -88,40 +105,49 @@ onMounted(load)
 
       <!-- Per-ad table -->
       <div class="card">
-        <div class="font-bold text-[.98rem] mb-4">By ad</div>
-        <table>
-          <thead>
-            <tr>
-              <th>AD</th><th>PLACEMENT</th><th>STATUS</th>
-              <th class="text-right">IMPRESSIONS</th><th class="text-right">CLICKS</th><th class="text-right">CTR</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="a in data.ads" :key="a.id">
-              <td>
-                <div class="flex items-center gap-2.5">
-                  <div class="w-12 h-8 rounded-md overflow-hidden bg-[#f1f1f5] shrink-0 flex items-center justify-center">
-                    <img v-if="a.image_url" :src="a.image_url" class="w-full h-full object-cover" :alt="a.title">
-                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4 text-muted"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                  </div>
-                  <span class="font-medium text-ink truncate">{{ a.title }}</span>
-                </div>
-              </td>
-              <td class="text-ink">{{ PLACEMENT_LABEL[a.placement] ?? a.placement }}</td>
-              <td>
-                <span class="px-2 py-0.5 rounded-full text-[.72rem] font-semibold" :class="a.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
-                  {{ a.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td class="text-right text-ink font-medium">{{ fmt(a.impressions) }}</td>
-              <td class="text-right text-ink font-medium">{{ fmt(a.clicks) }}</td>
-              <td class="text-right text-ink font-medium">{{ a.ctr }}%</td>
-            </tr>
-            <tr v-if="!data.ads.length">
-              <td colspan="6" class="text-center py-12 muted">No ads yet — create some in <strong>Manage ADs</strong> to see insights here.</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div class="font-bold text-[.98rem]">By ad</div>
+          <SearchInput v-model="search" placeholder="Search ads…" class="max-w-65" />
+        </div>
+
+        <DataTable
+          :items="data.ads"
+          :columns="adColumns"
+          :search="search"
+          :search-text="adSearchText"
+          row-key="id"
+          storage-key="ad-insights"
+        >
+          <template #cell-title="{ row }">
+            <div class="flex items-center gap-2.5">
+              <div class="w-12 h-8 rounded-md overflow-hidden bg-[#f1f1f5] shrink-0 flex items-center justify-center">
+                <img v-if="row.image_url" :src="row.image_url" class="w-full h-full object-cover" :alt="row.title">
+                <AppIcon v-else name="camera" class="w-4 h-4 text-muted" />
+              </div>
+              <span class="font-medium text-ink truncate">{{ row.title }}</span>
+            </div>
+          </template>
+          <template #cell-placement="{ row }">
+            <span class="text-ink">{{ PLACEMENT_LABEL[row.placement] ?? row.placement }}</span>
+          </template>
+          <template #cell-is_active="{ row }">
+            <span class="px-2 py-0.5 rounded-full text-[.72rem] font-semibold" :class="row.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
+              {{ row.is_active ? 'Active' : 'Inactive' }}
+            </span>
+          </template>
+          <template #cell-impressions="{ row }">
+            <span class="text-ink font-medium">{{ fmt(row.impressions) }}</span>
+          </template>
+          <template #cell-clicks="{ row }">
+            <span class="text-ink font-medium">{{ fmt(row.clicks) }}</span>
+          </template>
+          <template #cell-ctr="{ row }">
+            <span class="text-ink font-medium">{{ row.ctr }}%</span>
+          </template>
+          <template #empty>
+            <span class="muted">No ads yet — create some in <strong>Manage ADs</strong> to see insights here.</span>
+          </template>
+        </DataTable>
         <p v-if="data.ads.length && !data.totals.impressions" class="muted text-[.82rem] mt-3">
           No impressions recorded yet — metrics populate as your ads are shown and clicked in the event app.
         </p>

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -24,9 +28,16 @@ const SIZES: { key: string, label: string, width: number, height: number }[] = [
 
 const templates = ref<BadgeTemplate[]>([])
 const loading = ref(true)
+const search = ref('')
 
-const showCreate = ref(false)
+const shown = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return q ? templates.value.filter(t => t.name.toLowerCase().includes(q)) : templates.value
+})
+
+const drawerOpen = ref(false)
 const saving = ref(false)
+const error = ref('')
 const form = reactive({ name: '', badge_for: '', size: 'A6' })
 
 async function load() {
@@ -34,7 +45,8 @@ async function load() {
   try {
     const res: any = await api(`/events/${id}/badge-designs`)
     templates.value = res?.data ?? res ?? []
-  } catch (e) {
+  } catch {
+    toast.error('Could not load badge templates.')
     templates.value = []
   } finally {
     loading.value = false
@@ -45,11 +57,13 @@ function openCreate() {
   form.name = ''
   form.badge_for = ''
   form.size = 'A6'
-  showCreate.value = true
+  error.value = ''
+  drawerOpen.value = true
 }
 
 async function createTemplate() {
-  if (!form.name.trim()) return
+  if (!form.name.trim()) { error.value = 'Please enter a template name.'; return }
+  error.value = ''
   saving.value = true
   try {
     const size = SIZES.find(s => s.key === form.size) || SIZES[0]
@@ -66,10 +80,14 @@ async function createTemplate() {
       },
     })
     const newId = res?.data?.id
-    showCreate.value = false
+    drawerOpen.value = false
+    toast.success('Badge template created')
     // Straight into the editor for the freshly created template.
     if (newId) navigateTo(`/org/events/${id}/badge?design=${newId}`)
     else load()
+  } catch (e: any) {
+    error.value = e?.data?.message || 'Could not create the template.'
+    toast.error(error.value)
   } finally {
     saving.value = false
   }
@@ -80,9 +98,14 @@ function editTemplate(t: BadgeTemplate) {
 }
 
 async function deleteTemplate(t: BadgeTemplate) {
-  if (!confirm(`Delete badge template “${t.name}”? This cannot be undone.`)) return
-  await api(`/badge-designs/${t.id}`, { method: 'DELETE' })
-  load()
+  if (!confirm(`Delete badge template "${t.name}"? This cannot be undone.`)) return
+  try {
+    await api(`/badge-designs/${t.id}`, { method: 'DELETE' })
+    templates.value = templates.value.filter(x => x.id !== t.id)
+    toast.success('Badge template deleted')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not delete the template.')
+  }
 }
 
 function dims(t: BadgeTemplate) {
@@ -97,113 +120,84 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="bt">
-    <header class="bt-head">
-      <div>
-        <h1>Badge templates</h1>
-        <p>Design the badges printed for this event’s attendees, staff and exhibitors.</p>
-      </div>
-      <button class="btn-primary" @click="openCreate">
-        <AppIcon name="plus" /> New template
-      </button>
-    </header>
-
-    <div v-if="loading" class="bt-muted">Loading templates…</div>
-
-    <div v-else-if="!templates.length" class="bt-empty">
-      <AppIcon name="layers" />
-      <p>No badge templates yet.</p>
-      <button class="btn-primary" @click="openCreate">
-        <AppIcon name="plus" /> Create your first template
-      </button>
-    </div>
-
-    <div v-else class="bt-grid">
-      <div v-for="t in templates" :key="t.id" class="bt-card">
-        <div class="bt-preview">
-          <AppIcon name="box" />
+  <div>
+    <div class="card">
+      <div class="flex items-start justify-between gap-4 flex-wrap mb-3">
+        <div>
+          <div class="font-bold text-base">Badge templates</div>
+          <div class="muted text-[.85rem] mt-0.5">Design the badges printed for this event's attendees, staff and exhibitors.</div>
         </div>
-        <div class="bt-body">
-          <h3 :title="t.name">{{ t.name }}</h3>
-          <span v-if="t.badge_for" class="bt-pill">{{ t.badge_for }}</span>
-          <div class="bt-meta">
-            <span>{{ dims(t) }}</span>
-            <span v-if="when(t)">· {{ when(t) }}</span>
+        <button class="btn" @click="openCreate">+ NEW TEMPLATE</button>
+      </div>
+
+      <div v-if="templates.length" class="flex items-center justify-end gap-3 flex-wrap mb-4">
+        <SearchInput v-model="search" placeholder="Search templates…" class="max-w-65" />
+      </div>
+
+      <div v-if="loading" class="flex items-center justify-center gap-2.5 py-14 text-muted text-[.88rem]">
+        <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Loading templates…
+      </div>
+
+      <template v-else>
+        <div v-if="!shown.length" class="text-center py-13 px-5">
+          <div class="w-13.5 h-13.5 rounded-[14px] bg-[#f3f0ff] text-[#6352e7] grid place-items-center mx-auto mb-3.5">
+            <AppIcon name="layers" class="w-6.5 h-6.5" />
+          </div>
+          <p class="muted m-0 mb-3">{{ search ? 'No templates match your search.' : 'No badge templates yet.' }}</p>
+          <button class="btn" @click="openCreate">+ NEW TEMPLATE</button>
+        </div>
+
+        <div v-else class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))">
+          <div v-for="t in shown" :key="t.id" class="border border-line rounded-xl overflow-hidden flex flex-col">
+            <div class="h-33 bg-[#f1f1f5] flex items-center justify-center border-b border-line">
+              <AppIcon name="box" class="w-8 h-8 text-brand opacity-70" />
+            </div>
+
+            <div class="p-3 flex flex-col gap-2 flex-1">
+              <span class="font-semibold text-ink truncate" :title="t.name">{{ t.name }}</span>
+              <span v-if="t.badge_for" class="px-1.5 py-0.5 rounded text-[.68rem] bg-[#eef0ff] text-[#6352e7] font-medium self-start">{{ t.badge_for }}</span>
+              <div class="text-[.76rem] text-muted flex flex-wrap gap-x-1.5">
+                <span>{{ dims(t) }}</span>
+                <span v-if="when(t)">· {{ when(t) }}</span>
+              </div>
+
+              <div class="flex items-center gap-1.5 mt-auto pt-2">
+                <button class="btn ghost text-[.78rem] px-2.5 py-1 inline-flex items-center gap-1.5" @click="editTemplate(t)">
+                  <AppIcon name="pencil" class="w-3.5 h-3.5" /> Edit
+                </button>
+                <button class="text-[#dc2626] text-[.78rem] font-medium px-2 hover:underline ml-auto" @click="deleteTemplate(t)">Delete</button>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="bt-actions">
-          <button class="btn-soft" @click="editTemplate(t)">
-            <AppIcon name="cog" /> Edit
-          </button>
-          <button class="btn-danger" @click="deleteTemplate(t)" title="Delete">
-            <AppIcon name="logout" />
-          </button>
-        </div>
-      </div>
+      </template>
     </div>
 
-    <Modal v-if="showCreate" title="New badge template" @close="showCreate = false">
-      <form class="bt-form" @submit.prevent="createTemplate">
-        <label>
-          <span>Template name</span>
-          <input v-model="form.name" type="text" placeholder="e.g. Attendee Badge" required autofocus />
-        </label>
-        <label>
-          <span>Badge for <small>(optional)</small></span>
-          <input v-model="form.badge_for" type="text" placeholder="Attendee, Speaker, Exhibitor…" />
-        </label>
-        <label>
-          <span>Size</span>
-          <select v-model="form.size">
-            <option v-for="s in SIZES" :key="s.key" :value="s.key">{{ s.label }}</option>
-          </select>
-        </label>
-        <div class="bt-form-actions">
-          <button type="button" class="btn-soft" @click="showCreate = false">Cancel</button>
-          <button type="submit" class="btn-primary" :disabled="saving || !form.name.trim()">
-            {{ saving ? 'Creating…' : 'Create & design' }}
-          </button>
-        </div>
-      </form>
-    </Modal>
+    <Drawer v-if="drawerOpen" title="New badge template" @close="drawerOpen = false">
+      <div class="mb-4">
+        <AppInput v-model="form.name" label="Template name" required placeholder="e.g. Attendee Badge" autofocus />
+      </div>
+
+      <div class="mb-4">
+        <AppInput v-model="form.badge_for" label="Badge for" hint="Optional — e.g. Attendee, Speaker, Exhibitor" placeholder="Attendee, Speaker, Exhibitor…" />
+      </div>
+
+      <div class="mb-1">
+        <AppSelect v-model="form.size" label="Size" :options="SIZES.map(s => ({ value: s.key, label: s.label }))" />
+      </div>
+
+      <p v-if="error" class="error mt-3">{{ error }}</p>
+
+      <div class="modal-actions border-t border-line pt-4 mt-4">
+        <button class="btn ghost" @click="drawerOpen = false">CANCEL</button>
+        <button class="btn" :disabled="saving || !form.name.trim()" @click="createTemplate">
+          {{ saving ? 'Creating…' : 'CREATE & DESIGN' }}
+        </button>
+      </div>
+    </Drawer>
   </div>
 </template>
-
-<style scoped>
-.bt { padding: 4px 2px 40px; }
-.bt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-.bt-head h1 { font-size: 22px; font-weight: 650; color: var(--ink); }
-.bt-head p { color: var(--muted); font-size: 13px; margin-top: 4px; max-width: 52ch; }
-.bt-muted { color: var(--muted); padding: 40px 0; text-align: center; }
-
-.bt-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 64px 0; color: var(--muted); text-align: center; }
-.bt-empty svg { width: 40px; height: 40px; opacity: .5; }
-
-.bt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
-.bt-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; transition: box-shadow .15s, transform .15s; }
-.bt-card:hover { box-shadow: 0 8px 24px rgba(31,36,48,.08); transform: translateY(-2px); }
-.bt-preview { height: 132px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--brand-soft), #fff); border-bottom: 1px solid var(--line); }
-.bt-preview svg { width: 40px; height: 40px; color: var(--brand); opacity: .7; }
-.bt-body { padding: 12px 14px 6px; flex: 1; }
-.bt-body h3 { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bt-pill { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--brand-dark); background: var(--brand-soft); padding: 2px 9px; border-radius: 999px; }
-.bt-meta { margin-top: 8px; color: var(--faint); font-size: 12px; display: flex; gap: 6px; }
-.bt-actions { display: flex; gap: 8px; padding: 10px 14px 14px; }
-
-.btn-primary { display: inline-flex; align-items: center; gap: 6px; background: var(--brand); color: #fff; border: 0; padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-primary:hover { background: var(--brand-dark); }
-.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.btn-soft { display: inline-flex; align-items: center; gap: 6px; background: #f4f5f7; color: var(--ink); border: 1px solid var(--line); padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; flex: 1; justify-content: center; }
-.btn-soft:hover { background: #eceef1; }
-.btn-danger { display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #dc2626; border: 1px solid var(--line); padding: 8px 11px; border-radius: 10px; cursor: pointer; }
-.btn-danger:hover { background: #fef2f2; border-color: #fecaca; }
-.btn-primary svg, .btn-soft svg, .btn-danger svg { width: 15px; height: 15px; }
-
-.bt-form { display: flex; flex-direction: column; gap: 14px; min-width: 360px; }
-.bt-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
-.bt-form label small { color: var(--faint); font-weight: 400; }
-.bt-form input, .bt-form select { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 13px; font-weight: 400; }
-.bt-form input:focus, .bt-form select:focus { outline: none; border-color: var(--brand); }
-.bt-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-.bt-form-actions .btn-soft { flex: 0; }
-</style>

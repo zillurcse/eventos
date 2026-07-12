@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -41,6 +44,22 @@ interface Stats { total: number, pending: number, partial: number, approved: num
 
 const STATUSES: Status[] = ['pending', 'partial', 'approved', 'rejected']
 
+const statusPillClass: Record<Status, string> = {
+  pending: 'bg-[#fef3c7] text-[#b45309]',
+  partial: 'bg-[#dbeafe] text-[#1d4ed8]',
+  approved: 'bg-[#dcfce7] text-[#15803d]',
+  rejected: 'bg-[#fee2e2] text-[#b91c1c]',
+}
+const statusTextClass: Record<Status, string> = {
+  pending: 'text-[#b45309]',
+  partial: 'text-[#1d4ed8]',
+  approved: 'text-[#15803d]',
+  rejected: 'text-[#dc2626]',
+}
+function pillClass(status: string) {
+  return statusPillClass[status as Status]
+}
+
 // ── state ──────────────────────────────────────────────────────────────
 const orders = ref<Order[]>([])
 const stats = ref<Stats>({ total: 0, pending: 0, partial: 0, approved: 0, rejected: 0 })
@@ -53,9 +72,18 @@ const view = ref<'grouped' | 'list'>('grouped')
 const search = ref('')
 const exhibitorFilter = ref('')
 const categoryFilter = ref('')
-const perPage = ref(10)
-const page = ref(1)
+const groupPage = ref(1)
+const groupPerPage = ref(10)
 const expanded = ref<string | null>(null)
+
+const exhibitorOptions = computed(() => [
+  { label: 'All Exhibitor', value: '' },
+  ...exhibitors.value.map(e => ({ label: e.name, value: e.id })),
+])
+const categoryOptions = computed(() => [
+  { label: 'All Category', value: '' },
+  ...categories.value.map(c => ({ label: c.name, value: String(c.id) })),
+])
 
 async function load() {
   loading.value = true
@@ -80,7 +108,7 @@ async function load() {
 let searchTimer: ReturnType<typeof setTimeout>
 watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(load, 350) })
 watch([exhibitorFilter, categoryFilter], load)
-watch([statusTab, view, perPage], () => { page.value = 1; expanded.value = null })
+watch([statusTab, view, groupPerPage], () => { groupPage.value = 1; expanded.value = null })
 
 // ── derivation ─────────────────────────────────────────────────────────
 const visibleOrders = computed(() =>
@@ -108,15 +136,22 @@ const groups = computed<Group[]>(() => {
   })).sort((a, b) => a.name.localeCompare(b.name))
 })
 
-const rows = computed<(Group | Order)[]>(() => view.value === 'grouped' ? groups.value : visibleOrders.value)
-const totalPages = computed(() => Math.max(1, Math.ceil(rows.value.length / perPage.value)))
-const pagedGroups = computed(() => groups.value.slice((page.value - 1) * perPage.value, page.value * perPage.value))
-const pagedOrders = computed(() => visibleOrders.value.slice((page.value - 1) * perPage.value, page.value * perPage.value))
-const rangeText = computed(() => {
-  const n = rows.value.length
+const groupTotalPages = computed(() => Math.max(1, Math.ceil(groups.value.length / groupPerPage.value)))
+const pagedGroups = computed(() => groups.value.slice((groupPage.value - 1) * groupPerPage.value, groupPage.value * groupPerPage.value))
+const groupRangeText = computed(() => {
+  const n = groups.value.length
   if (!n) return '0 - 0 of 0'
-  return `${(page.value - 1) * perPage.value + 1} - ${Math.min(page.value * perPage.value, n)} of ${n}`
+  return `${(groupPage.value - 1) * groupPerPage.value + 1} - ${Math.min(groupPage.value * groupPerPage.value, n)} of ${n}`
 })
+
+const listColumns = [
+  { key: 'order_number', label: 'Order ID' },
+  { key: 'exhibitor', label: 'Exhibitor' },
+  { key: 'date', label: 'Date', sortable: true },
+  { key: 'lines_count', label: 'Items' },
+  { key: 'status', label: 'Status' },
+  { key: 'total', label: 'Total Amount', sortable: true },
+]
 
 // ── formatting ─────────────────────────────────────────────────────────
 function money(currency: string, amount: number) {
@@ -160,11 +195,12 @@ async function setLineStatus(item: OrderItem, status: LineStatus) {
   if (busyLine.value) return
   busyLine.value = item.id
   try {
-    detail.value = (await api<{ data: OrderDetail }>(`/service-requests/${item.id}`, {
+    const updated = (await api<{ data: OrderDetail }>(`/service-requests/${item.id}`, {
       method: 'PATCH',
       body: { status },
     })).data
-    syncRow(detail.value)
+    detail.value = updated
+    syncRow(updated)
   } finally {
     busyLine.value = null
   }
@@ -174,11 +210,12 @@ async function setOrderStatus(status: LineStatus) {
   if (!detail.value || busyOrder.value) return
   busyOrder.value = true
   try {
-    detail.value = (await api<{ data: OrderDetail }>(`/service-orders/${detail.value.id}`, {
+    const updated = (await api<{ data: OrderDetail }>(`/service-orders/${detail.value.id}`, {
       method: 'PATCH',
       body: { status },
     })).data
-    syncRow(detail.value)
+    detail.value = updated
+    syncRow(updated)
   } finally {
     busyOrder.value = false
   }
@@ -238,7 +275,7 @@ onMounted(load)
       </div>
       <div v-for="s in STATUSES" :key="s" class="card !p-5">
         <div class="flex items-baseline gap-2">
-          <span class="font-bold text-[1.02rem] capitalize" :class="`text-status-${s}`">{{ s }}</span>
+          <span class="font-bold text-[1.02rem] capitalize" :class="statusTextClass[s]">{{ s }}</span>
           <span class="muted text-[.82rem]">({{ percent(stats[s]) }})</span>
         </div>
         <div class="text-[1.6rem] font-bold mt-2">{{ stats[s] }} / {{ stats.total }}</div>
@@ -248,122 +285,134 @@ onMounted(load)
     <div class="card">
       <!-- toolbar -->
       <div class="flex flex-wrap items-center gap-3 mb-4">
-        <div class="seg">
-          <button :class="{ on: statusTab === 'all' }" @click="statusTab = 'all'">All</button>
-          <button v-for="s in STATUSES" :key="s" class="capitalize" :class="{ on: statusTab === s }" @click="statusTab = s">{{ s }}</button>
+        <div class="inline-flex bg-[#f7f7fa] border border-line rounded-xl p-1 gap-1">
+          <button
+            class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold capitalize transition-colors"
+            :class="statusTab === 'all' ? 'bg-[#6352e7] text-white' : 'text-muted hover:text-ink'"
+            @click="statusTab = 'all'"
+          >All</button>
+          <button
+            v-for="s in STATUSES" :key="s"
+            class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold capitalize transition-colors"
+            :class="statusTab === s ? 'bg-[#6352e7] text-white' : 'text-muted hover:text-ink'"
+            @click="statusTab = s"
+          >{{ s }}</button>
         </div>
-        <div class="seg alt">
-          <button :class="{ on: view === 'grouped' }" @click="view = 'grouped'">Grouped</button>
-          <button :class="{ on: view === 'list' }" @click="view = 'list'">List</button>
+
+        <div class="inline-flex bg-[#f7f7fa] border border-line rounded-xl p-1 gap-1">
+          <button
+            class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold transition-colors"
+            :class="view === 'grouped' ? 'bg-white text-brand shadow-sm' : 'text-muted hover:text-ink'"
+            @click="view = 'grouped'"
+          >Grouped</button>
+          <button
+            class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold transition-colors"
+            :class="view === 'list' ? 'bg-white text-brand shadow-sm' : 'text-muted hover:text-ink'"
+            @click="view = 'list'"
+          >List</button>
         </div>
+
         <div class="grow" />
-        <div class="search min-w-[220px] max-w-[320px]">
-          <AppIcon name="search" />
-          <input v-model="search" placeholder="Search services...">
-        </div>
-        <select v-model="exhibitorFilter" class="w-auto m-0 min-w-[170px]">
-          <option value="">All Exhibitor</option>
-          <option v-for="e in exhibitors" :key="e.id" :value="e.id">{{ e.name }}</option>
-        </select>
-        <select v-model="categoryFilter" class="w-auto m-0 min-w-[170px]">
-          <option value="">All Category</option>
-          <option v-for="c in categories" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
-        </select>
+        <SearchInput v-model="search" placeholder="Search services…" class="min-w-55 max-w-80" />
+        <FilterSelect v-model="exhibitorFilter" label="Exhibitor" :options="exhibitorOptions" />
+        <FilterSelect v-model="categoryFilter" label="Category" :options="categoryOptions" />
       </div>
 
-      <!-- grouped: one row per exhibitor, expandable into its orders -->
-      <table v-if="view === 'grouped'">
-        <thead>
-          <tr>
-            <th>EXHIBITOR NAME</th><th>TOTAL REQUESTS</th><th>STATUS SUMMARY</th>
-            <th>TOTAL AMOUNT</th><th>ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="g in pagedGroups" :key="g.name">
-            <tr class="align-middle">
-              <td class="font-medium">{{ g.name }}</td>
-              <td class="font-bold">{{ g.orders.length }}</td>
-              <td>
-                <span v-for="s in g.summary" :key="s.status" class="pill mr-1.5 capitalize" :class="`pill-${s.status}`">
-                  {{ s.count }} {{ s.status }}
-                </span>
-              </td>
-              <td class="whitespace-nowrap">{{ money(g.currency, g.total) }}</td>
-              <td>
-                <button class="btn sm" @click="expanded = expanded === g.name ? null : g.name">
-                  {{ expanded === g.name ? 'Hide Orders' : 'Show Orders' }}
-                </button>
-              </td>
+      <div v-if="loading" class="flex items-center justify-center gap-2.5 py-14 text-muted text-[.88rem]">
+        <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Loading requests…
+      </div>
+
+      <template v-else-if="view === 'grouped'">
+        <!-- grouped: one row per exhibitor, expandable into its orders -->
+        <table>
+          <thead>
+            <tr>
+              <th>EXHIBITOR NAME</th><th>TOTAL REQUESTS</th><th>STATUS SUMMARY</th>
+              <th>TOTAL AMOUNT</th><th>ACTIONS</th>
             </tr>
-            <tr v-if="expanded === g.name">
-              <td colspan="5" class="!p-0">
-                <table class="sub">
-                  <thead>
-                    <tr><th>ORDER ID</th><th>DATE</th><th>ITEMS</th><th>STATUS</th><th>AMOUNT</th><th /></tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="o in g.orders" :key="o.id">
-                      <td class="font-medium text-[#6352e7]">#{{ o.order_number }}</td>
-                      <td class="muted">{{ formatDate(o.date) }}</td>
-                      <td>{{ o.lines_count }}</td>
-                      <td><span class="pill capitalize" :class="`pill-${o.status}`">{{ o.status }}</span></td>
-                      <td class="whitespace-nowrap">{{ money(o.currency, o.total) }}</td>
-                      <td class="text-right"><button class="btn ghost sm" @click="openOrder(o)">View</button></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
+          </thead>
+          <tbody>
+            <template v-for="g in pagedGroups" :key="g.name">
+              <tr class="align-middle">
+                <td class="font-medium">{{ g.name }}</td>
+                <td class="font-bold">{{ g.orders.length }}</td>
+                <td>
+                  <span v-for="s in g.summary" :key="s.status" class="inline-block px-2.5 py-0.5 mr-1.5 text-[.72rem] font-semibold rounded-full capitalize whitespace-nowrap" :class="pillClass(s.status)">
+                    {{ s.count }} {{ s.status }}
+                  </span>
+                </td>
+                <td class="whitespace-nowrap">{{ money(g.currency, g.total) }}</td>
+                <td>
+                  <button class="btn sm" @click="expanded = expanded === g.name ? null : g.name">
+                    {{ expanded === g.name ? 'Hide Orders' : 'Show Orders' }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="expanded === g.name">
+                <td colspan="5" class="!p-0">
+                  <table class="bg-[#fafbfc]">
+                    <thead>
+                      <tr><th>ORDER ID</th><th>DATE</th><th>ITEMS</th><th>STATUS</th><th>AMOUNT</th><th /></tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="o in g.orders" :key="o.id">
+                        <td class="font-medium text-brand">#{{ o.order_number }}</td>
+                        <td class="muted">{{ formatDate(o.date) }}</td>
+                        <td>{{ o.lines_count }}</td>
+                        <td><span class="inline-block px-2.5 py-0.5 text-[.72rem] font-semibold rounded-full capitalize whitespace-nowrap" :class="pillClass(o.status)">{{ o.status }}</span></td>
+                        <td class="whitespace-nowrap">{{ money(o.currency, o.total) }}</td>
+                        <td class="text-right"><button class="btn ghost sm" @click="openOrder(o)">View</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </template>
+            <tr v-if="!pagedGroups.length">
+              <td colspan="5" class="muted text-center py-7">No service requests yet.</td>
             </tr>
-          </template>
-          <tr v-if="!loading && !pagedGroups.length">
-            <td colspan="5" class="muted text-center py-7">No service requests yet.</td>
-          </tr>
-          <tr v-if="loading"><td colspan="5" class="muted text-center py-7">Loading…</td></tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+
+        <!-- pagination -->
+        <div v-if="groups.length" class="flex items-center justify-end gap-4 mt-3.5 flex-wrap">
+          <label class="flex items-center gap-1.5 text-[.84rem] m-0">Nb / page
+            <select v-model.number="groupPerPage" class="w-auto m-0 py-1.5 px-2">
+              <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option>
+            </select>
+          </label>
+          <span class="muted text-[.84rem]">{{ groupRangeText }}</span>
+          <button class="btn ghost sm" :disabled="groupPage <= 1" @click="groupPage--">‹</button>
+          <button class="btn ghost sm" :disabled="groupPage >= groupTotalPages" @click="groupPage++">›</button>
+        </div>
+      </template>
 
       <!-- list: one row per order -->
-      <table v-else>
-        <thead>
-          <tr>
-            <th>ORDER ID</th><th>EXHIBITOR</th><th>DATE</th><th>ITEMS</th>
-            <th>STATUS</th><th>TOTAL AMOUNT</th><th class="text-right">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="o in pagedOrders" :key="o.id" class="align-middle">
-            <td class="font-medium text-[#6352e7]">#{{ o.order_number }}</td>
-            <td>{{ o.exhibitor.name }}</td>
-            <td class="muted">{{ formatDate(o.date) }}</td>
-            <td>{{ o.lines_count }}</td>
-            <td><span class="pill capitalize" :class="`pill-${o.status}`">{{ o.status }}</span></td>
-            <td class="whitespace-nowrap">{{ money(o.currency, o.total) }}</td>
-            <td class="text-right"><button class="btn ghost sm" @click="openOrder(o)">View</button></td>
-          </tr>
-          <tr v-if="!loading && !pagedOrders.length">
-            <td colspan="7" class="muted text-center py-7">No service requests yet.</td>
-          </tr>
-          <tr v-if="loading"><td colspan="7" class="muted text-center py-7">Loading…</td></tr>
-        </tbody>
-      </table>
-
-      <!-- pagination -->
-      <div class="flex items-center justify-end gap-4 mt-3.5 flex-wrap">
-        <label class="flex items-center gap-1.5 text-[.84rem] m-0">Nb / page
-          <select v-model.number="perPage" class="w-auto m-0 py-1.5 px-2">
-            <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option>
-          </select>
-        </label>
-        <label class="flex items-center gap-1.5 text-[.84rem] m-0">Page
-          <select v-model.number="page" class="w-auto m-0 py-1.5 px-2">
-            <option v-for="p in totalPages" :key="p" :value="p">{{ p }}</option>
-          </select>
-        </label>
-        <span class="muted text-[.84rem]">{{ rangeText }}</span>
-        <button class="btn ghost sm" :disabled="page <= 1" @click="page--">‹</button>
-        <button class="btn ghost sm" :disabled="page >= totalPages" @click="page++">›</button>
-      </div>
+      <DataTable
+        v-else
+        :items="visibleOrders"
+        :columns="listColumns"
+        row-key="id"
+        storage-key="requested-services"
+        empty-text="No service requests yet."
+      >
+        <template #cell-order_number="{ row }">
+          <span class="font-medium text-brand">#{{ row.order_number }}</span>
+        </template>
+        <template #cell-exhibitor="{ row }">{{ row.exhibitor.name }}</template>
+        <template #cell-date="{ row }"><span class="muted">{{ formatDate(row.date) }}</span></template>
+        <template #cell-status="{ row }">
+          <span class="inline-block px-2.5 py-0.5 text-[.72rem] font-semibold rounded-full capitalize whitespace-nowrap" :class="pillClass(row.status)">{{ row.status }}</span>
+        </template>
+        <template #cell-total="{ row }"><span class="whitespace-nowrap">{{ money(row.currency, row.total) }}</span></template>
+        <template #actions="{ row }">
+          <button class="btn ghost sm" @click="openOrder(row)">View</button>
+        </template>
+      </DataTable>
     </div>
 
     <!-- detail drawer -->
@@ -380,29 +429,29 @@ onMounted(load)
             <p class="text-[.84rem] font-semibold mt-2 mb-0">Exhibitor:</p>
             <p class="muted text-[.84rem] m-0">{{ detail.exhibitor.name }}</p>
           </div>
-          <span class="pill capitalize shrink-0" :class="`pill-${detail.status}`">{{ detail.status }}</span>
+          <span class="inline-block px-2.5 py-0.5 text-[.72rem] font-semibold rounded-full capitalize whitespace-nowrap shrink-0" :class="pillClass(detail.status)">{{ detail.status }}</span>
         </div>
 
         <!-- line items -->
         <h3 class="text-[1rem] mt-5 mb-2">Requested Services</h3>
         <div v-for="item in detail.items" :key="item.id" class="border border-line rounded-xl p-3 mb-2.5">
           <div class="flex gap-3">
-            <div class="w-[70px] h-[70px] rounded-lg overflow-hidden bg-[#f1f5f9] grid place-items-center shrink-0">
+            <div class="w-17.5 h-17.5 rounded-lg overflow-hidden bg-[#f1f5f9] grid place-items-center shrink-0">
               <img v-if="item.image" :src="item.image" :alt="item.name || ''" class="w-full h-full object-cover">
               <AppIcon v-else name="briefcase" class="w-5 h-5 text-[#94a3b8]" />
             </div>
             <div class="min-w-0 flex-1">
               <div class="font-semibold text-[.92rem]">{{ item.name }}</div>
               <p v-if="item.description" class="muted text-[.8rem] mt-0.5 mb-1">{{ plainText(item.description) }}</p>
-              <div class="text-[#6352e7] text-[.84rem]">{{ item.quantity }} X {{ money(item.currency, item.unit_price) }}</div>
+              <div class="text-brand text-[.84rem]">{{ item.quantity }} X {{ money(item.currency, item.unit_price) }}</div>
               <div class="text-[.84rem]">
-                <strong class="text-[#6352e7]">{{ money(item.currency, item.line_total) }}</strong>
+                <strong class="text-brand">{{ money(item.currency, item.line_total) }}</strong>
                 <span class="muted text-[.7rem] ml-1">{{ item.tax ? 'Excluding Tax' : 'Tax free' }}</span>
               </div>
             </div>
           </div>
           <div class="flex items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-line">
-            <span class="pill capitalize" :class="`pill-${item.status}`">{{ item.status }}</span>
+            <span class="inline-block px-2.5 py-0.5 text-[.72rem] font-semibold rounded-full capitalize whitespace-nowrap" :class="pillClass(item.status)">{{ item.status }}</span>
             <div class="flex gap-2">
               <button class="btn ghost sm" :disabled="busyLine === item.id || item.status === 'approved'" @click="setLineStatus(item, 'approved')">Approve</button>
               <button class="btn ghost sm !text-[#dc2626]" :disabled="busyLine === item.id || item.status === 'rejected'" @click="setLineStatus(item, 'rejected')">Reject</button>
@@ -436,26 +485,3 @@ onMounted(load)
     </Drawer>
   </div>
 </template>
-
-<style scoped>
-.seg { display: inline-flex; gap: 2px; background: #f1f2f6; border-radius: 10px; padding: 3px; }
-.seg button { border: 0; background: transparent; cursor: pointer; padding: 7px 14px; border-radius: 8px;
-              font-size: .84rem; font-weight: 500; color: var(--muted); }
-.seg button.on { background: #6352e7; color: #fff; font-weight: 600; }
-.seg.alt button.on { background: #fff; color: #6352e7; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
-
-.pill { display: inline-block; padding: 3px 10px; font-size: .72rem; font-weight: 600; border-radius: 9999px; white-space: nowrap; }
-.pill-pending { background: #fef3c7; color: #b45309; }
-.pill-partial { background: #dbeafe; color: #1d4ed8; }
-.pill-approved { background: #dcfce7; color: #15803d; }
-.pill-rejected { background: #fee2e2; color: #b91c1c; }
-
-.text-status-pending { color: #b45309; }
-.text-status-partial { color: #1d4ed8; }
-.text-status-approved { color: #15803d; }
-.text-status-rejected { color: #dc2626; }
-
-table.sub { width: 100%; border-collapse: collapse; background: #fafbfc; }
-table.sub th { font-size: .68rem; padding: 9px 16px; }
-table.sub td { padding: 11px 16px; }
-</style>

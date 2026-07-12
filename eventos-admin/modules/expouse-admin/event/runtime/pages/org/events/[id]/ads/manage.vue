@@ -7,7 +7,6 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
 const api = useApi()
-const { upload } = useUpload()
 const id = route.params.id as string
 
 const MAX_PER_PLACEMENT = 4
@@ -126,16 +125,10 @@ function targetOptions(type: string): { id: string, label: string }[] {
   return []
 }
 function onTypeChange(img: AdImage) { img.redirect_target_id = ''; img.redirect_target_label = '' }
+function setImageUrl(img: AdImage, v: string | string[] | null) { img.image_url = (Array.isArray(v) ? v[0] : v) || null }
 function onTargetPick(img: AdImage) {
   const opt = targetOptions(img.redirect_type).find(o => o.id === String(img.redirect_target_id))
   img.redirect_target_label = opt?.label || ''
-}
-
-async function uploadImage(e: Event, img: AdImage) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  try { const r = await upload(file, { collection: 'ad_image' }); img.image_url = r.url }
-  catch { toast.error('Could not upload image.') }
 }
 
 // Select-all helpers
@@ -193,14 +186,20 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[1100px]">
+  <div class="max-w-275">
     <div class="card">
       <div class="mb-2">
         <div class="font-bold text-base">Event Advertising</div>
         <div class="muted text-[.85rem] mt-0.5">Manage and control your event advertisements.</div>
       </div>
 
-      <div v-if="loading" class="muted text-center py-12">Loading ads…</div>
+      <div v-if="loading" class="flex items-center justify-center gap-2.5 py-12 text-muted text-[.88rem]">
+        <svg class="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+          <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        Loading ads…
+      </div>
 
       <template v-else>
         <div
@@ -209,7 +208,7 @@ onMounted(load)
         >
           <div class="flex items-start justify-between gap-6 flex-wrap">
             <!-- Left: title + desc + create -->
-            <div class="max-w-[420px]">
+            <div class="max-w-105">
               <div class="font-semibold text-ink text-[1.02rem]">{{ p.title }}</div>
               <p class="muted text-[.84rem] mt-1">
                 {{ p.desc }} You can create up to {{ MAX_PER_PLACEMENT }} different ads with targeted groups.
@@ -224,14 +223,14 @@ onMounted(load)
             </div>
 
             <!-- Right: ad cards -->
-            <div class="flex-1 min-w-[320px] flex flex-col gap-3">
+            <div class="flex-1 min-w-80 flex flex-col gap-3">
               <div
                 v-for="ad in adsByPlacement[p.key]" :key="ad.id"
                 class="flex items-center gap-3 border border-line rounded-xl p-2.5"
               >
                 <div class="w-24 h-14 rounded-lg overflow-hidden bg-[#f1f1f5] shrink-0 flex items-center justify-center">
                   <img v-if="ad.images?.[0]?.image_url" :src="ad.images[0].image_url" class="w-full h-full object-cover" :alt="ad.title">
-                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6 text-muted"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  <AppIcon v-else name="camera" class="w-6 h-6 text-muted" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium text-ink truncate">{{ ad.title }}</div>
@@ -264,8 +263,7 @@ onMounted(load)
 
       <!-- Ad title -->
       <div class="mb-4">
-        <label class="block mb-1.5">Ad Title <span class="text-[#dc2626]">*</span></label>
-        <input v-model="form.title" placeholder="e.g. Main Ad" class="m-0">
+        <AppInput v-model="form.title" label="Ad Title" required placeholder="e.g. Main Ad" />
       </div>
 
       <!-- Images -->
@@ -292,36 +290,39 @@ onMounted(load)
 
           <!-- body -->
           <div v-if="img._open" class="p-3 flex flex-col gap-3">
-            <div>
-              <label class="block mb-1.5">Image URL <span class="text-[#dc2626]">*</span></label>
-              <div class="rounded-lg overflow-hidden border border-line bg-[#f7f8fa] aspect-[2/1] flex items-center justify-center relative">
-                <img v-if="img.image_url" :src="img.image_url" class="w-full h-full object-cover">
-                <span v-else class="text-muted text-[.84rem]">No image</span>
-              </div>
-              <label class="btn ghost mt-2 text-[.8rem] inline-flex cursor-pointer">
-                <input type="file" accept="image/*" class="hidden" @change="uploadImage($event, img)">
-                {{ img.image_url ? 'Replace image' : 'Upload image' }}
-              </label>
-            </div>
+            <FormField label="Image" required>
+              <ImageField
+                :model-value="img.image_url"
+                :aspect="2"
+                collection="ad_image"
+                card-width="220px"
+                hint="Recommended 2:1 ratio."
+                @update:model-value="setImageUrl(img, $event)"
+              />
+            </FormField>
 
-            <div>
-              <label class="block mb-1.5">Redirect Type</label>
-              <select v-model="img.redirect_type" class="m-0 w-full" @change="onTypeChange(img)">
-                <option v-for="[v, l] in REDIRECT_TYPES" :key="v" :value="v">{{ l }}</option>
-              </select>
-            </div>
+            <AppSelect
+              v-model="img.redirect_type"
+              label="Redirect Type"
+              :options="REDIRECT_TYPES.map(([v, l]) => ({ value: v, label: l }))"
+              @update:model-value="onTypeChange(img)"
+            />
 
-            <div v-if="img.redirect_type === 'url'">
-              <label class="block mb-1.5">External URL</label>
-              <input v-model="img.redirect_target_id" placeholder="https://…" class="m-0" @input="img.redirect_target_label = img.redirect_target_id">
-            </div>
-            <div v-else-if="img.redirect_type !== 'none'">
-              <label class="block mb-1.5 capitalize">Select {{ img.redirect_type }}</label>
-              <select v-model="img.redirect_target_id" class="m-0 w-full" @change="onTargetPick(img)">
-                <option value="">— Select —</option>
-                <option v-for="o in targetOptions(img.redirect_type)" :key="o.id" :value="o.id">{{ o.label }}</option>
-              </select>
-            </div>
+            <AppInput
+              v-if="img.redirect_type === 'url'"
+              v-model="img.redirect_target_id"
+              label="External URL"
+              placeholder="https://…"
+              @update:model-value="img.redirect_target_label = img.redirect_target_id"
+            />
+            <AppSelect
+              v-else-if="img.redirect_type !== 'none'"
+              v-model="img.redirect_target_id"
+              :label="`Select ${img.redirect_type}`"
+              placeholder="— Select —"
+              :options="targetOptions(img.redirect_type).map(o => ({ value: o.id, label: o.label }))"
+              @update:model-value="onTargetPick(img)"
+            />
 
             <label class="flex items-center justify-between">
               <span class="text-[.9rem] font-medium text-ink">Status</span>
@@ -340,27 +341,37 @@ onMounted(load)
 
       <!-- Targeting -->
       <div class="flex gap-8 mb-4 flex-wrap">
-        <div class="flex-1 min-w-[180px]">
+        <div class="flex-1 min-w-45">
           <div class="font-semibold text-ink text-[.92rem] mb-2">Targeted Groups</div>
-          <label class="flex items-center gap-2 mb-1.5 cursor-pointer text-[.88rem] text-ink">
-            <input type="checkbox" class="accent-[#6352e7] w-4 h-4" :checked="allSelected(GROUPS, form.targeted_groups)" @change="toggleAll(GROUPS, form.targeted_groups, 'targeted_groups')">
-            <span class="font-medium">Select All</span>
-          </label>
-          <label v-for="[k, l] in GROUPS" :key="k" class="flex items-center gap-2 mb-1.5 cursor-pointer text-[.88rem] text-ink">
-            <input type="checkbox" class="accent-[#6352e7] w-4 h-4" :checked="form.targeted_groups.includes(k)" @change="toggleKey(k, 'targeted_groups')">
-            {{ l }}
-          </label>
+          <div class="flex flex-col gap-2">
+            <AppCheckbox
+              label="Select All"
+              :model-value="allSelected(GROUPS, form.targeted_groups)"
+              @update:model-value="toggleAll(GROUPS, form.targeted_groups, 'targeted_groups')"
+            />
+            <AppCheckbox
+              v-for="[k, l] in GROUPS" :key="k"
+              :label="l"
+              :model-value="form.targeted_groups.includes(k)"
+              @update:model-value="toggleKey(k, 'targeted_groups')"
+            />
+          </div>
         </div>
-        <div class="flex-1 min-w-[180px]">
+        <div class="flex-1 min-w-45">
           <div class="font-semibold text-ink text-[.92rem] mb-2">Targeted Pages</div>
-          <label class="flex items-center gap-2 mb-1.5 cursor-pointer text-[.88rem] text-ink">
-            <input type="checkbox" class="accent-[#6352e7] w-4 h-4" :checked="allSelected(PAGES, form.targeted_pages)" @change="toggleAll(PAGES, form.targeted_pages, 'targeted_pages')">
-            <span class="font-medium">Select All</span>
-          </label>
-          <label v-for="[k, l] in PAGES" :key="k" class="flex items-center gap-2 mb-1.5 cursor-pointer text-[.88rem] text-ink">
-            <input type="checkbox" class="accent-[#6352e7] w-4 h-4" :checked="form.targeted_pages.includes(k)" @change="toggleKey(k, 'targeted_pages')">
-            {{ l }}
-          </label>
+          <div class="flex flex-col gap-2">
+            <AppCheckbox
+              label="Select All"
+              :model-value="allSelected(PAGES, form.targeted_pages)"
+              @update:model-value="toggleAll(PAGES, form.targeted_pages, 'targeted_pages')"
+            />
+            <AppCheckbox
+              v-for="[k, l] in PAGES" :key="k"
+              :label="l"
+              :model-value="form.targeted_pages.includes(k)"
+              @update:model-value="toggleKey(k, 'targeted_pages')"
+            />
+          </div>
         </div>
       </div>
       <p class="muted text-[.8rem] mb-4">Select specific user groups / pages to target. If none selected, the ad will be shown to all users on all pages.</p>
