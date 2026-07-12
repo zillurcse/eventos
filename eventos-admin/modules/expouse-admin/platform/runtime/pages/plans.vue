@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Plans', subtitle: 'Subscription tiers' })
+definePageMeta({ middleware: 'platform', title: 'Plans', subtitle: 'Subscription plans' })
 
 const api = useApi()
 const plans = ref<any[]>([])

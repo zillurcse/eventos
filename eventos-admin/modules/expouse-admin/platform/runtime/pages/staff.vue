@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Platform staff', subtitle: 'Super-admins of the control plane' })
+definePageMeta({ middleware: 'platform', title: 'Platform staff', subtitle: 'Platform administrators' })
 
 const api = useApi()
 const auth = useAuthStore()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Exhibitors & sponsors', subtitle: 'Exhibitor accounts across all tenants' })
+definePageMeta({ middleware: 'platform', title: 'Exhibitors & sponsors', subtitle: 'All exhibitor accounts' })
 
 const api = useApi()
 

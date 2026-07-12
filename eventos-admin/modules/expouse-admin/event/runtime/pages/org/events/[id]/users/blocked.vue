@@ -8,6 +8,6 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
     subtitle="Users who have been blocked from this event. Unblock to restore their access."
     :query="{ blocked: 1 }"
     count-label="blocked user"
-    empty-text="No blocked users — block someone from All Users and they'll show up here."
+    empty-text="No blocked users yet."
   />
 </template>

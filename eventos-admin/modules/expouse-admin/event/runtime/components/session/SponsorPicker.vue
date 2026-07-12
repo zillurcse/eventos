@@ -43,7 +43,7 @@ function isSelected(s: Sponsor) {
       </div>
       <div class="px-5 overflow-y-auto flex-1">
         <div v-if="!filtered.length" class="text-center muted py-10 text-[.88rem]">
-          No sponsors yet — add exhibitors of type <strong>Sponsor</strong> first.
+          No sponsors yet. Add exhibitors of type <strong>Sponsor</strong> first.
         </div>
         <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-4">
           <button

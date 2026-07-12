@@ -98,10 +98,10 @@ const drawerTitle = computed(() =>
         <div v-if="login.banner_url" class="w-24 rounded-lg overflow-hidden border border-line" :style="{ aspectRatio: '1796 / 1390' }">
           <img :src="login.banner_url" alt="Login banner" class="w-full h-full object-cover">
         </div>
-        <span v-else class="text-[.85rem] text-muted">No banner set yet — use Customise to add one.</span>
+        <span v-else class="text-[.85rem] text-muted">No banner set. Click Customise to add one.</span>
       </template>
-      <span v-else-if="login.type === 'video'" class="text-[.85rem] text-muted truncate">{{ login.video_url || 'No video URL set yet — use Customise to add one.' }}</span>
-      <span v-else class="text-[.85rem] text-muted truncate">{{ login.website_url || 'No website URL set yet — use Customise to add one.' }}</span>
+      <span v-else-if="login.type === 'video'" class="text-[.85rem] text-muted truncate">{{ login.video_url || 'No video URL set. Click Customise to add one.' }}</span>
+      <span v-else class="text-[.85rem] text-muted truncate">{{ login.website_url || 'No website URL set. Click Customise to add one.' }}</span>
     </div>
 
     <!-- Customise sidebar: only the field for the selected design type -->

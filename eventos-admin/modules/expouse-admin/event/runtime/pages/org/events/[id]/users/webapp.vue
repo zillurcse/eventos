@@ -5,9 +5,9 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 <template>
   <EventUsersTable
     title="WebApp users"
-    subtitle="Participants with a web-app login — they can sign in to the event app."
+    subtitle="Participants who can sign in to the event app."
     :query="{ has_login: 1 }"
     count-label="app user"
-    empty-text="No web-app users yet — participants get a login when they register with a password."
+    empty-text="No web-app users yet. Participants get a login when they register with a password."
   />
 </template>

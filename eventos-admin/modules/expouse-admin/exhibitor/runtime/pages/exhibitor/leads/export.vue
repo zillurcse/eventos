@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', feature: 'lead_export', title: 'Lead Export', subtitle: 'Download and share your captured leads' })
+definePageMeta({ middleware: 'exhibitor', feature: 'lead_export', title: 'Lead Export', subtitle: 'Download your leads' })
 </script>
 
 <template>

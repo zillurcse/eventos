@@ -75,7 +75,7 @@ onMounted(load)
             <span>Meta Title</span>
             <span class="text-muted font-normal text-[.78rem]">{{ seo.title.length }}/{{ TITLE_LIMIT }}</span>
           </label>
-          <input v-model="seo.title" maxlength="70" placeholder="e.g. Tech Expo 2026 — The Future of Innovation">
+          <input v-model="seo.title" maxlength="70" placeholder="e.g. Tech Expo 2026">
          
 
           <label class="flex items-baseline justify-between">

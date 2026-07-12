@@ -95,7 +95,7 @@ onMounted(load)
     <EventsEmptyState
       v-if="!events.length"
       title="No events yet"
-      description="Create your first event to start managing sessions, speakers and attendees."
+      description="Create your first event to get started."
       cta-label="Create event"
       @cta="openCreate"
     />

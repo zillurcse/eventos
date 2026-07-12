@@ -16,7 +16,7 @@ function accentStyle(preset: TemplatePreset) {
       <div class="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
         <div>
           <h2 class="m-0 text-[1.1rem] font-bold">Choose a template</h2>
-          <p class="m-0 text-[.82rem] text-[#8b93a7]">Pick a starting point — you can customise everything afterwards.</p>
+          <p class="m-0 text-[.82rem] text-[#8b93a7]">Pick a starting point. You can customise everything later.</p>
         </div>
         <button class="w-9 h-9 rounded-lg border border-line grid place-items-center cursor-pointer hover:bg-[#f5f5fa] bg-white" @click="emit('close')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6b7a" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>

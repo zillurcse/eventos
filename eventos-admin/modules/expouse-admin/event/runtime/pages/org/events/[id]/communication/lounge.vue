@@ -168,14 +168,14 @@ onMounted(load)
     <!-- Networking Lounge -->
     <CommunicationLoungeSettingCard
       title="Networking Lounge" class="mb-4"
-      description="Enable lightning fast networking between attendees with the networking lounge."
+      description="Allow attendees to meet each other in the networking lounge."
       :model-value="enabled" @update:model-value="(v: boolean) => { enabled = v; persist() }"
     />
 
     <!-- Lounge Time Range -->
     <CommunicationLoungeSettingCard
       title="Lounge Time Range" class="mb-4"
-      description="Specify the time range between which networking Lounge will be open."
+      description="Set the times when the lounge is open."
     >
       <button class="btn ghost" @click="slotsOpen = true">MANAGE AVAILABLE SLOTS</button>
     </CommunicationLoungeSettingCard>
@@ -183,7 +183,7 @@ onMounted(load)
     <!-- Attendee Tables -->
     <CommunicationLoungeSettingCard
       title="Attendee Tables" class="mb-4"
-      description="Specify table names, discussion topics and capacity of your lounge tables."
+      description="Set table names, topics and seat capacity."
       :model-value="attendeeTablesEnabled" @update:model-value="(v: boolean) => { attendeeTablesEnabled = v; persist() }"
     >
       <button class="btn ghost" @click="attendeeOpen = true">MANAGE TABLES</button>
@@ -192,7 +192,7 @@ onMounted(load)
     <!-- Exhibitor Tables -->
     <CommunicationLoungeSettingCard
       title="Exhibitor Tables" class="mb-4"
-      description="Enable Exhibitor Members to interact with attendees on their branded tables."
+      description="Let exhibitor members meet attendees at their branded tables."
       :model-value="exhibitorTablesEnabled" @update:model-value="(v: boolean) => { exhibitorTablesEnabled = v; persist() }"
     >
       <label class="text-[.82rem] font-semibold text-brand block mb-1">Default meetings count</label>
@@ -208,7 +208,7 @@ onMounted(load)
     <!-- Sponsor Tables -->
     <CommunicationLoungeSettingCard
       title="Sponsor Tables" class="mb-5"
-      description="Enable Sponsor Members to interact with attendees on their branded tables."
+      description="Let sponsor members meet attendees at their branded tables."
       :model-value="sponsorTablesEnabled" @update:model-value="(v: boolean) => { sponsorTablesEnabled = v; persist() }"
     >
       <label class="text-[.82rem] font-semibold text-brand block mb-1">Default meetings count</label>

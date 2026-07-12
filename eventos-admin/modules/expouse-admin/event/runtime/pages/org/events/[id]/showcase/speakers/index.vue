@@ -224,11 +224,11 @@ function openEdit(s: Speaker) {
 // TODO: wire to real features — reuse speakers from a past event / pick from the
 // org-wide speakers directory. Stubbed for now so the buttons are non-destructive.
 function openPrevious() {
-  alert('Previous speakers — coming soon.')
+  alert('Coming soon.')
 }
 
 function openDirectory() {
-  alert('Speakers directory — coming soon.')
+  alert('Coming soon.')
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ onMounted(() => { load(); loadCategories() })
         <!-- Shown once: we store only the hash, so this can't be recovered later. -->
         <template v-else>
           <p class="text-[.85rem] text-ink mb-3">
-            Give these details to the speaker. The password is shown once — it can’t be
+            Give these details to the speaker. The password is shown once. It cannot be
             retrieved later, only reset.
           </p>
           <div class="border border-line rounded-xl p-3 mb-4 bg-[#fcfcfd] font-mono text-[.85rem]">

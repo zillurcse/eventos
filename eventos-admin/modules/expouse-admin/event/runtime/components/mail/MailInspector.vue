@@ -74,7 +74,7 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
         <textarea v-model="block.text" rows="2" class="m-0" />
         <div class="flex justify-end mt-1"><MailVariableMenu :groups="varGroups" compact @insert="t => insertVar(t, 'text')" /></div>
         <label class="ins-l">Level</label>
-        <select v-model.number="block.level" class="m-0"><option :value="1">H1 — Large</option><option :value="2">H2 — Medium</option><option :value="3">H3 — Small</option></select>
+        <select v-model.number="block.level" class="m-0"><option :value="1">H1 (Large)</option><option :value="2">H2 (Medium)</option><option :value="3">H3 (Small)</option></select>
         <label class="ins-l">Font size (px)</label>
         <input v-model.number="block.style.fontSize" type="number" min="10" max="60" class="m-0">
         <label class="ins-l">Weight</label>
@@ -189,7 +189,7 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
 
       <!-- VIDEO -->
       <template v-else-if="block.type === 'video'">
-        <p class="text-[#8b93a7] text-[.78rem] mb-2">Email clients can't play video inline — we show a thumbnail with a play button that links to the video.</p>
+        <p class="text-[#8b93a7] text-[.78rem] mb-2">Email clients can't play video inline. A thumbnail with a play button will link to the video.</p>
         <label class="ins-l">Thumbnail image</label>
         <div class="flex gap-2 items-center">
           <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>

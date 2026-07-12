@@ -326,7 +326,7 @@ onMounted(load)
       </div>
 
       <div v-if="!form.questions.length" class="text-center border border-dashed border-line rounded-xl py-8 mb-4 text-muted text-[.85rem]">
-        No questions yet — add one above.
+        No questions yet. Add one above.
       </div>
 
       <div v-else class="flex flex-col gap-2.5 mb-4">

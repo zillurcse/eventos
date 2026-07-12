@@ -13,7 +13,7 @@ defineEmits<{ (e: 'toggle'): void }>()
     type="button"
     class="flex items-center gap-2.5 select-none bg-white border border-line rounded-full pl-4 pr-1.5 py-1.5 cursor-pointer"
     :disabled="saving"
-    :title="on ? 'Moderation is ON — posts need approval' : 'Moderation is OFF — posts publish instantly'"
+    :title="on ? 'Moderation is on. Posts need approval.' : 'Moderation is off. Posts publish instantly.'"
     @click="$emit('toggle')"
   >
     <span class="text-[.78rem] font-bold tracking-wide" :class="on ? 'text-[#16a34a]' : 'text-muted'">MODERATE</span>

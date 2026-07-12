@@ -16,9 +16,9 @@ const TYPES: [string, string][] = [
   ['ama', 'AMA Session'], ['custom', 'Custom Type'],
 ]
 const ACCESS: { key: string, title: string, desc: string, icon: string }[] = [
-  { key: 'anyone', title: 'Anyone', desc: 'Open — any event attendee can join.', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z' },
+  { key: 'anyone', title: 'Anyone', desc: 'Any event attendee can join.', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M3.6 9h16.8 M3.6 15h16.8 M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z' },
   { key: 'coded', title: 'Coded', desc: 'Requires an access code to enter.', icon: 'M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z M6 11V7a6 6 0 0 1 12 0v4 M5 11h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9Z' },
-  { key: 'hidden', title: 'Hidden', desc: 'Unlisted — reachable by direct link / invite only.', icon: 'M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.8 21.8 0 0 1 5.06-6.06 M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-2.16 3.19 M14.12 14.12a3 3 0 1 1-4.24-4.24 M1 1l22 22' },
+  { key: 'hidden', title: 'Hidden', desc: 'Only reachable by direct link or invite.', icon: 'M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.8 21.8 0 0 1 5.06-6.06 M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-2.16 3.19 M14.12 14.12a3 3 0 1 1-4.24-4.24 M1 1l22 22' },
 ]
 const typeLabel = (k: string) => TYPES.find(([v]) => v === k)?.[1] || k
 

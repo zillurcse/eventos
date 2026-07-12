@@ -60,7 +60,7 @@ async function saveCustom() {
   try {
     const d = (await api<any>(`/events/${id}/domain`, { method: 'PUT', body: { custom_domain: form.custom_domain || null } })).data
     state.value = d; form.custom_domain = d.custom_domain || ''
-    toast.success(d.custom_domain ? 'Custom domain saved — now add the DNS records below.' : 'Custom domain removed')
+    toast.success(d.custom_domain ? 'Custom domain saved. Now add the DNS records below.' : 'Custom domain removed')
   } catch (e: any) {
     toast.error(e?.data?.errors?.custom_domain?.[0] || e?.data?.message || 'Could not save custom domain.')
   } finally { savingCustom.value = false }
@@ -71,8 +71,8 @@ async function verify() {
   try {
     const res = await api<any>(`/events/${id}/domain/verify`, { method: 'POST' })
     state.value = res.data
-    if (res.data.status === 'active') toast.success('Domain verified and live! 🎉')
-    else toast.error(res.data.error || 'Verification failed — check your DNS records.')
+    if (res.data.status === 'active') toast.success('Domain verified and live.')
+    else toast.error(res.data.error || 'Verification failed. Check your DNS records.')
   } catch (e: any) {
     toast.error(e?.data?.message || 'Could not verify domain.')
   } finally { verifying.value = false }
@@ -101,7 +101,7 @@ onMounted(load)
       <!-- ── Subdomain ─────────────────────────────────────────── -->
       <div class="card">
         <h2 class="mb-1">Subdomain</h2>
-        <p class="muted text-[.86rem] -mt-1">Your free EventOS address. Works instantly — no DNS setup needed.</p>
+        <p class="muted text-[.86rem] -mt-1">Your free EventOS address. No DNS setup is needed.</p>
 
         <label class="block mt-3 mb-1.5">Subdomain</label>
         <div class="flex items-center gap-2 flex-wrap">

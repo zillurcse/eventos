@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', feature: 'team_connections', title: 'Team Connections', subtitle: 'Leads captured across your booth team' })
+definePageMeta({ middleware: 'exhibitor', feature: 'team_connections', title: 'Team Connections', subtitle: 'Leads captured by your team' })
 </script>
 
 <template>

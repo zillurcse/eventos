@@ -128,11 +128,11 @@ const stream = reactive({
 
 // Host-aware label/placeholder/help for the stream link field.
 const HOST_LINK: Record<string, { label: string; placeholder: string; hint: string }> = {
-  youtube: { label: 'YouTube Live Link', placeholder: 'https://www.youtube.com/live/…', hint: 'Paste your YouTube live or watch URL — it plays embedded on the event page.' },
+  youtube: { label: 'YouTube Live Link', placeholder: 'https://www.youtube.com/live/…', hint: 'Paste your YouTube live or watch URL. It plays embedded on the event page.' },
   agora:   { label: 'Agora Channel (optional)', placeholder: 'Leave blank to auto-create a channel', hint: 'Broadcast video embedded on the event page: the speaker goes on camera, attendees watch. Best for a large audience. Needs an App ID + Certificate in Settings › Video.' },
   jitsi:   { label: 'Jitsi Room or Link (optional)', placeholder: 'Leave blank to auto-create a private room', hint: 'Free open-source video that runs embedded on the event page. Leave blank to auto-generate a room, or paste a meet.jit.si link/room name.' },
   zoom:    { label: 'Zoom Link',         placeholder: 'https://zoom.us/j/…', hint: 'Embeds inside the event page via the Zoom Web SDK (needs Zoom keys configured on the server).' },
-  meet:    { label: 'Google Meet Link',  placeholder: 'https://meet.google.com/abc-defg-hij', hint: 'Attendees open Meet in a new tab — Google Meet can’t be embedded.' },
+  meet:    { label: 'Google Meet Link',  placeholder: 'https://meet.google.com/abc-defg-hij', hint: 'Attendees open Meet in a new tab because Google Meet cannot be embedded.' },
   rtmp:    { label: 'Player URL',        placeholder: 'https://…', hint: 'The public player URL for your RTMP stream.' },
   self:    { label: 'Stream Link',       placeholder: 'https://…', hint: 'The public URL where attendees watch the stream.' },
 }
@@ -689,7 +689,7 @@ onMounted(load)
         <div class="card mb-5 p-5">
           <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Speakers</h3>
           <div v-if="!eventSpeakers.length" class="muted text-[.84rem]">
-            No event speakers yet — add them in <strong>Showcase › Speakers</strong>.
+            No event speakers yet. Add them in <strong>Showcase › Speakers</strong>.
           </div>
           <div v-else class="flex flex-col gap-2">
             <label
@@ -812,7 +812,7 @@ onMounted(load)
             <div v-if="stream.who_will_host === 'vimeo'" class="mb-4">
               <label class="block mb-1.5">Vimeo Live ID</label>
               <input v-model="stream.vimeo_live_id" placeholder="e.g. 123456789" class="m-0">
-              <p class="muted text-[.8rem] mt-1.5 mb-0">The numeric ID of your Vimeo live event — it embeds on the event page.</p>
+              <p class="muted text-[.8rem] mt-1.5 mb-0">The numeric ID of your Vimeo live event. It embeds on the event page.</p>
             </div>
 
             <div v-else class="mb-4">
@@ -837,8 +837,8 @@ onMounted(load)
             </p>
             <select v-model="stream.status" class="m-0 w-full max-w-xs">
               <option value="scheduled">Follow the schedule</option>
-              <option value="live">Live now — open the player</option>
-              <option value="ended">Ended — show the replay</option>
+              <option value="live">Live now (open the player)</option>
+              <option value="ended">Ended (show the replay)</option>
               <option value="canceled">Canceled</option>
             </select>
           </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Organizations', subtitle: 'Every tenant on the platform' })
+definePageMeta({ middleware: 'platform', title: 'Organizations', subtitle: 'All organizations on the platform' })
 
 const api = useApi()
 const orgs = ref<any[]>([])

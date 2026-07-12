@@ -3,7 +3,7 @@ definePageMeta({
   middleware: 'exhibitor',
   feature: 'all_leads',
   title: 'All Leads',
-  subtitle: "All your leads and team's connections in one place — track relationships, spot opportunities, and follow up.",
+  subtitle: 'View and manage all your leads and team connections.',
 })
 
 const api = useApi()

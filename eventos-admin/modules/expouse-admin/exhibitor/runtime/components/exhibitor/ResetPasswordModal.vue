@@ -34,7 +34,7 @@ async function copyPw() {
 
       <!-- Step 2: generated password reveal (auto mode) -->
       <div v-if="resetResult" class="rp-body">
-        <p class="rp-lead">The password has been reset. Copy it now — you won’t be able to see it again.</p>
+        <p class="rp-lead">The password has been reset. Copy it now. It will not be shown again.</p>
 
         <label class="rp-field-label">Email</label>
         <div class="rp-readonly">{{ resetResult.email }}</div>

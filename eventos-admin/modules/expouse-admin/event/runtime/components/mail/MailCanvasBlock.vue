@@ -224,7 +224,7 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
           :style="{ width: (style.width || 100) + '%', maxWidth: '100%', borderRadius: (style.borderRadius || 0) + 'px', display: 'inline-block' }"
         >
         <div v-else class="border-2 border-dashed border-line rounded-lg py-9 text-center text-[#8b93a7] text-[.85rem]">
-          🖼 No image — select and add a URL or upload
+          No image. Add a URL or upload one.
         </div>
       </div>
 
@@ -242,7 +242,7 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
       </div>
 
       <!-- html — rendered live so designers see the actual output -->
-      <div v-else-if="block.type === 'html'" class="email-html-block" v-html="block.html || '<p style=\'color:#94a3b8;font-size:13px;text-align:center\'>Custom HTML block — edit in inspector</p>'" />
+      <div v-else-if="block.type === 'html'" class="email-html-block" v-html="block.html || '<p style=\'color:#94a3b8;font-size:13px;text-align:center\'>Custom HTML block. Edit it in the inspector.</p>'" />
 
       <!-- logo -->
       <div v-else-if="block.type === 'logo'" :style="{ textAlign: style.align || 'center', backgroundColor: style.backgroundColor || 'transparent' }">
@@ -254,7 +254,7 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
         >
         <div v-else class="inline-flex items-center gap-2 text-[.8rem] border-2 border-dashed border-line rounded-lg px-4 py-2.5 text-[#8b93a7]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b93a7" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
-          Logo — upload or paste URL
+          Upload a logo or paste a URL
         </div>
       </div>
 

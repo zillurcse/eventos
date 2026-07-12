@@ -145,11 +145,11 @@ onMounted(load)
             <span class="text-ink font-medium">{{ row.ctr }}%</span>
           </template>
           <template #empty>
-            <span class="muted">No ads yet — create some in <strong>Manage ADs</strong> to see insights here.</span>
+            <span class="muted">No ads yet. Create ads in <strong>Manage ADs</strong> to see insights here.</span>
           </template>
         </DataTable>
         <p v-if="data.ads.length && !data.totals.impressions" class="muted text-[.82rem] mt-3">
-          No impressions recorded yet — metrics populate as your ads are shown and clicked in the event app.
+          No impressions recorded yet. Metrics will appear once your ads are shown in the event app.
         </p>
       </div>
     </template>

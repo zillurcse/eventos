@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', feature: 'teams', title: 'Team Members', subtitle: 'Your booth staff and their access' })
+definePageMeta({ middleware: 'exhibitor', feature: 'teams', title: 'Team Members', subtitle: 'Manage your team and their access' })
 
 const auth = useAuthStore()
 const api = useApi()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', title: 'Company Profile', subtitle: 'Your exhibitor / sponsor space' })
+definePageMeta({ middleware: 'exhibitor', title: 'Company Profile', subtitle: 'Manage your company profile' })
 
 const api = useApi()
 
@@ -186,7 +186,7 @@ onMounted(load)
                   <AppIcon name="link" class="w-4 h-4" /> {{ exhibitor.website_url }}
                 </a>
                 <p v-if="!phoneDisplay && !exhibitor.email && !exhibitor.website_url" class="muted text-[.88rem] m-0!">
-                  No contact details yet — add them with <button class="text-brand font-semibold" @click="startEdit">Edit</button>.
+                  No contact details yet. Click <button class="text-brand font-semibold" @click="startEdit">Edit</button> to add them.
                 </p>
               </div>
             </div>
@@ -233,7 +233,7 @@ onMounted(load)
             <button v-if="qrValue" class="btn ghost sm" @click="customizing = !customizing">Customize</button>
           </div>
           <p class="muted mt-2 text-[.86rem] leading-relaxed">
-            The QR code links to your company page in the event app — display it on your onsite booth or in your email signature.
+            The QR code links to your company page in the event app. You can display it on your booth or in your email signature.
           </p>
 
           <template v-if="qrValue">

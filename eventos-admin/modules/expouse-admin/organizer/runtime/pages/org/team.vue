@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'organizer', title: 'Team', subtitle: 'Who can manage your events' })
+definePageMeta({ middleware: 'organizer', title: 'Team', subtitle: 'Manage your team members' })
 
 const auth = useAuthStore()
 const api = useApi()

@@ -383,7 +383,7 @@ onMounted(load)
         </div>
 
         <div class="mb-4">
-          <FormField label="Description File" hint="PDF, PPT or DOC — up to 20 MB.">
+          <FormField label="Description File" hint="PDF, PPT or DOC, up to 20 MB.">
             <div v-if="form.description_file_url" class="flex items-center justify-between gap-2 border border-line rounded-[11px] px-3 py-2.5">
               <a :href="form.description_file_url" target="_blank" class="text-brand text-[.85rem] truncate">
                 {{ form.description_file_name || 'View file' }}

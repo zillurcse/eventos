@@ -150,7 +150,7 @@ onMounted(load)
     <div v-else-if="!templates.length" class="card text-center py-14">
       <div class="text-4xl mb-3">✉️</div>
       <h3 class="m-0 mb-1">No email templates yet</h3>
-      <p class="muted text-[.88rem] mb-5">Set up all 36 default templates in one click — invitations, reminders, confirmations, meetings and more — then customise as needed.</p>
+      <p class="muted text-[.88rem] mb-5">Set up all 36 default templates in one click: invitations, reminders, confirmations, meetings and more. Then customise them as needed.</p>
       <div class="flex items-center justify-center gap-3 flex-wrap">
         <button class="btn" :disabled="seeding" @click="seedDefaults">
           <svg v-if="seeding" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>

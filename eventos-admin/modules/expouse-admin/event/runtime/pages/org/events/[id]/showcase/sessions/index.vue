@@ -136,7 +136,7 @@ onMounted(load)
 
     <!-- Empty state -->
     <div v-if="!sessions.length && !search" class="card text-center py-12 muted">
-      No sessions yet — click <strong>+ SCHEDULE</strong> to add one.
+      No sessions yet. Click <strong>+ SCHEDULE</strong> to add one.
     </div>
 
     <SessionGrid

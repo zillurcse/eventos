@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'organizer', title: 'Overview', subtitle: 'Your organization at a glance' })
+definePageMeta({ middleware: 'organizer', title: 'Overview', subtitle: 'Organization overview' })
 
 const auth = useAuthStore()
 const api = useApi()

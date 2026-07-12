@@ -74,8 +74,8 @@ async function toggleModerate() {
   try {
     await api(`/events/${id}/feed-moderation/settings`, { method: 'PATCH', body: { moderate: next } })
     toast.success(next
-      ? 'Moderation on — new posts will wait for your approval.'
-      : 'Moderation off — new posts publish instantly.')
+      ? 'Moderation is on. New posts will wait for your approval.'
+      : 'Moderation is off. New posts publish instantly.')
   } catch {
     moderate.value = !next
     toast.error('Could not update the moderation setting.')
@@ -105,7 +105,7 @@ const emptyLabel = computed(() => {
   if (search.value.trim()) return 'No posts match your search.'
   if (tab.value === 'pending') {
     return moderate.value
-      ? 'No posts waiting for review — you’re all caught up. 🎉'
+      ? 'No posts waiting for review.'
       : 'No pending posts. Turn on MODERATE to review posts before they go live.'
   }
   return tab.value === 'published' ? 'No approved posts yet.' : 'No rejected posts.'
@@ -123,7 +123,7 @@ onMounted(() => load())
         <p class="muted text-[.85rem] mt-0.5 mb-0">
           Review attendee posts from the event app.
           <template v-if="moderate">New posts are held here until you approve them.</template>
-          <template v-else>Posts publish instantly — enable moderation to review them first.</template>
+          <template v-else>Posts publish instantly. Enable moderation to review them first.</template>
         </p>
       </div>
 

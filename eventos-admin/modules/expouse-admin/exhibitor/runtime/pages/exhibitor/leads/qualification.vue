@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'exhibitor', feature: 'lead_qualification', title: 'Lead Qualification', subtitle: 'Move leads through your pipeline' })
+definePageMeta({ middleware: 'exhibitor', feature: 'lead_qualification', title: 'Lead Qualification', subtitle: 'Qualify and track your leads' })
 </script>
 
 <template>

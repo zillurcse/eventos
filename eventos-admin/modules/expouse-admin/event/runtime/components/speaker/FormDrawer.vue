@@ -183,7 +183,7 @@ function save() {
     <!-- Presentation -->
     <div class="mb-5 flex flex-col gap-3">
       <AppInput v-model="draft.presentation_title" label="Presentation Title" placeholder="e.g. Scaling engineering teams" />
-      <FormField label="Presentation File" hint="PDF, PPT, DOC — up to 20 MB.">
+      <FormField label="Presentation File" hint="PDF, PPT or DOC, up to 20 MB.">
         <div v-if="draft.presentation_file" class="flex items-center justify-between gap-2 border border-line rounded-[11px] px-3 py-2.5">
           <a :href="draft.presentation_file" target="_blank" class="text-brand text-[.85rem] truncate">
             {{ draft.presentation_file_name || 'View file' }}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'platform', title: 'Platform overview', subtitle: 'Cross-tenant metrics' })
+definePageMeta({ middleware: 'platform', title: 'Platform overview', subtitle: 'Platform metrics' })
 
 const api = useApi()
 const m = ref<any>(null)

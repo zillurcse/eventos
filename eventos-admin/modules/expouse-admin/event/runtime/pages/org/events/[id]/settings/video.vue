@@ -49,7 +49,7 @@ const agoraCertBad = computed(() => !!agora.app_certificate.trim() && !HEX32.tes
 const PEM_HINT = '-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----'
 const keyPlaceholder = computed(() =>
   state.value?.jitsi.has_private_key
-    ? 'A key is stored — paste a new one only to replace it'
+    ? 'A key is already stored. Paste a new one to replace it.'
     : PEM_HINT,
 )
 
@@ -161,7 +161,7 @@ onMounted(load)
         </div>
         <p class="muted text-[.83rem] mt-0 mb-4">
           Broadcast video: the speaker goes on camera and everyone else watches. Best for a
-          large audience — one upstream feeds thousands of viewers. Create a project at
+          large audience. Create a project at
           <a href="https://console.agora.io" target="_blank" rel="noopener" class="text-brand hover:underline">console.agora.io</a>
           and enable its App Certificate.
         </p>
@@ -170,7 +170,7 @@ onMounted(load)
           <label class="block mb-1.5">App ID <span class="text-[#dc2626]">*</span></label>
           <input v-model="agora.app_id" placeholder="32-character hex string" class="m-0 font-mono text-[.85rem]">
           <p v-if="agoraIdBad" class="error text-[.8rem] mt-1.5 mb-0">
-            An Agora App ID is exactly 32 hex characters — this doesn’t look like one.
+            An Agora App ID is exactly 32 hex characters. This does not look like one.
           </p>
         </div>
 
@@ -183,14 +183,13 @@ onMounted(load)
             v-model="agora.app_certificate"
             type="password"
             class="m-0 font-mono text-[.85rem]"
-            :placeholder="state?.agora.has_certificate ? 'A certificate is stored — type to replace it' : '32-character hex string'"
+            :placeholder="state?.agora.has_certificate ? 'A certificate is already stored. Type to replace it.' : '32-character hex string'"
           >
           <p v-if="agoraCertBad" class="error text-[.8rem] mt-1.5 mb-0">
             An App Certificate is exactly 32 hex characters.
           </p>
           <p v-else class="muted text-[.8rem] mt-1.5 mb-0">
-            From the project’s Security settings. Stored encrypted and never shown again — it
-            signs each viewer’s token, so it must stay on the server.
+            From the project’s Security settings. It is stored encrypted and never shown again.
           </p>
           <p v-if="state?.agora.has_certificate" class="text-[.8rem] text-[#16a34a] font-medium mt-1.5 mb-0">
             ✓ A certificate is stored for this event
@@ -216,8 +215,8 @@ onMounted(load)
         </div>
         <p class="muted text-[.83rem] mt-0 mb-4">
           Round-table video where everyone can join in. Without a signing key it falls back to the
-          public <code>meet.jit.si</code>, which refuses to start a room until someone signs in as
-          a moderator — your attendees would be stuck waiting. Add a
+          public <code>meet.jit.si</code>, which does not start a room until a moderator signs in.
+          Add a
           <a href="https://jaas.8x8.vc" target="_blank" rel="noopener" class="text-brand hover:underline">JaaS</a>
           account (free tier available).
         </p>
@@ -266,7 +265,7 @@ onMounted(load)
             v-model="jitsi.app_secret"
             type="password"
             class="m-0 font-mono text-[.85rem]"
-            :placeholder="state?.jitsi.has_app_secret ? 'A secret is stored — type to replace it' : 'Prosody shared secret'"
+            :placeholder="state?.jitsi.has_app_secret ? 'A secret is already stored. Type to replace it.' : 'Prosody shared secret'"
           >
           <p class="muted text-[.8rem] mt-1.5 mb-0">
             The shared secret from your self-hosted Jitsi’s token auth. Stored encrypted.

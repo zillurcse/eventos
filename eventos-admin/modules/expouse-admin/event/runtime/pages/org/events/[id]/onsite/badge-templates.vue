@@ -20,10 +20,10 @@ interface BadgeTemplate {
 
 // Print-size presets the editor understands (millimetres).
 const SIZES: { key: string, label: string, width: number, height: number }[] = [
-  { key: 'A6', label: 'A6 — 105 × 148 mm', width: 105, height: 148 },
-  { key: 'A7', label: 'A7 — 74 × 105 mm', width: 74, height: 105 },
-  { key: 'A4', label: 'A4 — 210 × 297 mm', width: 210, height: 297 },
-  { key: 'card', label: 'Card — 85.6 × 54 mm', width: 86, height: 54 },
+  { key: 'A6', label: 'A6 (105 × 148 mm)', width: 105, height: 148 },
+  { key: 'A7', label: 'A7 (74 × 105 mm)', width: 74, height: 105 },
+  { key: 'A4', label: 'A4 (210 × 297 mm)', width: 210, height: 297 },
+  { key: 'card', label: 'Card (85.6 × 54 mm)', width: 86, height: 54 },
 ]
 
 const templates = ref<BadgeTemplate[]>([])
@@ -183,7 +183,7 @@ onMounted(load)
       </div>
 
       <div class="mb-4">
-        <AppInput v-model="form.badge_for" label="Badge for" hint="Optional — e.g. Attendee, Speaker, Exhibitor" placeholder="Attendee, Speaker, Exhibitor…" />
+        <AppInput v-model="form.badge_for" label="Badge for" hint="Optional, e.g. Attendee, Speaker, Exhibitor" placeholder="Attendee, Speaker, Exhibitor…" />
       </div>
 
       <div class="mb-1">
