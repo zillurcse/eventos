@@ -22,6 +22,10 @@ interface EventSpeaker {
   designation: string; image_url: string | null
 }
 
+interface Sponsor { id: string; name: string; logo_url?: string | null }
+
+interface SessionDocument { name: string; url: string }
+
 interface Session {
   id: string
   title: string
@@ -34,6 +38,9 @@ interface Session {
   stream_url: string | null
   session_place: string | null
   logo_url: string | null
+  icon_url: string | null
+  sponsors: Sponsor[]
+  documents: SessionDocument[]
   tags: string[]
   is_featured: boolean
   is_allowed_to_rate: boolean
@@ -82,6 +89,14 @@ interface PanelMessage {
 const session       = ref<Session | null>(null)
 const tracks        = ref<Track[]>([])
 const eventSpeakers = ref<EventSpeaker[]>([])
+const sponsorsList    = ref<Sponsor[]>([])
+const speakerModal    = ref(false)
+const sponsorModal    = ref(false)
+const iconChooserOpen = ref(false)
+
+// Older sessions stored an uploaded image URL in icon_url; new ones store a
+// catalog icon key from the /icons registry. Render whichever we have.
+const iconIsImage = computed(() => !!basic.icon_url && /^https?:\/\//.test(basic.icon_url))
 const activeTab     = ref<'basic' | 'stream' | 'engagement'>('basic')
 const loading       = ref(true)
 const tagInput      = ref('')
@@ -103,6 +118,9 @@ const basic = reactive({
   track_id:           '' as number | '',
   session_place:      '',
   logo_url:           null as string | null,
+  icon_url:           null as string | null,
+  sponsors:           [] as Sponsor[],
+  documents:          [] as SessionDocument[],
   capacity:           '' as number | '',
   tags:               [] as string[],
   is_featured:        false,
@@ -192,16 +210,18 @@ const canSaveBasic = computed(() =>
 async function load() {
   loading.value = true
   try {
-    const [sessRes, trkRes, spkRes] = await Promise.all([
+    const [sessRes, trkRes, spkRes, sponRes] = await Promise.all([
       api<any>(`/sessions/${sessionId}`),
       api<any>(`/tracks?event=${id}`),
       api<any>(`/events/${id}/speakers`),
+      api<any>(`/exhibitors?event=${id}&type=sponsor`),
     ])
 
     const s: Session = sessRes.data
     session.value       = s
     tracks.value        = trkRes.data
     eventSpeakers.value = spkRes.data
+    sponsorsList.value  = (sponRes.data || []).map((e: any) => ({ id: e.id, name: e.name, logo_url: e.logo_url ?? null }))
 
     // Populate basic form
     basic.title              = s.title
@@ -212,6 +232,9 @@ async function load() {
     basic.track_id           = s.track?.id ?? ''
     basic.session_place      = s.session_place ?? ''
     basic.logo_url           = s.logo_url ?? null
+    basic.icon_url           = s.icon_url ?? null
+    basic.sponsors           = [...(s.sponsors ?? [])]
+    basic.documents          = [...(s.documents ?? [])]
     basic.capacity           = s.capacity ?? ''
     basic.tags               = [...(s.tags ?? [])]
     basic.is_featured        = s.is_featured ?? false
@@ -378,6 +401,9 @@ async function saveBasic() {
         track_id:           basic.track_id || null,
         session_place:      basic.session_place || null,
         logo_url:           basic.logo_url || null,
+        icon_url:           basic.icon_url || null,
+        sponsors:           basic.sponsors,
+        documents:          basic.documents,
         capacity:           basic.capacity || null,
         tags:               basic.tags,
         is_featured:        basic.is_featured,
@@ -436,6 +462,7 @@ async function toggleSpeaker(sp: EventSpeaker) {
     if (isSessionSpeaker(sp)) {
       await api(`/sessions/${sessionId}/speakers/${sp.id}`, { method: 'DELETE' })
       session.value.speakers = session.value.speakers.filter(s => s.id !== sp.id)
+      toast.success(`${sp.name} removed from this session`)
     } else {
       const parts = sp.name.split(' ')
       await api(`/sessions/${sessionId}/speakers`, {
@@ -450,10 +477,31 @@ async function toggleSpeaker(sp: EventSpeaker) {
       // Reload session speakers
       const fresh = await api<any>(`/sessions/${sessionId}`)
       session.value.speakers = fresh.data.speakers ?? session.value.speakers
+      toast.success(`${sp.name} added to this session`)
     }
-  } catch { /* */ } finally {
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update speakers.')
+  } finally {
     spkSaving.value = false
   }
+}
+
+// The picker emits a speaker id; add/remove runs live against the pivot.
+function toggleSpeakerById(spId: string) {
+  const sp = eventSpeakers.value.find(s => s.id === spId)
+  if (sp) toggleSpeaker(sp)
+}
+
+// ── Sponsors (draft state — saved with SAVE CHANGES) ─────────────────────────
+
+function toggleSponsor(s: Sponsor) {
+  const i = basic.sponsors.findIndex(x => x.id === s.id)
+  if (i >= 0) basic.sponsors.splice(i, 1)
+  else basic.sponsors.push({ id: s.id, name: s.name, logo_url: s.logo_url ?? null })
+}
+
+function removeSponsor(sid: string) {
+  basic.sponsors = basic.sponsors.filter(x => x.id !== sid)
 }
 
 // ── Track inline CRUD ─────────────────────────────────────────────────────────
@@ -666,56 +714,93 @@ onMounted(load)
 
           <div class="mb-4">
             <label class="block mb-1.5">Description</label>
-            <textarea v-model="basic.description" rows="4" placeholder="What is this session about?" class="w-full resize-y m-0" />
+            <SessionDescriptionEditor v-model="basic.description" />
           </div>
 
-          <div>
-            <label class="block mb-1.5">Session Logo</label>
-            <ImageField
-              :model-value="basic.logo_url"
-              :aspect="1"
-              :output-width="400"
-              :output-height="400"
-              collection="logo"
-              card-width="160px"
-              hint="Square image recommended"
-              :gallery-path="`/events/${id}/gallery`"
-              @update:model-value="basic.logo_url = (Array.isArray($event) ? $event[0] : $event) || null"
-            />
+          <div class="flex gap-6">
+            <div>
+              <label class="block mb-1.5">Logo</label>
+              <ImageField
+                :model-value="basic.logo_url"
+                :aspect="1"
+                :output-width="400"
+                :output-height="400"
+                collection="session_logo"
+                card-width="120px"
+                :gallery-path="`/events/${id}/gallery`"
+                @update:model-value="basic.logo_url = (Array.isArray($event) ? $event[0] : $event) || null"
+              />
+            </div>
+            <div>
+              <label class="block mb-1.5">Icon</label>
+              <button
+                type="button"
+                class="w-[120px] h-[120px] rounded-xl border border-dashed border-[#d7dae1] flex items-center justify-center bg-[#fafbfc] cursor-pointer hover:border-brand overflow-hidden"
+                @click="iconChooserOpen = true"
+              >
+                <img v-if="iconIsImage" :src="basic.icon_url!" alt="Session icon" class="w-full h-full object-cover">
+                <AppIcon v-else-if="basic.icon_url" :name="basic.icon_url" class="w-10 h-10 text-ink" />
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-9 h-9 text-muted"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Speakers -->
+        <!-- Speakers + Sponsors -->
         <div class="card mb-5 p-5">
           <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Speakers</h3>
-          <div v-if="!eventSpeakers.length" class="muted text-[.84rem]">
-            No event speakers yet. Add them in <strong>Showcase › Speakers</strong>.
-          </div>
-          <div v-else class="flex flex-col gap-2">
-            <label
-              v-for="sp in eventSpeakers"
+          <div class="flex flex-wrap gap-2 items-center mb-5">
+            <button
+              type="button"
+              class="w-16 h-16 border-2 border-dashed border-line rounded-xl flex items-center justify-center text-2xl text-muted hover:border-brand hover:text-brand transition-colors"
+              @click.stop="speakerModal = true"
+            >+</button>
+            <div
+              v-for="sp in session?.speakers ?? []"
               :key="sp.id"
-              class="flex items-center gap-3 px-4 py-3 border border-line rounded-xl cursor-pointer select-none transition-colors"
-              :class="isSessionSpeaker(sp) ? 'bg-brand-soft border-brand/20' : 'bg-white hover:bg-[#fafbfc]'"
+              class="relative w-16 h-16 rounded-xl overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
+              :title="sp.name"
             >
-              <input
-                type="checkbox"
-                :checked="isSessionSpeaker(sp)"
+              <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
+              <span v-else>{{ initials(sp.name) }}</span>
+              <button
+                class="absolute top-0.5 right-0.5 w-4 h-4 bg-white text-brand border border-line rounded-full text-[.7rem] leading-none flex items-center justify-center shadow"
                 :disabled="spkSaving"
-                class="w-4.5 h-4.5 m-0 accent-brand shrink-0"
-                @change="toggleSpeaker(sp)"
-              >
-              <div class="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-brand-soft flex items-center justify-center text-brand text-[.72rem] font-semibold">
-                <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
-                <span v-else>{{ initials(sp.name) }}</span>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="font-semibold text-[.9rem] text-ink leading-tight truncate">{{ sp.name }}</div>
-                <div class="muted text-[.78rem] truncate">{{ sp.designation || sp.email }}</div>
-              </div>
-              <span v-if="isSessionSpeaker(sp)" class="text-[.73rem] font-medium text-brand shrink-0">Added</span>
-            </label>
+                @click.stop="toggleSpeakerById(sp.id)"
+              >×</button>
+            </div>
           </div>
+          <p v-if="!eventSpeakers.length" class="muted text-[.84rem] m-0 mb-5">
+            No event speakers yet. Add them in <strong>Showcase › Speakers</strong>.
+          </p>
+
+          <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Session Sponsors</h3>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              class="w-16 h-16 border-2 border-dashed border-line rounded-xl flex items-center justify-center text-2xl text-muted hover:border-brand hover:text-brand transition-colors"
+              @click.stop="sponsorModal = true"
+            >+</button>
+            <div
+              v-for="sp in basic.sponsors"
+              :key="sp.id"
+              class="relative w-16 h-16 rounded-xl overflow-hidden bg-[#f1f1f5] text-muted flex items-center justify-center text-[.8rem] font-bold border border-line p-1 text-center"
+              :title="sp.name"
+            >
+              <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name" class="w-full h-full object-contain">
+              <span v-else class="leading-tight line-clamp-2">{{ sp.name }}</span>
+              <button
+                class="absolute top-0.5 right-0.5 w-4 h-4 bg-white text-brand border border-line rounded-full text-[.7rem] leading-none flex items-center justify-center shadow"
+                @click.stop="removeSponsor(sp.id)"
+              >×</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="card mb-5 p-5">
+          <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Documents</h3>
+          <SessionDocumentUploader v-model="basic.documents" @error="basicError = $event" />
         </div>
 
         <!-- Tags + options -->
@@ -723,7 +808,7 @@ onMounted(load)
           <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Tags &amp; Options</h3>
 
           <div class="mb-5">
-            <label class="block mb-1.5">Tags</label>
+            <label class="block mb-1.5">Custom Tags</label>
             <div class="flex flex-wrap gap-1.5 mb-2">
               <span
                 v-for="(tag, i) in basic.tags" :key="i"
@@ -735,7 +820,7 @@ onMounted(load)
             </div>
             <input
               v-model="tagInput"
-              placeholder="Type a tag and press Enter or comma"
+              placeholder="Add tag &amp; press enter"
               class="m-0"
               @keydown="onTagKey"
               @blur="addTag"
@@ -745,11 +830,11 @@ onMounted(load)
           <div class="flex flex-col gap-3">
             <label class="flex items-center gap-3 cursor-pointer select-none">
               <input v-model="basic.is_allowed_to_rate" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-              <span class="text-[.93rem] font-medium text-ink">Allow attendee ratings</span>
+              <span class="text-[.93rem] font-medium text-ink">Attendees can rate this session</span>
             </label>
             <label class="flex items-center gap-3 cursor-pointer select-none">
               <input v-model="basic.is_featured" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-              <span class="text-[.93rem] font-medium text-ink">Featured session</span>
+              <span class="text-[.93rem] font-medium text-ink">Featured schedule</span>
             </label>
           </div>
         </div>
@@ -765,6 +850,30 @@ onMounted(load)
             {{ basicSaving ? 'Saving…' : 'SAVE CHANGES' }}
           </button>
         </div>
+
+        <SessionSpeakerPicker
+          v-if="speakerModal"
+          :speakers="eventSpeakers"
+          :selected-ids="(session?.speakers ?? []).map(s => s.id)"
+          @close="speakerModal = false"
+          @toggle="toggleSpeakerById"
+        />
+
+        <SessionSponsorPicker
+          v-if="sponsorModal"
+          :sponsors="sponsorsList"
+          :selected="basic.sponsors"
+          @close="sponsorModal = false"
+          @toggle="toggleSponsor"
+        />
+
+        <IconChooserModal
+          v-if="iconChooserOpen"
+          :model-value="iconIsImage ? '' : basic.icon_url"
+          title="Choose Session Icon"
+          @select="basic.icon_url = $event"
+          @close="iconChooserOpen = false"
+        />
       </div>
 
       <!-- ── Stream Tab ──────────────────────────────────────────────────── -->

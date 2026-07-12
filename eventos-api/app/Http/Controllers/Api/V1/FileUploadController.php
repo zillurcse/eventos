@@ -22,13 +22,13 @@ class FileUploadController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // The `document` collection carries presentation decks / handouts, so it
-        // accepts common office file types (and images) up to 20 MB. The `feed`
-        // collection additionally accepts video for attendee feed posts (≤ 80 MB);
-        // `chat` mirrors it plus office docs for message attachments.
-        // Every other collection is image-only (≤ 5 MB).
+        // The `document` and `session_doc` collections carry presentation decks /
+        // handouts, so they accept common office file types (and images) up to
+        // 20 MB. The `feed` collection additionally accepts video for attendee
+        // feed posts (≤ 80 MB); `chat` mirrors it plus office docs for message
+        // attachments. Every other collection is image-only (≤ 5 MB).
         $collectionInput = $request->input('collection');
-        $isDocument = $collectionInput === 'document';
+        $isDocument = in_array($collectionInput, ['document', 'session_doc'], true);
         $isFeed = $collectionInput === 'feed';
         $isChat = $collectionInput === 'chat';
 

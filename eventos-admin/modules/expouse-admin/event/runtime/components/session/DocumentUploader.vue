@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import vueFilePond from 'vue-filepond'
+import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type'
+import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size'
+import 'filepond/dist/filepond.min.css'
 
 interface SessionDocument { name: string; url: string }
 
-const DOC_EXT = ['doc', 'docx', 'ppt', 'pptx', 'pdf']
 const MAX_FILES = 10
-const MAX_SIZE  = 10 * 1024 * 1024
+
+// doc / docx / ppt / pptx / pdf — mirrors the API's session_doc whitelist.
+const DOC_MIMES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]
 
 const props = defineProps<{
   modelValue: SessionDocument[]
@@ -16,30 +27,48 @@ const emit = defineEmits<{
   (e: 'error', message: string): void
 }>()
 
+const FilePond = vueFilePond(FilePondPluginFileValidateType, FilePondPluginFileValidateSize)
+const pond = ref<any>(null)
+
 const { upload } = useUpload()
 const uploading = ref(false)
 
-async function onPick(e: Event) {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files || [])
-  input.value = ''
-  const docs = [...props.modelValue]
-  for (const file of files) {
-    if (docs.length >= MAX_FILES) { emit('error', 'Maximum 10 files allowed.'); break }
-    const ext = file.name.split('.').pop()?.toLowerCase() || ''
-    if (!DOC_EXT.includes(ext)) { emit('error', `Only doc, ppt and pdf files allowed (${file.name}).`); continue }
-    if (file.size > MAX_SIZE) { emit('error', `${file.name} exceeds 10 MB.`); continue }
+// The pond is only a dropper: a processed file is appended to modelValue and
+// then removed from the pond, so the list below stays the single source.
+const pondServer = {
+  process: (
+    _field: string,
+    file: File,
+    _meta: any,
+    load: (id: string) => void,
+    error: (msg: string) => void,
+    _progress: any,
+    abort: () => void,
+  ) => {
+    let aborted = false
     uploading.value = true
-    try {
-      const r = await upload(file, { collection: 'session_doc' })
-      docs.push({ name: file.name, url: r.url })
-      emit('update:modelValue', [...docs])
-    } catch {
-      emit('error', `Could not upload ${file.name}.`)
-    } finally {
-      uploading.value = false
-    }
+    upload(file, { collection: 'session_doc' })
+      .then((r) => {
+        if (aborted) return
+        emit('update:modelValue', [...props.modelValue, { name: file.name, url: r.url }])
+        load(String(r.id))
+      })
+      .catch(() => { if (!aborted) error('Upload failed') })
+      .finally(() => { uploading.value = false })
+    return { abort: () => { aborted = true; uploading.value = false; abort() } }
+  },
+}
+
+function beforeAddFile() {
+  if (props.modelValue.length >= MAX_FILES) {
+    emit('error', `Maximum ${MAX_FILES} files allowed.`)
+    return false
   }
+  return true
+}
+
+function onProcessFile(err: any, file: any) {
+  if (!err) pond.value?.removeFile(file)
 }
 
 function remove(i: number) {
@@ -51,11 +80,19 @@ function remove(i: number) {
 
 <template>
   <div>
-    <label class="flex items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl p-4 cursor-pointer hover:border-brand bg-[#fafbfc] transition-colors">
-      <input type="file" multiple accept=".doc,.docx,.ppt,.pptx,.pdf" class="hidden" @change="onPick">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5 text-muted"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-      <span class="text-muted text-[.86rem]">{{ uploading ? 'Uploading…' : 'Only doc, ppt and pdf file allowed' }}</span>
-    </label>
+    <FilePond
+      ref="pond"
+      name="file"
+      :server="pondServer"
+      :accepted-file-types="DOC_MIMES"
+      max-file-size="10MB"
+      :allow-multiple="true"
+      :max-files="MAX_FILES"
+      :before-add-file="beforeAddFile"
+      :credits="false"
+      label-idle='Only doc, ppt and pdf file allowed — <span class="filepond--label-action">Browse</span>'
+      @processfile="onProcessFile"
+    />
     <p class="text-[.76rem] text-muted mt-1">Maximum : 10 MB and 10 files are only allowed to upload</p>
     <div v-if="modelValue.length" class="mt-2 flex flex-col gap-1">
       <div
@@ -72,3 +109,11 @@ function remove(i: number) {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Blend FilePond's default look into the admin form styling. */
+:deep(.filepond--root) { margin-bottom: 0; font-size: .86rem; }
+:deep(.filepond--panel-root) { background: #fafbfc; border: 2px dashed var(--line); border-radius: 12px; }
+:deep(.filepond--drop-label) { color: var(--muted, #6b7280); }
+:deep(.filepond--label-action) { color: var(--brand); text-decoration-color: var(--brand); }
+</style>

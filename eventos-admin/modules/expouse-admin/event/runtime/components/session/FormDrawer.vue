@@ -52,6 +52,7 @@ function freshDraft(): DraftShape {
 const draft   = reactive<DraftShape>(freshDraft())
 const saving  = ref(false)
 const error   = ref('')
+const iconChooserOpen = ref(false)
 
 // ── Data needed by this drawer (tracks / speakers / sponsors / event dates) ────
 
@@ -337,16 +338,14 @@ async function save() {
       </div>
       <div>
         <label class="block mb-1.5">Icon</label>
-        <ImageField
-          :model-value="draft.icon_url"
-          :aspect="1"
-          :output-width="200"
-          :output-height="200"
-          collection="session_icon"
-          card-width="120px"
-          :gallery-path="`/events/${eventId}/gallery`"
-          @update:model-value="draft.icon_url = (Array.isArray($event) ? $event[0] : $event) || null"
-        />
+        <button
+          type="button"
+          class="w-[120px] h-[120px] rounded-xl border border-dashed border-[#d7dae1] flex items-center justify-center bg-[#fafbfc] cursor-pointer hover:border-brand"
+          @click="iconChooserOpen = true"
+        >
+          <AppIcon v-if="draft.icon_url" :name="draft.icon_url" class="w-10 h-10 text-ink" />
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-9 h-9 text-muted"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>
+        </button>
       </div>
     </div>
 
@@ -459,6 +458,14 @@ async function save() {
       :selected="draft.sponsors"
       @close="sponsorModal = false"
       @toggle="toggleSponsor"
+    />
+
+    <IconChooserModal
+      v-if="iconChooserOpen"
+      :model-value="draft.icon_url"
+      title="Choose Session Icon"
+      @select="draft.icon_url = $event"
+      @close="iconChooserOpen = false"
     />
   </Drawer>
 </template>

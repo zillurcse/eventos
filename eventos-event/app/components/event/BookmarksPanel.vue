@@ -115,7 +115,9 @@ const rows = computed<Row[]>(() => {
         .map(s => ({
           id: s.id, type: 'session' as const,
           title: s.title, sub: whenLabel(s.starts_at, s.ends_at),
-          image: s.icon_url || s.logo_url, round: false, to: '/sessions',
+          // icon_url may hold a catalog icon key (not a URL) for newer sessions;
+          // only use it as an image when it actually points somewhere.
+          image: (s.icon_url && /^https?:\/\//.test(s.icon_url) ? s.icon_url : null) || s.logo_url, round: false, to: '/sessions',
         }))
   }
   return []
