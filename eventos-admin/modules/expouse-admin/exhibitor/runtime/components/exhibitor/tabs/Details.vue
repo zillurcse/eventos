@@ -29,7 +29,7 @@ function onSpotlightUploaded(v: { id: number, url: string }) {
   draft.spotlight_file_id = v.id
 }
 
-const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value: pkg.id, label: pkg.name })))
+const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id, label: pkg.name })))
 
 // ── Manage Filters ────────────────────────────────────────────────────
 // Two-level accordion built from the event's configured filters
@@ -38,16 +38,16 @@ const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value:
 const openFilter  = ref<string | null>(null)
 const openHeading = reactive<Record<string, string | null>>({})
 
-function toggleFilter(f: any) {
+function toggleFilter(f: EventFilter) {
   if (openFilter.value === f.id) { openFilter.value = null; return }
   openFilter.value = f.id
   // Expand the first heading by default, like the reference layout.
   if (openHeading[f.id] === undefined) openHeading[f.id] = f.headings?.[0]?.heading ?? null
 }
-function toggleHeading(f: any, heading: string) {
+function toggleHeading(f: EventFilter, heading: string) {
   openHeading[f.id] = openHeading[f.id] === heading ? null : heading
 }
-function headingOpen(f: any, heading: string) {
+function headingOpen(f: EventFilter, heading: string) {
   const cur = openHeading[f.id]
   return (cur === undefined ? f.headings?.[0]?.heading : cur) === heading
 }

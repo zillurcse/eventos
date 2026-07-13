@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Session;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,6 +45,7 @@ class SessionResource extends JsonResource
             'can_attendee_list'        => $meta['can_attendee_list'] ?? false,
             'can_session'              => $meta['can_session'] ?? false,
             'qa_moderation'            => $meta['qa_moderation'] ?? false,
+            'qa_answer_policy'         => $meta['qa_answer_policy'] ?? Session::QA_ANSWER_HOSTS,
 
             'track'    => new TrackResource($this->whenLoaded('track')),
             'room'     => new RoomResource($this->whenLoaded('room')),

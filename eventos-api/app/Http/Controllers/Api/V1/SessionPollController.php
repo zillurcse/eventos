@@ -121,35 +121,85 @@ class SessionPollController extends Controller
             'status' => ['nullable', 'in:published,pending,rejected'],
         ]);
 
+        // Answers are threaded under their question rather than listed beside
+        // it, so the queue reads as a conversation.
         $rows = SessionMessage::where('session_id', $session->id)
+            ->whereNull('parent_id')
             ->when($data['kind'] ?? null, fn ($q, $k) => $q->where('kind', $k))
             ->when($data['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
-            ->with('participation.contact')
+            ->with(['participation.contact', 'replies.participation.contact'])
             ->orderByDesc('is_pinned')
             ->orderByDesc('id')
             ->limit(300)
             ->get();
 
         return response()->json([
-            'data' => $rows->map(fn (SessionMessage $m) => [
-                'id' => $m->id,
-                'kind' => $m->kind,
-                'body' => $m->body,
-                'author' => $m->participation?->contact?->fullName() ?: 'Attendee',
-                'author_image' => $m->participation?->profile_data['image_url'] ?? null,
-                'upvotes' => (int) $m->upvotes,
-                'status' => $m->status,
-                'is_hidden' => (bool) $m->is_hidden,
-                'is_pinned' => (bool) $m->is_pinned,
-                'is_answered' => (bool) $m->is_answered,
-                'created_at' => $m->created_at?->toIso8601String(),
-            ]),
+            'data' => $rows->map(fn (SessionMessage $m) => $this->row($m)),
             'meta' => [
                 'pending' => $rows->where('status', SessionMessage::STATUS_PENDING)->count(),
                 'hidden' => $rows->where('is_hidden', true)->count(),
                 'qa_moderation' => $session->qaModerated(),
+                'qa_answer_policy' => $session->qaAnswerPolicy(),
             ],
         ]);
+    }
+
+    /**
+     * The organizer answers a question straight from the console — the common
+     * case for a question that lands after the session, or one the speaker never
+     * got to on stage.
+     *
+     * They act here as a user, not as a participation in the room, so there is
+     * no participation_id to hang the byline on: the display name is snapshotted
+     * onto the row instead (SessionMessage::authorName). The reply is official
+     * by definition — only someone with events.manage on this organization can
+     * reach this endpoint — so it carries the badge and closes the question out.
+     */
+    public function messageReply(Request $request, int $message): JsonResponse
+    {
+        $question = SessionMessage::where('kind', SessionMessage::KIND_QUESTION)->findOrFail($message);
+
+        $data = $request->validate(['body' => ['required', 'string', 'max:1000']]);
+
+        $reply = SessionMessage::create([
+            'event_id' => $question->event_id,
+            'session_id' => $question->session_id,
+            'parent_id' => $question->id,
+            'kind' => SessionMessage::KIND_ANSWER,
+            'author_role' => SessionMessage::ROLE_ORGANIZER,
+            'status' => SessionMessage::STATUS_PUBLISHED,
+            'body' => trim($data['body']),
+            'meta' => ['author_name' => $request->user()?->name ?: 'Organizer'],
+        ]);
+
+        if (! $question->is_answered) {
+            $question->forceFill(['is_answered' => true, 'answered_at' => now()])->save();
+        }
+
+        return response()->json(['data' => $this->row($reply)], 201);
+    }
+
+    /** Project a message for the organizer's moderation queue, replies nested. */
+    private function row(SessionMessage $m): array
+    {
+        return [
+            'id' => $m->id,
+            'kind' => $m->kind,
+            'body' => $m->body,
+            'author' => $m->authorName(),
+            'author_image' => $m->participation?->profile_data['image_url'] ?? null,
+            'author_role' => $m->author_role ?: SessionMessage::ROLE_ATTENDEE,
+            'is_official' => $m->isOfficial(),
+            'upvotes' => (int) $m->upvotes,
+            'status' => $m->status,
+            'is_hidden' => (bool) $m->is_hidden,
+            'is_pinned' => (bool) $m->is_pinned,
+            'is_answered' => (bool) $m->is_answered,
+            'created_at' => $m->created_at?->toIso8601String(),
+            'replies' => $m->relationLoaded('replies')
+                ? $m->replies->sortBy('id')->map(fn (SessionMessage $r) => $this->row($r))->values()
+                : [],
+        ];
     }
 
     public function messageUpdate(Request $request, int $message): JsonResponse
@@ -183,7 +233,14 @@ class SessionPollController extends Controller
 
     public function messageDestroy(int $message): JsonResponse
     {
-        SessionMessage::findOrFail($message)->delete(); // soft — recoverable
+        $m = SessionMessage::findOrFail($message);
+
+        // A soft delete doesn't fire the FK cascade, so take the answers with it.
+        if ($m->kind === SessionMessage::KIND_QUESTION) {
+            $m->replies()->delete();
+        }
+
+        $m->delete(); // soft — recoverable
 
         return response()->json(['status' => 'success']);
     }

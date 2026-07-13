@@ -172,6 +172,8 @@ class SessionController extends Controller
             'can_session'              => ['nullable', 'boolean'],
             // Hold questions for host approval before attendees see them.
             'qa_moderation'            => ['nullable', 'boolean'],
+            // Who may post a reply under a question (Session::canAnswerQa).
+            'qa_answer_policy'         => ['nullable', 'in:'.implode(',', Session::QA_ANSWER_POLICIES)],
         ], [
             'vimeo_live_id.regex' => 'The Vimeo Live ID is the numeric event id, e.g. 123456789.',
         ]);
@@ -180,7 +182,7 @@ class SessionController extends Controller
             'meta' => array_merge($session->meta ?? [], $request->only([
                 'is_stream', 'who_will_host', 'stream_link', 'on_demand_recording_link',
                 'vimeo_live_id', 'can_live_chat', 'can_qa', 'can_live_polls',
-                'can_attendee_list', 'can_session', 'qa_moderation',
+                'can_attendee_list', 'can_session', 'qa_moderation', 'qa_answer_policy',
             ])),
         ];
 

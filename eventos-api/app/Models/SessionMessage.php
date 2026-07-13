@@ -6,13 +6,14 @@ use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * A live-session side-panel message — group Chat (kind=chat) or a Q&A question
- * (kind=question, with upvotes). Hosts can hide, pin, answer or delete these;
- * deletes are soft so a mis-click is recoverable. Tenant-isolated via
- * BelongsToOrganization + RLS.
+ * A live-session side-panel message — group Chat (kind=chat), a Q&A question
+ * (kind=question, with upvotes) or a reply to one (kind=answer, parent_id set).
+ * Hosts can hide, pin, answer or delete these; deletes are soft so a mis-click
+ * is recoverable. Tenant-isolated via BelongsToOrganization + RLS.
  */
 class SessionMessage extends Model
 {
@@ -23,6 +24,19 @@ class SessionMessage extends Model
     public const STATUS_PUBLISHED = 'published';
 
     public const STATUS_REJECTED = 'rejected';
+
+    public const KIND_CHAT = 'chat';
+
+    public const KIND_QUESTION = 'question';
+
+    public const KIND_ANSWER = 'answer';
+
+    /** Author roles, snapshotted on write — see the qa-replies migration. */
+    public const ROLE_ORGANIZER = 'organizer';
+
+    public const ROLE_SPEAKER = 'speaker';
+
+    public const ROLE_ATTENDEE = 'attendee';
 
     protected $guarded = [];
 
@@ -41,9 +55,39 @@ class SessionMessage extends Model
         return $this->belongsTo(Participation::class);
     }
 
+    /** The question this row answers (kind=answer only). */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /** Answers posted under this question. */
+    public function replies(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id')->where('kind', self::KIND_ANSWER);
+    }
+
+    /**
+     * An answer from someone on the stage or running the event, as opposed to
+     * one attendee helping out another. It carries the badge, and it's what
+     * marks the question answered.
+     */
+    public function isOfficial(): bool
+    {
+        return in_array($this->author_role, [self::ROLE_ORGANIZER, self::ROLE_SPEAKER], true);
+    }
+
+    /** The name to show: an organizer replying from the admin console has no
+     *  participation, so their name is snapshotted onto the row instead. */
+    public function authorName(): string
+    {
+        return ($this->meta['author_name'] ?? null)
+            ?: ($this->participation?->contact?->fullName() ?: 'Attendee');
+    }
+
     /**
      * What an ordinary attendee may see: published and not hidden — plus their
-     * own pending questions, so a question doesn't appear to vanish while it
+     * own pending messages, so a question doesn't appear to vanish while it
      * waits for the host's approval.
      */
     public function scopeVisibleTo(Builder $q, int $participationId): Builder

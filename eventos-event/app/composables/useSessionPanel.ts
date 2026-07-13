@@ -9,12 +9,16 @@
  * lifecycle, and mute a participant. `canModerate` comes from the server on
  * every response — it decides what we render, never what we're allowed to do.
  */
+export type PanelRole = 'organizer' | 'speaker' | 'attendee'
 export interface PanelMessage {
   id: number
   body: string
   author: string
   author_image: string | null
   author_id: string | null
+  author_role: PanelRole
+  /** From the stage or the organizers — carries the badge, closes the question. */
+  is_official: boolean
   is_mine: boolean
   upvotes: number
   voted: boolean
@@ -24,6 +28,8 @@ export interface PanelMessage {
   status: 'published' | 'pending' | 'rejected'
   can_delete: boolean
   created_at: string | null
+  /** Answers, oldest first. Only questions carry these. */
+  replies: PanelMessage[]
 }
 export interface PollOption { id: string, text: string, votes: number }
 export interface Poll {
@@ -50,6 +56,10 @@ interface PanelMeta {
   can_moderate: boolean
   is_muted: boolean
   qa_moderation: boolean
+  /** Who the organizer lets reply to questions. */
+  qa_answer_policy: 'organizers' | 'hosts' | 'everyone'
+  can_answer: boolean
+  my_role: PanelRole
   pending_count: number
 }
 
@@ -65,6 +75,9 @@ export function useSessionPanel() {
   const canModerate = ref(false)
   const isMuted = ref(false)
   const qaModeration = ref(false)
+  const qaAnswerPolicy = ref<PanelMeta['qa_answer_policy']>('hosts')
+  const canAnswer = ref(false)
+  const myRole = ref<PanelRole>('attendee')
   const pendingCount = ref(0)
 
   let eventUuid = ''
@@ -79,6 +92,9 @@ export function useSessionPanel() {
     canModerate.value = !!meta.can_moderate
     isMuted.value = !!meta.is_muted
     qaModeration.value = !!meta.qa_moderation
+    qaAnswerPolicy.value = meta.qa_answer_policy ?? 'hosts'
+    canAnswer.value = !!meta.can_answer
+    myRole.value = meta.my_role ?? 'attendee'
     pendingCount.value = meta.pending_count ?? 0
   }
 
@@ -110,6 +126,12 @@ export function useSessionPanel() {
   async function upvoteQuestion(id: number) {
     if (!ready()) return
     await api(`${base()}/questions/${id}/upvote`, { method: 'POST' })
+    await loadQuestions()
+  }
+  /** Reply to a question. The server re-checks the session's answer policy. */
+  async function replyToQuestion(id: number, body: string) {
+    if (!ready() || !body.trim()) return
+    await api(`${base()}/questions/${id}/replies`, { method: 'POST', body: { body: body.trim() } })
     await loadQuestions()
   }
 
@@ -187,9 +209,9 @@ export function useSessionPanel() {
 
   return {
     chat, questions, polls, attendees, attendeeMeta,
-    canModerate, isMuted, qaModeration, pendingCount,
+    canModerate, isMuted, qaModeration, qaAnswerPolicy, canAnswer, myRole, pendingCount,
     bind, loaderFor,
-    sendChat, askQuestion, upvoteQuestion, votePoll,
+    sendChat, askQuestion, upvoteQuestion, replyToQuestion, votePoll,
     moderate, removeMessage,
     createPoll, updatePoll, deletePoll,
     toggleMute,
