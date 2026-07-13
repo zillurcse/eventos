@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\V1\PresenceController;
 use App\Http\Controllers\Api\V1\ExhibitorController;
 use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
 use App\Http\Controllers\Api\V1\ExhibitorMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorImportController;
 use App\Http\Controllers\Api\V1\ExhibitorPackageController;
 use App\Http\Controllers\Api\V1\ExhibitorProductController;
 use App\Http\Controllers\Api\V1\ExhibitorProjectController;
@@ -69,6 +70,7 @@ use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SessionEngagementController;
 use App\Http\Controllers\Api\V1\SessionPollController;
 use App\Http\Controllers\Api\V1\SpeakerController;
+use App\Http\Controllers\Api\V1\SpeakerImportController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\TicketTypeController;
@@ -233,6 +235,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/sessions/{sessionUuid}/questions', [SessionEngagementController::class, 'questionIndex']);
             Route::post('/sessions/{sessionUuid}/questions', [SessionEngagementController::class, 'questionAsk']);
             Route::post('/sessions/{sessionUuid}/questions/{message}/upvote', [SessionEngagementController::class, 'questionUpvote']);
+            // Reply to a question. Gated by the session's qa_answer_policy —
+            // organizers only, organizers + speakers, or the whole room.
+            Route::post('/sessions/{sessionUuid}/questions/{message}/replies', [SessionEngagementController::class, 'questionReply']);
             Route::get('/sessions/{sessionUuid}/polls', [SessionEngagementController::class, 'pollIndex']);
             Route::post('/sessions/{sessionUuid}/polls/{poll}/vote', [SessionEngagementController::class, 'pollVote']);
             Route::get('/sessions/{sessionUuid}/attendees', [SessionEngagementController::class, 'attendees']);
@@ -363,6 +368,8 @@ Route::prefix('v1')->group(function () {
                 // (the host does the same live, from the watch page).
                 Route::match(['put', 'patch'], '/session-messages/{message}', [SessionPollController::class, 'messageUpdate']);
                 Route::delete('/session-messages/{message}', [SessionPollController::class, 'messageDestroy']);
+                // Answer a question from the console — no need to join the room.
+                Route::post('/session-messages/{message}/replies', [SessionPollController::class, 'messageReply']);
             });
             Route::get('/sessions/{uuid}/polls', [SessionPollController::class, 'index'])->middleware('perm:events.view');
             Route::get('/sessions/{uuid}/messages', [SessionPollController::class, 'messages'])->middleware('perm:events.view');
@@ -378,6 +385,11 @@ Route::prefix('v1')->group(function () {
 
                 Route::get('/events/{uuid}/speakers', [SpeakerController::class, 'index']);
                 Route::post('/events/{uuid}/speakers', [SpeakerController::class, 'store']);
+                // "Previous speakers": re-seat someone who has spoken at one of
+                // this organizer's earlier events. Declared ahead of the
+                // /speakers/{participation} routes, which would swallow the path.
+                Route::get('/events/{uuid}/speakers/importable', [SpeakerImportController::class, 'candidates']);
+                Route::post('/events/{uuid}/speakers/import', [SpeakerImportController::class, 'store']);
                 Route::match(['put', 'patch'], '/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'update']);
                 Route::delete('/events/{uuid}/speakers/{participation}', [SpeakerController::class, 'destroy']);
                 // Give a speaker a login so they can sign in to the event site
@@ -444,6 +456,11 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/exhibitor-packages/{exhibitorPackage}', [ExhibitorPackageController::class, 'destroy']);
                 Route::get('/exhibitors', [ExhibitorController::class, 'index']);
                 Route::post('/exhibitors', [ExhibitorController::class, 'store']);
+                // "Previous exhibitors": carry a company the organizer has run
+                // before into the event they are building now. Declared ahead of
+                // /exhibitors/{uuid}, which would otherwise swallow the path.
+                Route::get('/exhibitors/importable', [ExhibitorImportController::class, 'candidates']);
+                Route::post('/exhibitors/import', [ExhibitorImportController::class, 'store']);
                 Route::get('/exhibitors/{uuid}', [ExhibitorController::class, 'show']);
                 Route::match(['put', 'patch'], '/exhibitors/{uuid}', [ExhibitorController::class, 'update']);
                 Route::post('/exhibitors/{uuid}/reset-password', [ExhibitorController::class, 'resetPassword']);

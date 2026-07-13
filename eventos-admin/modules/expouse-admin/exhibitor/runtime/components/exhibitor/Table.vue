@@ -6,7 +6,7 @@ const {
   exhibitors, packages, openAdd,
   search, filterType, filterPackage, resetFilters, filtered,
   packageName, toggleActions, actionsOpenId, openEdit, remove,
-  openResetPassword, toggleStatus,
+  openResetPassword, toggleStatus, previous,
 } = useExhibitorContext()
 
 const typeOptions = TYPE_OPTIONS.map((t: string) => ({ value: t.toLowerCase(), label: t }))
@@ -45,7 +45,9 @@ const columns = [
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-        <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2">PREVIOUS EXHIBITORS</button>
+        <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2" @click="previous.openPicker">
+          PREVIOUS EXHIBITORS
+        </button>
         <button class="btn ghost text-[.82rem] px-4 py-2">Exhibitors Directory</button>
         <button class="btn text-[.82rem] tracking-wide px-4 py-2" @click="openAdd">
           + EXHIBITOR
@@ -94,7 +96,7 @@ const columns = [
         <span class="capitalize text-ink">{{ row.type || 'Exhibitor' }}</span>
       </template>
       <template #cell-status="{ row }">
-        <span class="font-medium text-[.9rem]" :class="(row.status || 'active') === 'active' ? 'text-green-600' : 'text-muted'">
+        <span class="font-medium text-[.9rem]" :class="isActive(row) ? 'text-green-600' : 'text-muted'">
           {{ exhibitorStatusLabel(row) }}
         </span>
       </template>
@@ -121,7 +123,7 @@ const columns = [
               Edit
             </button>
             <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="toggleStatus(row)">
-              <template v-if="(row.status || 'active') === 'active'">
+              <template v-if="isActive(row)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dc2626]"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
                 Deactivate
               </template>

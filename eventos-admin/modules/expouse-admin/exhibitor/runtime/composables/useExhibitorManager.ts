@@ -4,329 +4,258 @@ import { toast } from 'vue-sonner'
 /**
  * State + data layer for the exhibitor management screen. Created once in
  * <ExhibitorManager> and shared with the table / drawer / tab components via
- * provide/inject (ExhibitorKey). Keeps all API and mutation logic in one place;
- * the components are presentational.
+ * provide/inject (ExhibitorKey). The components stay presentational.
+ *
+ * This file orchestrates; it deliberately holds no mechanics of its own:
+ *   - the table (search / filters / paging)      → useExhibitorTable
+ *   - each edit tab's list (members, docs, …)    → useExhibitorCollection
+ *   - the reset-password modal                   → useExhibitorPasswordReset
+ *   - draft ⇄ API row mapping                    → utils/exhibitor (pure)
  */
 export function useExhibitorManager(eventId: string) {
   const api = useApi()
   const { upload } = useUpload()
 
   // ── List + meta ──────────────────────────────────────────────────────
-  const exhibitors = ref<any[]>([])
-  const packages   = ref<any[]>([])
-  const filters    = ref<any[]>([])
+  const exhibitors = ref<Exhibitor[]>([])
+  const packages = ref<ExhibitorPackage[]>([])
+  const filters = ref<EventFilter[]>([])
 
   // ── Drawer / editing ─────────────────────────────────────────────────
   const drawerMode = ref<'add' | 'edit' | null>(null)
-  const editingId  = ref<string | null>(null)
-  const activeTab  = ref('Details')
-  const saving     = ref(false)
-  const error      = ref('')
-  const draft      = reactive<Draft>(freshDraft())
+  const editingId = ref<string | null>(null)
+  const activeTab = ref('Details')
+  const saving = ref(false)
+  const error = ref('')
+  const draft = reactive<Draft>(freshDraft())
 
   const spotlightUploading = ref(false)
   const tagInput = ref('')
 
-  // ── Sub-resources (edit tabs) ────────────────────────────────────────
-  const members      = ref<any[]>([])
-  const documents    = ref<any[]>([])
-  const projects     = ref<any[]>([])
-  const products     = ref<any[]>([])
+  // ── Edit tabs ────────────────────────────────────────────────────────
+  // One saving/error pair across the tabs: only one form is on screen at a time.
+  const subSaving = ref(false)
+  const subError = ref('')
   const entitlements = ref<FeatureLine[]>([])
-  const subSaving    = ref(false)
-  const subError     = ref('')
-  const memberForm   = reactive({ email: '', first_name: '', last_name: '', role: 'staff', password: '' })
-  const docForm      = reactive({ title: '', url: '' })
-  const projectForm  = reactive({ name: '', description: '', status: '' })
-  const productForm  = reactive({ name: '', description: '', price: '' })
 
-  // ── Table / filter / pagination ──────────────────────────────────────
-  const search        = ref('')
-  const filterType    = ref('')
-  const filterPackage = ref('')
-  const page          = ref(1)
-  const perPage       = ref(10)
-  const actionsOpenId = ref<string | null>(null)
-
-  // ── Reset password modal ─────────────────────────────────────────────
-  const resetTarget   = ref<any | null>(null)            // exhibitor being reset
-  const resetMode     = ref<'auto' | 'manual'>('auto')
-  const resetPassword = ref('')
-  const resetMustChange = ref(true)
-  const resetSaving   = ref(false)
-  const resetError    = ref('')
-  const resetResult   = ref<{ email: string, password: string } | null>(null) // step 2 (auto)
-
-  watch(perPage, () => { page.value = 1 })
-  watch([search, filterType, filterPackage], () => { page.value = 1 })
-
-  const filtered = computed(() => {
-    let list = exhibitors.value
-    if (search.value) {
-      const q = search.value.toLowerCase()
-      list = list.filter((p: any) => p.name?.toLowerCase().includes(q))
-    }
-    if (filterType.value) {
-      list = list.filter((p: any) => p.type === filterType.value.toLowerCase())
-    }
-    if (filterPackage.value) {
-      // eslint-disable-next-line eqeqeq
-      list = list.filter((p: any) => p.package_id == filterPackage.value)
-    }
-    return list
+  const memberList = useExhibitorCollection<ExhibitorMember, typeof MEMBER_FORM>(editingId, subSaving, subError, {
+    path: 'members',
+    blank: MEMBER_FORM,
+    required: 'email',
+    confirmText: m => `Remove ${m.contact?.email || 'this member'}?`,
+    noun: 'member',
   })
-  const paginated = computed(() => {
-    const start = (page.value - 1) * perPage.value
-    return filtered.value.slice(start, start + perPage.value)
+  const documentList = useExhibitorCollection<ExhibitorDocument, typeof DOC_FORM>(editingId, subSaving, subError, {
+    path: 'documents',
+    blank: DOC_FORM,
+    required: 'title',
+    confirmText: d => `Remove "${d.title}"?`,
+    noun: 'document',
   })
-  const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage.value)))
-  const paginationLabel = computed(() => {
-    if (!filtered.value.length) return '0 - 0 of 0'
-    const from = (page.value - 1) * perPage.value + 1
-    const to   = Math.min(page.value * perPage.value, filtered.value.length)
-    return `${from} - ${to} of ${filtered.value.length}`
+  const projectList = useExhibitorCollection<ExhibitorProject, typeof PROJECT_FORM>(editingId, subSaving, subError, {
+    path: 'projects',
+    blank: PROJECT_FORM,
+    required: 'name',
+    confirmText: p => `Remove "${p.name}"?`,
+    noun: 'project',
+  })
+  const productList = useExhibitorCollection<ExhibitorProduct, typeof PRODUCT_FORM>(editingId, subSaving, subError, {
+    path: 'products',
+    blank: PRODUCT_FORM,
+    required: 'name',
+    // The form takes dollars; the API stores cents.
+    toBody: f => ({
+      name: f.name,
+      description: f.description || undefined,
+      price_cents: f.price ? Math.round(Number(f.price) * 100) : undefined,
+    }),
+    confirmText: p => `Remove "${p.name}"?`,
+    noun: 'product',
   })
 
-  function packageName(pid: string | number) {
-    // eslint-disable-next-line eqeqeq
-    return packages.value.find((p: any) => p.id == pid)?.name || (pid ? String(pid) : '—')
-  }
-  function resetFilters() { search.value = ''; filterType.value = ''; filterPackage.value = ''; page.value = 1 }
-  function toggleActions(pid: string) { actionsOpenId.value = actionsOpenId.value === pid ? null : pid }
+  // ── Table ────────────────────────────────────────────────────────────
+  const table = useExhibitorTable(exhibitors, packages)
 
   // ── Load ─────────────────────────────────────────────────────────────
   async function load() {
-    try { exhibitors.value = (await api<any>(`/exhibitors?event=${eventId}`)).data } catch { /* */ }
+    try {
+      exhibitors.value = (await api<{ data: Exhibitor[] }>(`/exhibitors?event=${eventId}`)).data
+    } catch (e) {
+      toast.error(exhibitorError(e, 'Could not load exhibitors.'))
+    }
   }
+
   async function loadMeta() {
     try {
       const [pkgRes, settingsRes] = await Promise.all([
-        api<any>(`/exhibitor-packages?event=${eventId}`),
-        api<any>(`/events/${eventId}/settings`),
+        api<{ data: ExhibitorPackage[] }>(`/exhibitor-packages?event=${eventId}`),
+        api<{ data: { filters?: EventFilter[] } }>(`/events/${eventId}/settings`),
       ])
       packages.value = pkgRes.data
-      filters.value  = settingsRes.data.filters || []
-    } catch { /* */ }
+      filters.value = settingsRes.data.filters || []
+    } catch (e) {
+      toast.error(exhibitorError(e, 'Could not load packages and filters.'))
+    }
   }
-  function init() { load(); loadMeta() }
+
+  function init() {
+    load()
+    loadMeta()
+  }
 
   // ── Open drawers ─────────────────────────────────────────────────────
   function openAdd() {
-    Object.assign(draft, freshDraft()); editingId.value = null
-    activeTab.value = 'Details'; error.value = ''; drawerMode.value = 'add'
-  }
-  function populateDraft(p: any) {
-    Object.assign(draft, {
-      ...freshDraft(),
-      name: p.name || '', email: p.email || '',
-      logo_url: p.logo_url || '', logo_file_id: p.logo_file_id ?? null,
-      package_id: p.package_id ?? '', stall_no: p.stall_no || '',
-      type: p.type ? p.type.charAt(0).toUpperCase() + p.type.slice(1) : 'Exhibitor',
-      phone_code: p.phone_code || '+880', phone: p.phone || '',
-      rating: !!p.rating, featured: !!p.featured, premium: !!p.premium,
-      about: p.about || '',
-      street: p.street || '', city: p.city || '', state: p.state || '',
-      zip: p.zip || '', country: p.country || '',
-      location_url: p.location_url || '', website_url: p.website_url || '',
-      tags: Array.isArray(p.tags) ? [...p.tags] : [], filter_id: p.filter_id || '',
-      filter_selections: p.filter_selections && typeof p.filter_selections === 'object'
-        ? JSON.parse(JSON.stringify(p.filter_selections))
-        : {},
-      spotlight_type: p.spotlight_type || 'image',
-      spotlight_url: p.spotlight_url || '', spotlight_file_id: p.spotlight_file_id ?? null,
-      cta: Array.isArray(p.cta) ? p.cta.map((c: any) => ({ ...c, open: false })) : [],
-      social: { facebook: '', linkedin: '', twitter: '', instagram: '', whatsapp: '', youtube: '', ...(p.social || {}) },
-      contact: { full_name: '', company_name: '', position: '', email: '', phone_code: '+880', phone: '', ...(p.contact || {}) },
-    })
-  }
-  async function openEdit(p: any) {
-    editingId.value = p.id; activeTab.value = 'Details'
-    error.value = ''; subError.value = ''
     Object.assign(draft, freshDraft())
-    members.value = []; documents.value = []; projects.value = []; products.value = []
+    editingId.value = null
+    activeTab.value = 'Details'
+    error.value = ''
+    drawerMode.value = 'add'
+  }
+
+  async function openEdit(e: Exhibitor) {
+    // Open on the loaded-but-empty state first: the drawer is on screen while
+    // the full record (with its sub-resources) is still in flight.
+    editingId.value = e.id
+    activeTab.value = 'Details'
+    error.value = ''
+    subError.value = ''
+    Object.assign(draft, freshDraft())
+    memberList.set([])
+    documentList.set([])
+    projectList.set([])
+    productList.set([])
     entitlements.value = mergeFeatures(null)
     drawerMode.value = 'edit'
-    try {
-      const full = (await api<any>(`/exhibitors/${p.id}`)).data
-      populateDraft(full)
-      members.value   = full.members ?? []
-      documents.value = full.documents ?? []
-      projects.value  = full.projects ?? []
-      products.value  = full.products ?? []
-      entitlements.value = mergeFeatures(full.entitlements)
-    } catch { /* */ }
-  }
 
-  // ── Save (create / update / delete) ──────────────────────────────────
-  function buildPayload() {
-    return {
-      event: eventId, name: draft.name, email: draft.email,
-      logo_file_id: draft.logo_file_id,
-      package_id: draft.package_id, stall_no: draft.stall_no,
-      type: draft.type.toLowerCase(),
-      phone_code: draft.phone_code, phone: draft.phone,
-      rating: draft.rating, featured: draft.featured, premium: draft.premium,
-      about: draft.about, street: draft.street, city: draft.city,
-      state: draft.state, zip: draft.zip, country: draft.country,
-      location_url: draft.location_url, website_url: draft.website_url,
-      tags: draft.tags, filter_id: draft.filter_id,
-      filter_selections: JSON.parse(JSON.stringify(draft.filter_selections)),
-      spotlight_type: draft.spotlight_type, spotlight_file_id: draft.spotlight_file_id,
-      cta: draft.cta, social: draft.social, contact: draft.contact,
+    try {
+      const full = (await api<{ data: Exhibitor }>(`/exhibitors/${e.id}`)).data
+      Object.assign(draft, draftFromExhibitor(full))
+      memberList.set(full.members ?? [])
+      documentList.set(full.documents ?? [])
+      projectList.set(full.projects ?? [])
+      productList.set(full.products ?? [])
+      entitlements.value = mergeFeatures(full.entitlements ?? null)
+    } catch (err) {
+      error.value = exhibitorError(err, 'Could not load this exhibitor.')
     }
   }
+
+  // ── Create / update / delete ─────────────────────────────────────────
   async function create() {
-    error.value = ''; saving.value = true
+    error.value = ''
+    saving.value = true
     const adminEmail = draft.email
     try {
-      const res = await api<any>('/exhibitors', { method: 'POST', body: buildPayload() })
-      drawerMode.value = null; await load()
-      if (res?.admin_invited) toast.success('Exhibitor created', { description: `A 6-digit access code was emailed to ${adminEmail}.` })
-      else toast.success('Exhibitor created')
-    } catch (e: any) { error.value = e?.data?.message || 'Could not create.'; toast.error(error.value) }
-    finally { saving.value = false }
-  }
-  async function update() {
-    error.value = ''; saving.value = true
-    try {
-      await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: buildPayload() })
-      drawerMode.value = null; await load()
-      toast.success('Exhibitor updated')
-    } catch (e: any) { error.value = e?.data?.message || 'Could not update.'; toast.error(error.value) }
-    finally { saving.value = false }
-  }
-  async function remove(p: any) {
-    if (!confirm(`Delete "${p.name}"?`)) return
-    try { await api(`/exhibitors/${p.id}`, { method: 'DELETE' }); await load(); toast.success('Exhibitor deleted') }
-    catch (e: any) { toast.error(e?.data?.message || 'Could not delete.') }
+      const res = await api<{ admin_invited?: boolean }>('/exhibitors', {
+        method: 'POST',
+        body: draftToPayload(draft, eventId),
+      })
+      drawerMode.value = null
+      await load()
+      toast.success('Exhibitor created', res?.admin_invited
+        ? { description: `A 6-digit access code was emailed to ${adminEmail}.` }
+        : undefined)
+    } catch (e) {
+      error.value = exhibitorError(e, 'Could not create.')
+      toast.error(error.value)
+    } finally {
+      saving.value = false
+    }
   }
 
-  // ── Activate / deactivate ────────────────────────────────────────────
-  async function setStatus(p: any, status: 'active' | 'suspended') {
+  async function update() {
+    error.value = ''
+    saving.value = true
     try {
-      await api(`/exhibitors/${p.id}`, { method: 'PUT', body: { status } })
+      await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: draftToPayload(draft, eventId) })
+      drawerMode.value = null
+      await load()
+      toast.success('Exhibitor updated')
+    } catch (e) {
+      error.value = exhibitorError(e, 'Could not update.')
+      toast.error(error.value)
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function remove(e: Exhibitor) {
+    if (!confirm(`Delete "${e.name}"?`)) return
+    try {
+      await api(`/exhibitors/${e.id}`, { method: 'DELETE' })
+      await load()
+      toast.success('Exhibitor deleted')
+    } catch (err) {
+      toast.error(exhibitorError(err, 'Could not delete.'))
+    }
+  }
+
+  async function toggleStatus(e: Exhibitor) {
+    const status = isActive(e) ? 'suspended' : 'active'
+    table.closeActions()
+    try {
+      await api(`/exhibitors/${e.id}`, { method: 'PUT', body: { status } })
       await load()
       toast.success(status === 'active' ? 'Exhibitor activated' : 'Exhibitor deactivated')
-    } catch (e: any) { toast.error(e?.data?.message || 'Could not update status.') }
+    } catch (err) {
+      toast.error(exhibitorError(err, 'Could not update status.'))
+    }
   }
-  function toggleStatus(p: any) {
-    setStatus(p, (p.status || 'active') === 'active' ? 'suspended' : 'active')
-    actionsOpenId.value = null
+
+  async function savePermissions() {
+    subError.value = ''
+    subSaving.value = true
+    try {
+      await api(`/exhibitors/${editingId.value}`, {
+        method: 'PUT',
+        body: { entitlements: JSON.parse(JSON.stringify(entitlements.value)) },
+      })
+      toast.success('Permissions saved')
+    } catch (e) {
+      subError.value = exhibitorError(e, 'Could not save permissions.')
+      toast.error(subError.value)
+    } finally {
+      subSaving.value = false
+    }
   }
 
   // ── Reset password ───────────────────────────────────────────────────
-  function openResetPassword(p: any) {
-    resetTarget.value = p
-    resetMode.value = 'auto'
-    resetPassword.value = ''
-    resetMustChange.value = true
-    resetError.value = ''
-    resetResult.value = null
-    actionsOpenId.value = null
-  }
-  function closeResetPassword() { resetTarget.value = null; resetResult.value = null }
-  async function submitResetPassword() {
-    if (!resetTarget.value) return
-    if (resetMode.value === 'manual' && resetPassword.value.length < 8) {
-      resetError.value = 'Password must have at least 8 characters'
-      return
-    }
-    resetError.value = ''; resetSaving.value = true
-    try {
-      const body: any = { mode: resetMode.value, must_change: resetMustChange.value }
-      if (resetMode.value === 'manual') body.password = resetPassword.value
-      const r = await api<any>(`/exhibitors/${resetTarget.value.id}/reset-password`, { method: 'POST', body })
-      if (resetMode.value === 'auto') {
-        resetResult.value = r.data                 // { email, password } → reveal step
-      } else {
-        toast.success('Password reset')
-        resetTarget.value = null
-      }
-    } catch (e: any) {
-      resetError.value = e?.data?.message || 'Could not reset password.'
-    } finally { resetSaving.value = false }
-  }
+  const reset = useExhibitorPasswordReset(table.closeActions)
 
-  // ── Uploads ──────────────────────────────────────────────────────────
+  // ── Previous exhibitors (import from the organizer's other events) ───
+  const previous = usePreviousExhibitors(eventId, load)
+
+  // ── Uploads / tags / CTA ─────────────────────────────────────────────
   async function pickSpotlight(e: Event) {
-    const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+
     spotlightUploading.value = true
-    try { const r = await upload(file, { collection: 'exhibitor_spotlight' }); draft.spotlight_url = r.url; draft.spotlight_file_id = r.id }
-    finally { spotlightUploading.value = false }
+    try {
+      const r = await upload(file, { collection: 'exhibitor_spotlight' })
+      draft.spotlight_url = r.url
+      draft.spotlight_file_id = r.id
+    } catch (err) {
+      error.value = exhibitorError(err, 'Could not upload the spotlight file.')
+    } finally {
+      spotlightUploading.value = false
+    }
   }
 
-  // ── Tags / CTA ───────────────────────────────────────────────────────
   function addTag(e: KeyboardEvent) {
-    if (e.key !== 'Enter') return; e.preventDefault()
-    const t = tagInput.value.trim()
-    if (t && !draft.tags.includes(t)) draft.tags.push(t)
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const tag = tagInput.value.trim()
+    if (tag && !draft.tags.includes(tag)) draft.tags.push(tag)
     tagInput.value = ''
   }
-  function removeTag(tag: string) { draft.tags = draft.tags.filter(t => t !== tag) }
-  function addCta() { draft.cta.push({ id: 'cta_' + Date.now(), type: 'TEXT', label: '', value: '', open: false }) }
 
-  // ── Sub-resource CRUD ────────────────────────────────────────────────
-  async function addMember() {
-    if (!memberForm.email) return
-    subError.value = ''; subSaving.value = true
-    try {
-      const r = await api<any>(`/exhibitors/${editingId.value}/members`, { method: 'POST', body: { ...memberForm } })
-      members.value.push(r.data)
-      Object.assign(memberForm, { email: '', first_name: '', last_name: '', role: 'staff', password: '' })
-    } catch (e: any) { subError.value = e?.data?.message || 'Could not add member.' }
-    finally { subSaving.value = false }
+  function removeTag(tag: string) {
+    draft.tags = draft.tags.filter(t => t !== tag)
   }
-  async function removeMember(m: any) {
-    if (!confirm(`Remove ${m.contact?.email || 'this member'}?`)) return
-    try { await api(`/exhibitors/${editingId.value}/members/${m.id}`, { method: 'DELETE' }); members.value = members.value.filter((x: any) => x.id !== m.id) } catch { /* */ }
-  }
-  async function addDocument() {
-    if (!docForm.title) return
-    subError.value = ''; subSaving.value = true
-    try {
-      const r = await api<any>(`/exhibitors/${editingId.value}/documents`, { method: 'POST', body: { ...docForm } })
-      documents.value.push(r.data); docForm.title = ''; docForm.url = ''
-    } catch (e: any) { subError.value = e?.data?.message || 'Could not add document.' }
-    finally { subSaving.value = false }
-  }
-  async function removeDocument(d: any) {
-    if (!confirm(`Remove "${d.title}"?`)) return
-    try { await api(`/exhibitors/${editingId.value}/documents/${d.id}`, { method: 'DELETE' }); documents.value = documents.value.filter((x: any) => x.id !== d.id) } catch { /* */ }
-  }
-  async function addProject() {
-    if (!projectForm.name) return
-    subError.value = ''; subSaving.value = true
-    try {
-      const r = await api<any>(`/exhibitors/${editingId.value}/projects`, { method: 'POST', body: { ...projectForm } })
-      projects.value.push(r.data); projectForm.name = ''; projectForm.description = ''; projectForm.status = ''
-    } catch (e: any) { subError.value = e?.data?.message || 'Could not add project.' }
-    finally { subSaving.value = false }
-  }
-  async function removeProject(p: any) {
-    if (!confirm(`Remove "${p.name}"?`)) return
-    try { await api(`/exhibitors/${editingId.value}/projects/${p.id}`, { method: 'DELETE' }); projects.value = projects.value.filter((x: any) => x.id !== p.id) } catch { /* */ }
-  }
-  async function addProduct() {
-    if (!productForm.name) return
-    subError.value = ''; subSaving.value = true
-    try {
-      const body = { name: productForm.name, description: productForm.description || undefined, price_cents: productForm.price ? Math.round(Number(productForm.price) * 100) : undefined }
-      const r = await api<any>(`/exhibitors/${editingId.value}/products`, { method: 'POST', body })
-      products.value.push(r.data); productForm.name = ''; productForm.description = ''; productForm.price = ''
-    } catch (e: any) { subError.value = e?.data?.message || 'Could not add product.' }
-    finally { subSaving.value = false }
-  }
-  async function removeProduct(p: any) {
-    if (!confirm(`Remove "${p.name}"?`)) return
-    try { await api(`/exhibitors/${editingId.value}/products/${p.id}`, { method: 'DELETE' }); products.value = products.value.filter((x: any) => x.id !== p.id) } catch { /* */ }
-  }
-  async function savePermissions() {
-    subError.value = ''; subSaving.value = true
-    try {
-      await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: { entitlements: JSON.parse(JSON.stringify(entitlements.value)) } })
-      toast.success('Permissions saved')
-    } catch (e: any) { subError.value = e?.data?.message || 'Could not save permissions.'; toast.error(subError.value) }
-    finally { subSaving.value = false }
+
+  function addCta() {
+    draft.cta.push({ id: `cta_${Date.now()}`, type: 'TEXT', label: '', value: '', open: false })
   }
 
   return {
@@ -334,30 +263,74 @@ export function useExhibitorManager(eventId: string) {
     eventId, exhibitors, packages, filters,
     // drawer / editing
     drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput,
-    // sub-resources
-    members, documents, projects, products, entitlements, subSaving, subError,
-    memberForm, docForm, projectForm, productForm,
-    // table
-    search, filterType, filterPackage, page, perPage, actionsOpenId,
-    filtered, paginated, totalPages, paginationLabel, packageName, resetFilters, toggleActions,
-    // reset password + status
-    resetTarget, resetMode, resetPassword, resetMustChange, resetSaving, resetError, resetResult,
-    openResetPassword, closeResetPassword, submitResetPassword, toggleStatus,
-    // actions
-    init, load, loadMeta, openAdd, openEdit, populateDraft,
-    buildPayload, create, update, remove,
+    init, load, loadMeta, openAdd, openEdit, create, update, remove, toggleStatus,
     pickSpotlight, addTag, removeTag, addCta,
-    addMember, removeMember, addDocument, removeDocument,
-    addProject, removeProject, addProduct, removeProduct, savePermissions,
+    // table (search / filters / paging / row menu)
+    ...table,
+    // edit tabs — the components see the same flat names they always have
+    subSaving, subError, entitlements, savePermissions,
+    members: memberList.items,
+    memberForm: memberList.form,
+    addMember: memberList.add,
+    removeMember: memberList.remove,
+    documents: documentList.items,
+    docForm: documentList.form,
+    addDocument: documentList.add,
+    removeDocument: documentList.remove,
+    projects: projectList.items,
+    projectForm: projectList.form,
+    addProject: projectList.add,
+    removeProject: projectList.remove,
+    products: productList.items,
+    productForm: productList.form,
+    addProduct: productList.add,
+    removeProduct: productList.remove,
+    // previous exhibitors — the picker owns its own state; the table only opens it
+    previous,
+    // reset password
+    resetTarget: reset.target,
+    resetMode: reset.mode,
+    resetPassword: reset.password,
+    resetMustChange: reset.mustChange,
+    resetSaving: reset.saving,
+    resetError: reset.error,
+    resetResult: reset.result,
+    openResetPassword: reset.open,
+    closeResetPassword: reset.close,
+    submitResetPassword: reset.submit,
   }
 }
 
 export type ExhibitorManager = ReturnType<typeof useExhibitorManager>
-export const ExhibitorKey: InjectionKey<ExhibitorManager> = Symbol('exhibitor-manager')
 
-/** Convenience inject for child components. */
+/**
+ * Symbol.for, not Symbol: the injection key has to survive this module being
+ * evaluated more than once. A plain Symbol() is a fresh identity every time the
+ * module is re-instantiated — which HMR does on every edit to this file — so
+ * <ExhibitorManager> would still be providing under the *old* symbol while its
+ * children injected with the new one and got nothing ("must be used within
+ * <ExhibitorManager>" on a page that was working a second ago). Symbol.for
+ * looks the key up in the global registry, so every instance agrees.
+ */
+export const ExhibitorKey: InjectionKey<ExhibitorManager> = Symbol.for('expouse.exhibitor-manager')
+
+/**
+ * Convenience inject for child components.
+ *
+ * The failure message names the component that could not find the context: this
+ * is otherwise a needle-in-a-haystack in a SPA, where the throw surfaces as a
+ * bare error page with no component in sight.
+ */
 export function useExhibitorContext(): ExhibitorManager {
   const ctx = inject(ExhibitorKey)
-  if (!ctx) throw new Error('Exhibitor components must be used within <ExhibitorManager>')
+
+  if (!ctx) {
+    const where = getCurrentInstance()?.type.__name ?? 'an exhibitor component'
+    throw new Error(
+      `<${where}> could not find the exhibitor context — it must be rendered inside <ExhibitorManager>. `
+      + '(If this appeared after an edit, the dev server is serving a stale module: hard-reload the page.)',
+    )
+  }
+
   return ctx
 }

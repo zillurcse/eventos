@@ -596,8 +596,8 @@ function goToSession(sid: string) { router.push(`/session/${sid}`) }
 // ── Live panel data (Chat / Q&A / Polls / Attendees) ───────────────────────
 const {
   chat, questions, polls, attendees, attendeeMeta,
-  canModerate, isMuted, qaModeration, pendingCount,
-  bind, loaderFor, sendChat, askQuestion, upvoteQuestion, votePoll,
+  canModerate, isMuted, qaModeration, qaAnswerPolicy, canAnswer, pendingCount,
+  bind, loaderFor, sendChat, askQuestion, upvoteQuestion, replyToQuestion, votePoll,
   moderate, removeMessage, createPoll, updatePoll, deletePoll, toggleMute,
 } = useSessionPanel()
 
@@ -642,6 +642,35 @@ async function submitQuestion() {
   qaInput.value = ''
   try { await askQuestion(b) } catch { qaInput.value = b }
 }
+
+// ── Q&A replies ────────────────────────────────────────────────────────────
+// Who may reply is the organizer's setting (`canAnswer` comes back with every
+// panel response); a reply from the organizer or a speaker carries a badge and
+// marks the question answered, which the server does — we just re-read the list.
+const replyingTo = ref<number | null>(null)
+const replyInput = ref('')
+
+function openReply(q: PanelMessage) {
+  replyingTo.value = replyingTo.value === q.id ? null : q.id
+  replyInput.value = ''
+}
+async function submitReply(q: PanelMessage) {
+  const b = replyInput.value.trim()
+  if (!b) return
+  replyInput.value = ''
+  replyingTo.value = null
+  try { await replyToQuestion(q.id, b) } catch { replyInput.value = b; replyingTo.value = q.id }
+}
+/** The byline badge on a reply — 'Attendee' needs no chip. */
+function roleLabel(m: PanelMessage) {
+  return m.author_role === 'organizer' ? 'Organizer' : m.author_role === 'speaker' ? 'Speaker' : ''
+}
+/** Why the reply box isn't there, in the attendee's words. */
+const answerHint = computed(() =>
+  qaAnswerPolicy.value === 'organizers'
+    ? 'Only the organizers answer questions here.'
+    : 'Only the organizers and this session’s speakers answer questions here.',
+)
 function pct(o: { votes: number }, p: { total_votes: number }) {
   return p.total_votes ? Math.round((o.votes / p.total_votes) * 100) : 0
 }
@@ -651,8 +680,16 @@ function pct(o: { votes: number }, p: { total_votes: number }) {
 // only tells us whether to draw the controls.
 const pinnedChat = computed<PanelMessage[]>(() => chat.value.filter((m: PanelMessage) => m.is_pinned))
 
-async function confirmRemove(m: PanelMessage, kind: 'chat' | 'qa') {
-  const what = kind === 'chat' ? 'message' : 'question'
+async function confirmRemove(m: PanelMessage, kind: 'chat' | 'qa', isReply = false) {
+  // Deleting a question takes its answers with it — say so, it isn't obvious.
+  const n = m.replies?.length ?? 0
+  const what = kind === 'chat'
+    ? 'message'
+    : isReply
+      ? 'reply'
+      : n
+        ? `question and its ${n} ${n === 1 ? 'reply' : 'replies'}`
+        : 'question'
   if (!confirm(`Delete this ${what}? Attendees will no longer see it.`)) return
   await removeMessage(m, kind)
 }
@@ -1018,6 +1055,9 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             <p v-if="qaModeration && !canModerate" class="modnote">
               Questions are reviewed by the host before everyone sees them.
             </p>
+            <p v-if="!canAnswer && !canModerate" class="modnote">
+              {{ answerHint }}
+            </p>
 
             <div class="qlist">
               <p v-if="!questions.length" class="empty">No questions yet.<br>Be the first to ask.</p>
@@ -1045,7 +1085,62 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                     <span v-if="q.is_hidden" class="flag">Hidden</span>
                   </span>
 
-                  <div v-if="canModerate || q.can_delete" class="mtools">
+                  <!-- The answers, oldest first. An organizer's or speaker's reply
+                       is the answer to the room, so it's the one that gets marked. -->
+                  <div v-if="q.replies.length" class="rthread">
+                    <div
+                      v-for="r in q.replies" :key="r.id"
+                      class="rrow" :class="{ official: r.is_official, hidden: r.is_hidden, pending: r.status === 'pending' }"
+                    >
+                      <span class="rav">
+                        <img v-if="r.author_image" :src="r.author_image" :alt="r.author">
+                        <template v-else>{{ initials(r.author) }}</template>
+                      </span>
+                      <div class="rbody">
+                        <span class="rwho">
+                          {{ r.is_mine ? 'You' : r.author }}
+                          <span v-if="roleLabel(r)" class="flag" :class="r.author_role === 'speaker' ? 'brand' : 'ok'">
+                            {{ roleLabel(r) }}
+                          </span>
+                          <span v-if="r.status === 'pending'" class="flag warn">Awaiting host</span>
+                          <span v-if="r.is_hidden" class="flag">Hidden</span>
+                        </span>
+                        <span class="rtext">{{ r.body }}</span>
+
+                        <div v-if="canModerate || r.can_delete" class="mtools">
+                          <template v-if="canModerate">
+                            <template v-if="r.status === 'pending'">
+                              <button class="mbtn ok" @click="moderate(r, { status: 'published' }, 'qa')">Approve</button>
+                              <button class="mbtn danger" @click="moderate(r, { status: 'rejected' }, 'qa')">Reject</button>
+                            </template>
+                            <button v-else class="mbtn" @click="moderate(r, { is_hidden: !r.is_hidden }, 'qa')">
+                              {{ r.is_hidden ? 'Unhide' : 'Hide' }}
+                            </button>
+                          </template>
+                          <button v-if="r.can_delete" class="mbtn danger" @click="confirmRemove(r, 'qa', true)">Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Reply box. Only for whoever the organizer allows — and the
+                       server re-checks the policy on the write regardless. -->
+                  <form
+                    v-if="replyingTo === q.id" class="rform"
+                    @submit.prevent="submitReply(q)"
+                  >
+                    <input v-model="replyInput" type="text" placeholder="Write an answer…" maxlength="1000" autofocus>
+                    <button type="submit" :disabled="!replyInput.trim()">Reply</button>
+                    <button type="button" class="rcancel" @click="replyingTo = null">Cancel</button>
+                  </form>
+
+                  <div v-if="canModerate || canAnswer || q.can_delete" class="mtools">
+                    <button
+                      v-if="canAnswer && !isMuted && q.status === 'published'"
+                      class="mbtn go" @click="openReply(q)"
+                    >
+                      {{ replyingTo === q.id ? 'Close' : 'Reply' }}
+                    </button>
                     <template v-if="canModerate">
                       <!-- Pre-moderation: a pending question is a decision, not a row. -->
                       <template v-if="q.status === 'pending'">
@@ -1323,9 +1418,30 @@ hr { border: none; border-top: 1px solid #eef0f3; margin: 18px 0; }
 .qvote { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 6px 9px; cursor: pointer; color: #64748b; font: inherit; font-weight: 800; font-size: .78rem; }
 .qvote.on { border-color: var(--brand-primary); color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 8%, #fff); }
 .qvote svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.qbody { display: flex; flex-direction: column; gap: 3px; }
+.qbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .qtext { font-size: .85rem; color: #1e293b; line-height: 1.4; }
 .qwho { font-size: .72rem; color: #94a3b8; }
+
+/* Answers, indented under their question and hung off a rail so a long thread
+   still reads as belonging to the question above it. */
+.rthread { display: flex; flex-direction: column; gap: 8px; margin: 7px 0 2px; padding-left: 10px; border-left: 2px solid #eef0f3; }
+.rrow { display: flex; gap: 7px; align-items: flex-start; }
+.rrow.official { border-left: 2px solid var(--brand-primary); margin-left: -12px; padding-left: 10px; }
+.rav { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; overflow: hidden; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: .58rem; font-weight: 800; }
+.rav img { width: 100%; height: 100%; object-fit: cover; }
+.rbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rwho { font-size: .7rem; color: #94a3b8; font-weight: 700; }
+.rtext { font-size: .82rem; color: #334155; line-height: 1.4; }
+.rrow.hidden .rtext { opacity: .5; text-decoration: line-through; }
+.rrow.pending { background: #fffbeb; border-radius: 8px; padding: 6px; }
+.rrow:hover .mtools, .rrow .mtools:focus-within { opacity: 1; }
+
+.rform { display: flex; gap: 6px; align-items: center; margin: 8px 0 2px; padding-left: 10px; border-left: 2px solid #eef0f3; }
+.rform input { flex: 1; min-width: 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: .82rem; color: #1e293b; outline: none; }
+.rform input:focus { border-color: var(--brand-primary); }
+.rform button { flex: 0 0 auto; border: none; background: var(--brand-primary); color: #fff; border-radius: 8px; padding: 7px 12px; font: inherit; font-weight: 700; font-size: .75rem; cursor: pointer; }
+.rform button:disabled { opacity: .45; cursor: default; }
+.rform .rcancel { background: none; color: #94a3b8; padding: 7px 4px; }
 
 /* Polls */
 .polls, .att { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }

@@ -61,7 +61,8 @@ class SessionEngagementController extends Controller
             'event_id' => $request->attributes->get('event_id'),
             'session_id' => $s->id,
             'participation_id' => $this->participationId($request),
-            'kind' => 'chat',
+            'kind' => SessionMessage::KIND_CHAT,
+            'author_role' => $this->authorRole($request),
             'status' => SessionMessage::STATUS_PUBLISHED,
             'body' => trim($data['body']),
         ])->load('participation.contact');
@@ -76,7 +77,7 @@ class SessionEngagementController extends Controller
         $pid = $this->participationId($request);
 
         $rows = SessionMessage::where('session_id', $s->id)
-            ->where('kind', 'question')
+            ->where('kind', SessionMessage::KIND_QUESTION)
             ->when(! $this->canModerate($request), fn ($q) => $q->visibleTo($pid))
             ->with('participation.contact')
             ->orderByDesc('is_pinned')      // host's pick rides at the top
@@ -86,7 +87,83 @@ class SessionEngagementController extends Controller
             ->limit(150)
             ->get();
 
-        return $this->messageList($rows, $request, $s);
+        return $this->messageList($rows, $request, $s, $this->repliesFor($rows, $request));
+    }
+
+    /**
+     * The replies under the questions on screen, in one query, grouped by
+     * question. An attendee sees the moderated set (plus their own pending
+     * reply); the host sees everything, flagged.
+     */
+    private function repliesFor($questions, Request $request): \Illuminate\Support\Collection
+    {
+        if ($questions->isEmpty()) {
+            return collect();
+        }
+
+        return SessionMessage::where('kind', SessionMessage::KIND_ANSWER)
+            ->whereIn('parent_id', $questions->pluck('id'))
+            ->when(! $this->canModerate($request), fn ($q) => $q->visibleTo($this->participationId($request)))
+            ->with('participation.contact')
+            ->orderBy('id') // oldest first: an answer thread reads top-down
+            ->get()
+            ->groupBy('parent_id');
+    }
+
+    /**
+     * Reply to a question. Who may do this is the organizer's call
+     * (Session::canAnswerQa) — but an organizer or speaker answering is the
+     * answer, so it gets the badge and closes the question out.
+     */
+    public function questionReply(Request $request): JsonResponse
+    {
+        $s = $this->session($request);
+        $this->abortIfMuted($request, $s);
+
+        abort_unless(
+            $s->canAnswerQa($this->participation($request)),
+            403,
+            'Replies to questions are limited to '.($s->qaAnswerPolicy() === Session::QA_ANSWER_ORGANIZERS
+                ? 'the event organizers.'
+                : 'the organizers and this session’s speakers.'),
+        );
+
+        $data = $request->validate(['body' => ['required', 'string', 'max:1000']]);
+
+        $question = SessionMessage::where('session_id', $s->id)
+            ->where('kind', SessionMessage::KIND_QUESTION)
+            ->findOrFail((int) $request->route('message'));
+
+        // Nothing to answer until the question is actually public — otherwise a
+        // reply could out a question the host has hidden or not yet approved.
+        if (! $this->canModerate($request)
+            && ($question->status !== SessionMessage::STATUS_PUBLISHED || $question->is_hidden)) {
+            return response()->json(['message' => 'This question is not open for replies.'], 422);
+        }
+
+        $role = $this->authorRole($request);
+        $official = $role !== SessionMessage::ROLE_ATTENDEE;
+
+        $reply = SessionMessage::create([
+            'event_id' => $request->attributes->get('event_id'),
+            'session_id' => $s->id,
+            'participation_id' => $this->participationId($request),
+            'parent_id' => $question->id,
+            'kind' => SessionMessage::KIND_ANSWER,
+            'author_role' => $role,
+            // An attendee's reply (policy=everyone) queues like their questions
+            // do; one from the stage goes straight up — it is the moderation.
+            'status' => (! $official && $s->qaModerated())
+                ? SessionMessage::STATUS_PENDING
+                : SessionMessage::STATUS_PUBLISHED,
+            'body' => trim($data['body']),
+        ]);
+
+        if ($official && ! $question->is_answered) {
+            $question->forceFill(['is_answered' => true, 'answered_at' => now()])->save();
+        }
+
+        return response()->json(['data' => $this->message($reply->load('participation.contact'), $request)], 201);
     }
 
     public function questionAsk(Request $request): JsonResponse
@@ -102,7 +179,8 @@ class SessionEngagementController extends Controller
             'event_id' => $request->attributes->get('event_id'),
             'session_id' => $s->id,
             'participation_id' => $this->participationId($request),
-            'kind' => 'question',
+            'kind' => SessionMessage::KIND_QUESTION,
+            'author_role' => $this->authorRole($request),
             'status' => $s->qaModerated() ? SessionMessage::STATUS_PENDING : SessionMessage::STATUS_PUBLISHED,
             'body' => trim($data['body']),
             'meta' => ['voters' => []],
@@ -197,6 +275,13 @@ class SessionEngagementController extends Controller
         $m->moderated_by = $pid;
         $m->moderated_at = now();
         $m->save();
+
+        // The FK cascade only fires on a hard delete, so a soft-deleted question
+        // would otherwise leave its answers behind as orphans.
+        if ($m->kind === SessionMessage::KIND_QUESTION) {
+            $m->replies()->delete();
+        }
+
         $m->delete(); // soft — recoverable, and the row survives for audit
 
         return response()->json(['status' => 'success']);
@@ -626,6 +711,12 @@ class SessionEngagementController extends Controller
         abort_if($muted, 403, 'The host has muted you for this session.');
     }
 
+    /** This caller's badge in this session — snapshotted onto what they post. */
+    private function authorRole(Request $request): string
+    {
+        return once(fn () => $this->session($request)->qaRoleOf($this->participation($request)));
+    }
+
     /** Capabilities the panel needs to decide what to render. */
     private function meta(Request $request, Session $s): array
     {
@@ -637,25 +728,31 @@ class SessionEngagementController extends Controller
                 ->where('participation_id', $this->participationId($request))
                 ->exists(),
             'qa_moderation' => $s->qaModerated(),
+            // Who the organizer has allowed to reply, and whether that's this
+            // caller — the panel draws a reply box off the second one.
+            'qa_answer_policy' => $s->qaAnswerPolicy(),
+            'can_answer' => $s->canAnswerQa($this->participation($request)),
+            'my_role' => $this->authorRole($request),
             'pending_count' => $host
                 ? SessionMessage::where('session_id', $s->id)
-                    ->where('kind', 'question')
+                    ->whereIn('kind', [SessionMessage::KIND_QUESTION, SessionMessage::KIND_ANSWER])
                     ->where('status', SessionMessage::STATUS_PENDING)
                     ->count()
                 : 0,
         ];
     }
 
-    private function messageList($rows, Request $request, Session $s): JsonResponse
+    /** @param  \Illuminate\Support\Collection|null  $replies  answers grouped by question id */
+    private function messageList($rows, Request $request, Session $s, $replies = null): JsonResponse
     {
         return response()->json([
-            'data' => $rows->map(fn (SessionMessage $m) => $this->message($m, $request)),
+            'data' => $rows->map(fn (SessionMessage $m) => $this->message($m, $request, $replies)),
             'meta' => $this->meta($request, $s),
         ]);
     }
 
-    /** Project a chat/question row for the client. */
-    private function message(SessionMessage $m, Request $request): array
+    /** Project a chat / question / answer row for the client. */
+    private function message(SessionMessage $m, Request $request, $replies = null): array
     {
         $pid = $this->participationId($request);
         $p = $m->participation;
@@ -664,9 +761,11 @@ class SessionEngagementController extends Controller
         return [
             'id' => $m->id,
             'body' => $m->body,
-            'author' => $p?->contact?->fullName() ?: 'Attendee',
+            'author' => $m->authorName(),
             'author_image' => $p?->profile_data['image_url'] ?? null,
             'author_id' => $p?->uuid,
+            'author_role' => $m->author_role ?: SessionMessage::ROLE_ATTENDEE,
+            'is_official' => $m->isOfficial(),
             'is_mine' => $mine,
             'upvotes' => (int) $m->upvotes,
             'voted' => collect($m->meta['voters'] ?? [])->contains($pid),
@@ -676,6 +775,9 @@ class SessionEngagementController extends Controller
             'status' => $m->status,
             'can_delete' => $mine || $this->canModerate($request),
             'created_at' => $m->created_at?->toIso8601String(),
+            'replies' => $replies === null
+                ? []
+                : ($replies[$m->id] ?? collect())->map(fn (SessionMessage $r) => $this->message($r, $request))->values(),
         ];
     }
 

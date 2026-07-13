@@ -55,6 +55,7 @@ interface Session {
   can_attendee_list: boolean
   can_session: boolean
   qa_moderation: boolean
+  qa_answer_policy: 'organizers' | 'hosts' | 'everyone'
   track: Track | null
   speakers: SessionSpeaker[]
 }
@@ -73,15 +74,19 @@ interface Poll {
 
 interface PanelMessage {
   id: number
-  kind: 'chat' | 'question'
+  kind: 'chat' | 'question' | 'answer'
   body: string
   author: string
+  author_role: 'organizer' | 'speaker' | 'attendee'
+  is_official: boolean
   upvotes: number
   status: 'published' | 'pending' | 'rejected'
   is_hidden: boolean
   is_pinned: boolean
   is_answered: boolean
   created_at: string | null
+  /** Answers threaded under a question, oldest first. */
+  replies: PanelMessage[]
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -142,6 +147,7 @@ const stream = reactive({
   can_attendee_list:        false,
   can_session:              false,
   qa_moderation:            false,
+  qa_answer_policy:         'hosts' as Session['qa_answer_policy'],
 })
 
 // Host-aware label/placeholder/help for the stream link field.
@@ -253,6 +259,7 @@ async function load() {
     stream.can_attendee_list        = s.can_attendee_list ?? false
     stream.can_session              = s.can_session ?? false
     stream.qa_moderation            = s.qa_moderation ?? false
+    stream.qa_answer_policy         = s.qa_answer_policy ?? 'hosts'
   } catch { /* */ } finally {
     loading.value = false
   }
@@ -356,8 +363,44 @@ async function patchMessage(m: PanelMessage, patch: Record<string, unknown>, not
   }
 }
 
+// ── Answering a question from the console ────────────────────────────────────
+// The organizer rarely sits in the room with the panel open; the questions that
+// land late, or that the speaker never got to, get answered from here. The reply
+// posts as the organizer, badged, and marks the question answered.
+const replyingTo  = ref<number | null>(null)
+const replyInput  = ref('')
+const replySaving = ref(false)
+
+function openReply(m: PanelMessage) {
+  replyingTo.value = replyingTo.value === m.id ? null : m.id
+  replyInput.value = ''
+}
+
+async function sendReply(m: PanelMessage) {
+  const body = replyInput.value.trim()
+  if (!body || replySaving.value) return
+  replySaving.value = true
+  try {
+    await api(`/session-messages/${m.id}/replies`, { method: 'POST', body: { body } })
+    replyingTo.value = null
+    replyInput.value = ''
+    await loadEngagement()
+    toast.success('Reply posted')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not post the reply.')
+  } finally {
+    replySaving.value = false
+  }
+}
+
 async function deleteMessage(m: PanelMessage) {
-  if (!confirm('Delete this message? Attendees will no longer see it.')) return
+  const n = m.replies?.length ?? 0
+  const what = m.kind === 'answer'
+    ? 'Delete this reply?'
+    : n
+      ? `Delete this message and its ${n} ${n === 1 ? 'reply' : 'replies'}?`
+      : 'Delete this message?'
+  if (!confirm(`${what} Attendees will no longer see it.`)) return
   try {
     await api(`/session-messages/${m.id}`, { method: 'DELETE' })
     await loadEngagement()
@@ -374,7 +417,12 @@ function pct(o: PollOption, p: Poll) {
   return p.total_votes ? Math.round((o.votes / p.total_votes) * 100) : 0
 }
 
-const pendingCount = computed(() => messages.value.filter(m => m.status === 'pending').length)
+// Replies can queue for approval too (attendee answers, when both "anyone can
+// reply" and pre-moderation are on), so the badge counts the whole thread.
+const pendingCount = computed(() => messages.value.reduce(
+  (n, m) => n + (m.status === 'pending' ? 1 : 0) + (m.replies?.filter(r => r.status === 'pending').length ?? 0),
+  0,
+))
 
 // Load the engagement data lazily — only when the organizer opens that tab.
 watch(activeTab, (t) => { if (t === 'engagement') loadEngagement() })
@@ -441,6 +489,7 @@ async function saveStream() {
         can_attendee_list:        stream.can_attendee_list,
         can_session:              stream.can_session,
         qa_moderation:            stream.qa_moderation,
+        qa_answer_policy:         stream.qa_answer_policy,
       },
     })
     session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
@@ -983,6 +1032,29 @@ onMounted(load)
                   </div>
                 </div>
               </label>
+              <!-- Who may post an answer under a question. You can always answer
+                   yourself — this is about who else may. -->
+              <div v-if="stream.can_qa" class="ml-8">
+                <div class="font-medium text-ink text-[.93rem] mb-1">Who can reply to questions</div>
+                <select v-model="stream.qa_answer_policy" class="m-0 w-full max-w-sm">
+                  <option value="organizers">Organizers only</option>
+                  <option value="hosts">Organizers and this session’s speakers</option>
+                  <option value="everyone">Anyone in the session</option>
+                </select>
+                <p class="muted text-[.8rem] mt-1.5 mb-0">
+                  <template v-if="stream.qa_answer_policy === 'organizers'">
+                    Speakers can still ask and upvote, but answers come from your team only.
+                  </template>
+                  <template v-else-if="stream.qa_answer_policy === 'everyone'">
+                    Attendees can answer each other. Their replies go through the same
+                    review queue as questions when the option above is on.
+                  </template>
+                  <template v-else>
+                    The default — the person on stage answers what they are asked.
+                  </template>
+                  A reply from you or a speaker is badged and marks the question answered.
+                </p>
+              </div>
               <label class="flex items-start gap-3 cursor-pointer select-none">
                 <input v-model="stream.can_live_polls" type="checkbox" class="w-4.5 h-4.5 m-0 mt-0.5 accent-brand shrink-0">
                 <div>
@@ -1140,44 +1212,95 @@ onMounted(load)
 
           <div
             v-for="m in messages" :key="m.id"
-            class="flex items-start gap-3 py-3 border-b border-line last:border-0"
+            class="py-3 border-b border-line last:border-0"
             :class="{ 'opacity-60': m.is_hidden || m.status === 'rejected' }"
           >
-            <div class="flex-1 min-w-0">
-              <div class="text-[.88rem] text-ink leading-snug" :class="{ 'line-through': m.is_hidden }">{{ m.body }}</div>
-              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                <span class="muted text-[.76rem]">{{ m.author }}</span>
-                <span v-if="m.kind === 'question'" class="muted text-[.76rem]">· {{ m.upvotes }} upvote{{ m.upvotes === 1 ? '' : 's' }}</span>
-                <span v-if="m.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
-                <span v-if="m.status === 'rejected'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Rejected</span>
-                <span v-if="m.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>
-                <span v-if="m.is_pinned" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-brand-soft text-brand">Pinned</span>
-                <span v-if="m.is_answered" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#dcfce7] text-[#15803d]">Answered</span>
+            <div class="flex items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="text-[.88rem] text-ink leading-snug" :class="{ 'line-through': m.is_hidden }">{{ m.body }}</div>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span class="muted text-[.76rem]">{{ m.author }}</span>
+                  <span v-if="m.kind === 'question'" class="muted text-[.76rem]">· {{ m.upvotes }} upvote{{ m.upvotes === 1 ? '' : 's' }}</span>
+                  <span v-if="m.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
+                  <span v-if="m.status === 'rejected'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Rejected</span>
+                  <span v-if="m.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>
+                  <span v-if="m.is_pinned" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-brand-soft text-brand">Pinned</span>
+                  <span v-if="m.is_answered" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#dcfce7] text-[#15803d]">Answered</span>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap justify-end gap-1.5 shrink-0">
+                <template v-if="m.status === 'pending'">
+                  <button class="btn sm" @click="patchMessage(m, { status: 'published' }, 'Question approved')">Approve</button>
+                  <button class="btn ghost sm text-[#dc2626]" @click="patchMessage(m, { status: 'rejected' }, 'Question rejected')">Reject</button>
+                </template>
+                <template v-else>
+                  <!-- Answering a live question is the point of this queue, so it
+                       leads: the rest are clean-up. -->
+                  <button
+                    v-if="m.kind === 'question' && !m.is_hidden"
+                    class="btn sm"
+                    @click="openReply(m)"
+                  >{{ replyingTo === m.id ? 'Close' : 'Reply' }}</button>
+                  <button
+                    v-if="m.kind === 'question'"
+                    class="btn ghost sm"
+                    @click="patchMessage(m, { is_answered: !m.is_answered }, m.is_answered ? 'Question reopened' : 'Marked as answered')"
+                  >{{ m.is_answered ? 'Reopen' : 'Answered' }}</button>
+                  <button
+                    class="btn ghost sm"
+                    @click="patchMessage(m, { is_pinned: !m.is_pinned }, m.is_pinned ? 'Unpinned' : 'Pinned')"
+                  >{{ m.is_pinned ? 'Unpin' : 'Pin' }}</button>
+                  <button
+                    class="btn ghost sm"
+                    @click="patchMessage(m, { is_hidden: !m.is_hidden }, m.is_hidden ? 'Message restored' : 'Message hidden')"
+                  >{{ m.is_hidden ? 'Unhide' : 'Hide' }}</button>
+                </template>
+                <button class="btn ghost sm text-[#dc2626]" @click="deleteMessage(m)">Delete</button>
               </div>
             </div>
 
-            <div class="flex flex-wrap justify-end gap-1.5 shrink-0">
-              <template v-if="m.status === 'pending'">
-                <button class="btn sm" @click="patchMessage(m, { status: 'published' }, 'Question approved')">Approve</button>
-                <button class="btn ghost sm text-[#dc2626]" @click="patchMessage(m, { status: 'rejected' }, 'Question rejected')">Reject</button>
-              </template>
-              <template v-else>
-                <button
-                  v-if="m.kind === 'question'"
-                  class="btn ghost sm"
-                  @click="patchMessage(m, { is_answered: !m.is_answered }, m.is_answered ? 'Question reopened' : 'Marked as answered')"
-                >{{ m.is_answered ? 'Reopen' : 'Answered' }}</button>
-                <button
-                  class="btn ghost sm"
-                  @click="patchMessage(m, { is_pinned: !m.is_pinned }, m.is_pinned ? 'Unpinned' : 'Pinned')"
-                >{{ m.is_pinned ? 'Unpin' : 'Pin' }}</button>
-                <button
-                  class="btn ghost sm"
-                  @click="patchMessage(m, { is_hidden: !m.is_hidden }, m.is_hidden ? 'Message restored' : 'Message hidden')"
-                >{{ m.is_hidden ? 'Unhide' : 'Hide' }}</button>
-              </template>
-              <button class="btn ghost sm text-[#dc2626]" @click="deleteMessage(m)">Delete</button>
+            <!-- The answers so far, threaded under the question. -->
+            <div v-if="m.replies?.length" class="mt-3 pl-4 border-l-2 border-line flex flex-col gap-3">
+              <div v-for="r in m.replies" :key="r.id" class="flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[.85rem] text-ink leading-snug" :class="{ 'line-through': r.is_hidden }">{{ r.body }}</div>
+                  <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span class="muted text-[.76rem]">{{ r.author }}</span>
+                    <span
+                      v-if="r.author_role !== 'attendee'"
+                      class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded"
+                      :class="r.author_role === 'speaker' ? 'bg-brand-soft text-brand' : 'bg-[#dcfce7] text-[#15803d]'"
+                    >{{ r.author_role === 'speaker' ? 'Speaker' : 'Organizer' }}</span>
+                    <span v-if="r.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
+                    <span v-if="r.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap justify-end gap-1.5 shrink-0">
+                  <template v-if="r.status === 'pending'">
+                    <button class="btn sm" @click="patchMessage(r, { status: 'published' }, 'Reply approved')">Approve</button>
+                    <button class="btn ghost sm text-[#dc2626]" @click="patchMessage(r, { status: 'rejected' }, 'Reply rejected')">Reject</button>
+                  </template>
+                  <button
+                    v-else class="btn ghost sm"
+                    @click="patchMessage(r, { is_hidden: !r.is_hidden }, r.is_hidden ? 'Reply restored' : 'Reply hidden')"
+                  >{{ r.is_hidden ? 'Unhide' : 'Hide' }}</button>
+                  <button class="btn ghost sm text-[#dc2626]" @click="deleteMessage(r)">Delete</button>
+                </div>
+              </div>
             </div>
+
+            <form v-if="replyingTo === m.id" class="mt-3 pl-4 border-l-2 border-brand flex gap-2" @submit.prevent="sendReply(m)">
+              <input
+                v-model="replyInput" type="text" maxlength="1000" autofocus
+                placeholder="Write an answer — it posts as the organizer"
+                class="m-0 flex-1"
+              >
+              <button type="submit" class="btn" :disabled="!replyInput.trim() || replySaving">
+                {{ replySaving ? 'Posting…' : 'Post reply' }}
+              </button>
+              <button type="button" class="btn ghost" @click="replyingTo = null">Cancel</button>
+            </form>
           </div>
         </div>
       </div>

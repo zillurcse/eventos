@@ -223,8 +223,12 @@ function openEdit(s: Speaker) {
 
 // TODO: wire to real features — reuse speakers from a past event / pick from the
 // org-wide speakers directory. Stubbed for now so the buttons are non-destructive.
+// Re-seat someone who has spoken at one of this organizer's other events; the
+// drawer owns the picking and the import, we just reload the list afterwards.
+const previousOpen = ref(false)
+
 function openPrevious() {
-  alert('Coming soon.')
+  previousOpen.value = true
 }
 
 function openDirectory() {
@@ -283,6 +287,14 @@ onMounted(() => { load(); loadCategories() })
         @login="openLogin"
       />
     </div>
+
+    <!-- Import speakers from the organizer's other events. -->
+    <SpeakerPreviousDrawer
+      v-if="previousOpen"
+      :event-id="id"
+      @close="previousOpen = false"
+      @imported="load"
+    />
 
     <!-- Speaker login: a speaker has no account until this runs, and without one
          they can't sign in to the event site or host their own session. -->
