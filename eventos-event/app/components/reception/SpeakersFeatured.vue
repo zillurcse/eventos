@@ -3,6 +3,8 @@ import type { ReceptionSpeaker } from '~/stores/reception'
 
 const props = defineProps<{ speakers: ReceptionSpeaker[] }>()
 
+const bookmarks = useBookmarksStore()
+
 function initials(name?: string | null): string {
   if (!name) return '?'
   const p = name.trim().split(/\s+/)
@@ -11,26 +13,69 @@ function initials(name?: string | null): string {
 </script>
 
 <template>
-  <ReceptionSectionCard title="Speakers" featured view-all>
-    <ReceptionCardCarousel>
-      <article v-for="sp in props.speakers" :key="sp.id" class="spk">
-        <span class="avatar">
+  <section class="speakers-featured">
+    <header class="head">
+      <h2>Featured Speakers ({{ speakers.length }})</h2>
+    </header>
+
+    <div class="grid">
+      <article v-for="sp in speakers" :key="sp.id" class="spk">
+        <div class="photo">
           <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name || ''" />
-          <template v-else>{{ initials(sp.name) }}</template>
-        </span>
-        <h3 class="name">{{ sp.name }}</h3>
-        <p v-if="sp.designation" class="role">{{ sp.designation }}</p>
-        <p v-if="sp.company" class="company">{{ sp.company }}</p>
+          <span v-else class="ph">{{ initials(sp.name) }}</span>
+
+          <button
+            class="bookmark"
+            :class="{ on: bookmarks.isOn('speaker', sp.id) }"
+            type="button"
+            :title="bookmarks.isOn('speaker', sp.id) ? 'Remove bookmark' : 'Bookmark'"
+            @click="bookmarks.toggle('speaker', sp.id)"
+          >
+            <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+          </button>
+        </div>
+
+        <div class="foot">
+          <h3 class="name">{{ sp.name }}</h3>
+          <p v-if="sp.designation" class="role">{{ sp.designation }}</p>
+          <p v-if="sp.company" class="company">{{ sp.company }}</p>
+        </div>
       </article>
-    </ReceptionCardCarousel>
-  </ReceptionSectionCard>
+    </div>
+
+    <div class="viewall">
+      <span class="line" />
+      <NuxtLink to="/speakers" class="viewall-btn">View all speakers</NuxtLink>
+      <span class="line" />
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.spk { flex: 0 0 calc(33.333% - 10px); min-width: 170px; border: 1px solid #eef0f3; border-radius: 12px; padding: 20px 14px; text-align: center; background: #fff; }
-.avatar { width: 78px; height: 78px; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); font-size: 1.3rem; font-weight: 800; }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
-.name { margin: 0 0 4px; font-size: .88rem; font-weight: 700; color: var(--brand-primary); }
-.role { margin: 0; font-size: .74rem; color: #475569; line-height: 1.3; }
-.company { margin: 2px 0 0; font-size: .74rem; color: #94a3b8; }
+.speakers-featured { display: flex; flex-direction: column; gap: 20px; }
+.head h2 { margin: 0; font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+
+.spk { background: #fff; border: 1px solid #eef0f3; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+
+.photo { position: relative; background: color-mix(in srgb, var(--brand-primary) 12%, #fff); display: flex; align-items: center; justify-content: center; }
+.photo img { width: 100%; height: 100%;max-height: 210px;min-height: 210px; object-fit: cover; display: block; }
+.ph { font-size: 2.2rem; font-weight: 800; color: var(--brand-primary); }
+
+.bookmark { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 8px; border: none; background: rgba(255,255,255,.92); color: var(--brand-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(15,23,42,.12); }
+.bookmark:hover { background: var(--brand-primary); color: #fff; }
+.bookmark.on { background: var(--brand-primary); color: #fff; }
+.bookmark svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bookmark.on svg { fill: currentColor; }
+
+.foot { padding: 16px; }
+.name { margin: 0; font-size: 1rem; font-weight: 800; color: #1e293b; }
+.role { margin: 6px 0 0; font-size: .86rem; color: #64748b; }
+.company { margin: 2px 0 0; font-size: .86rem; color: #94a3b8; }
+
+.viewall { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
+.viewall .line { flex: 1; height: 1px; background: #D1D2DE; }
+.viewall-btn { flex: 0 0 auto; padding: 8px 16px; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); font-weight: 700; font-size: .88rem; text-decoration: none; }
+.viewall-btn:hover { background: color-mix(in srgb, var(--brand-primary) 18%, #fff); }
 </style>

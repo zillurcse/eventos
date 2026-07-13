@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { TYPE_OPTIONS } from '../../utils/exhibitor'
+
 const {
   exhibitors, packages, openAdd,
   search, filterType, filterPackage, resetFilters, filtered,
   packageName, toggleActions, actionsOpenId, openEdit, remove,
   openResetPassword, toggleStatus,
 } = useExhibitorContext()
+
+const typeOptions = TYPE_OPTIONS.map((t: string) => ({ value: t.toLowerCase(), label: t }))
+const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value: String(pkg.id), label: pkg.name })))
 
 const columns = [
   { key: 'image', label: 'Image', width: '68px' },
@@ -50,14 +56,18 @@ const columns = [
     <!-- Filters row -->
     <div class="flex items-center gap-3 mb-5 flex-wrap">
       <SearchInput v-model="search" placeholder="Search Exhibitors" class="flex-1 min-w-45 max-w-70" />
-      <select v-model="filterType" style="width:170px;">
-        <option value="">Select Type</option>
-        <option v-for="t in TYPE_OPTIONS" :key="t" :value="t.toLowerCase()">{{ t }}</option>
-      </select>
-      <select v-model="filterPackage" style="width:190px;">
-        <option value="">Select Package</option>
-        <option v-for="pkg in packages" :key="pkg.id" :value="String(pkg.id)">{{ pkg.name }}</option>
-      </select>
+      <AppSelect
+        v-model="filterType"
+        placeholder="Select Type"
+        class="w-[170px]"
+        :options="typeOptions"
+      />
+      <AppSelect
+        v-model="filterPackage"
+        placeholder="Select Package"
+        class="w-[190px]"
+        :options="packageOptions"
+      />
       <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2" @click="resetFilters">RESET FILTERS</button>
     </div>
 

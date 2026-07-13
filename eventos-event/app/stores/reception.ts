@@ -26,6 +26,8 @@ export interface ReceptionSession {
   ends_at: string | null
   timezone: string | null
   icon_url?: string | null
+  logo_url?: string | null
+  session_place?: string | null
   speakers?: Array<{ id: string, name: string | null, profile?: any }>
 }
 

@@ -270,25 +270,23 @@ async function save() {
 
     <!-- Choose Day -->
     <div class="mb-4">
-      <label class="block mb-1.5">Choose Day <span class="text-[#dc2626]">*</span></label>
-      <select v-model="draft.date" class="m-0 w-full">
-        <option value="">Select</option>
-        <option v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
-      </select>
-      <p v-if="!dayOptions.length" class="text-[.78rem] text-muted mt-1">
-        Set the event start &amp; end dates to choose a day.
-      </p>
+      <AppSelect
+        v-model="draft.date"
+        label="Choose Day"
+        required
+        placeholder="Select"
+        :options="dayOptions"
+        :hint="!dayOptions.length ? 'Set the event start & end dates to choose a day.' : undefined"
+      />
     </div>
 
     <!-- Schedule Start / End -->
     <div class="flex gap-3 mb-1">
       <div class="flex-1">
-        <label class="block mb-1.5">Schedule Start <span class="text-[#dc2626]">*</span></label>
-        <input v-model="draft.start_time" type="time" class="m-0 w-full">
+        <AppInput v-model="draft.start_time" label="Schedule Start" type="time" required />
       </div>
       <div class="flex-1">
-        <label class="block mb-1.5">Schedule End <span class="text-[#dc2626]">*</span></label>
-        <input v-model="draft.end_time" type="time" class="m-0 w-full">
+        <AppInput v-model="draft.end_time" label="Schedule End" type="time" required />
       </div>
     </div>
     <p v-if="timeError" class="error mb-3">{{ timeError }}</p>
@@ -420,13 +418,12 @@ async function save() {
           >×</button>
         </span>
       </div>
-      <input
+      <AppInput
         v-model="tagInput"
-        placeholder="Add tag &amp; press enter"
-        class="m-0"
+        placeholder="Add tag & press enter"
         @keydown="onTagKey"
         @blur="addTag"
-      >
+      />
     </div>
 
     <!-- Checkboxes -->

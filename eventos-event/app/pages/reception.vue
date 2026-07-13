@@ -41,16 +41,17 @@ onMounted(async () => {
   <div v-if="reception.loading && !data" class="loading">Loading reception…</div>
 
   <div v-else-if="data" class="reception">
-    <!-- Hero banner carousel -->
-    <ReceptionHeroCarousel v-if="data.banners.length" :banners="data.banners" class="span2" />
-
-    <!-- Sponsor / ad strip -->
-    <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" class="span2" />
+    
 
     <!-- Row: About (main) + Meetings (rail) -->
     <div class="cols">
       <div class="main">
-        <ReceptionAboutCard :about="data.about" />
+        <!-- Hero banner carousel -->
+    <ReceptionHeroCarousel v-if="data.banners.length" :banners="data.banners" class="span2" />
+
+    <!-- Sponsor / ad strip -->
+    <ReceptionAboutCard :about="data.about" />
+    <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" class="span2" />
         <ReceptionSessionsFeatured v-if="data.sessions.length" :sessions="data.sessions" />
         <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" :partners="data.exhibitors" />
         <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" :partners="data.sponsors" />

@@ -38,5 +38,5 @@ const banners = computed<Banner[]>(() =>
 <style scoped>
 .strip { display: flex; flex-direction: column; gap: 12px; }
 .banner { display: block; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.banner img { display: block; width: 100%; height: auto; object-fit: cover; }
+.banner img { display: block; width: 100%;max-height: 120px;  height: auto; object-fit: cover; }
 </style>
