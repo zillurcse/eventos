@@ -6,8 +6,7 @@ const contact = useExhibitorContactStore()
 
 <template>
   <div class="event-shell">
-    <EventTopbar />
-    <EventNav />
+    <EventHeader />
     <main class="event-main">
       <slot />
     </main>
@@ -17,6 +16,6 @@ const contact = useExhibitorContactStore()
 </template>
 
 <style scoped>
-.event-shell { min-height: 100vh; background: #e9ebee; }
-.event-main { max-width: 1180px; margin: 0 auto; padding: 20px 18px 56px; }
+.event-shell { min-height: 100vh; background: #F7F7FB; }
+.event-main { max-width: 1440px; margin: 0 auto; padding: 30px 18px 56px; }
 </style>

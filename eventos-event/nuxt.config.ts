@@ -7,6 +7,16 @@ export default defineNuxtConfig({
 
   css: ['~/assets/main.css'],
 
+  app: {
+    head: {
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap' },
+      ],
+    },
+  },
+
   // EventOS Event app is a pure SPA (per-event public microsite): no SSR, so all
   // API calls run in the browser and "localhost:8088" resolves to the host —
   // not the Nuxt container.
@@ -34,7 +44,7 @@ export default defineNuxtConfig({
   vite: {
     // Pre-bundle client deps so first load doesn't trigger a Vite reload/re-optimize
     // (livekit-client powers the breakout Rooms video, laravel-echo/pusher the WS).
-    optimizeDeps: { include: ['laravel-echo', 'pusher-js', 'livekit-client', 'uqr'] },
+    optimizeDeps: { include: ['laravel-echo', 'pusher-js', 'livekit-client', 'uqr', 'swiper/vue', 'swiper/modules'] },
     server: {
       // Windows + Docker bind mounts don't propagate inotify events, so poll.
       watch: { usePolling: true, interval: 300 },

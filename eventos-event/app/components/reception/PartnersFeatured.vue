@@ -7,30 +7,72 @@ function initials(name: string): string {
   const p = name.trim().split(/\s+/)
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase()
 }
+
+function subtitle(p: ReceptionPartner): string {
+  return [p.booth, p.type ? p.type[0]!.toUpperCase() + p.type.slice(1) : ''].filter(Boolean).join(', ')
+}
 </script>
 
 <template>
-  <ReceptionSectionCard :title="props.title" featured view-all>
-    <ReceptionCardCarousel>
-      <article v-for="p in props.partners" :key="p.id" class="pcard">
-        <div class="logo">
-          <img v-if="p.logo_url" :src="p.logo_url" :alt="p.name" />
-          <span v-else class="ph">{{ initials(p.name) }}</span>
+  <section class="partners-featured">
+    <header class="head">
+      <h2>Featured {{ title }} ({{ partners.length }})</h2>
+    </header>
+
+    <div class="grid">
+      <article v-for="p in partners" :key="p.id" class="pcard">
+        <div class="banner">
+          <img v-if="p.logo_url" :src="p.logo_url" :alt="p.name" class="banner-logo" />
+          <span v-else class="banner-ph">{{ initials(p.name) }}</span>
         </div>
-        <h3 class="name">{{ p.name }}</h3>
-        <span class="type">{{ p.type }}</span>
-        <span v-if="p.booth" class="booth">{{ p.booth }}</span>
+
+        <div class="foot">
+          <div class="logo-box">
+            <img v-if="p.logo_url" :src="p.logo_url" :alt="p.name" />
+            <span v-else>{{ initials(p.name) }}</span>
+          </div>
+          <div class="info">
+            <h3 class="name">{{ p.name }}</h3>
+            <span v-if="subtitle(p)" class="sub">{{ subtitle(p) }}</span>
+          </div>
+        </div>
       </article>
-    </ReceptionCardCarousel>
-  </ReceptionSectionCard>
+    </div>
+
+    <div class="viewall">
+      <span class="line" />
+      <NuxtLink to="/exhibitors" class="viewall-btn">View all {{ title.toLowerCase() }}</NuxtLink>
+      <span class="line" />
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.pcard { flex: 0 0 calc(33.333% - 10px); min-width: 170px; border: 1px solid #eef0f3; border-radius: 12px; padding: 14px; text-align: center; background: #fff; }
-.logo { height: 96px; border-radius: 10px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 12px; }
-.logo img { max-width: 88%; max-height: 80%; object-fit: contain; }
-.ph { font-size: 1.6rem; font-weight: 800; color: var(--brand-primary); }
-.name { margin: 0 0 3px; font-size: .86rem; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.type { display: block; font-size: .74rem; color: var(--brand-primary); text-transform: capitalize; }
-.booth { display: block; font-size: .74rem; color: #94a3b8; margin-top: 2px; }
+.partners-featured { display: flex; flex-direction: column; gap: 20px; }
+.head h2 { margin: 0; font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+
+.pcard { background: #fff; border: 1px solid #eef0f3; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+
+.banner {
+   display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 16%, #fff), color-mix(in srgb, var(--brand-primary) 4%, #fff));
+}
+.banner-logo { max-width: 100%; width: 100%; max-height: 160px; object-fit: cover; }
+.banner-ph { font-size: 2.4rem; font-weight: 800; color: var(--brand-primary); }
+
+.foot { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.logo-box { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 8px; border: 1px solid #E8E8EE; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.logo-box img { max-width: 80%; max-height: 80%; object-fit: contain; }
+.logo-box span { font-weight: 800; color: var(--brand-primary); font-size: .9rem; }
+
+.info { min-width: 0; }
+.name { margin: 0; font-size: 1rem; font-weight: 800; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { display: block; margin-top: 2px; color: #94a3b8; font-size: .84rem; }
+
+.viewall { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
+.viewall .line { flex: 1; height: 1px; background: #D1D2DE; }
+.viewall-btn { flex: 0 0 auto; padding: 8px 16px; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); font-weight: 700; font-size: .88rem; text-decoration: none; text-transform: capitalize; }
+.viewall-btn:hover { background: color-mix(in srgb, var(--brand-primary) 18%, #fff); }
 </style>

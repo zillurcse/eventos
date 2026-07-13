@@ -5,7 +5,14 @@ const props = defineProps<{ about: ReceptionPayload['about'] }>()
 
 const expanded = ref(false)
 
-const image = computed(() => props.about.cover_url || props.about.logo_url)
+const image = computed(() => props.about.logo_url || props.about.cover_url)
+
+const locationText = computed(() => {
+  const loc = props.about.location
+  if (!loc) return ''
+  if (typeof loc === 'string') return loc
+  return loc.address || loc.url || ''
+})
 
 const dateRange = computed(() => {
   const s = props.about.starts_at ? new Date(props.about.starts_at) : null
@@ -44,54 +51,210 @@ const ICON: Record<string, string> = {
 </script>
 
 <template>
-  <ReceptionSectionCard title="About">
-    <div class="about">
-      <div v-if="image" class="cover">
+  <div class="about-card">
+    <div class="head">
+      <div v-if="image" class="mark">
         <img :src="image" :alt="about.name" />
       </div>
+      <div v-else class="mark placeholder">{{ (about.name || 'E').slice(0, 3).toUpperCase() }}</div>
 
-      <div class="body">
+      <div class="head-text">
         <h3 class="ttl">{{ about.name }}</h3>
-        <p v-if="about.description" class="desc" :class="{ clamp: !expanded }">{{ about.description }}</p>
-        <a v-if="about.description && about.description.length > 160" href="#" class="more" @click.prevent="expanded = !expanded">
-          {{ expanded ? '- READ LESS' : '+ READ MORE' }}
-        </a>
 
-        <div v-if="dateRange" class="when">
-          <strong>{{ dateRange }}</strong>
-          <span v-if="timeRange" class="time">{{ timeRange }}</span>
-        </div>
-
-        <div v-if="socials.length" class="socials">
-          <a v-for="[key, url] in socials" :key="key" :href="url as string" target="_blank" rel="noopener" :aria-label="key">
-            <svg viewBox="0 0 24 24"><path :d="ICON[key]" /></svg>
-          </a>
+        <div class="meta">
+          <div v-if="dateRange" class="meta-item">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M8 3v4M16 3v4M3 10h18" />
+            </svg>
+            <span>{{ dateRange }}<template v-if="timeRange"> | {{ timeRange }}</template></span>
+          </div>
+          <div v-if="locationText" class="meta-item">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 22s7-7.4 7-12.5A7 7 0 0 0 5 9.5C5 14.6 12 22 12 22z" />
+              <circle cx="12" cy="9.5" r="2.5" />
+            </svg>
+            <span>{{ locationText }}</span>
+          </div>
         </div>
       </div>
     </div>
-  </ReceptionSectionCard>
+
+    <div class="divider" />
+
+    <div v-if="socials.length" class="socials">
+      <a v-for="[key, url] in socials" :key="key" :href="url as string" target="_blank" rel="noopener"
+        :aria-label="key">
+        <svg viewBox="0 0 24 24">
+          <path :d="ICON[key]" />
+        </svg>
+      </a>
+    </div>
+
+    <p v-if="about.description" class="desc" :class="{ clamp: !expanded }">{{ about.description }}</p>
+    <a v-if="about.description && about.description.length > 160" href="#" class="more"
+      @click.prevent="expanded = !expanded">
+      {{ expanded ? 'Less Details' : 'More Details' }}
+      <svg viewBox="0 0 24 24" :class="{ up: expanded }">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </a>
+  </div>
 </template>
 
 <style scoped>
-.about { display: flex; gap: 18px; }
-.cover { flex: 0 0 190px; }
-.cover img { width: 190px; height: 190px; object-fit: cover; border-radius: 12px; }
-.body { flex: 1; min-width: 0; }
-.ttl { margin: 0 0 8px; font-size: 1rem; font-weight: 800; color: #1e293b; }
-.desc { margin: 0; color: #64748b; font-size: .86rem; line-height: 1.55; }
-.desc.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.more { display: inline-block; margin-top: 8px; font-size: .78rem; font-weight: 700; color: var(--brand-primary); }
-.when { margin-top: 16px; }
-.when strong { display: block; color: #1e293b; font-size: .95rem; }
-.time { color: #94a3b8; font-size: .82rem; }
-.socials { display: flex; gap: 8px; margin-top: 14px; }
-.socials a { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: var(--brand-primary); }
-.socials a:hover { background: var(--brand-primary); color: #fff; border-color: var(--brand-primary); }
-.socials svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.about-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #E8E8EE
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mark {
+  flex: 0 0 64px;
+}
+
+.mark img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.mark.placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--brand-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: .8rem;
+}
+
+.head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ttl {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #475569;
+  font-size: .84rem;
+}
+
+.meta-item svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.divider {
+  margin-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.socials {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.socials a {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+}
+
+.socials a:hover {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.socials svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.desc {
+  margin: 16px 0 0;
+  color: #64748b;
+  font-size: .86rem;
+  line-height: 1.6;
+}
+
+.desc.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.more svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform .15s ease;
+}
+
+.more svg.up {
+  transform: rotate(180deg);
+}
 
 @media (max-width: 640px) {
-  .about { flex-direction: column; }
-  .cover { flex: none; }
-  .cover img { width: 100%; height: 180px; }
+  .head {
+    align-items: flex-start;
+  }
 }
 </style>
