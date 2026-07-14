@@ -3,11 +3,6 @@ import type { ReceptionPartner } from '~/stores/reception'
 
 const props = defineProps<{ title: string, partners: ReceptionPartner[] }>()
 
-function initials(name: string): string {
-  const p = name.trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase()
-}
-
 function subtitle(p: ReceptionPartner): string {
   return [p.booth, p.type ? p.type[0]!.toUpperCase() + p.type.slice(1) : ''].filter(Boolean).join(', ')
 }
@@ -22,14 +17,12 @@ function subtitle(p: ReceptionPartner): string {
     <div class="grid">
       <article v-for="p in partners" :key="p.id" class="pcard">
         <div class="banner">
-          <img v-if="p.logo_url" :src="p.logo_url" :alt="p.name" class="banner-logo" />
-          <span v-else class="banner-ph">{{ initials(p.name) }}</span>
+          <AppImage :src="p.logo_url" :alt="p.name" class="banner-logo" />
         </div>
 
         <div class="foot">
           <div class="logo-box">
-            <img v-if="p.logo_url" :src="p.logo_url" :alt="p.name" />
-            <span v-else>{{ initials(p.name) }}</span>
+            <AppImage :src="p.logo_url" :alt="p.name" />
           </div>
           <div class="info">
             <h3 class="name">{{ p.name }}</h3>

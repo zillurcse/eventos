@@ -16,10 +16,6 @@ const state = ref<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
 const isSelf = computed(() => !!chat.me && chat.me === id.value)
 
-function initials(n?: string | null) {
-  const p = (n || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
 
 async function load() {
   loading.value = true
@@ -72,8 +68,7 @@ watch(id, load)
 
       <template v-else>
         <span class="av">
-          <img v-if="person.avatar_url" :src="person.avatar_url" :alt="person.name || ''">
-          <template v-else>{{ initials(person.name) }}</template>
+          <UserAvatar :src="person.avatar_url" :name="person.name" />
         </span>
         <h1 class="name">{{ person.name }}</h1>
         <p v-if="person.job_title || person.company" class="sub">

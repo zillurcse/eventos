@@ -27,11 +27,6 @@ watch(id, v => v && store.fetchDetail(v))
 
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', id.value))
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 function openContact() {
   if (ex.value) contact.openFor({ id: ex.value.id, name: ex.value.name })
 }
@@ -82,8 +77,7 @@ function ctaHref(v: string) {
 
         <div class="idbar">
           <div class="logo">
-            <img v-if="ex.logo_url" :src="ex.logo_url" :alt="ex.name">
-            <span v-else class="ini">{{ initials(ex.name) }}</span>
+            <AppImage :src="ex.logo_url" :alt="ex.name" />
           </div>
           <h1 class="title">{{ ex.name }}</h1>
 
@@ -111,8 +105,7 @@ function ctaHref(v: string) {
             <div class="proj-grid">
               <article v-for="(p, i) in ex.projects" :key="i" class="proj">
                 <div class="proj-img">
-                  <img v-if="p.image_url" :src="p.image_url" :alt="p.name">
-                  <span v-else>{{ p.name }}</span>
+                  <AppImage :src="p.image_url" :alt="p.name" />
                 </div>
                 <div v-if="p.name || p.description" class="proj-body">
                   <strong>{{ p.name }}</strong>
@@ -127,8 +120,7 @@ function ctaHref(v: string) {
             <div class="mem-grid">
               <article v-for="(m, i) in ex.members" :key="i" class="mem">
                 <div class="mem-photo">
-                  <img v-if="m.avatar_url" :src="m.avatar_url" :alt="m.name">
-                  <span v-else class="ini">{{ initials(m.name) }}</span>
+                  <UserAvatar :src="m.avatar_url" :name="m.name" />
                   <div class="mem-cap">
                     <strong>{{ m.name }}</strong>
                     <span v-if="m.designation">{{ m.designation }}</span>

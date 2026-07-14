@@ -3,11 +3,6 @@ import type { SimilarDelegate } from '~/stores/delegates'
 
 const store = useDelegatesStore()
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 function open(d: SimilarDelegate) {
   store.openConnect(d)
 }
@@ -25,8 +20,7 @@ function open(d: SimilarDelegate) {
       <li v-for="d in store.similar" :key="d.id">
         <button type="button" class="row" @click="open(d)">
           <span class="avatar">
-            <img v-if="d.avatar_url" :src="d.avatar_url" :alt="d.name || ''">
-            <span v-else class="ini">{{ initials(d.name) }}</span>
+            <UserAvatar :src="d.avatar_url" :name="d.name" />
             <span class="dot" :class="{ on: d.online }" :title="d.online ? 'Online' : 'Offline'" />
           </span>
 
@@ -57,7 +51,6 @@ function open(d: SimilarDelegate) {
 
 .avatar { position: relative; width: 40px; height: 40px; border-radius: 8px; overflow: visible; flex: 0 0 auto; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-.ini { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: color-mix(in srgb, var(--brand-primary) 75%, #fff); font-size: .82rem; font-weight: 700; }
 
 .dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; background: #cbd5e1; }
 .dot.on { background: #22c55e; }

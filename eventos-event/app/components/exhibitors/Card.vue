@@ -12,11 +12,6 @@ function toggleBookmark() {
   bookmarks.toggle('exhibitor', props.exhibitor.id)
 }
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 // Secondary meta line under the type: the event edition year.
 const meta = computed(() => store.year ? String(store.year) : '')
 </script>
@@ -25,8 +20,7 @@ const meta = computed(() => store.year ? String(store.year) : '')
   <article class="card" @click="navigateTo(`/exhibitor/${exhibitor.id}`)">
     <!-- Logo tile with a hover "Contact" veil -->
     <div class="logo">
-      <img v-if="exhibitor.logo_url" :src="exhibitor.logo_url" :alt="exhibitor.name">
-      <span v-else class="ini">{{ initials(exhibitor.name) }}</span>
+      <AppImage :src="exhibitor.logo_url" :alt="exhibitor.name" />
 
       <div class="veil" @click.stop>
         <button class="contact" type="button" @click="contact.openFor({ id: exhibitor.id, name: exhibitor.name })">

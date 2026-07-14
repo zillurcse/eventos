@@ -22,11 +22,6 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') store.close()
 }
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 const subtitle = computed(() => {
   const s = props.speaker
   return [s.designation, s.company].filter(Boolean).join(' · ')
@@ -84,8 +79,7 @@ function whenLabel(s: AgendaSession) {
 
       <header class="head">
         <div class="photo">
-          <img v-if="speaker.image_url" :src="speaker.image_url" :alt="speaker.name || ''">
-          <span v-else class="ini">{{ initials(speaker.name) }}</span>
+          <UserAvatar :src="speaker.image_url" :name="speaker.name" />
         </div>
 
         <div class="ident">

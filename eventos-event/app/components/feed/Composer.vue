@@ -225,7 +225,7 @@ async function submit() {
     @drop.prevent="onDrop"
   >
     <div class="row">
-      <span class="me">{{ initials(auth.user?.name) }}</span>
+      <span class="me"><UserAvatar :name="auth.user?.name" /></span>
       <textarea v-model="body" rows="2" :placeholder="placeholder" />
     </div>
 

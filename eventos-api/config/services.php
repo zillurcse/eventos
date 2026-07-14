@@ -97,4 +97,36 @@ return [
         'token_ttl' => (int) env('JITSI_TOKEN_TTL', 7200),
     ],
 
+    /*
+     * Social sign-in for the attendee sites (Settings › Access authentication).
+     *
+     * The OAuth apps are the *platform's*, not each organizer's: asking every
+     * event to register its own Google app would make the feature unusable, and
+     * providers verify one redirect URI per app anyway. So one app per provider,
+     * one callback (/auth/social/{provider}/callback), and the event a person is
+     * signing in to rides through the OAuth `state` — see SocialAuthController.
+     *
+     * A provider with no client_id is simply not offered: the organizer can tick
+     * the box, but the attendee site only shows a button we can actually honour.
+     */
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('APP_URL').'/api/v1/auth/social/google/callback',
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('APP_URL').'/api/v1/auth/social/facebook/callback',
+    ],
+
+    // Socialite's modern LinkedIn driver (OpenID Connect); the old `linkedin`
+    // driver is deprecated and its scopes no longer work for new apps.
+    'linkedin-openid' => [
+        'client_id' => env('LINKEDIN_CLIENT_ID'),
+        'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
+        'redirect' => env('APP_URL').'/api/v1/auth/social/linkedin/callback',
+    ],
+
 ];

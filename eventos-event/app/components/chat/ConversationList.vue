@@ -53,8 +53,7 @@ const ROLE_CLS: Record<string, string> = { speaker: 'speaker', exhibitor: 'exhib
         @click="$emit('select', c)"
       >
         <span class="av">
-          <img v-if="c.with.avatar_url" :src="c.with.avatar_url" :alt="c.with.name">
-          <template v-else>{{ initials(c.with.name) }}</template>
+          <UserAvatar :src="c.with.avatar_url" :name="c.with.name" />
         </span>
         <span class="mid">
           <span class="top">

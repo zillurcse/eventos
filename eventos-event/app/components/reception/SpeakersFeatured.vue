@@ -5,11 +5,6 @@ const props = defineProps<{ speakers: ReceptionSpeaker[] }>()
 
 const bookmarks = useBookmarksStore()
 
-function initials(name?: string | null): string {
-  if (!name) return '?'
-  const p = name.trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase()
-}
 </script>
 
 <template>
@@ -21,8 +16,7 @@ function initials(name?: string | null): string {
     <div class="grid">
       <article v-for="sp in speakers" :key="sp.id" class="spk">
         <div class="photo">
-          <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name || ''" />
-          <span v-else class="ph">{{ initials(sp.name) }}</span>
+          <UserAvatar :src="sp.image_url" :name="sp.name" />
 
           <button class="bookmark" :class="{ on: bookmarks.isOn('speaker', sp.id) }" type="button"
             :title="bookmarks.isOn('speaker', sp.id) ? 'Remove bookmark' : 'Bookmark'"

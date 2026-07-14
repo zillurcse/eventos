@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -35,14 +37,23 @@ async function load() {
     if (t.mode)          theme.mode          = t.mode
     if (t.header_style)  theme.header_style  = t.header_style
     if (t.button_radius) theme.button_radius = t.button_radius
-  } catch { /* */ }
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not load the theme.')
+  }
 }
 
 async function save() {
   saving.value = true
   try {
     await api(`/events/${id}/settings`, { method: 'PUT', body: { theme: JSON.parse(JSON.stringify(theme)) } })
+    // The inline tick on the colour card stays — it marks *what* was saved; the
+    // toast is the confirmation you get wherever you are on the page.
     saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Theme saved')
+  } catch (e: any) {
+    // A failed save used to vanish: no catch at all, so the rejection went
+    // nowhere and the button just stopped spinning as if it had worked.
+    toast.error(e?.data?.message || 'Could not save the theme.')
   } finally {
     saving.value = false
   }

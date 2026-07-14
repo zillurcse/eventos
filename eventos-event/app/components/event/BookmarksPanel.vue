@@ -161,9 +161,14 @@ function go(row: Row) {
 
         <article v-for="r in rows" :key="r.id" class="row">
           <button class="hit" type="button" @click="go(r)">
+            <!-- A saved list mixes people with things: a speaker with no photo
+                 gets their initials, a session with no cover gets the placeholder. -->
             <span class="thumb" :class="{ round: r.round }">
-              <img v-if="r.image" :src="r.image" :alt="r.title">
-              <span v-else class="ini">{{ initials(r.title) }}</span>
+              <UserAvatar
+                v-if="r.type === 'speaker' || r.type === 'delegate'"
+                :src="r.image" :name="r.title"
+              />
+              <AppImage v-else :src="r.image" :alt="r.title" />
             </span>
             <span class="txt">
               <strong>{{ r.title }}</strong>

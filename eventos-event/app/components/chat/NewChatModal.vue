@@ -72,8 +72,7 @@ onBeforeUnmount(() => clearTimeout(timer))
 
         <button v-for="p in people" :key="p.id" type="button" class="person" @click="emit('pick', p)">
           <span class="av">
-            <img v-if="p.avatar_url" :src="p.avatar_url" :alt="p.name">
-            <template v-else>{{ initials(p.name) }}</template>
+            <UserAvatar :src="p.avatar_url" :name="p.name" />
           </span>
           <span class="who">
             <span class="name">{{ p.name }}</span>

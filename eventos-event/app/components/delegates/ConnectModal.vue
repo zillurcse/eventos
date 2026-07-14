@@ -65,11 +65,6 @@ function busy(date: string, slot: string) {
 }
 function fmtSlot(s: string) { return s ? s.replace('-', ' – ') : '' }
 
-function initials(n?: string | null) {
-  const p = (n || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 let flashTimer: ReturnType<typeof setTimeout> | undefined
 function flash(m: string) { toast.value = m; clearTimeout(flashTimer); flashTimer = setTimeout(() => (toast.value = ''), 4000) }
 
@@ -122,8 +117,7 @@ async function sendMeeting() {
 
       <header class="head">
         <span class="av">
-          <img v-if="target.avatar_url" :src="target.avatar_url" :alt="target.name || ''">
-          <template v-else>{{ initials(target.name) }}</template>
+          <UserAvatar :src="target.avatar_url" :name="target.name" />
         </span>
         <h2>{{ target.name }}</h2>
         <p v-if="target.job_title || target.company" class="sub">{{ [target.job_title, target.company].filter(Boolean).join(' · ') }}</p>

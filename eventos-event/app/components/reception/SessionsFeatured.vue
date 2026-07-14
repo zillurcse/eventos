@@ -60,11 +60,6 @@ function calendarLink(s: ReceptionSession): string | null {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
-function speakerInitials(name?: string | null): string {
-  if (!name) return '?'
-  const p = name.trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase()
-}
 </script>
 
 <template>
@@ -150,8 +145,7 @@ function speakerInitials(name?: string | null): string {
           <div class="row">
             <div class="avatars">
               <span v-for="sp in s.speakers.slice(0, 4)" :key="sp.id" class="av" :title="sp.name || ''">
-                <img v-if="sp.profile?.image_url" :src="sp.profile.image_url" :alt="sp.name || ''" />
-                <template v-else>{{ speakerInitials(sp.name) }}</template>
+                <UserAvatar :src="sp.profile?.image_url" :name="sp.name" />
               </span>
             </div>
             <span v-if="s.speakers.length > 4" class="more">+{{ s.speakers.length - 4 }} More</span>

@@ -1,14 +1,9 @@
 /**
- * Shared display formatters (auto-imported from app/utils). Several components
- * still carry local copies of `initials` — those shadow this one harmlessly;
- * new code should rely on these.
+ * Shared display formatters (auto-imported from app/utils).
+ *
+ * `initials` lives in utils/avatar now, next to the colour it is drawn on —
+ * see <UserAvatar> for people, <AppImage> for everything else.
  */
-
-/** "Jane van Dorn" → "JV" — avatar fallback. */
-export function initials(name?: string | null): string {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
 
 /** Relative timestamp: "just now", "5m ago", "3h ago", "2d ago", then a date. */
 export function timeAgo(iso?: string | null): string {

@@ -75,8 +75,7 @@ const lastSeenIndex = computed(() => {
     <template v-else>
       <header class="head">
         <span class="av">
-          <img v-if="conversation.with.avatar_url" :src="conversation.with.avatar_url" :alt="conversation.with.name">
-          <template v-else>{{ initials(conversation.with.name) }}</template>
+          <UserAvatar :src="conversation.with.avatar_url" :name="conversation.with.name" />
         </span>
         <div class="who">
           <strong>{{ conversation.with.name }}</strong>
