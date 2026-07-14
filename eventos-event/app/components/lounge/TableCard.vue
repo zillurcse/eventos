@@ -11,11 +11,6 @@ const emit = defineEmits<{ join: [], leave: [] }>()
 
 const MAX_SEATS = 10
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 const layout = computed(() => props.table.design || 'round')
 // Per-table accent recolors everything that reads --brand-primary; presence
 // (live/self green) stays fixed so it always reads as "someone's here".
@@ -90,20 +85,17 @@ function onChair(c: Chair) {
         <!-- Centrepiece per layout -->
         <div v-if="layout === 'round'" class="board round" :style="{ '--frac': fillFrac }">
           <div class="disc">
-            <img v-if="table.image_url" :src="table.image_url" :alt="table.name">
-            <span v-else class="mono">{{ initials(table.name) }}</span>
+            <AppImage :src="table.image_url" :alt="table.name" />
           </div>
           <span v-if="overflow" class="more">+{{ overflow }}</span>
         </div>
         <div v-else-if="layout === 'boardroom'" class="board boardroom">
-          <img v-if="table.image_url" :src="table.image_url" :alt="table.name">
-          <span v-else class="mono">{{ initials(table.name) }}</span>
+          <AppImage :src="table.image_url" :alt="table.name" />
           <span v-if="overflow" class="more">+{{ overflow }}</span>
         </div>
         <template v-else>
           <div class="art">
-            <img v-if="table.image_url" :src="table.image_url" :alt="table.name">
-            <span v-else class="mono">{{ initials(table.name) }}</span>
+            <AppImage :src="table.image_url" :alt="table.name" />
           </div>
           <div class="sofa" />
         </template>
@@ -117,13 +109,11 @@ function onChair(c: Chair) {
           @click="onChair(c)"
         >
           <template v-if="c.occupant">
-            <img v-if="c.occupant.avatar_url" :src="c.occupant.avatar_url" :alt="c.occupant.name">
-            <span v-else class="ini">{{ initials(c.occupant.name) }}</span>
+            <UserAvatar :src="c.occupant.avatar_url" :name="c.occupant.name" />
             <span v-if="c.isMe" class="x" title="Leave" @click.stop="emit('leave')">×</span>
             <div class="pop" :class="{ below: c.low }">
               <span class="pa">
-                <img v-if="c.occupant.avatar_url" :src="c.occupant.avatar_url" :alt="c.occupant.name">
-                <span v-else>{{ initials(c.occupant.name) }}</span>
+                <UserAvatar :src="c.occupant.avatar_url" :name="c.occupant.name" />
               </span>
               <strong>{{ c.occupant.name }}</strong>
               <em :class="{ self: c.isMe }">{{ c.isMe ? 'You’re seated here' : 'Available for meeting' }}</em>

@@ -24,11 +24,6 @@ async function contact() {
   }
 }
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 const subtitle = computed(() => {
   const d = props.delegate
   return [d.job_title, d.company].filter(Boolean).join(' · ')
@@ -44,8 +39,7 @@ const subtitle = computed(() => {
     />
 
     <div class="avatar">
-      <img v-if="delegate.avatar_url" :src="delegate.avatar_url" :alt="delegate.name || ''">
-      <span v-else class="ini">{{ initials(delegate.name) }}</span>
+      <UserAvatar :src="delegate.avatar_url" :name="delegate.name" />
     </div>
 
     <div class="body">
@@ -98,7 +92,6 @@ const subtitle = computed(() => {
 
 .avatar { position: relative; aspect-ratio: 1 / 1; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); display: flex; align-items: center; justify-content: center; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.ini { font-size: 3.4rem; font-weight: 700; color: color-mix(in srgb, var(--brand-primary) 75%, #fff); letter-spacing: 1px; }
 
 .body { padding: 12px 14px 16px; text-align: center; }
 .name { margin: 0; font-size: .96rem; font-weight: 700; color: var(--brand-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

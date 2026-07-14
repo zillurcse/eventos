@@ -59,11 +59,6 @@ function isBusy(slot: string): boolean {
   return busyKeys.value.has(`${selectedDate.value}|${slot}`)
 }
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 function fmtDateTab(iso: string): string {
   const [y, m, dd] = iso.split('-').map(Number)
   const d = new Date(y ?? 1970, (m ?? 1) - 1, dd ?? 1)
@@ -155,8 +150,7 @@ async function submit() {
           <li v-for="d in filtered" :key="d.id">
             <button type="button" class="person" @click="choose(d)">
               <span class="pa">
-                <img v-if="d.avatar_url" :src="d.avatar_url" :alt="d.name || ''">
-                <span v-else>{{ initials(d.name) }}</span>
+                <UserAvatar :src="d.avatar_url" :name="d.name" />
               </span>
               <span class="pi">
                 <strong>{{ d.name }}</strong>
@@ -172,8 +166,7 @@ async function submit() {
       <div v-else class="body">
         <div class="chosen">
           <span class="pa">
-            <img v-if="selected?.avatar_url" :src="selected.avatar_url" :alt="selected?.name || ''">
-            <span v-else>{{ initials(selected?.name) }}</span>
+            <UserAvatar :src="selected?.avatar_url" :name="selected?.name" />
           </span>
           <div>
             <strong>{{ selected?.name }}</strong>

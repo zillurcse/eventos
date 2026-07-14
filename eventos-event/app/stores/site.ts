@@ -21,11 +21,37 @@ interface SiteBranding {
   login: { type: string, banner_url: string | null, video_url: string | null, website_url: string | null }
 }
 
+/** The tab bar the organizer built in admin › Navigation & Menu › Web App Tabs.
+ *  Only the enabled tabs arrive, already in their order. Empty when the
+ *  organizer never touched that screen — the header then uses its defaults. */
+export interface SiteNavigation {
+  tabs: { key: string, label: string }[]
+  icons: boolean
+  background: boolean
+  alignment: string
+  /** The "Filter By" rail on the feed (admin › Allowed Feed Tabs). */
+  feed_tabs: { key: string, label: string }[]
+  /** Header brand block + quick actions (admin › Modules). All default to on. */
+  modules: Record<string, boolean>
+  /** Null when there is no video, or the organizer switched off both triggers. */
+  welcome_video: WelcomeVideo | null
+}
+
+export interface WelcomeVideo {
+  type: 'youtube' | 'vimeo' | 'uploaded' | string
+  url: string
+  /** Null when the pasted link couldn't be parsed — show nothing, not an empty player. */
+  embed_url: string | null
+  show_after_login: boolean
+  show_on_home: boolean
+}
+
 interface SitePayload {
   event: SiteEvent
   branding: SiteBranding
   login: { methods: string[], require_login: boolean }
   seo: { meta_title: string | null, meta_description: string | null, favicon_url: string | null }
+  navigation: SiteNavigation
   subdomain: string
   registration_form_uuid: string | null
   powered_by: string
@@ -49,6 +75,8 @@ export const useSiteStore = defineStore('site', {
     branding: (s): SiteBranding | null => s.site?.branding ?? null,
     name: (s): string => s.site?.event?.name ?? 'Event',
     logoUrl: (s): string | null => s.site?.branding?.logo_url ?? null,
+    navigation: (s): SiteNavigation | null => s.site?.navigation ?? null,
+    welcomeVideo: (s): WelcomeVideo | null => s.site?.navigation?.welcome_video ?? null,
     poweredBy: (s): string => s.site?.powered_by ?? 'EXPOUSE',
     registrationFormUuid: (s): string | null => s.site?.registration_form_uuid ?? null,
   },

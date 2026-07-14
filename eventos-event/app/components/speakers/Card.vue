@@ -8,11 +8,6 @@ const auth = useAuthStore()
 
 const bookmarked = computed(() => bookmarks.isOn('speaker', props.speaker.id))
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 const subtitle = computed(() => {
   const s = props.speaker
   return [s.designation, s.company].filter(Boolean).join(' · ')
@@ -24,8 +19,7 @@ const connectState = computed(() => store.connected[props.speaker.id])
 <template>
   <article class="card" @click="store.open(speaker)">
     <div class="avatar">
-      <img v-if="speaker.image_url" :src="speaker.image_url" :alt="speaker.name || ''">
-      <span v-else class="ini">{{ initials(speaker.name) }}</span>
+      <UserAvatar :src="speaker.image_url" :name="speaker.name" />
     </div>
 
     <!-- Hover-revealed quick actions (space always reserved, no layout jump) -->
@@ -68,7 +62,6 @@ const connectState = computed(() => store.connected[props.speaker.id])
 
 .avatar { width: 128px; height: 128px; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); border: 3px solid color-mix(in srgb, var(--brand-primary) 16%, #fff); display: flex; align-items: center; justify-content: center; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.ini { font-size: 2.6rem; font-weight: 700; color: color-mix(in srgb, var(--brand-primary) 75%, #fff); letter-spacing: 1px; }
 
 /* Elements that fade in on hover; space is always reserved. */
 .reveal { opacity: 0; transition: opacity .18s ease; }

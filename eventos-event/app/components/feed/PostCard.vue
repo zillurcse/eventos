@@ -65,8 +65,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
 
     <header class="ph">
       <span class="av" :class="{ org: post.author_role === 'organizer' }">
-        <img v-if="post.author_avatar" :src="post.author_avatar" :alt="post.author">
-        <template v-else>{{ initials(post.author) }}</template>
+        <UserAvatar :src="post.author_avatar" :name="post.author" />
       </span>
       <div class="who">
         <span class="name">
@@ -156,8 +155,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
 
       <div v-for="c in comments" :key="c.id" class="comment">
         <span class="cav" :class="{ org: c.author_role === 'organizer' }">
-          <img v-if="c.author_avatar" :src="c.author_avatar" :alt="c.author">
-          <template v-else>{{ initials(c.author) }}</template>
+          <UserAvatar :src="c.author_avatar" :name="c.author" />
         </span>
         <div class="cbubble">
           <span class="cname">{{ c.author }}<span v-if="c.author_role === 'organizer'" class="tag">Organizer</span></span>

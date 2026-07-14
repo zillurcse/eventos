@@ -6,11 +6,6 @@ const store = useMeetingsStore()
 
 const acting = computed(() => store.acting[props.meeting.id] === true)
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 const person = computed(() => props.meeting.counterpart)
 
 const subtitle = computed(() => {
@@ -65,8 +60,7 @@ const badge = computed(() => {
   <article class="card">
     <div class="who">
       <div class="avatar">
-        <img v-if="person?.avatar_url" :src="person.avatar_url" :alt="person?.name || ''">
-        <span v-else class="ini">{{ initials(person?.name) }}</span>
+        <UserAvatar :src="person?.avatar_url" :name="person?.name" />
       </div>
       <div class="meta">
         <h3 class="name">

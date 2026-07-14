@@ -495,10 +495,6 @@ const dateTimeLabel = computed(() => {
   const range = s.ends_at ? `${fmtTime(s.starts_at)} - ${fmtTime(s.ends_at)}` : fmtTime(s.starts_at)
   return `${fmtDateLong(s.starts_at)} | ${range}`
 })
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
 const countdown = computed(() => {
   const s = session.value
   if (!s?.starts_at) return ''
@@ -942,8 +938,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                 <div class="cards">
                   <div v-for="sp in speakers" :key="sp.id" class="pcard">
                     <div class="pimg">
-                      <img v-if="sp.profile?.image_url" :src="sp.profile.image_url" :alt="sp.name || ''">
-                      <span v-else class="pini">{{ initials(sp.name) }}</span>
+                      <UserAvatar :src="sp.profile?.image_url" :name="sp.name" />
                     </div>
                     <div class="pbody">
                       <div class="pname">{{ sp.name }}</div>
@@ -1006,8 +1001,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                 class="cmsg" :class="{ mine: m.is_mine, hidden: m.is_hidden }"
               >
                 <span class="cav">
-                  <img v-if="m.author_image" :src="m.author_image" :alt="m.author">
-                  <template v-else>{{ initials(m.author) }}</template>
+                  <UserAvatar :src="m.author_image" :name="m.author" />
                 </span>
                 <div class="cbub">
                   <span class="cwho">
@@ -1093,8 +1087,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                       class="rrow" :class="{ official: r.is_official, hidden: r.is_hidden, pending: r.status === 'pending' }"
                     >
                       <span class="rav">
-                        <img v-if="r.author_image" :src="r.author_image" :alt="r.author">
-                        <template v-else>{{ initials(r.author) }}</template>
+                        <UserAvatar :src="r.author_image" :name="r.author" />
                       </span>
                       <div class="rbody">
                         <span class="rwho">
@@ -1250,8 +1243,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             </p>
             <div v-for="a in shownAttendees" :key="a.id" class="arow">
               <span class="aav">
-                <img v-if="a.image_url" :src="a.image_url" :alt="a.name">
-                <template v-else>{{ initials(a.name) }}</template>
+                <UserAvatar :src="a.image_url" :name="a.name" />
                 <i v-if="a.online" class="ondot" />
               </span>
               <div class="ainfo">

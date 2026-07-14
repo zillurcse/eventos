@@ -31,11 +31,6 @@ const timeLabel = computed(() => {
   return `${fmtDate(s.starts_at)} | ${range}`
 })
 
-function initials(name: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 /** Live now / ended / upcoming, from the session window in real time. */
 const phase = computed<'live' | 'ended' | 'upcoming'>(() => {
   const s = props.session
@@ -110,15 +105,13 @@ const extraSpeakers = computed(() => Math.max(0, props.session.speakers.length -
             class="av"
             :title="sp.name || ''"
           >
-            <img v-if="sp.profile?.image_url" :src="sp.profile.image_url" :alt="sp.name || ''">
-            <template v-else>{{ initials(sp.name) }}</template>
+            <UserAvatar :src="sp.profile?.image_url" :name="sp.name" />
           </span>
           <span v-if="extraSpeakers" class="av more">+{{ extraSpeakers }}</span>
         </div>
         <div v-if="session.sponsors?.length" class="sponsors">
           <span v-for="sp in session.sponsors.slice(0, 3)" :key="sp.id" class="sponsor" :title="sp.name">
-            <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name">
-            <template v-else>{{ sp.name?.[0] }}</template>
+            <AppImage :src="sp.logo_url" :alt="sp.name" />
           </span>
         </div>
       </div>

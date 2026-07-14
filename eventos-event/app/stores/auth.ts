@@ -70,7 +70,15 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.token = null
       this.user = null
-      if (import.meta.client) localStorage.removeItem('eventos_token')
+      if (import.meta.client) {
+        localStorage.removeItem('eventos_token')
+        // The welcome video is shown once per login, so signing out has to clear
+        // the "seen" flags — otherwise "show after login" would mean "show after
+        // the first login this browser ever made".
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('eventos:welcome_seen:')) localStorage.removeItem(key)
+        }
+      }
       navigateTo('/')
     },
   },

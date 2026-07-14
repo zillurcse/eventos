@@ -67,8 +67,7 @@ onMounted(() => { if (!rooms.loaded) rooms.fetchRooms() })
     <div v-else class="grid">
       <article v-for="r in rooms.rooms" :key="r.id" class="room">
         <div class="poster">
-          <img v-if="r.poster_url" :src="r.poster_url" :alt="r.name" />
-          <div v-else class="poster-ph" />
+          <AppImage :src="r.poster_url" :alt="r.name" />
           <span class="type">{{ label(r.type) }}</span>
           <span v-if="r.access_type === 'coded'" class="lock" title="Access code required">
             <svg viewBox="0 0 24 24"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5z" /></svg>

@@ -12,11 +12,6 @@ function openContact() {
 const bookmarks = useBookmarksStore()
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', props.exhibitor.id))
 
-function initials(name?: string | null) {
-  const p = (name || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 function money(v: number | null) {
   if (v === null) return null
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
@@ -40,8 +35,7 @@ const socials = computed(() => Object.entries(props.exhibitor.social || {}).filt
 
       <header class="head">
         <div class="logo">
-          <img v-if="exhibitor.logo_url" :src="exhibitor.logo_url" :alt="exhibitor.name">
-          <span v-else class="ini">{{ initials(exhibitor.name) }}</span>
+          <AppImage :src="exhibitor.logo_url" :alt="exhibitor.name" />
         </div>
         <div class="ident">
           <div class="tags">

@@ -142,8 +142,7 @@ function sender(mine: boolean): Sender {
 
             <button v-for="c in shown" :key="c.id" type="button" class="row" @click="chat.openConversation(c)">
               <span class="av">
-                <img v-if="c.with.avatar_url" :src="c.with.avatar_url" :alt="c.with.name">
-                <template v-else>{{ initials(c.with.name) }}</template>
+                <UserAvatar :src="c.with.avatar_url" :name="c.with.name" />
               </span>
               <span class="mid">
                 <span class="name">{{ c.with.name }}</span>
@@ -176,8 +175,7 @@ function sender(mine: boolean): Sender {
 
             <div v-for="m in chat.messages" :key="m.id" class="msg">
               <span class="mav">
-                <img v-if="sender(m.mine).avatar_url" :src="sender(m.mine).avatar_url!" :alt="sender(m.mine).name">
-                <template v-else>{{ initials(sender(m.mine).name) }}</template>
+                <UserAvatar :src="sender(m.mine).avatar_url" :name="sender(m.mine).name" />
               </span>
               <div class="mbody">
                 <span class="mname">{{ sender(m.mine).name }}</span>

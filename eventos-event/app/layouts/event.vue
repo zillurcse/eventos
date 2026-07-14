@@ -12,6 +12,10 @@ const contact = useExhibitorContactStore()
     </main>
     <!-- App-wide so it can open from the chat drawer / chat page too. -->
     <ExhibitorsContactModal v-if="contact.open" />
+
+    <!-- The organizer's welcome video; decides for itself whether this is the
+         moment to appear (after login / on the reception page). -->
+    <EventWelcomeVideo />
   </div>
 </template>
 

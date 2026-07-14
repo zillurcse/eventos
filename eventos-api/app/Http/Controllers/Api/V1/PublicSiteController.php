@@ -13,8 +13,10 @@ use App\Models\Form;
 use App\Models\Participation;
 use App\Models\Session;
 use App\Models\User;
+use App\Services\Auth\EventAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -82,19 +84,143 @@ class PublicSiteController extends Controller
                     ],
                 ],
                 'login' => [
-                    'methods' => $login['methods'] ?? [],
+                    // Which doors are open (Settings › Access authentication).
+                    // A social channel the platform has no OAuth app for is
+                    // reported false however the organizer ticked it — the login
+                    // page must never show a button that dead-ends.
+                    'channels' => app(EventAccess::class)->channels($setting),
                     'require_login' => (bool) ($login['require_login'] ?? false),
+                    'onboarding' => (bool) ($login['onboarding'] ?? false),
+                    // Kept for older clients that read `methods` directly.
+                    'methods' => $login['methods'] ?? [],
                 ],
                 'seo' => [
                     'meta_title' => $seo['meta_title'] ?? null,
                     'meta_description' => $seo['meta_description'] ?? null,
                     'favicon_url' => $seo['favicon_url'] ?? null,
                 ],
+                // The tab bar the organizer configured in Navigation & Menu ›
+                // Web App Tabs: which sections appear, in what order, and how.
+                'navigation' => $this->navigation($setting->navigation ?? []),
                 'subdomain' => $sub,
                 'registration_form_uuid' => $regForm?->uuid,
                 'powered_by' => 'EXPOUSE',
             ],
         ]);
+    }
+
+    /**
+     * The attendee app's tab bar, as configured in Navigation & Menu › Web App
+     * Tabs (event_settings.navigation.web_app_tabs).
+     *
+     * Only the *enabled* tabs go over the wire, in the organizer's order — the
+     * ones they switched off are their business, not the public's, and the app
+     * has no use for them. An event whose organizer never opened that screen has
+     * no config at all: we return an empty list and the app falls back to its
+     * default tab bar rather than rendering an event site with no navigation.
+     *
+     * Where each tab actually *goes* (its route and icon) is the app's business,
+     * not ours — the organizer chooses the label and the order, and the app maps
+     * the key onto the page it ships. So we send keys and labels, nothing else.
+     */
+    private function navigation(array $navigation): array
+    {
+        $tabs = $navigation['web_app_tabs'] ?? [];
+
+        return [
+            'tabs' => $this->enabledItems($tabs),
+            'icons' => (bool) ($tabs['icons'] ?? true),
+            'background' => (bool) ($tabs['background'] ?? true),
+            'alignment' => (string) ($tabs['alignment'] ?? 'left'),
+            // Navigation & Menu › Allowed Feed Tabs — the "Filter By" rail on the
+            // event feed. Same contract as the tab bar: enabled items, in order.
+            'feed_tabs' => $this->enabledItems($navigation['feed_tabs'] ?? []),
+            // Navigation & Menu › Modules — the header's brand block and quick
+            // actions (briefcase, chat, notifications…).
+            'modules' => $this->modules($navigation['modules'] ?? []),
+            // Navigation & Menu › Welcome Video.
+            'welcome_video' => $this->welcomeVideo($navigation['welcome_video'] ?? []),
+        ];
+    }
+
+    /**
+     * The welcome video the organizer configured, ready to play.
+     *
+     * The embed URL is resolved here rather than in each client: the admin
+     * preview and the attendee site must agree on what a pasted YouTube link
+     * means, and that parsing has no business existing twice. A url we cannot
+     * make sense of comes back with `embed_url` null — the app then shows
+     * nothing rather than an empty player.
+     *
+     * Null when there is no video to show at all (no url, or the organizer
+     * switched off both triggers), so the client has one thing to check.
+     */
+    private function welcomeVideo(array $video): ?array
+    {
+        $url = trim((string) ($video['url'] ?? ''));
+        $afterLogin = (bool) ($video['show_after_login'] ?? false);
+        $onHome = (bool) ($video['show_on_home'] ?? false);
+
+        if ($url === '' || (! $afterLogin && ! $onHome)) {
+            return null;
+        }
+
+        $type = (string) ($video['type'] ?? 'youtube');
+
+        return [
+            'type' => $type,
+            'url' => $url,
+            'embed_url' => $this->videoEmbedUrl($type, $url),
+            'show_after_login' => $afterLogin,
+            'show_on_home' => $onHome,
+        ];
+    }
+
+    /** youtube/vimeo → their embeddable player; an upload plays as-is in <video>. */
+    private function videoEmbedUrl(string $type, string $url): ?string
+    {
+        if ($type === 'youtube') {
+            return preg_match('#(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})#', $url, $m)
+                ? 'https://www.youtube.com/embed/'.$m[1]
+                : null;
+        }
+
+        if ($type === 'vimeo') {
+            return preg_match('#vimeo\.com/(?:video/)?(\d+)#', $url, $m)
+                ? 'https://player.vimeo.com/video/'.$m[1]
+                : null;
+        }
+
+        return $url; // uploaded: a direct file the <video> tag can play
+    }
+
+    /**
+     * Which header modules the organizer left switched on.
+     *
+     * Every module defaults to *on*: an event whose organizer never opened that
+     * screen has no config at all, and a header with no chat, no notifications
+     * and no logo would be a worse default than the full one. Only an explicit
+     * `false` turns something off.
+     */
+    private function modules(array $modules): array
+    {
+        $keys = ['event_logo', 'event_title', 'briefcase', 'chat', 'notifications', 'leaderboard', 'bookmark'];
+
+        return collect($keys)
+            ->mapWithKeys(fn (string $key) => [$key => ($modules[$key] ?? true) !== false])
+            ->all();
+    }
+
+    /** The enabled entries of a configured tab list, in the organizer's order. */
+    private function enabledItems(array $config): Collection
+    {
+        return collect($config['items'] ?? [])
+            ->filter(fn ($item) => ($item['enabled'] ?? false) && ! empty($item['key']))
+            ->map(fn ($item) => [
+                'key' => (string) $item['key'],
+                'label' => (string) ($item['label'] ?? $item['key']),
+            ])
+            ->values();
     }
 
     /**

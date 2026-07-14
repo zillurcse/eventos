@@ -15,11 +15,6 @@ const name = computed(() => chat.profile?.name || auth.user?.name || 'Me')
 const subtitle = computed(() => [chat.profile?.job_title, chat.profile?.company].filter(Boolean).join(' · '))
 const avatar = computed(() => chat.profile?.avatar_url || null)
 
-function initials(n?: string | null) {
-  const p = (n || '?').trim().split(/\s+/)
-  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
 /** Scannable link to my connect page, preserving the event subdomain in dev. */
 const link = computed(() => {
   if (!import.meta.client || !me.value) return ''
@@ -61,8 +56,7 @@ async function share() {
 
       <div class="who">
         <span class="av">
-          <img v-if="avatar" :src="avatar" :alt="name">
-          <template v-else>{{ initials(name) }}</template>
+          <UserAvatar :src="avatar" :name="name" />
         </span>
         <strong class="name">{{ name }}</strong>
         <span v-if="subtitle" class="sub">{{ subtitle }}</span>

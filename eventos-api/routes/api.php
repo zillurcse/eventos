@@ -25,7 +25,11 @@ use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
 use App\Http\Controllers\Api\V1\DomainController;
 use App\Http\Controllers\Api\V1\EmailTemplateController;
+use App\Http\Controllers\Api\V1\EventAdminController;
 use App\Http\Controllers\Api\V1\EventController;
+use App\Http\Controllers\Api\V1\OtpAuthController;
+use App\Http\Controllers\Api\V1\ParticipantProfileController;
+use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FeedModerationController;
 use App\Http\Controllers\Api\V1\FileUploadController;
@@ -92,6 +96,16 @@ Route::prefix('v1')->group(function () {
     Route::get('/plans', [PlanController::class, 'index']);
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+
+    // ── Attendee sign-in channels (Settings › Access authentication) ──
+    // A one-time code emailed to the attendee. Rate-limited inside the
+    // controller (per email, per IP, per code) — it mails strangers on demand.
+    Route::post('/public/auth/otp', [OtpAuthController::class, 'request']);
+    Route::post('/public/auth/otp/verify', [OtpAuthController::class, 'verify']);
+    // Social sign-in. One callback for every event: the event rides through the
+    // OAuth `state`, and the token comes home in the URL fragment.
+    Route::get('/auth/social/{provider}/redirect', [SocialAuthController::class, 'redirect']);
+    Route::get('/auth/social/{provider}/callback', [SocialAuthController::class, 'callback']);
 
     // Public per-event microsite bootstrap (resolve subdomain → published event
     // branding/config) + email-first login/signup branching. No auth, no tenant.
@@ -216,6 +230,9 @@ Route::prefix('v1')->group(function () {
 
         // ── Attendee context: networking & feed (§6.5, §6.6) ──
         Route::middleware('participant')->prefix('events/{event}')->group(function () {
+            // The attendee's own profile, and the onboarding step that fills it in.
+            Route::get('/profile', [ParticipantProfileController::class, 'show']);
+            Route::match(['put', 'patch'], '/profile', [ParticipantProfileController::class, 'update']);
             Route::get('/feed', [FeedController::class, 'index']);
             Route::post('/feed', [FeedController::class, 'store']);
             Route::get('/feed/{post}/comments', [FeedController::class, 'comments']);
@@ -329,6 +346,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/events/{uuid}/domain', [DomainController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/events/{uuid}/domain', [DomainController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/domain/verify', [DomainController::class, 'verify'])->middleware('perm:events.manage');
+            // ── Event admins (Settings › Add event admin) — web-app access +
+            //    session moderation, i.e. a participation with role=staff. ──
+            Route::get('/events/{uuid}/admins', [EventAdminController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/admins', [EventAdminController::class, 'store'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/admins/{participation}', [EventAdminController::class, 'destroy'])->middleware('perm:events.manage');
             // ── Video settings (the event's own Jitsi/JaaS signing credentials) ──
             Route::get('/events/{uuid}/video', [VideoSettingsController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/events/{uuid}/video', [VideoSettingsController::class, 'update'])->middleware('perm:events.manage');

@@ -14,16 +14,67 @@ watch(term, (v) => {
 
 onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
 
-const filters: Array<{ key: FeedFilter, label: string, icon: string }> = [
-  { key: 'all', label: 'All', icon: 'M4 8h16M4 14h16' },
-  { key: 'image', label: 'Images', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
-  { key: 'video', label: 'Video', icon: 'M3 6h13v12H3zM16 10l5-3v10l-5-3z' },
-  { key: 'pdf', label: 'Pdf', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6' },
-  { key: 'poll', label: 'Polls', icon: 'M5 21V10M12 21V4M19 21v-7' },
-  { key: 'offering', label: 'Offers', icon: 'M20 12v9H4v-9M2 7h20v5H2zM12 22V7' },
-  { key: 'looking_for', label: 'Looking For', icon: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5' },
-  { key: 'mine', label: 'My Posts', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
+/**
+ * The "Filter By" rail is the organizer's (admin › Navigation & Menu › Allowed
+ * Feed Tabs): they choose which filters appear, in what order, and what they are
+ * called. The app owns what each one *does* — the store's FeedFilter and the
+ * icon — because only it knows how to query them. The two meet on the key.
+ *
+ * Admin slugs its labels, so "Images" arrives as `images` while the store's
+ * filter is `image`; the aliases below reconcile the two vocabularies.
+ */
+interface FilterMeta { filter: FeedFilter, icon: string }
+
+const FILTER_META: Record<string, FilterMeta> = {
+  all: { filter: 'all', icon: 'M4 8h16M4 14h16' },
+  images: { filter: 'image', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
+  image: { filter: 'image', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
+  video: { filter: 'video', icon: 'M3 6h13v12H3zM16 10l5-3v10l-5-3z' },
+  pdf: { filter: 'pdf', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6' },
+  polls: { filter: 'poll', icon: 'M5 21V10M12 21V4M19 21v-7' },
+  poll: { filter: 'poll', icon: 'M5 21V10M12 21V4M19 21v-7' },
+  offers: { filter: 'offering', icon: 'M20 12v9H4v-9M2 7h20v5H2zM12 22V7' },
+  offering: { filter: 'offering', icon: 'M20 12v9H4v-9M2 7h20v5H2zM12 22V7' },
+  looking_for: { filter: 'looking_for', icon: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5' },
+  my_posts: { filter: 'mine', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
+  mine: { filter: 'mine', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
+}
+
+/** Used only when the organizer has never opened the Allowed Feed Tabs screen. */
+const DEFAULT_FILTERS: { key: string, label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'images', label: 'Images' },
+  { key: 'video', label: 'Video' },
+  { key: 'pdf', label: 'Pdf' },
+  { key: 'polls', label: 'Polls' },
+  { key: 'offers', label: 'Offers' },
+  { key: 'looking_for', label: 'Looking For' },
+  { key: 'my_posts', label: 'My Posts' },
 ]
+
+const site = useSiteStore()
+
+const filters = computed<{ key: FeedFilter, label: string, icon: string }[]>(() => {
+  const configured = site.navigation?.feed_tabs ?? []
+  const source: { key: string, label: string }[] = configured.length ? configured : DEFAULT_FILTERS
+
+  return source
+    // A filter this build cannot actually run is dropped rather than shown as a
+    // dead button — unlike a nav tab, there is no "coming soon" page behind it.
+    .filter(f => !!FILTER_META[f.key])
+    .map(f => ({
+      key: FILTER_META[f.key]!.filter,
+      label: f.label,
+      icon: FILTER_META[f.key]!.icon,
+    }))
+})
+
+// The organizer can switch off the filter the viewer is currently on (or the
+// feed can be loaded with a stale one) — fall back to All rather than leaving
+// the rail with nothing highlighted and the feed silently filtered.
+watch(filters, (list) => {
+  if (list.length && !list.some(f => f.key === feed.filter)) feed.setFilter('all')
+}, { immediate: true })
 </script>
 
 <template>
