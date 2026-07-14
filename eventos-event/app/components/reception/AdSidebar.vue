@@ -21,22 +21,31 @@ const cards = computed<Card[]>(() =>
 
 <template>
   <div v-if="cards.length" class="side-ads">
-    <component
-      :is="c.href ? 'a' : 'div'"
-      v-for="c in cards"
-      :key="c.key"
-      class="ad"
-      :href="c.href || undefined"
-      :target="c.href ? '_blank' : undefined"
-      rel="noopener"
-    >
+    <component :is="c.href ? 'a' : 'div'" v-for="c in cards" :key="c.key" class="ad" :href="c.href || undefined"
+      :target="c.href ? '_blank' : undefined" rel="noopener">
       <img :src="c.src" :alt="c.alt" />
     </component>
   </div>
 </template>
 
 <style scoped>
-.side-ads { display: flex; flex-direction: column; gap: 16px; }
-.ad { display: block; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); background: #fff; }
-.ad img { display: block; width: 100%; height: auto; object-fit: cover; }
+.side-ads {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ad {
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ad img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
 </style>

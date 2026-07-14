@@ -48,31 +48,134 @@ function subtitle(p: ReceptionPartner): string {
 </template>
 
 <style scoped>
-.partners-featured { display: flex; flex-direction: column; gap: 20px; }
-.head h2 { margin: 0; font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+.partners-featured {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+.head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4D5154;
+}
 
-.pcard { background: #fff; border: 1px solid #eef0f3; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.pcard {
+  background: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+}
 
 .banner {
-   display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 16%, #fff), color-mix(in srgb, var(--brand-primary) 4%, #fff));
 }
-.banner-logo { max-width: 100%; width: 100%; max-height: 160px; object-fit: cover; }
-.banner-ph { font-size: 2.4rem; font-weight: 800; color: var(--brand-primary); }
 
-.foot { display: flex; align-items: center; gap: 14px; padding: 16px; }
-.logo-box { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 8px; border: 1px solid #E8E8EE; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.logo-box img { max-width: 80%; max-height: 80%; object-fit: contain; }
-.logo-box span { font-weight: 800; color: var(--brand-primary); font-size: .9rem; }
+.banner-logo {
+  max-width: 100%;
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+}
 
-.info { min-width: 0; }
-.name { margin: 0; font-size: 1rem; font-weight: 800; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sub { display: block; margin-top: 2px; color: #94a3b8; font-size: .84rem; }
+.banner-ph {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--brand-primary);
+}
 
-.viewall { display: flex; align-items: center; gap: 24px; margin-top: 8px; }
-.viewall .line { flex: 1; height: 1px; background: #D1D2DE; }
-.viewall-btn { flex: 0 0 auto; padding: 8px 16px; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); font-weight: 700; font-size: .88rem; text-decoration: none; text-transform: capitalize; }
-.viewall-btn:hover { background: color-mix(in srgb, var(--brand-primary) 18%, #fff); }
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+}
+
+.logo-box {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #E8E8EE;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.logo-box img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+}
+
+.logo-box span {
+  font-weight: 800;
+  color: var(--brand-primary);
+  font-size: .9rem;
+}
+
+.info {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: #212529;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  display: block;
+  color: #64676A;
+  font-size: 14px;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
+.viewall {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.viewall .line {
+  flex: 1;
+  height: 1px;
+  background: #D1D2DE;
+}
+
+.viewall-btn {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  font-weight: 700;
+  font-size: .88rem;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+
+.viewall-btn:hover {
+  background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
+}
 </style>

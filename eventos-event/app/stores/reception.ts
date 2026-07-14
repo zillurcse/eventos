@@ -25,6 +25,8 @@ export interface ReceptionSession {
   starts_at: string | null
   ends_at: string | null
   timezone: string | null
+  status?: 'scheduled' | 'live' | 'ended' | 'canceled' | null
+  is_featured?: boolean
   icon_url?: string | null
   logo_url?: string | null
   session_place?: string | null
