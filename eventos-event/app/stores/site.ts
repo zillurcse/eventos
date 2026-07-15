@@ -49,7 +49,14 @@ export interface WelcomeVideo {
 interface SitePayload {
   event: SiteEvent
   branding: SiteBranding
-  login: { methods: string[], require_login: boolean }
+  login: {
+    /** Which sign-in doors are open — social keys already exclude providers with
+     *  no OAuth app, so a `true` is a channel the login page can render. */
+    channels: Record<string, boolean>
+    require_login: boolean
+    onboarding: boolean
+    methods: string[]
+  }
   seo: { meta_title: string | null, meta_description: string | null, favicon_url: string | null }
   navigation: SiteNavigation
   subdomain: string

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\EventSetting;
+use App\Models\User;
 use App\Services\Auth\EventAccess;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -70,6 +72,8 @@ class SocialAuthController extends Controller
             'issued_at' => now()->timestamp,
         ]));
 
+        $this->useEventCredentials($provider, $driver, $setting);
+
         return Socialite::driver($driver)
             ->stateless()
             ->with(['state' => $state])
@@ -93,6 +97,8 @@ class SocialAuthController extends Controller
             403,
             'That sign-in method is not available for this event.',
         );
+
+        $this->useEventCredentials($provider, $driver, $setting);
 
         try {
             $social = Socialite::driver($driver)->stateless()->user();
@@ -129,6 +135,24 @@ class SocialAuthController extends Controller
         return $this->back($state['subdomain'], [], $this->access->token($user));
     }
 
+    /**
+     * Point Socialite at this event's OAuth app for the rest of the request.
+     *
+     * An organizer may have registered their own app (Settings › Access
+     * authentication); otherwise this is a no-op and the platform's app
+     * (config/services.php) is what Socialite already has loaded. Scoped to a
+     * single request/driver call — never call this twice for the same $driver
+     * with different credentials, since Socialite\Manager caches driver
+     * instances by name and the second call would reuse the first's config.
+     */
+    private function useEventCredentials(string $provider, string $driver, ?EventSetting $setting): void
+    {
+        $creds = $this->access->credentials($provider, $setting);
+
+        config(["services.{$driver}.client_id" => $creds['client_id']]);
+        config(["services.{$driver}.client_secret" => $creds['client_secret']]);
+    }
+
     /** Decrypt and sanity-check the state we minted on the way out. */
     private function readState(Request $request, string $provider): array
     {
@@ -153,7 +177,7 @@ class SocialAuthController extends Controller
 
     private function knownUser(string $email): bool
     {
-        return \App\Models\User::on('pgsql_admin')->where('email', $email)->exists();
+        return User::on('pgsql_admin')->where('email', $email)->exists();
     }
 
     /**

@@ -6,6 +6,7 @@ definePageMeta({ middleware: 'organizer', layout: 'event' })
 const route = useRoute()
 const api = useApi()
 const id = route.params.id as string
+const { public: { apiBase } } = useRuntimeConfig()
 
 /**
  * How attendees get into the event web app.
@@ -46,6 +47,25 @@ const onboarding = ref(true)
 const available = ref<Record<string, boolean>>({})
 const saving = ref(false)
 
+// An organizer may plug in their own OAuth app per social channel instead of
+// the platform's; the secret is write-only (see hasSecret) so it's never
+// pre-filled — a blank value on save just keeps whatever is already stored.
+const SOCIAL_KEYS = CHANNELS.filter(c => c.social).map(c => c.key)
+const socialCreds = reactive<Record<string, { client_id: string, client_secret: string }>>(
+  Object.fromEntries(SOCIAL_KEYS.map(k => [k, { client_id: '', client_secret: '' }])),
+)
+const hasSecret = reactive<Record<string, boolean>>(Object.fromEntries(SOCIAL_KEYS.map(k => [k, false])))
+
+/** The redirect URI to whitelist in the provider's own OAuth app console. */
+function redirectUri(provider: string) {
+  return `${apiBase}/auth/social/${provider}/callback`
+}
+
+async function copy(text: string) {
+  try { await navigator.clipboard.writeText(text); toast.success('Copied') }
+  catch { toast.error('Copy failed') }
+}
+
 async function load() {
   try {
     const s = (await api<any>(`/events/${id}/settings`)).data
@@ -53,18 +73,19 @@ async function load() {
     for (const c of CHANNELS) methods[c.key] = c.key === 'signup' ? m.signup !== false : !!m[c.key]
     requireLogin.value = s.login?.require_login !== false
     onboarding.value = !!s.login?.onboarding
+    // `social_available` is computed by the API from either the organizer's own
+    // credentials or the platform's, so we can flag providers with no app yet.
+    available.value = s.login?.social_available || {}
+
+    const sc = s.login?.social_credentials || {}
+    for (const key of SOCIAL_KEYS) {
+      socialCreds[key].client_id = sc[key]?.client_id || ''
+      socialCreds[key].client_secret = ''
+      hasSecret[key] = !!sc[key]?.has_client_secret
+    }
   } catch (e: any) {
     toast.error(e?.data?.message || 'Could not load the login settings.')
   }
-}
-
-/** The public payload tells us which providers have credentials configured. */
-async function loadCapabilities() {
-  try {
-    const site = (await api<any>(`/events/${id}/settings`)).data
-    // `social_available` is computed by the API from the platform's OAuth config.
-    available.value = site.login?.social_available || {}
-  } catch { /* capability is a hint; the checkboxes still work without it */ }
 }
 
 async function save() {
@@ -77,6 +98,12 @@ async function save() {
           methods: { ...methods },
           require_login: requireLogin.value,
           onboarding: onboarding.value,
+          social_credentials: Object.fromEntries(
+            SOCIAL_KEYS.map(key => [key, {
+              client_id: socialCreds[key].client_id.trim(),
+              client_secret: socialCreds[key].client_secret,
+            }]),
+          ),
         },
       },
     })
@@ -145,7 +172,6 @@ async function removeAdmin(a: EventAdmin) {
 
 onMounted(() => {
   load()
-  loadCapabilities()
   loadAdmins()
 })
 </script>
@@ -153,8 +179,8 @@ onMounted(() => {
 <template>
   <div class="max-w-180">
     <div class="mb-6">
-      <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Login Settings</h1>
-      <p class="text-muted text-[.88rem]">Control how attendees authenticate and access this event.</p>
+      <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Login Setup</h1>
+      <p class="text-muted text-[.88rem]">Login setup will appear at the event login page.</p>
     </div>
 
     <div class="card p-0">
@@ -164,7 +190,9 @@ onMounted(() => {
           <p class="font-semibold text-[1rem] text-ink mb-1">Require login on app start?</p>
           <p class="text-[.85rem] text-muted m-0">Require login setup will appear at the event login page.</p>
         </div>
-        <NavigationToggleSwitch v-model="requireLogin" />
+        <button type="button" class="toggle" :class="{ on: requireLogin }" @click="requireLogin = !requireLogin">
+          <i />
+        </button>
       </div>
 
       <!-- Access authentication -->
@@ -193,9 +221,33 @@ onMounted(() => {
         >
           {{ CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).map(c => c.label).join(', ') }}
           {{ CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).length > 1 ? 'have' : 'has' }}
-          no OAuth app configured on this platform yet, so the button stays hidden on the login page until an
-          administrator adds the credentials.
+          no OAuth app configured yet — plug in your own app below, or ask a platform administrator to add one.
         </p>
+
+        <!-- Per-channel OAuth app: an organizer's own credentials, used instead of
+             the platform's when present. -->
+        <div
+          v-for="c in CHANNELS.filter(c => c.social && methods[c.key])" :key="c.key"
+          class="mt-4 border border-line rounded-xl p-4"
+        >
+          <p class="font-semibold text-[.88rem] text-ink mb-3">{{ c.label }} app credentials</p>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <AppInput v-model="socialCreds[c.key].client_id" label="Client ID" placeholder="App client ID" />
+            <AppInput
+              v-model="socialCreds[c.key].client_secret"
+              type="password"
+              label="Client Secret"
+              :placeholder="hasSecret[c.key] ? '•••••• (leave blank to keep)' : 'App client secret'"
+              :hint="hasSecret[c.key] ? 'A secret is already saved. Leave blank to keep it.' : undefined"
+            />
+          </div>
+          <p class="text-[.8rem] text-muted mt-3 mb-0">
+            Leave both blank to use the platform's own {{ c.label }} app, if one is configured. To use your own,
+            register an app with {{ c.label }} and whitelist this redirect URI:
+            <code class="bg-faint px-1.5 py-0.5 rounded font-mono text-[.78rem] break-all">{{ redirectUri(c.key) }}</code>
+            <button type="button" class="text-[#6352e7] font-medium hover:underline ml-1" @click="copy(redirectUri(c.key))">Copy</button>
+          </p>
+        </div>
       </div>
 
       <!-- Event admins -->
@@ -205,7 +257,7 @@ onMounted(() => {
             <p class="font-semibold text-[.95rem] text-ink mb-0.5">Add event admin</p>
             <p class="text-[.83rem] text-muted m-0">Users added to the web app are provided web app access.</p>
           </div>
-          <button class="btn shrink-0" @click="addOpen = true">+ ADD USERS</button>
+          <button class="btn shrink-0" @click="addOpen = true">+ Add User</button>
         </div>
 
         <p v-if="!admins.length" class="text-[.85rem] text-muted m-0">No event admins added yet.</p>
@@ -237,7 +289,9 @@ onMounted(() => {
             Reception. They can skip it; it's what fills the delegate directory.
           </p>
         </div>
-        <NavigationToggleSwitch v-model="onboarding" />
+        <button type="button" class="toggle" :class="{ on: onboarding }" @click="onboarding = !onboarding">
+          <i />
+        </button>
       </div>
     </div>
 
@@ -267,3 +321,17 @@ onMounted(() => {
     </Drawer>
   </div>
 </template>
+
+<style scoped>
+/* Standalone on/off toggle (no label), for the Require-login and Onboarding rows. */
+.toggle {
+  position: relative; width: 44px; height: 24px; flex: 0 0 auto; border: 0; border-radius: 999px;
+  background: #cdd2dc; cursor: pointer; transition: background .15s;
+}
+.toggle.on { background: var(--brand); }
+.toggle i {
+  position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s;
+}
+.toggle.on i { transform: translateX(20px); }
+</style>

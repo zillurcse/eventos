@@ -14,13 +14,33 @@ const auth = useAuthStore()
 const site = useSiteStore()
 const api = useApi()
 
-const step = ref<'email' | 'password' | 'register'>('email')
+const step = ref<'email' | 'password' | 'register' | 'otp'>('email')
 const email = ref('')
 const password = ref('')
 const agreed = ref(false)
 const forgot = ref(false)
 const error = ref('')
 const loading = ref(false)
+
+// OTP sign-in state.
+const otpCode = ref('')
+const otpInfo = ref('')
+
+/**
+ * Which sign-in doors the organizer opened (Settings › Access authentication).
+ * The API already hides a social channel with no OAuth app, so a `true` here is
+ * a channel we can actually render.
+ */
+const channels = computed(() => site.site?.login?.channels ?? { signup: true, otp: false })
+const signupOpen = computed(() => channels.value.signup !== false)
+const otpEnabled = computed(() => !!channels.value.otp)
+
+const SOCIAL = [
+  { key: 'google', label: 'Continue with Google' },
+  { key: 'facebook', label: 'Continue with Facebook' },
+  { key: 'linkedin', label: 'Continue with LinkedIn' },
+] as const
+const socialChannels = computed(() => SOCIAL.filter(s => channels.value[s.key]))
 
 // Registration (inline signup) state — shown on the same page, no navigation.
 const regFields = ref<Field[]>([])
@@ -40,10 +60,45 @@ const DEFAULT_FIELDS: Field[] = [
   { key: 'job_title', label: 'Job title', type: 'text', required: false },
 ]
 
-onMounted(() => {
+onMounted(async () => {
   auth.init()
+
+  // Social sign-in comes home with the token in the URL fragment (never a query
+  // string, so it stays out of server logs). Adopt it and scrub the address bar.
+  if (import.meta.client) {
+    const frag = new URLSearchParams(window.location.hash.slice(1))
+    const token = frag.get('token')
+    if (token) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+      try {
+        await auth.adoptToken(token)
+      } catch { /* stale token → fall through to the normal login screen */ }
+    }
+
+    // A social sign-in that failed sends back an ?error= we can explain.
+    const err = new URLSearchParams(window.location.search).get('error')
+    if (err) error.value = socialError(err)
+  }
+
   if (auth.isAuthed) navigateTo('/reception')
 })
+
+function socialError(code: string): string {
+  switch (code) {
+    case 'social_no_email': return 'That account has no email we can use. Try another sign-in method.'
+    case 'signup_closed': return 'This event is invite-only — ask the organizer to add you.'
+    case 'account_disabled': return 'This account has been disabled.'
+    default: return 'We could not complete that sign-in. Please try again.'
+  }
+}
+
+/** Send the browser off to the provider; it returns to this page with a token. */
+function signInWith(provider: string) {
+  const { public: { apiBase } } = useRuntimeConfig()
+  const sub = useEventSubdomain()
+  const url = `${apiBase}/auth/social/${provider}/redirect?subdomain=${encodeURIComponent(sub || '')}`
+  window.location.href = url
+}
 
 const initials = computed(() =>
   (site.name || 'EV').trim().slice(0, 4).toUpperCase())
@@ -55,14 +110,64 @@ async function onContinue() {
 
   loading.value = true
   try {
-    const { has_password } = await auth.checkEmail(email.value)
-    if (has_password) {
-      step.value = 'password'          // known account → ask for the password
-    } else {
+    const { exists, has_password } = await auth.checkEmail(email.value)
+
+    if (exists && has_password && signupOpen.value) {
+      // Known account, password door — only offered while Signup stays open;
+      // closing Signup retires password sign-in in favour of OTP/social.
+      step.value = 'password'
+    } else if (otpEnabled.value) {
+      // OTP is a self-sufficient door: it logs in an existing account (with or
+      // without a password) and self-enrols a brand-new email, independent of
+      // whatever Signup is set to.
+      await sendOtp()
+    } else if (!exists && signupOpen.value) {
       await startRegister()            // unknown email → show the signup form inline
+    } else if (exists && has_password) {
+      // Signup is closed and there's no OTP to fall back on.
+      error.value = 'Password sign-in is currently disabled for this event. Contact the organizer.'
+    } else if (!exists) {
+      // Invite-only event and we don't know this address.
+      error.value = 'This event is invite-only — ask the organizer for access.'
+    } else {
+      // Known passwordless account but OTP is off — nothing we can offer.
+      error.value = 'This account can only sign in with a method that’s currently disabled. Contact the organizer.'
     }
   } catch (e: any) {
     error.value = e?.data?.message || 'Something went wrong. Please try again.'
+  } finally {
+    loading.value = false
+  }
+}
+
+// ── OTP ─────────────────────────────────────────────────────────────────────
+async function sendOtp() {
+  error.value = ''
+  if (!agreed.value) { error.value = 'Please agree to the Terms of Service and Privacy Policy.'; return }
+  if (!email.value.includes('@')) { error.value = 'Enter a valid email address.'; return }
+
+  loading.value = true
+  try {
+    await auth.requestOtp(email.value)
+    otpInfo.value = `We’ve emailed a 6-digit code to ${email.value}. It expires in 10 minutes.`
+    step.value = 'otp'
+  } catch (e: any) {
+    error.value = e?.data?.message || 'Could not send a code. Please try again.'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onVerifyOtp() {
+  error.value = ''
+  if (otpCode.value.trim().length < 6) { error.value = 'Enter the 6-digit code from your email.'; return }
+
+  loading.value = true
+  try {
+    await auth.verifyOtp(email.value, otpCode.value.trim())
+    navigateTo('/reception')
+  } catch (e: any) {
+    error.value = e?.data?.message || 'That code is not right.'
   } finally {
     loading.value = false
   }
@@ -121,6 +226,8 @@ function backToEmail() {
   step.value = 'email'
   password.value = ''
   regPassword.value = ''
+  otpCode.value = ''
+  otpInfo.value = ''
   error.value = ''
 }
 </script>
@@ -146,39 +253,84 @@ function backToEmail() {
             <span>{{ step === 'register' ? 'create your account to join' : 'enter your email to login/ signup' }}</span>
           </div>
 
-          <!-- Email / password (login) -->
-          <form v-if="step !== 'register'" @submit.prevent="step === 'email' ? onContinue() : onSignIn()">
+          <!-- OTP: enter the code we emailed -->
+          <form v-if="step === 'otp'" @submit.prevent="onVerifyOtp()">
+            <p v-if="otpInfo" class="muted small otp-note">{{ otpInfo }}</p>
             <label class="field">
-              <span class="icon">&#128100;</span>
-              <input v-model="email" type="email" placeholder="Enter email address"
-                     autocomplete="username" :disabled="step === 'password'" />
-            </label>
-
-            <label v-if="step === 'password'" class="field">
-              <span class="icon">&#128274;</span>
-              <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
-            </label>
-
-            <div class="forgot">
-              <a href="#" @click.prevent="forgot = !forgot">Forget password</a>
-            </div>
-            <p v-if="forgot" class="muted small">Password resets are handled by the event organizer — please reach out to them.</p>
-
-            <label v-if="step === 'email'" class="agree">
-              <input type="checkbox" v-model="agreed" />
-              <span>I agree to expouse <a href="#" @click.prevent>Terms of Service</a> and <a href="#" @click.prevent>Privacy Policy</a></span>
+              <span class="icon">&#128273;</span>
+              <input v-model="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code"
+                     maxlength="6" placeholder="Enter 6-digit code" />
             </label>
 
             <p v-if="error" class="error">{{ error }}</p>
 
             <button class="continue" type="submit" :disabled="loading">
-              {{ loading ? 'PLEASE WAIT…' : (step === 'email' ? 'CONTINUE' : 'SIGN IN') }}
+              {{ loading ? 'PLEASE WAIT…' : 'VERIFY & SIGN IN' }}
             </button>
 
-            <p v-if="step === 'password'" class="switch">
+            <p class="switch">
+              <a href="#" @click.prevent="sendOtp()">Resend code</a>
+              <span class="sep">·</span>
               <a href="#" @click.prevent="backToEmail()">← Use a different email</a>
             </p>
           </form>
+
+          <!-- Email / password (login) + social — grouped under one branch so the
+               registration form's v-else below only ever fires on step 'register',
+               never while step is 'otp' or 'password'. -->
+          <template v-else-if="step !== 'register'">
+            <form @submit.prevent="step === 'email' ? onContinue() : onSignIn()">
+              <label class="field">
+                <span class="icon">&#128100;</span>
+                <input v-model="email" type="email" placeholder="Enter email address"
+                       autocomplete="username" :disabled="step === 'password'" />
+              </label>
+
+              <label v-if="step === 'password'" class="field">
+                <span class="icon">&#128274;</span>
+                <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
+              </label>
+
+              <div class="forgot">
+                <a href="#" @click.prevent="forgot = !forgot">Forget password</a>
+              </div>
+              <p v-if="forgot" class="muted small">Password resets are handled by the event organizer — please reach out to them.</p>
+
+              <label v-if="step === 'email'" class="agree">
+                <input type="checkbox" v-model="agreed" />
+                <span>I agree to expouse <a href="#" @click.prevent>Terms of Service</a> and <a href="#" @click.prevent>Privacy Policy</a></span>
+              </label>
+
+              <p v-if="error" class="error">{{ error }}</p>
+
+              <button class="continue" type="submit" :disabled="loading">
+                {{ loading ? 'PLEASE WAIT…' : (step === 'email' ? 'CONTINUE' : 'SIGN IN') }}
+              </button>
+
+              <!-- Sign in with an emailed code instead (Access authentication › OTP). -->
+              <p v-if="step === 'email' && otpEnabled" class="switch">
+                <a href="#" @click.prevent="sendOtp()">Email me a sign-in code instead</a>
+              </p>
+
+              <p v-if="step === 'password'" class="switch">
+                <a href="#" @click.prevent="backToEmail()">← Use a different email</a>
+              </p>
+            </form>
+
+            <!-- Social sign-in — only on the email step, only the channels the
+                 organizer enabled, and only providers this platform actually has
+                 an OAuth app for. -->
+            <template v-if="step === 'email' && socialChannels.length">
+              <div class="or"><span>or</span></div>
+              <div class="social">
+                <button
+                  v-for="s in socialChannels" :key="s.key"
+                  type="button" class="social-btn" :class="s.key"
+                  @click="signInWith(s.key)"
+                >{{ s.label }}</button>
+              </div>
+            </template>
+          </template>
 
           <!-- Registration (signup) — inline, same page -->
           <form v-else @submit.prevent="onRegister()">
@@ -294,6 +446,23 @@ function backToEmail() {
 .continue:disabled { opacity: .6; cursor: default; }
 .switch { margin-top: 14px; font-size: .86rem; }
 .switch a { color: var(--brand-primary); }
+.switch .sep { color: #cbd0d8; margin: 0 8px; }
+
+.otp-note { margin-bottom: 14px; }
+
+/* "or" divider between password and social sign-in. */
+.or { display: flex; align-items: center; gap: 12px; margin: 20px 0 16px; color: #9aa0a8; font-size: .78rem; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+
+.social { display: flex; flex-direction: column; gap: 10px; }
+.social-btn {
+  width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #d7dae1; background: #fff;
+  font: inherit; font-size: .9rem; font-weight: 600; color: #334155; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.social-btn:hover { background: #f8fafc; border-color: #c7ccd5; }
+.social-btn.google:hover { border-color: #ea4335; }
+.social-btn.facebook:hover { border-color: #1877f2; }
+.social-btn.linkedin:hover { border-color: #0a66c2; }
 
 .error { color: #b91c1c; font-size: .88rem; margin-top: 12px; }
 

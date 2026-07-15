@@ -8,9 +8,10 @@ use App\Http\Resources\EventResource;
 use App\Http\Resources\SessionResource;
 use App\Models\Event;
 use App\Models\EventSetting;
-use App\Models\Membership;
 use App\Models\Exhibitor;
+use App\Models\Membership;
 use App\Models\Session;
+use App\Services\Auth\EventAccess;
 use App\Services\Email\EventTemplateSeeder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -150,6 +151,12 @@ class EventController extends Controller
             'login' => ['sometimes', 'array'],
             'login.methods' => ['sometimes', 'array'],
             'login.require_login' => ['sometimes', 'boolean'],
+            'login.onboarding' => ['sometimes', 'boolean'],
+            // An organizer's own OAuth app for a social channel (Settings › Access
+            // authentication), keyed by provider (google/facebook/linkedin).
+            'login.social_credentials' => ['sometimes', 'array'],
+            'login.social_credentials.*.client_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'login.social_credentials.*.client_secret' => ['sometimes', 'nullable', 'string', 'max:500'],
             'navigation' => ['sometimes', 'array'],
             'seo' => ['sometimes', 'array'],
             'filters' => ['sometimes', 'array'],
@@ -280,6 +287,26 @@ class EventController extends Controller
         // generic settings save overwrite it, even if a client sends it.
         unset($data['domain']);
 
+        // `social_available` is a read-only capability we compute on GET; a client
+        // echoing it back must not persist it into the stored login blob.
+        if (isset($data['login'])) {
+            unset($data['login']['social_available']);
+        }
+
+        // Client secrets are write-only, same as the SMTP password below: the GET
+        // response never echoes one back, so a blank value on save means "keep
+        // what's stored" rather than "clear it".
+        if (isset($data['login']['social_credentials'])) {
+            $existingCreds = $s->login['social_credentials'] ?? [];
+            foreach ($data['login']['social_credentials'] as $provider => $incoming) {
+                if (($incoming['client_secret'] ?? '') === '') {
+                    $incoming['client_secret'] = $existingCreds[$provider]['client_secret'] ?? null;
+                }
+                $data['login']['social_credentials'][$provider] = $incoming;
+            }
+            $data['login']['social_credentials'] = array_merge($existingCreds, $data['login']['social_credentials']);
+        }
+
         // The SMTP password is write-only: a blank value on save keeps the stored
         // one (the GET response never echoes it back), so re-saving other fields
         // doesn't wipe the password.
@@ -303,7 +330,13 @@ class EventController extends Controller
             'theme' => (object) ($s->theme ?? []),
             'modules_enabled' => (object) ($s->modules_enabled ?? []),
             'branding' => (object) ($s->branding ?? []),
-            'login' => (object) ($s->login ?? []),
+            // `social_available` isn't stored — it's derived from the organizer's
+            // own credentials (if any) or the platform's, so the organizer can see
+            // which social channels can actually be honoured before ticking them.
+            'login' => (object) array_merge($s->login ?? [], [
+                'social_available' => $this->socialAvailable($s),
+                'social_credentials' => $this->socialCredentialsArray($s),
+            ]),
             'domain' => (object) ($s->domain ?? []),
             'navigation' => (object) ($s->navigation ?? []),
             'seo' => (object) ($s->seo ?? []),
@@ -324,6 +357,33 @@ class EventController extends Controller
         ];
     }
 
+    /** Which social sign-in providers have an OAuth app behind them — theirs or the platform's. */
+    protected function socialAvailable(EventSetting $s): array
+    {
+        $access = app(EventAccess::class);
+
+        return collect(array_keys(EventAccess::SOCIAL_DRIVERS))
+            ->mapWithKeys(fn (string $p) => [$p => $access->providerConfigured($p, $s)])
+            ->all();
+    }
+
+    /** Client id is safe to echo back; the secret is write-only (see updateSettings). */
+    protected function socialCredentialsArray(EventSetting $s): array
+    {
+        $stored = $s->login['social_credentials'] ?? [];
+
+        return collect(array_keys(EventAccess::SOCIAL_DRIVERS))
+            ->mapWithKeys(function (string $p) use ($stored) {
+                $creds = $stored[$p] ?? [];
+
+                return [$p => [
+                    'client_id' => $creds['client_id'] ?? null,
+                    'has_client_secret' => filled($creds['client_secret'] ?? null),
+                ]];
+            })
+            ->all();
+    }
+
     /** Sender config for the client — password is never echoed, only a flag. */
     protected function senderArray(EventSetting $s): array
     {
@@ -342,6 +402,7 @@ class EventController extends Controller
         $meta = $event->meta ?? [];
         $meta['mobile_access']['username'] = $data['username'];
         $event->update(['meta' => $meta]);
+
         return response()->json(['data' => ['username' => $data['username']]]);
     }
 

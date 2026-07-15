@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
-use App\Models\User;
 use App\Services\Auth\EventAccess;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -75,12 +74,9 @@ class OtpAuthController extends Controller
         RateLimiter::hit($this->hourlyKey($email), 3600);
         RateLimiter::hit($this->ipKey($request), 3600);
 
-        // An unknown address gets no code — but the caller cannot tell, because
-        // the response above is identical either way.
-        if (! $this->canSignIn($email, $setting)) {
-            return $answer;
-        }
-
+        // OTP is a self-sufficient door: enabling it lets a brand-new address in
+        // the same way it lets an existing one back in, regardless of Signup —
+        // the `otp` channel check above is the only gate this needs.
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put($this->codeKey($event->id, $email), [
@@ -142,18 +138,6 @@ class OtpAuthController extends Controller
             'token' => $this->access->token($user),
             'user' => new UserResource($user),
         ]);
-    }
-
-    /**
-     * May this address sign in at all? An existing account always may. An unknown
-     * one may only when the organizer left Signup on — otherwise OTP would be a
-     * back door around a closed event.
-     */
-    private function canSignIn(string $email, $setting): bool
-    {
-        $exists = User::on('pgsql_admin')->where('email', $email)->exists();
-
-        return $exists || $this->access->channels($setting)['signup'];
     }
 
     private function event(Request $request): array

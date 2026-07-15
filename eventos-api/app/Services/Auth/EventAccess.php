@@ -64,11 +64,12 @@ class EventAccess
      * The sign-in channels this event actually offers.
      *
      * `signup` and `otp` we implement ourselves, so the organizer's toggle is the
-     * whole story. A social channel additionally needs the platform to hold an
-     * OAuth app for that provider: without a client id there is nothing to
-     * redirect to, so we report it unavailable no matter what the organizer
-     * ticked. Password sign-in is not a channel — it is always available to
-     * someone who already has an account.
+     * whole story. A social channel additionally needs an OAuth app for that
+     * provider — either the organizer's own (Settings › Access authentication)
+     * or the platform's — without a client id there is nothing to redirect to,
+     * so we report it unavailable no matter what the organizer ticked. Password
+     * sign-in is not a channel — it is always available to someone who already
+     * has an account.
      */
     public function channels(?EventSetting $setting): array
     {
@@ -83,18 +84,44 @@ class EventAccess
 
         foreach (array_keys(self::SOCIAL_DRIVERS) as $provider) {
             $channels[$provider] = (bool) ($methods[$provider] ?? false)
-                && $this->providerConfigured($provider);
+                && $this->providerConfigured($provider, $setting);
         }
 
         return $channels;
     }
 
-    /** Does the platform hold an OAuth app for this provider? */
-    public function providerConfigured(string $provider): bool
+    /** Does an OAuth app exist for this provider — the organizer's own, or the platform's? */
+    public function providerConfigured(string $provider, ?EventSetting $setting = null): bool
+    {
+        return self::SOCIAL_DRIVERS[$provider] ?? null
+            ? filled($this->credentials($provider, $setting)['client_id'])
+            : false;
+    }
+
+    /**
+     * The OAuth client id/secret to use for this provider on this event.
+     *
+     * An organizer who has registered their own app (with our fixed callback URL
+     * whitelisted in it) gets that; otherwise we fall back to the platform's app,
+     * if one is configured. The redirect URI is always ours — see
+     * SocialAuthController — because it is what every OAuth app's console has
+     * been told to allow, regardless of whose client id/secret is behind it.
+     */
+    public function credentials(string $provider, ?EventSetting $setting = null): array
     {
         $driver = self::SOCIAL_DRIVERS[$provider] ?? null;
+        $own = $setting?->login['social_credentials'][$provider] ?? [];
 
-        return $driver !== null && filled(config("services.{$driver}.client_id"));
+        $clientId = filled($own['client_id'] ?? null) ? $own['client_id'] : config("services.{$driver}.client_id");
+        $clientSecret = filled($own['client_id'] ?? null) && filled($own['client_secret'] ?? null)
+            ? $own['client_secret']
+            : config("services.{$driver}.client_secret");
+
+        return [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'redirect' => config("services.{$driver}.redirect"),
+        ];
     }
 
     /**

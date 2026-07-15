@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Contact;
 use App\Models\Event;
 use App\Models\Participation;
 use App\Models\User;

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { ReceptionSpeaker } from '~/stores/reception'
 
-const props = defineProps<{ speakers: ReceptionSpeaker[] }>()
+const props = defineProps<{ speakers: ReceptionSpeaker[], limit?: number }>()
 
 const bookmarks = useBookmarksStore()
+
+const visible = computed(() => props.limit ? props.speakers.slice(0, props.limit) : props.speakers)
 
 </script>
 
@@ -14,7 +16,7 @@ const bookmarks = useBookmarksStore()
     </header>
 
     <div class="grid">
-      <article v-for="sp in speakers" :key="sp.id" class="spk">
+      <article v-for="sp in visible" :key="sp.id" class="spk">
         <div class="photo">
           <UserAvatar :src="sp.image_url" :name="sp.name" />
 

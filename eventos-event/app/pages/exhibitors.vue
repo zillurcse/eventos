@@ -5,10 +5,12 @@ definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const store = useExhibitorsStore()
 const bookmarks = useBookmarksStore()
+const route = useRoute()
 
 const search = ref('')
 const sort = ref<'default' | 'az' | 'za'>('default')
-const type = ref<'all' | 'exhibitor' | 'sponsor'>('all')
+const initialType = route.query.type === 'exhibitor' || route.query.type === 'sponsor' ? route.query.type : 'all'
+const type = ref<'all' | 'exhibitor' | 'sponsor'>(initialType)
 const category = ref<string>('')
 const savedOnly = ref(false)
 

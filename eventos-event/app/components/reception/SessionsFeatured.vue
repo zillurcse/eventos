@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { ReceptionSession } from '~/stores/reception'
 
-const props = withDefaults(defineProps<{ sessions: ReceptionSession[], title?: string }>(), {
+const props = withDefaults(defineProps<{ sessions: ReceptionSession[], title?: string, limit?: number }>(), {
   title: 'Live Sessions',
 })
 
 const bookmarks = useBookmarksStore()
+
+const visible = computed(() => props.limit ? props.sessions.slice(0, props.limit) : props.sessions)
 
 const heading = computed(() => {
   const first = props.sessions[0]
@@ -70,7 +72,7 @@ function calendarLink(s: ReceptionSession): string | null {
     </header>
 
     <div class="grid">
-      <article v-for="s in sessions" :key="s.id" class="scard">
+      <article v-for="s in visible" :key="s.id" class="scard">
         <div class="top">
           <span class="badge">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -165,6 +167,12 @@ function calendarLink(s: ReceptionSession): string | null {
           <div class="sessions-progress-bar" :style="{ width: `${liveProgress(s)}%` }" />
         </div>
       </article>
+    </div>
+
+    <div class="viewall">
+      <span class="line" />
+      <NuxtLink to="/sessions" class="viewall-btn">View all {{ title.toLowerCase() }}</NuxtLink>
+      <span class="line" />
     </div>
   </section>
 </template>
@@ -477,6 +485,35 @@ function calendarLink(s: ReceptionSession): string | null {
   height: 100%;
   background: var(--brand-primary);
   border-radius: 999px;
+}
+
+.viewall {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.viewall .line {
+  flex: 1;
+  height: 1px;
+  background: #D1D2DE;
+}
+
+.viewall-btn {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  font-weight: 700;
+  font-size: .88rem;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+
+.viewall-btn:hover {
+  background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
 }
 /* .accent {
   position: absolute;

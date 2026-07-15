@@ -55,16 +55,11 @@ onMounted(async () => {
     <!-- Sponsor / ad strip -->
     <ReceptionAboutCard :about="data.about" />
     <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" class="span2" />
-        <ReceptionSessionsFeatured v-if="liveSessions.length" title="Live Sessions" :sessions="liveSessions" />
-        <ReceptionSessionsFeatured v-if="featuredSessions.length" title="Featured Sessions" :sessions="featuredSessions" />
-        <div v-if="liveSessions.length || featuredSessions.length" class="viewall">
-          <span class="line" />
-          <NuxtLink to="/sessions" class="viewall-btn">View all sessions</NuxtLink>
-          <span class="line" />
-        </div>
-        <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" :partners="data.exhibitors" />
-        <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" :partners="data.sponsors" />
-        <ReceptionSpeakersFeatured v-if="data.speakers.length" :speakers="data.speakers" />
+        <ReceptionSessionsFeatured v-if="liveSessions.length" title="Live Sessions" :sessions="liveSessions" :limit="3" />
+        <ReceptionSessionsFeatured v-if="featuredSessions.length" title="Featured Sessions" :sessions="featuredSessions" :limit="3" />
+        <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" type="exhibitor" :partners="data.exhibitors" :limit="3" />
+        <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" type="sponsor" :partners="data.sponsors" :limit="3" />
+        <ReceptionSpeakersFeatured v-if="data.speakers.length" :speakers="data.speakers" :limit="4" />
       </div>
 
       <aside class="rail">
@@ -83,20 +78,6 @@ onMounted(async () => {
 .main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .rail { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 92px; }
 .loading { padding: 60px 0; text-align: center; color: #64748b; }
-
-.viewall { display: flex; align-items: center; gap: 24px; }
-.viewall .line { flex: 1; height: 1px; background: #D1D2DE; }
-.viewall-btn {
-  flex: 0 0 auto;
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
-  color: var(--brand-primary);
-  font-weight: 700;
-  font-size: .88rem;
-  text-decoration: none;
-}
-.viewall-btn:hover { background: color-mix(in srgb, var(--brand-primary) 18%, #fff); }
 
 @media (max-width: 900px) {
   .cols { grid-template-columns: 1fr; }

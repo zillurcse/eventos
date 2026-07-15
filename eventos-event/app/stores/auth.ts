@@ -43,9 +43,43 @@ export const useAuthStore = defineStore('auth', {
         headers: this.subHeaders(),
         body: { email, password },
       })
-      this.token = res.token
-      this.user = res.user
-      if (import.meta.client) localStorage.setItem('eventos_token', res.token)
+      this.setSession(res.token, res.user)
+    },
+
+    /** Email a one-time sign-in code (Settings › Access authentication › OTP). */
+    async requestOtp(email: string) {
+      const { public: { apiBase } } = useRuntimeConfig()
+      return $fetch<{ sent: boolean, expires_in: number }>(`${apiBase}/public/auth/otp`, {
+        method: 'POST',
+        headers: this.subHeaders(),
+        body: { email },
+      })
+    },
+
+    /** Trade a valid code for a session. */
+    async verifyOtp(email: string, code: string) {
+      const { public: { apiBase } } = useRuntimeConfig()
+      const res = await $fetch<{ token: string, user: User }>(`${apiBase}/public/auth/otp/verify`, {
+        method: 'POST',
+        headers: this.subHeaders(),
+        body: { email, code },
+      })
+      this.setSession(res.token, res.user)
+    },
+
+    /** Adopt a session — used by the OTP/password/register flows, and by the
+     *  social callback which hands the token back in the URL fragment. */
+    setSession(token: string, user: User | null) {
+      this.token = token
+      this.user = user
+      if (import.meta.client) localStorage.setItem('eventos_token', token)
+    },
+
+    /** A token arrived in the URL (social sign-in). Adopt it, then fetch who we
+     *  are — the callback only carries the token, not the profile. */
+    async adoptToken(token: string) {
+      this.setSession(token, null)
+      await this.fetchMe()
     },
 
     /** Attach the resolved event subdomain so auth calls carry event context. */

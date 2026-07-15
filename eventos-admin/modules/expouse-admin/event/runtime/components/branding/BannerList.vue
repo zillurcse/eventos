@@ -6,10 +6,15 @@ export interface BrandingBanner {
   active?: boolean
 }
 
-const props = defineProps<{
-  eventId: string
-  banners: BrandingBanner[]
-}>()
+const props = withDefaults(defineProps<{
+  eventId:  string
+  banners:  BrandingBanner[]
+  title?:   string
+  subtitle?: string
+}>(), {
+  title:    'Community Banner',
+  subtitle: 'Banners displayed on the event landing page.',
+})
 
 const emit = defineEmits<{
   (e: 'update', v: BrandingBanner[]): void
@@ -80,8 +85,8 @@ function toggleActive(i: number) {
           </svg>
         </div>
         <div>
-          <h2 class="mb-0!">Community Banner</h2>
-          <p class="text-[.8rem] text-muted mt-0.5">Banners displayed on the event landing page.</p>
+          <h2 class="mb-0!">{{ title }}</h2>
+          <p class="text-[.8rem] text-muted mt-0.5">{{ subtitle }}</p>
         </div>
       </div>
       <button class="btn sm ghost shrink-0" @click="openAdd">
@@ -97,7 +102,7 @@ function toggleActive(i: number) {
           <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>
         </svg>
       </div>
-      <p class="text-[.88rem] font-semibold text-ink mb-1">No Community Banners</p>
+      <p class="text-[.88rem] font-semibold text-ink mb-1">No {{ title }}s</p>
       <p class="text-[.82rem] text-muted mb-3">Add a banner to get started.</p>
       <button class="btn sm" @click="openAdd">Add banner</button>
     </div>
@@ -106,7 +111,7 @@ function toggleActive(i: number) {
     <div v-else class="flex gap-4 flex-wrap mt-4">
       <div v-for="(b, i) in banners" :key="b.image + i" class="w-75">
         <div class="img-card" :class="{ 'opacity-50': b.active === false }" :style="{ aspectRatio: '1036 / 350' }">
-          <img :src="b.image" :alt="b.title || 'Community banner'">
+          <img :src="b.image" :alt="b.title || title">
           <span v-if="b.active === false" class="badge draft absolute top-1.5 left-1.5">Hidden</span>
           <div class="img-card-actions">
             <button class="img-action" title="Edit banner" @click="openEdit(i)">
@@ -127,7 +132,7 @@ function toggleActive(i: number) {
     </div>
 
     <!-- Add / edit sidebar -->
-    <Drawer v-if="drawerOpen" :title="editIndex === null ? 'Add Community Banner' : 'Edit Community Banner'" @close="drawerOpen = false">
+    <Drawer v-if="drawerOpen" :title="`${editIndex === null ? 'Add' : 'Edit'} ${title}`" @close="drawerOpen = false">
       <div class="flex flex-col gap-4">
         <AppInput
           v-model="form.title"

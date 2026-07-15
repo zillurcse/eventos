@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { ReceptionPartner } from '~/stores/reception'
 
-const props = defineProps<{ title: string, partners: ReceptionPartner[] }>()
+const props = defineProps<{ title: string, partners: ReceptionPartner[], limit?: number, type?: 'exhibitor' | 'sponsor' }>()
+
+const visible = computed(() => props.limit ? props.partners.slice(0, props.limit) : props.partners)
 
 function subtitle(p: ReceptionPartner): string {
   return [p.booth, p.type ? p.type[0]!.toUpperCase() + p.type.slice(1) : ''].filter(Boolean).join(', ')
@@ -15,7 +17,7 @@ function subtitle(p: ReceptionPartner): string {
     </header>
 
     <div class="grid">
-      <article v-for="p in partners" :key="p.id" class="pcard">
+      <article v-for="p in visible" :key="p.id" class="pcard">
         <div class="banner">
           <AppImage :src="p.logo_url" :alt="p.name" class="banner-logo" />
         </div>
@@ -34,7 +36,7 @@ function subtitle(p: ReceptionPartner): string {
 
     <div class="viewall">
       <span class="line" />
-      <NuxtLink to="/exhibitors" class="viewall-btn">View all {{ title.toLowerCase() }}</NuxtLink>
+      <NuxtLink :to="{ path: '/exhibitors', query: type ? { type } : undefined }" class="viewall-btn">View all {{ title.toLowerCase() }}</NuxtLink>
       <span class="line" />
     </div>
   </section>

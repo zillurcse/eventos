@@ -14,11 +14,28 @@ interface BannerItem {
   active?: boolean
 }
 
-const coverUrl     = ref<string | null>(null)
-const coverFileId  = ref<number | null>(null)
-const theme        = reactive({ primary: '#6352e7', accent: '#22d3ee' })
+interface BrandingColors {
+  nav_bg:         string
+  nav_text:       string
+  primary_button: string
+  body_text:      string
+  page_bg:        string
+  content_bg:     string
+}
+
+const theme        = reactive({ accent: '#22d3ee' })
+const colors       = reactive<BrandingColors>({
+  nav_bg:         '#F7F7FB',
+  nav_text:       '#212529',
+  primary_button: '#6352e7',
+  body_text:      '#212529',
+  page_bg:        '#F7F7FB',
+  content_bg:     '#F0EEFD',
+})
+const appearance   = ref('minimal')
 const logoUrl      = ref<string | null>(null)
 const banners      = ref<BannerItem[]>([])
+const eventBanners = ref<BannerItem[]>([])
 const emailHeaderUrl = ref<string | null>(null)
 const login        = reactive<{ type: string; banner_url: string | null; video_url: string; website_url: string }>(
   { type: 'banner', banner_url: null, video_url: '', website_url: '' },
@@ -28,24 +45,30 @@ const saving = ref(false)
 const saved  = ref(false)
 const error  = ref('')
 
+// Banners were once stored as plain URL strings; normalize to objects.
+function normalizeBanners(arr: unknown): BannerItem[] {
+  return (Array.isArray(arr) ? arr : [])
+    .map((x: any) => (typeof x === 'string' ? { image: x, active: true } : x))
+    .filter((x: any) => x?.image)
+}
+
 async function load() {
-  const [e, s] = await Promise.all([api<any>(`/events/${id}`), api<any>(`/events/${id}/settings`)])
-  coverUrl.value = e.data.cover_url ?? null
-  theme.primary  = s.data.theme?.primary || '#6352e7'
+  const s = await api<any>(`/events/${id}/settings`)
   theme.accent   = s.data.theme?.accent  || '#22d3ee'
   const b = s.data.branding || {}
   logoUrl.value        = b.logo_url ?? null
-  // Banners were once stored as plain URL strings; normalize to objects.
-  banners.value        = (Array.isArray(b.banners) ? b.banners : [])
-    .map((x: any) => (typeof x === 'string' ? { image: x, active: true } : x))
-    .filter((x: any) => x?.image)
+  Object.assign(colors, b.colors || {}, { primary_button: s.data.theme?.primary || b.colors?.primary_button || '#6352e7' })
+  appearance.value     = b.appearance || 'minimal'
+  banners.value        = normalizeBanners(b.banners)
+  eventBanners.value   = normalizeBanners(b.event_banners)
   emailHeaderUrl.value = b.email_header_url ?? null
   if (b.login) Object.assign(login, { type: b.login.type || 'banner', banner_url: b.login.banner_url ?? null, video_url: b.login.video_url ?? '', website_url: b.login.website_url ?? '' })
 }
 
 function onBannersUpdate(v: BannerItem[]) { banners.value = v }
+function onEventBannersUpdate(v: BannerItem[]) { eventBanners.value = v }
+function onColorsUpdate(v: Partial<BrandingColors>) { Object.assign(colors, v) }
 
-function onCoverUploaded(v: { id: number; url: string })    { coverFileId.value = v.id; coverUrl.value = v.url }
 function onLogoUploaded(v: { url: string | null })          { logoUrl.value = v.url }
 function onEmailHeaderUploaded(v: { url: string | null })   { emailHeaderUrl.value = v.url }
 function onLoginUpdate(v: Partial<typeof login>)         { Object.assign(login, v) }
@@ -54,14 +77,16 @@ async function save() {
   error.value  = ''
   saving.value = true
   try {
-    if (coverFileId.value) await api(`/events/${id}`, { method: 'PATCH', body: { cover_file_id: coverFileId.value } })
     await api(`/events/${id}/settings`, {
       method: 'PUT',
       body: {
-        theme: { primary: theme.primary, accent: theme.accent },
+        theme: { primary: colors.primary_button, accent: theme.accent },
         branding: {
           logo_url:         logoUrl.value,
+          colors:           { ...colors },
+          appearance:       appearance.value,
           banners:          banners.value,
+          event_banners:    eventBanners.value,
           email_header_url: emailHeaderUrl.value,
           login: { type: login.type, banner_url: login.banner_url, video_url: login.video_url, website_url: login.website_url },
         },
@@ -100,28 +125,40 @@ onMounted(load)
       </button>
     </div>
 
-    <BrandingThemeColor
-      class="mb-4"
-      :primary="theme.primary"
-      :accent="theme.accent"
-      @update:primary="theme.primary = $event"
-      @update:accent="theme.accent = $event"
-    />
-
-    <BrandingLogoAndCover
+    <BrandingLogo
       class="mb-4"
       :event-id="id"
-      :cover-url="coverUrl"
       :logo-url="logoUrl"
-      @cover-uploaded="onCoverUploaded"
       @logo-uploaded="onLogoUploaded"
     />
 
-    <BrandingCommunityBanners
+    <BrandingAppearance
+      class="mb-4"
+      v-model="appearance"
+    />
+
+    <BrandingColors
+      class="mb-4"
+      :colors="colors"
+      @update="onColorsUpdate"
+    />
+
+    <BrandingBannerList
       class="mb-4"
       :event-id="id"
       :banners="banners"
+      title="Community Banner"
+      subtitle="Banners displayed on the event landing page."
       @update="onBannersUpdate"
+    />
+
+    <BrandingBannerList
+      class="mb-4"
+      :event-id="id"
+      :banners="eventBanners"
+      title="Event Page Banner"
+      subtitle="Banners displayed inside the event app after sign-in."
+      @update="onEventBannersUpdate"
     />
 
     <BrandingLoginPageDesign

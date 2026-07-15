@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\EventAd;
 use App\Models\EventSetting;
 use App\Models\Exhibitor;
+use App\Models\File;
 use App\Models\Form;
 use App\Models\Participation;
 use App\Models\Session;
@@ -352,7 +353,9 @@ class PublicSiteController extends Controller
                     'name' => $event->name,
                     'slug' => $event->slug,
                 ],
-                'banners' => $this->publicBanners($branding),
+                // Event Page Banners take priority in-app; fall back to the
+                // Community Banners if the organizer hasn't set any up yet.
+                'banners' => $this->publicBanners($branding, 'event_banners') ?: $this->publicBanners($branding),
                 'ads' => [
                     'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
                     'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
@@ -854,13 +857,16 @@ class PublicSiteController extends Controller
     }
 
     /**
-     * Community banners are stored either as plain URL strings (legacy) or as
+     * Banners are stored either as plain URL strings (legacy) or as
      * {image, title, url, active} objects from the admin's banner form. The
      * public payload stays a flat list of image URLs, hidden banners excluded.
+     * `$key` selects which stored list to read — `banners` (Community
+     * Banners, shown on the pre-login site) or `event_banners` (Event Page
+     * Banners, shown in-app on the reception page).
      */
-    protected function publicBanners(array $branding): array
+    protected function publicBanners(array $branding, string $key = 'banners'): array
     {
-        return collect($branding['banners'] ?? [])
+        return collect($branding[$key] ?? [])
             ->map(fn ($b) => is_array($b)
                 ? (($b['active'] ?? true) ? ($b['image'] ?? null) : null)
                 : $b)
@@ -876,7 +882,7 @@ class PublicSiteController extends Controller
             return null;
         }
 
-        $file = \App\Models\File::on('pgsql_admin')->find($fileId);
+        $file = File::on('pgsql_admin')->find($fileId);
 
         return $file ? Storage::disk($file->disk)->url($file->path) : null;
     }
