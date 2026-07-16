@@ -66,6 +66,21 @@ export interface UploadedMedia {
   filename: string | null
 }
 
+export interface FeedAdImage {
+  image_url?: string
+  url?: string
+  redirect_url?: string
+  is_active?: boolean
+  [k: string]: any
+}
+
+export interface FeedAd {
+  id: string | number
+  title: string
+  placement: string
+  images: FeedAdImage[]
+}
+
 interface Paginated<T> {
   data: T[]
   meta?: { current_page: number, last_page: number }
@@ -88,6 +103,8 @@ export const useFeedStore = defineStore('feed', {
     error: false,
     filter: 'all' as FeedFilter,
     search: '',
+    ads: [] as FeedAd[],
+    adsLoaded: false,
   }),
 
   getters: {
@@ -129,6 +146,26 @@ export const useFeedStore = defineStore('feed', {
       if (this.loading || !this.hasMore) return
       this.page += 1
       await this.fetchFeed(false)
+    },
+
+    /** The "main ads" strip (organizer's AD Managements, targeted to the Event
+     *  Feed page) — shown in place of a banner slider at the top of the feed. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: FeedAd[], sidebar: FeedAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'feed' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the feed still works without them.
+      } finally {
+        this.adsLoaded = true
+      }
     },
 
     /** Change the active "Filter By" tab and reload from the top. */

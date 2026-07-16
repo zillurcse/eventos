@@ -3,7 +3,8 @@ const props = withDefaults(defineProps<{
   modelValue: string | string[] | null
   multiple?: boolean
   max?: number
-  aspect: number
+  /** Omit for a free-form crop box (no fixed ratio). */
+  aspect?: number
   outputWidth?: number
   outputHeight?: number
   collection?: string
@@ -29,7 +30,8 @@ const canAdd = computed(() =>
 )
 
 // Wide formats (banners, headers) get a bigger card so the preview stays legible.
-const cardW = computed(() => props.cardWidth ?? (props.aspect >= 1.6 ? '300px' : '160px'))
+const cardW = computed(() => props.cardWidth ?? ((props.aspect ?? 1) >= 1.6 ? '300px' : '160px'))
+const cardAspect = computed(() => String(props.aspect ?? 1))
 
 const chooserOpen = ref(false)
 const cropSrc = ref('')
@@ -84,7 +86,7 @@ function view(url: string) {
         v-for="(url, i) in items"
         :key="url + i"
         class="img-card"
-        :style="{ width: cardW, aspectRatio: String(aspect) }"
+        :style="{ width: cardW, aspectRatio: cardAspect }"
       >
         <img :src="url" alt="">
         <div class="img-card-actions">
@@ -129,7 +131,7 @@ function view(url: string) {
         </slot>
       </button> -->
       <!-- EMPTY CARD (Add new image) -->
-        <div class="card-empty" :style="{ width: cardW, aspectRatio: String(aspect) }" @click="openChooser(null)"
+        <div class="card-empty" :style="{ width: cardW, aspectRatio: cardAspect }" @click="openChooser(null)"
             v-if="canAdd">
             <div class="plus-icon-box">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 13 12" fill="none">

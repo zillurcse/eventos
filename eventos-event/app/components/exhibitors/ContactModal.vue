@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 const contact = useExhibitorContactStore()
 
 const draft = ref('')
@@ -7,7 +9,6 @@ const agenda = ref('')
 const place = ref('')
 const pickedDate = ref('')
 const pickedSlot = ref('')
-const sentToast = ref('')
 const meetError = ref('')
 
 // In-person / hybrid events meet somewhere physical; online ones don't.
@@ -28,7 +29,6 @@ watch(() => contact.target?.id, () => {
   place.value = ''
   pickedDate.value = contact.lounge?.dates?.[0] ?? ''
   pickedSlot.value = ''
-  sentToast.value = ''
   meetError.value = ''
 })
 watch(() => contact.lounge, (l) => {
@@ -47,7 +47,7 @@ function busy(date: string, slot: string) {
 async function send() {
   if (await contact.sendMessage(draft.value)) {
     draft.value = ''
-    flash('Message sent to the exhibitor.')
+    toast.success('Message sent to the exhibitor.')
   }
 }
 
@@ -72,15 +72,8 @@ async function sendMeeting() {
     subject.value = ''
     agenda.value = ''
     pickedSlot.value = ''
-    flash('Meeting request sent.')
+    toast.success('Meeting request sent.')
   }
-}
-
-let flashTimer: ReturnType<typeof setTimeout> | undefined
-function flash(msg: string) {
-  sentToast.value = msg
-  clearTimeout(flashTimer)
-  flashTimer = setTimeout(() => { sentToast.value = '' }, 4000)
 }
 
 function fmtSlot(slot: string) {
@@ -106,8 +99,6 @@ function statusLabel(s: string) {
         <button type="button" class="tab" :class="{ on: contact.tab === 'chat' }" @click="contact.tab = 'chat'">Chat</button>
         <button type="button" class="tab" :class="{ on: contact.tab === 'meet' }" @click="contact.tab = 'meet'">Meet</button>
       </div>
-
-      <p v-if="sentToast" class="toast">{{ sentToast }}</p>
 
       <!-- ── Chat ── -->
       <section v-if="contact.tab === 'chat'" class="pane">
@@ -243,7 +234,6 @@ function statusLabel(s: string) {
 .tab { flex: 1; border: none; background: none; padding: 14px; font: inherit; font-size: .95rem; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
 .tab.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
 
-.toast { margin: 12px 22px 0; padding: 10px 14px; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); border-radius: 10px; font-size: .84rem; font-weight: 600; }
 .err { margin: 10px 22px 16px; color: #dc2626; font-size: .84rem; }
 
 .pane { display: flex; flex-direction: column; min-height: 0; padding: 16px 22px 20px; gap: 14px; }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 const profile = useProfileStore()
 
 const saving = ref(false)
-const savedFlash = ref(false)
 const lookingFor = ref<string[]>([])
 const offering = ref<string[]>([])
 const lookingInput = ref('')
@@ -25,8 +26,9 @@ async function save() {
   saving.value = true
   try {
     await profile.save({ looking_for: lookingFor.value, offering: offering.value })
-    savedFlash.value = true
-    setTimeout(() => { savedFlash.value = false }, 2500)
+    toast.success('Saved')
+  } catch {
+    toast.error('Could not save your changes.')
   } finally {
     saving.value = false
   }
@@ -67,7 +69,6 @@ function cancel() {
     <div class="foot">
       <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
       <button type="button" class="btn text" :disabled="saving" @click="cancel">Cancel</button>
-      <span v-if="savedFlash" class="saved">Saved</span>
     </div>
   </div>
 </template>
@@ -88,5 +89,4 @@ function cancel() {
 .btn.primary:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 .btn.text { background: none; color: var(--brand-primary); padding: 11px 4px; }
 .btn:disabled { opacity: .6; cursor: default; }
-.saved { color: #16a34a; font-size: .85rem; font-weight: 600; }
 </style>

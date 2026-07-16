@@ -51,10 +51,11 @@ const jobLine = computed(() => {
         <svg v-if="route.path === '/profile/briefcase'" class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
         <span v-else-if="briefcase.count" class="count">{{ briefcase.count }}</span>
       </NuxtLink>
-      <button type="button" class="row" disabled title="Coming soon">
+      <NuxtLink to="/profile/schedule" class="row" :class="{ active: route.path === '/profile/schedule' }">
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M8 2v4M16 2v4M3 10h18" /></svg>
         My Schedule
-      </button>
+        <svg v-if="route.path === '/profile/schedule'" class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+      </NuxtLink>
       <button type="button" class="row" disabled title="Coming soon">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v12H4zM9 21h6M9 16v5" /></svg>
         My Certificates

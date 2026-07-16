@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 const auth = useAuthStore()
 
 const currentPassword = ref('')
@@ -6,7 +8,6 @@ const password = ref('')
 const confirmPassword = ref('')
 const saving = ref(false)
 const error = ref('')
-const savedFlash = ref(false)
 
 function reset() {
   currentPassword.value = ''
@@ -32,8 +33,7 @@ async function save() {
   try {
     await auth.changePassword(currentPassword.value, password.value)
     reset()
-    savedFlash.value = true
-    setTimeout(() => { savedFlash.value = false }, 2500)
+    toast.success('Password updated')
   } catch (e: any) {
     error.value = e?.data?.errors?.current_password?.[0] ?? e?.data?.message ?? 'Could not update password.'
   } finally {
@@ -66,7 +66,6 @@ function cancel() { reset() }
     <div class="foot">
       <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
       <button type="button" class="btn text" :disabled="saving" @click="cancel">Cancel</button>
-      <span v-if="savedFlash" class="saved">Saved</span>
     </div>
   </div>
 </template>
@@ -91,5 +90,4 @@ function cancel() { reset() }
 .btn.primary:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 .btn.text { background: none; color: var(--brand-primary); padding: 11px 4px; }
 .btn:disabled { opacity: .6; cursor: default; }
-.saved { color: #16a34a; font-size: .85rem; font-weight: 600; }
 </style>

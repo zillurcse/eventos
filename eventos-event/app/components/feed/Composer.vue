@@ -42,6 +42,8 @@ const LIMITS: Record<Kind, { mimes: string[], maxMB: number }> = {
   pdf: { mimes: ['application/pdf'], maxMB: 20 },
 }
 const ACCEPT_MEDIA = [...LIMITS.image.mimes, ...LIMITS.video.mimes].join(',')
+const ACCEPT_IMAGE = LIMITS.image.mimes.join(',')
+const ACCEPT_VIDEO = LIMITS.video.mimes.join(',')
 const ACCEPT_PDF = 'application/pdf'
 
 const media = ref<MediaItem[]>([])
@@ -151,7 +153,7 @@ onBeforeUnmount(() => { for (const m of media.value) URL.revokeObjectURL(m.previ
 const placeholder = computed(() => {
   if (mode.value === 'looking_for') return 'What are you looking for?'
   if (mode.value === 'offering') return 'What are you offering?'
-  return 'Share something with the event'
+  return 'Got a spark of an idea? Let the community feel your energy!'
 })
 
 function setMode(m: Mode) { mode.value = mode.value === m ? 'compose' : m }
@@ -294,9 +296,11 @@ async function submit() {
 
     <div class="toolbar">
       <div class="tools">
-        <button class="tool" type="button" title="Photo or video" @click="pick(ACCEPT_MEDIA)">
+        <button class="tool" type="button" title="Photo" @click="pick(ACCEPT_IMAGE)">
           <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" /></svg>
-          <span class="tlabel">Photo / Video</span>
+        </button>
+        <button class="tool" type="button" title="Video" @click="pick(ACCEPT_VIDEO)">
+          <svg viewBox="0 0 24 24"><path d="M3 6h13v12H3zM16 10l5-3v10l-5-3z" /></svg>
         </button>
         <button class="tool" type="button" title="PDF" @click="pick(ACCEPT_PDF)">
           <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6" /></svg>
@@ -395,8 +399,6 @@ textarea:focus { border-color: var(--brand-primary); }
 .tool:hover { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); }
 .tool.on { background: var(--brand-primary); color: #fff; }
 .tool svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.tlabel { white-space: nowrap; }
-@media (max-width: 560px) { .tlabel { display: none; } }
 .sep { width: 1px; height: 22px; background: #e2e8f0; margin: 0 4px; }
 
 .right { display: flex; align-items: center; gap: 10px; margin-left: auto; }

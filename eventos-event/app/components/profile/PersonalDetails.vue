@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
 import { COUNTRIES } from '~/utils/countries'
 
 const profile = useProfileStore()
@@ -6,7 +7,6 @@ const auth = useAuthStore()
 
 const saving = ref(false)
 const uploading = ref(false)
-const savedFlash = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const form = reactive({
@@ -79,8 +79,9 @@ async function save() {
       social: { website: form.website.trim() || undefined },
     })
     if (auth.user) auth.user.name = `${form.first_name} ${form.last_name}`.trim()
-    savedFlash.value = true
-    setTimeout(() => { savedFlash.value = false }, 2500)
+    toast.success('Profile saved')
+  } catch {
+    toast.error('Could not save your profile.')
   } finally {
     saving.value = false
   }
@@ -194,7 +195,6 @@ function cancel() { fillFromProfile() }
     <div class="foot">
       <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
       <button type="button" class="btn text" :disabled="saving" @click="cancel">Cancel</button>
-      <span v-if="savedFlash" class="saved">Saved</span>
     </div>
   </div>
 </template>
@@ -226,5 +226,4 @@ function cancel() { fillFromProfile() }
 .btn.ghost svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .btn.ghost.danger { color: #ef4444; background: #fef2f2; }
 .btn:disabled { opacity: .6; cursor: default; }
-.saved { color: #16a34a; font-size: .85rem; font-weight: 600; }
 </style>

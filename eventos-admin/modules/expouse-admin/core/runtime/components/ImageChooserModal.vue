@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
-  aspect: number
+  aspect?: number
   outputWidth?: number
   outputHeight?: number
   collection?: string

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
 import { LANGUAGES } from '~/utils/languages'
 import { TIMEZONES } from '~/utils/timezones'
 
@@ -16,15 +17,15 @@ function fillFromProfile() {
 watch(() => profile.data, fillFromProfile, { immediate: true })
 
 const saving = ref(false)
-const savedFlash = ref(false)
 
 async function save() {
   if (saving.value) return
   saving.value = true
   try {
     await profile.save({ language: form.language || undefined, timezone: form.timezone || undefined })
-    savedFlash.value = true
-    setTimeout(() => { savedFlash.value = false }, 2500)
+    toast.success('Preferences saved')
+  } catch {
+    toast.error('Could not save your preferences.')
   } finally {
     saving.value = false
   }
@@ -48,7 +49,6 @@ function cancel() { fillFromProfile() }
     <div class="foot">
       <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
       <button type="button" class="btn text" :disabled="saving" @click="cancel">Cancel</button>
-      <span v-if="savedFlash" class="saved">Saved</span>
     </div>
   </div>
 </template>
@@ -65,5 +65,4 @@ function cancel() { fillFromProfile() }
 .btn.primary:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 .btn.text { background: none; color: var(--brand-primary); padding: 11px 4px; }
 .btn:disabled { opacity: .6; cursor: default; }
-.saved { color: #16a34a; font-size: .85rem; font-weight: 600; }
 </style>

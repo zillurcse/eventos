@@ -3,17 +3,6 @@ import type { FeedFilter } from '~/stores/feed'
 
 const feed = useFeedStore()
 
-const term = ref(feed.search)
-let timer: ReturnType<typeof setTimeout> | null = null
-
-// Debounce search input → refetch after the user pauses typing.
-watch(term, (v) => {
-  if (timer) clearTimeout(timer)
-  timer = setTimeout(() => feed.setSearch(v), 350)
-})
-
-onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
-
 /**
  * The "Filter By" rail is the organizer's (admin › Navigation & Menu › Allowed
  * Feed Tabs): they choose which filters appear, in what order, and what they are
@@ -79,11 +68,6 @@ watch(filters, (list) => {
 
 <template>
   <aside class="rail">
-    <div class="search">
-      <input v-model="term" type="text" placeholder="Search">
-      <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
-    </div>
-
     <div class="card">
       <p class="title">Filter By</p>
       <nav class="list">
@@ -105,12 +89,6 @@ watch(filters, (list) => {
 
 <style scoped>
 .rail { display: flex; flex-direction: column; gap: 16px; }
-.search { position: relative; }
-.search input { width: 100%; border: none; background: #fff; border-radius: 12px; padding: 14px 46px 14px 18px; font: inherit; font-size: .95rem; color: #334155; outline: none; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.search input::placeholder { color: #94a3b8; }
-.search input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 40%, transparent); }
-.search svg { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: none; stroke: var(--brand-primary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-
 .card { background: #fff; border-radius: 14px; padding: 18px 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .title { margin: 0 6px 6px; padding-bottom: 12px; border-bottom: 1px solid #eef0f3; color: #334155; font-weight: 700; font-size: 1rem; }
 .list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }

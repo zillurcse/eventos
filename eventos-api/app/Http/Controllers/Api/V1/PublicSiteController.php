@@ -369,6 +369,50 @@ class PublicSiteController extends Controller
     }
 
     /**
+     * GET /api/v1/public/ads?page=feed — active ads targeted at a given app
+     * page (organizer sets this in AD Managements › targeted pages). Same
+     * strip (main/featured) + sidebar (content) split as reception()'s ads.
+     */
+    public function ads(Request $request): JsonResponse
+    {
+        $resolved = $this->resolvePublishedEvent($request);
+
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+        $page = $request->string('page', 'feed')->toString();
+        $now = now();
+
+        $ads = EventAd::on('pgsql_admin')
+            ->where('event_id', $event->id)
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', $now))
+            ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', $now))
+            ->get()
+            ->filter(function (EventAd $ad) use ($page) {
+                $pages = $ad->targeted_pages;
+
+                return empty($pages) || in_array($page, $pages, true);
+            });
+
+        $formatAd = fn (EventAd $ad) => [
+            'id' => $ad->uuid ?? $ad->id,
+            'title' => $ad->title,
+            'placement' => $ad->placement,
+            'images' => $ad->images ?? [],
+        ];
+
+        return response()->json([
+            'data' => [
+                'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
+                'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
+            ],
+        ]);
+    }
+
+    /**
      * GET /api/v1/public/speakers — the attendee-facing speaker directory
      * ("Speakers" tab) for the event this subdomain resolves to. Public read
      * (published events only); only PUBLIC speakers are exposed. Returns the

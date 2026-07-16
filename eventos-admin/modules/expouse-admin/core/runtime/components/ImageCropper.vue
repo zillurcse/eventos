@@ -4,7 +4,8 @@ import 'vue-advanced-cropper/dist/style.css'
 
 const props = defineProps<{
   src: string
-  aspect: number
+  /** Omit for a free-form crop box (no fixed ratio). */
+  aspect?: number
   outputWidth?: number
   outputHeight?: number
 }>()
@@ -34,7 +35,7 @@ defineExpose({ crop })
     ref="cropperRef"
     class="crop-stage"
     :src="src"
-    :stencil-props="{ aspectRatio: aspect }"
+    :stencil-props="aspect ? { aspectRatio: aspect } : {}"
     :canvas="canvasOpts"
     :cross-origin="'anonymous'"
     image-restriction="fit-area"

@@ -262,10 +262,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <ImageField
         :model-value="pendingUrls"
         multiple
-        :aspect="1"
         collection="cover"
         card-width="140px"
-        hint="Pick, crop and upload as many photos as you like."
+        hint="Pick, crop (any size) and upload as many photos as you like."
         @update:model-value="onPendingChange"
         @uploaded="onPendingUploaded"
       />

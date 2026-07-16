@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/speakers', [PublicSiteController::class, 'speakers']);
     Route::get('/public/exhibitors', [PublicSiteController::class, 'exhibitors']);
     Route::get('/public/exhibitors/{uuid}', [PublicSiteController::class, 'exhibitor']);
+    Route::get('/public/ads', [PublicSiteController::class, 'ads']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::get('/public/sessions/{uuid}/zoom-signature', [PublicSiteController::class, 'zoomSignature']);
     Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);

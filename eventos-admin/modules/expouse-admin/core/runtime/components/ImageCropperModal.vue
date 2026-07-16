@@ -4,7 +4,7 @@ const props = withDefaults(defineProps<{
   src?: string | null
   /** …or a freshly picked file to crop before its first upload. */
   file?: File | null
-  aspect: number
+  aspect?: number
   outputWidth?: number
   outputHeight?: number
   collection?: string
