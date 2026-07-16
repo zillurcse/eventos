@@ -88,6 +88,15 @@ export const useAuthStore = defineStore('auth', {
       return sub ? { 'X-Event-Subdomain': sub } : {}
     },
 
+    /** Profile › Account Settings › Change Password. */
+    async changePassword(currentPassword: string, password: string) {
+      const api = useApi()
+      return api<{ message: string }>('/auth/change-password', {
+        method: 'POST',
+        body: { current_password: currentPassword, password, password_confirmation: password },
+      })
+    },
+
     async fetchMe() {
       if (!this.token) return
       const { public: { apiBase } } = useRuntimeConfig()

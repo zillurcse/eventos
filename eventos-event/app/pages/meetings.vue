@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { JoinConfig } from '~/stores/rooms'
 import type { Meeting } from '~/stores/meetings'
 
 definePageMeta({ layout: 'event', middleware: 'auth' })
@@ -7,6 +8,11 @@ const store = useMeetingsStore()
 
 const tab = ref<'pending' | 'approved' | 'rejected'>('pending')
 const showModal = ref(false)
+const active = ref<{ config: JoinConfig, title: string } | null>(null)
+
+function onJoin(cfg: JoinConfig & { title: string }) {
+  active.value = { config: cfg, title: cfg.title }
+}
 
 onMounted(() => { if (!store.loaded) store.fetchMeetings() })
 
@@ -61,10 +67,15 @@ const emptyText = computed(() => ({
     <div v-else-if="!list.length" class="state">{{ emptyText }}</div>
 
     <div v-else class="cards">
-      <MeetingsCard v-for="m in list" :key="m.id" :meeting="m" />
+      <MeetingsCard v-for="m in list" :key="m.id" :meeting="m" @join="onJoin" />
     </div>
 
+    <p v-if="store.joinError" class="err">{{ store.joinError }}</p>
+
     <MeetingsNewMeetingModal v-if="showModal" @close="showModal = false" />
+
+    <!-- Live one-to-one video room -->
+    <RoomsRoomStage v-if="active" :config="active.config" :title="active.title" @leave="active = null" />
   </div>
 </template>
 
@@ -85,4 +96,5 @@ const emptyText = computed(() => ({
 
 .state { background: #fff; border-radius: 14px; padding: 48px 20px; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.err { color: #dc2626; font-size: .86rem; margin: 14px 0 0; text-align: center; }
 </style>

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BookmarkController;
 use App\Http\Controllers\Api\V1\BriefcaseController;
+use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\BreakoutRoomController;
 use App\Http\Controllers\Api\V1\CheckInController;
@@ -130,6 +131,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+        Route::get('/auth/sessions', [AuthController::class, 'sessions']);
+        Route::delete('/auth/sessions/{id}', [AuthController::class, 'revokeSession'])->whereNumber('id');
+        Route::post('/auth/sessions/logout-others', [AuthController::class, 'logoutOtherSessions']);
 
         // ── User notifications & preferences (cross-tenant identity) ──
         Route::get('/notifications', [NotificationController::class, 'index']);
@@ -286,6 +291,10 @@ Route::prefix('v1')->group(function () {
             // Cross-tab "save" bookmarks (speakers/sessions/delegates/exhibitors).
             Route::get('/bookmarks', [BookmarkController::class, 'index']);
             Route::post('/bookmarks', [BookmarkController::class, 'toggle']);
+            // Personal notes jotted against a speaker/session/delegate.
+            Route::get('/notes', [NoteController::class, 'index']);
+            Route::post('/notes', [NoteController::class, 'save']);
+            Route::delete('/notes/{type}/{targetId}', [NoteController::class, 'destroy']);
             // Personal "Briefcase" of saved files (exhibitor brochures, docs…).
             Route::get('/briefcase', [BriefcaseController::class, 'index']);
             Route::post('/briefcase', [BriefcaseController::class, 'store']);
@@ -297,6 +306,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/lounge', [MeetingController::class, 'lounge']);
             Route::post('/meetings', [MeetingController::class, 'store']);
             Route::patch('/meetings/{meeting}', [MeetingController::class, 'respond']);
+            // Join the live video room once a one-to-one meeting is confirmed and running.
+            Route::post('/meetings/{meeting}/join', [MeetingController::class, 'join']);
             // Attendee → exhibitor "Contact" (Chat + Meet). Recipient is a booth;
             // the exhibitor admin later assigns a member (handled in the admin).
             Route::get('/exhibitor-conversations', [ExhibitorContactController::class, 'conversations']);

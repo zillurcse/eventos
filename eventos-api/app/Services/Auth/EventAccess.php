@@ -189,7 +189,13 @@ class EventAccess
     {
         $user->forceFill(['last_login_at' => now()])->save();
 
-        return $user->createToken('event', ['tenant'])->plainTextToken;
+        $newToken = $user->createToken('event', ['tenant']);
+        $newToken->accessToken->forceFill([
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ])->save();
+
+        return $newToken->plainTextToken;
     }
 
     /** Disabled accounts cannot get in through any door. */

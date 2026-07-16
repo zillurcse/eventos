@@ -45,6 +45,7 @@ const connectState = computed(() => store.connected[props.speaker.id])
       >
         <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
       </button>
+      <EventNotePopover v-if="auth.isAuthed" type="speaker" :id="speaker.id" />
     </div>
 
     <div class="body">

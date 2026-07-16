@@ -4,6 +4,7 @@ import type { AgendaSession } from '~/stores/sessions'
 const props = defineProps<{ session: AgendaSession, tz: string }>()
 
 const bookmarks = useBookmarksStore()
+const auth = useAuthStore()
 const bookmarked = computed(() => bookmarks.isOn('session', props.session.id))
 
 function toggleBookmark() {
@@ -80,6 +81,7 @@ const extraSpeakers = computed(() => Math.max(0, props.session.speakers.length -
         <button class="act" :class="{ on: bookmarked }" type="button" :title="bookmarked ? 'Remove bookmark' : 'Bookmark'" @click="toggleBookmark">
           <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         </button>
+        <EventNotePopover v-if="auth.isAuthed" type="session" :id="session.id" :calendar-link="calendarLink" />
       </div>
     </div>
 

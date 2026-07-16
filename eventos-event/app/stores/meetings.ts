@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { JoinConfig } from '~/stores/rooms'
 
 export interface MeetingPerson {
   name: string
@@ -64,6 +65,8 @@ export const useMeetingsStore = defineStore('meetings', {
     sending: false,
     lastError: '' as string,
     acting: {} as Record<string, boolean>,
+    joining: {} as Record<string, boolean>,
+    joinError: '' as string,
   }),
 
   getters: {
@@ -123,6 +126,28 @@ export const useMeetingsStore = defineStore('meetings', {
         return false
       } finally {
         this.sending = false
+      }
+    },
+
+    /** Join the live video room for a confirmed, currently-running meeting. */
+    async join(meeting: Meeting): Promise<(JoinConfig & { title: string }) | null> {
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid) return null
+
+      this.joining[meeting.id] = true
+      this.joinError = ''
+      try {
+        const api = useApi()
+        const res = await api<{ data: JoinConfig & { title: string } }>(
+          `/events/${uuid}/meetings/${meeting.id}/join`,
+          { method: 'POST' },
+        )
+        return res.data
+      } catch (e: any) {
+        this.joinError = e?.data?.message || e?.response?._data?.message || 'Could not join the meeting.'
+        return null
+      } finally {
+        this.joining[meeting.id] = false
       }
     },
 

@@ -13,9 +13,12 @@ const search = ref('')
 const selected = ref<Delegate | null>(null)
 const title = ref('')
 const agenda = ref('')
-const startsAt = ref('')
 const location = ref('')
 const errorMsg = ref('')
+
+// ── Fallback date/time picker (no lounge slots configured) ────────────────
+const fallbackDate = ref('')
+const fallbackTime = ref('')
 
 // ── Lounge slot picker state ──────────────────────────────────────────────
 const avail = ref<LoungeAvailability | null>(null)
@@ -65,12 +68,60 @@ function fmtDateTab(iso: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function pad(n: number): string { return String(n).padStart(2, '0') }
+
+function todayIso(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// The event's own day list (always returned by /lounge, whether or not slot
+// booking is enabled) — reused here so the fallback picker offers the same
+// days the event actually runs on, instead of a bare native date input.
+const fallbackDates = computed<string[]>(() => avail.value?.dates ?? [])
+
+function isPastDate(d: string): boolean {
+  return d < todayIso()
+}
+
+// Half-hour points across the day — this is a proposed time, not a booked
+// slot, so no busy/availability check applies, only "has it already passed".
+const timeOptions = computed<string[]>(() => {
+  const out: string[] = []
+  for (let h = 0; h < 24; h++) {
+    out.push(`${pad(h)}:00`)
+    out.push(`${pad(h)}:30`)
+  }
+  return out
+})
+
+function isPastTime(time: string): boolean {
+  if (!fallbackDate.value || fallbackDate.value !== todayIso()) return false
+  const [hh, mm] = time.split(':').map(Number)
+  const cand = new Date()
+  cand.setHours(hh ?? 0, mm ?? 0, 0, 0)
+  return cand.getTime() < Date.now()
+}
+
+function pickFallbackDate(d: string) {
+  if (isPastDate(d)) return
+  fallbackDate.value = fallbackDate.value === d ? '' : d
+  fallbackTime.value = ''
+}
+
+function pickFallbackTime(t: string) {
+  if (isPastTime(t)) return
+  fallbackTime.value = fallbackTime.value === t ? '' : t
+}
+
 async function choose(d: Delegate) {
   selected.value = d
   title.value = `Meeting with ${d.name || 'you'}`
   step.value = 'form'
   selectedDate.value = ''
   selectedSlot.value = ''
+  fallbackDate.value = ''
+  fallbackTime.value = ''
   location.value = ''
   errorMsg.value = ''
 
@@ -105,6 +156,23 @@ async function submit() {
     return
   }
 
+  // The proposed-time picker is optional, but a half-filled pair (date with
+  // no time, or vice versa) isn't a usable time — and a picked time that has
+  // since passed (e.g. left the modal open) must be caught before sending.
+  let startsAtIso: string | undefined
+  if (!useSlots.value && (fallbackDate.value || fallbackTime.value)) {
+    if (!fallbackDate.value || !fallbackTime.value) {
+      errorMsg.value = 'Pick both a date and a time.'
+      return
+    }
+    const candidate = new Date(`${fallbackDate.value}T${fallbackTime.value}`)
+    if (Number.isNaN(candidate.getTime()) || candidate.getTime() < Date.now()) {
+      errorMsg.value = 'Pick a time that is now or later.'
+      return
+    }
+    startsAtIso = candidate.toISOString()
+  }
+
   const ok = await meetings.request({
     to: selected.value.id,
     title: title.value.trim() || undefined,
@@ -112,7 +180,7 @@ async function submit() {
     location: needsLocation.value ? location.value.trim() : undefined,
     ...(useSlots.value
       ? { date: selectedDate.value, slot: selectedSlot.value }
-      : { starts_at: startsAt.value ? new Date(startsAt.value).toISOString() : undefined }),
+      : { starts_at: startsAtIso }),
   })
 
   if (ok) { emit('close'); return }
@@ -233,11 +301,30 @@ async function submit() {
           <p v-else class="hint">No slots on this day.</p>
         </div>
 
-        <!-- Fallback: free-form time when the lounge has no configured slots -->
-        <label v-else class="field">
+        <!-- Fallback: pick a day, then a time — when the lounge has no configured slots -->
+        <div v-else class="field">
           <span>Proposed time <em>(optional)</em></span>
-          <input v-model="startsAt" type="datetime-local">
-        </label>
+
+          <div v-if="fallbackDates.length" class="dates">
+            <button
+              v-for="d in fallbackDates" :key="d" type="button" class="date"
+              :class="{ on: fallbackDate === d }"
+              :disabled="isPastDate(d)"
+              @click="pickFallbackDate(d)"
+            >{{ fmtDateTab(d) }}</button>
+          </div>
+          <input v-else v-model="fallbackDate" type="date" :min="todayIso()">
+
+          <div v-if="fallbackDate" class="slots times">
+            <button
+              v-for="t in timeOptions" :key="t" type="button" class="slot"
+              :class="{ on: fallbackTime === t, taken: isPastTime(t) }"
+              :disabled="isPastTime(t)"
+              :title="isPastTime(t) ? 'Already passed' : ''"
+              @click="pickFallbackTime(t)"
+            >{{ t }}</button>
+          </div>
+        </div>
 
         <p v-if="errorMsg" class="err">{{ errorMsg }}</p>
 
@@ -304,6 +391,7 @@ async function submit() {
 .place svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.slots.times { max-height: 168px; overflow-y: auto; margin-top: 10px; padding-right: 2px; }
 .slot { border: 1px solid #e2e8f0; background: #fff; border-radius: 9px; padding: 9px 6px; font: inherit; font-size: .8rem; font-weight: 600; color: #334155; cursor: pointer; }
 .slot:hover:not(:disabled) { border-color: var(--brand-primary); color: var(--brand-primary); }
 .slot.on { border-color: var(--brand-primary); background: var(--brand-primary); color: #fff; }

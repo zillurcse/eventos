@@ -23,6 +23,10 @@ export default defineNuxtConfig({
   ssr: false,
 
   runtimeConfig: {
+    // Server-only: where the image proxy (server/api/image-proxy) reaches
+    // MinIO from inside its own container. Empty in prod, where the stored
+    // URL is already a real public bucket/CDN address the proxy can hit directly.
+    minioInternalBase: '',
     public: {
       apiBase: 'http://localhost:8088/api/v1',
       // Platform apex for subdomain → event resolution (see useEventSubdomain).

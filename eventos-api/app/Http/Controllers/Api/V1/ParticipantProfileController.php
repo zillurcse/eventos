@@ -43,13 +43,28 @@ class ParticipantProfileController extends Controller
         $participation = $this->participation($request);
 
         $data = $request->validate([
+            'first_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
             'job_title' => ['nullable', 'string', 'max:150'],
             'company' => ['nullable', 'string', 'max:150'],
             'bio' => ['nullable', 'string', 'max:2000'],
             'avatar_url' => ['nullable', 'string', 'max:2000'],
             'phone' => ['nullable', 'string', 'max:40'],
+            'gender' => ['nullable', 'string', 'max:40'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'zip_code' => ['nullable', 'string', 'max:20'],
+            'purpose_of_visit' => ['nullable', 'string', 'max:300'],
+            'purchasing_decision' => ['nullable', 'string', 'max:300'],
+            'language' => ['nullable', 'string', 'max:20'],
+            'timezone' => ['nullable', 'string', 'max:60'],
             'interests' => ['nullable', 'array', 'max:12'],
             'interests.*' => ['string', 'max:40'],
+            'looking_for' => ['nullable', 'array', 'max:12'],
+            'looking_for.*' => ['string', 'max:40'],
+            'offering' => ['nullable', 'array', 'max:12'],
+            'offering.*' => ['string', 'max:40'],
             'social' => ['nullable', 'array'],
             'social.linkedin' => ['nullable', 'string', 'max:300'],
             'social.twitter' => ['nullable', 'string', 'max:300'],
@@ -60,9 +75,19 @@ class ParticipantProfileController extends Controller
             'complete_onboarding' => ['nullable', 'boolean'],
         ]);
 
+        // First/last name live on the shared Contact record (name is global to
+        // the person, not per-event), so they're saved there rather than into
+        // this participation's profile_data.
+        if ($participation->contact && (isset($data['first_name']) || isset($data['last_name']))) {
+            $participation->contact->fill(collect($data)->only(['first_name', 'last_name'])->all())->save();
+        }
+
         $profile = array_merge(
             $participation->profile_data ?? [],
-            collect($data)->except('complete_onboarding')->filter(fn ($v) => $v !== null)->all(),
+            collect($data)
+                ->except(['complete_onboarding', 'first_name', 'last_name'])
+                ->filter(fn ($v) => $v !== null)
+                ->all(),
         );
 
         $meta = $participation->meta ?? [];
@@ -72,7 +97,7 @@ class ParticipantProfileController extends Controller
 
         $participation->update(['profile_data' => $profile, 'meta' => $meta]);
 
-        $fresh = $participation->fresh();
+        $fresh = $participation->fresh(['contact']);
 
         return response()->json([
             'data' => $this->profile($fresh),
@@ -110,13 +135,26 @@ class ParticipantProfileController extends Controller
 
         return [
             'name' => $contact?->fullName(),
+            'first_name' => $contact?->first_name ?? '',
+            'last_name' => $contact?->last_name ?? '',
             'email' => $contact?->email,
             'job_title' => $profile['job_title'] ?? ($profile['designation'] ?? ''),
             'company' => $profile['company'] ?? '',
             'bio' => $profile['bio'] ?? '',
             'avatar_url' => $profile['avatar_url'] ?? ($profile['image_url'] ?? null),
             'phone' => $profile['phone'] ?? '',
+            'gender' => $profile['gender'] ?? '',
+            'country' => $profile['country'] ?? '',
+            'state' => $profile['state'] ?? '',
+            'city' => $profile['city'] ?? '',
+            'zip_code' => $profile['zip_code'] ?? '',
+            'purpose_of_visit' => $profile['purpose_of_visit'] ?? '',
+            'purchasing_decision' => $profile['purchasing_decision'] ?? '',
+            'language' => $profile['language'] ?? '',
+            'timezone' => $profile['timezone'] ?? '',
             'interests' => $profile['interests'] ?? [],
+            'looking_for' => $profile['looking_for'] ?? [],
+            'offering' => $profile['offering'] ?? [],
             'social' => $profile['social'] ?? [],
             'onboarded_at' => $participation->meta['onboarded_at'] ?? null,
         ];

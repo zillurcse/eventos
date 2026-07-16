@@ -11,6 +11,7 @@ use App\Models\ExhibitorMeetingRequest;
 use App\Models\ExhibitorMember;
 use App\Models\Meeting;
 use App\Models\Participation;
+use App\Services\BreakoutRoom\Providers\LiveKitProvider;
 use App\Services\Notifications\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,16 @@ use Illuminate\Support\Collection;
 class MeetingController extends Controller
 {
     use HandlesMeetingLocation, NormalizesTimestamps;
+
+    // How early you may join before starts_at, how long an untimed slot is
+    // assumed to run, and how long after the end the room still admits you.
+    private const JOIN_LEAD_MINUTES = 10;
+
+    private const DEFAULT_DURATION_MINUTES = 30;
+
+    private const JOIN_GRACE_MINUTES = 15;
+
+    public function __construct(private LiveKitProvider $livekit) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -326,6 +337,47 @@ class MeetingController extends Controller
         );
 
         return response()->json(['data' => $this->format($record->fresh('participants.contact'), $me)]);
+    }
+
+    /**
+     * Mint a LiveKit join config for a confirmed one-to-one meeting that is
+     * currently running. Untimed meetings (no proposed time was ever set) have
+     * no window to enforce — they're joinable any time once confirmed.
+     * POST /events/{event}/meetings/{meeting}/join
+     */
+    public function join(string $event, string $meeting, Request $request): JsonResponse
+    {
+        $eventId = $request->attributes->get('event_id');
+        $me = $request->attributes->get('participation_id');
+
+        $record = Meeting::with('participants.contact')
+            ->where('uuid', $meeting)
+            ->where('event_id', $eventId)
+            ->firstOrFail();
+
+        abort_unless($record->type === 'one_on_one', 422, 'Group meetings don\'t join over video here.');
+        abort_unless($record->status === 'confirmed', 422, 'This meeting hasn\'t been confirmed yet.');
+
+        $mine = $record->participants->firstWhere('id', $me);
+        abort_unless($mine, 403, 'You are not part of this meeting.');
+
+        if ($record->starts_at) {
+            $opensAt = $record->starts_at->copy()->subMinutes(self::JOIN_LEAD_MINUTES);
+            $endsAt = $record->ends_at ?? $record->starts_at->copy()->addMinutes(self::DEFAULT_DURATION_MINUTES);
+            $closesAt = $endsAt->copy()->addMinutes(self::JOIN_GRACE_MINUTES);
+
+            abort_if(now()->lt($opensAt), 422, 'This meeting hasn\'t started yet.');
+            abort_if(now()->gt($closesAt), 422, 'This meeting has already ended.');
+        }
+
+        $config = $this->livekit->joinConfigForRoom('meeting_'.$record->uuid, [
+            'identity' => 'user_'.($request->user()?->uuid ?? 'guest'),
+            'name' => $this->name($mine),
+            'role' => 'attendee',
+            'canPublish' => true,
+        ]);
+
+        return response()->json(['data' => $config + ['title' => $record->title ?: 'Meeting']]);
     }
 
     /**

@@ -244,6 +244,9 @@ services:
       NUXT_PUBLIC_REVERB_PORT: "${REVERB_PORT:-8081}"
       # Platform apex for per-event subdomains (<subdomain>.<base>). Match PLATFORM_APEX.
       NUXT_PUBLIC_EVENT_BASE_DOMAIN: "${EVENT_BASE_DOMAIN:-expouse.test}"
+      # Lets server/api/image-proxy reach MinIO from inside this container —
+      # the public localhost:9000 URL stored on profiles only resolves in the browser.
+      NUXT_MINIO_INTERNAL_BASE: "http://minio:9000"
 
 volumes:
   pgdata:

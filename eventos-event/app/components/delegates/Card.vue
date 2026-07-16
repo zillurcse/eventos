@@ -5,6 +5,7 @@ const props = defineProps<{ delegate: Delegate }>()
 const store = useDelegatesStore()
 const chat = useChatStore()
 const bookmarks = useBookmarksStore()
+const auth = useAuthStore()
 
 const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
 const connectState = computed(() => store.connected[props.delegate.id])
@@ -69,6 +70,7 @@ const subtitle = computed(() => {
         >
           <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4zM12 8v5M9.5 10.5h5" /></svg>
         </button>
+        <EventNotePopover v-if="auth.isAuthed" type="delegate" :id="delegate.id" />
       </div>
 
       <button class="contact" type="button" :disabled="contacting" @click="contact">

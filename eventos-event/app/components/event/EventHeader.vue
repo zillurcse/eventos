@@ -86,6 +86,7 @@ const notifications = useNotificationsStore()
 const chat = useChatStore()
 const presence = usePresenceStore()
 const briefcase = useBriefcaseStore()
+const profile = useProfileStore()
 
 const menuOpen = ref(false)
 const bellOpen = ref(false)
@@ -106,6 +107,9 @@ onMounted(() => {
     if (mod('notifications')) notifications.start()
     if (mod('chat') && !chat.loaded) chat.fetchInbox()
     if (mod('briefcase')) briefcase.fetch()
+    // So the header avatar shows the same photo the Edit Profile page saves —
+    // both read this one store, so a save there updates the header live.
+    profile.fetch()
   }
 })
 onBeforeUnmount(() => {
@@ -194,7 +198,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
       <div class="user">
         <button class="user-btn" type="button" @click.stop="menuOpen = !menuOpen">
           <span class="avatar">
-            <UserAvatar :name="auth.user?.name || site.name" />
+            <UserAvatar :src="profile.data?.avatar_url" :name="auth.user?.name || site.name" />
           </span>
         </button>
         <div v-if="menuOpen" class="menu">
@@ -202,6 +206,12 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
             <strong>{{ auth.user?.name }}</strong>
             <small>{{ auth.user?.email }}</small>
           </div>
+          <NuxtLink to="/profile" class="menu-item" @click="menuOpen = false">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0" />
+            </svg>
+            Profile
+          </NuxtLink>
           <button type="button" class="menu-item" @click="qrOpen = true; menuOpen = false">
             <svg viewBox="0 0 24 24">
               <rect x="3" y="3" width="7" height="7" rx="1" />

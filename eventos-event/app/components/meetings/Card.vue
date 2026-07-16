@@ -1,10 +1,36 @@
 <script setup lang="ts">
+import type { JoinConfig } from '~/stores/rooms'
 import type { Meeting } from '~/stores/meetings'
 
 const props = defineProps<{ meeting: Meeting }>()
+const emit = defineEmits<{ join: [config: JoinConfig & { title: string }] }>()
 const store = useMeetingsStore()
 
 const acting = computed(() => store.acting[props.meeting.id] === true)
+const joining = computed(() => store.joining[props.meeting.id] === true)
+
+// Mirrors the server-side join window (MeetingController::join): joinable
+// from 10 minutes before starts_at through 15 minutes past the end — an
+// untimed meeting (no proposed time was ever set) has no window at all.
+const JOIN_LEAD_MS = 10 * 60_000
+const DEFAULT_DURATION_MS = 30 * 60_000
+const JOIN_GRACE_MS = 15 * 60_000
+
+const isRunning = computed(() => {
+  const m = props.meeting
+  if (m.status !== 'confirmed' || m.source !== 'delegate') return false
+  if (!m.starts_at) return true
+
+  const start = new Date(m.starts_at).getTime()
+  const end = m.ends_at ? new Date(m.ends_at).getTime() : start + DEFAULT_DURATION_MS
+  const now = Date.now()
+  return now >= start - JOIN_LEAD_MS && now <= end + JOIN_GRACE_MS
+})
+
+async function join() {
+  const cfg = await store.join(props.meeting)
+  if (cfg) emit('join', cfg)
+}
 
 const person = computed(() => props.meeting.counterpart)
 
@@ -96,6 +122,13 @@ const badge = computed(() => {
     <div v-else-if="meeting.direction === 'outgoing' && meeting.status === 'requested'" class="acts">
       <button type="button" class="btn cancel" :disabled="acting" @click="store.respond(meeting, 'cancel')">Cancel request</button>
     </div>
+    <!-- Confirmed and running → join the live video room -->
+    <div v-else-if="isRunning" class="acts">
+      <button type="button" class="btn join" :disabled="joining" @click="join">
+        <svg viewBox="0 0 24 24"><path d="M3 7h11v10H3zM14 10l7-3v10l-7-3z" /></svg>
+        {{ joining ? 'Joining…' : 'Join meeting' }}
+      </button>
+    </div>
   </article>
 </template>
 
@@ -132,4 +165,6 @@ const badge = computed(() => {
 .btn.reject:hover:not(:disabled) { background: #fdecec; color: #dc2626; }
 .btn.cancel { background: #f1f5f9; color: #475569; }
 .btn.cancel:hover:not(:disabled) { background: #fdecec; color: #dc2626; }
+.btn.join { display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: var(--brand-primary); color: #fff; }
+.btn.join svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 </style>
