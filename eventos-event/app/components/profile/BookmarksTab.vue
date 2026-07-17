@@ -88,7 +88,7 @@ const empty = computed(() => {
       </div>
 
       <div v-else-if="tab === 'sessions'" class="sessions">
-        <SessionsCard v-for="s in savedSessions" :key="s.id" :session="s" :tz="sessions.eventTimezone" />
+        <SessionsCard v-for="s in savedSessions" :key="s.id" :session="s" :tz="deviceTimezone()" />
       </div>
 
       <div v-else-if="tab === 'exhibitors'" class="cards exhibitors">

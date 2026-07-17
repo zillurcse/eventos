@@ -20,7 +20,9 @@ const session = computed<AgendaSession | null>(
   () => store.sessions.find((s: AgendaSession) => s.id === id.value) ?? null,
 )
 
-const tz = computed(() => session.value?.timezone || store.eventTimezone || 'UTC')
+// The viewer's own device timezone, not the session's — times read out in
+// whatever hours the attendee's clock already shows.
+const tz = computed(() => deviceTimezone())
 
 // ── Live / upcoming / ended, evaluated in real time ────────────────────────
 const now = ref(Date.now())

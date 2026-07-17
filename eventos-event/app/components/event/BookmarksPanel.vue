@@ -74,7 +74,7 @@ function ordinal(n: number) {
 
 function whenLabel(iso: string | null, endIso: string | null) {
   if (!iso) return 'Time TBA'
-  const tz = sessions.eventTimezone
+  const tz = deviceTimezone()
   const part = (opts: Intl.DateTimeFormatOptions, d: Date) =>
     new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(d)
   const d = new Date(iso)

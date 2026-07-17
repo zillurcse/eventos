@@ -13,13 +13,14 @@ const selectedTags = ref<Set<string>>(new Set())
 const selectedSpeakers = ref<Set<string>>(new Set())
 const selectedDay = ref<string | null>(null)
 const savedOnly = ref(false)
-const tz = ref('UTC')
+// Default to the viewer's own device timezone, not the event's — attendees
+// should see "when" in the hours their clock actually shows.
+const tz = ref(deviceTimezone())
 
 onMounted(async () => {
   bookmarks.fetch()
   store.fetchAds()
   await store.fetchSessions()
-  tz.value = store.eventTimezone
   buildDays()
   // Default to the event's first day (or today if it's within the range).
   if (days.value.length) {
@@ -31,7 +32,7 @@ onMounted(async () => {
 // ── Timezone options ─────────────────────────────────────────────────────
 const tzOptions = computed(() => {
   const base = ['UTC', 'Asia/Dhaka', 'Asia/Riyadh', 'Asia/Dubai', 'Europe/London', 'America/New_York']
-  return Array.from(new Set([store.eventTimezone, ...base]))
+  return Array.from(new Set([deviceTimezone(), store.eventTimezone, ...base]))
 })
 
 watch(tz, () => { buildDays(); if (days.value.length && !days.value.includes(selectedDay.value || '')) selectedDay.value = days.value[0]! })

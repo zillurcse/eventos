@@ -101,7 +101,7 @@ function onJoin(cfg: JoinConfig & { title: string }) {
         <h2 class="day-label">{{ g.label }}</h2>
         <div class="items">
           <template v-for="e in g.items" :key="e.key">
-            <SessionsCard v-if="e.kind === 'session'" :session="(e.item as AgendaSession)" :tz="sessions.eventTimezone" />
+            <SessionsCard v-if="e.kind === 'session'" :session="(e.item as AgendaSession)" :tz="deviceTimezone()" />
             <MeetingsCard v-else :meeting="(e.item as Meeting)" @join="onJoin" />
           </template>
         </div>

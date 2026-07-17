@@ -55,10 +55,10 @@ const schedule = computed<AgendaSession[]>(() =>
     }),
 )
 
-/** "NOV 18 | TUE | 11:00 AM - 01:00 PM" in the event's timezone. */
+/** "NOV 18 | TUE | 11:00 AM - 01:00 PM" in the viewer's own timezone. */
 function whenLabel(s: AgendaSession) {
   if (!s.starts_at) return 'Time TBA'
-  const tz = sessionsStore.eventTimezone
+  const tz = deviceTimezone()
   const d = new Date(s.starts_at)
   const part = (opts: Intl.DateTimeFormatOptions, date: Date) =>
     new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(date)

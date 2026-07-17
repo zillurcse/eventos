@@ -9,10 +9,9 @@ const bookmarks = useBookmarksStore()
 
 const visible = computed(() => props.limit ? props.sessions.slice(0, props.limit) : props.sessions)
 
-// A session's own resolved timezone (organizer override, or the event's),
-// always sent by the backend — falls back to UTC only if that's ever missing.
-function zoneOf(s: ReceptionSession): string {
-  return s.timezone || 'UTC'
+// Times are shown in the viewer's own device timezone, not the session's.
+function zoneOf(_s: ReceptionSession): string {
+  return deviceTimezone()
 }
 
 const heading = computed(() => {
