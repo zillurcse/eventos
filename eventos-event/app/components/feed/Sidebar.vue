@@ -88,7 +88,7 @@ watch(filters, (list) => {
 </template>
 
 <style scoped>
-.rail { display: flex; flex-direction: column; gap: 16px; }
+.rail { display: flex; flex-direction: column; gap: 24px; padding: 32px; box-sizing: border-box; }
 .card { background: #fff; border-radius: 14px; padding: 18px 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .title { margin: 0 6px 6px; padding-bottom: 12px; border-bottom: 1px solid #eef0f3; color: #334155; font-weight: 700; font-size: 1rem; }
 .list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }

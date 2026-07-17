@@ -13,7 +13,7 @@ const id = computed(() => route.params.id as string)
 
 onMounted(async () => {
   bookmarks.fetch()
-  if (!store.loaded) await store.fetchSessions()
+  await store.fetchSessions()
 })
 
 const session = computed<AgendaSession | null>(
@@ -750,6 +750,10 @@ async function confirmMute(a: PanelAttendee) {
 
 const speakers = computed(() => session.value?.speakers ?? [])
 const sponsors = computed(() => session.value?.sponsors ?? [])
+const documents = computed(() => session.value?.documents ?? [])
+function docKind(name: string) {
+  return (name.split('.').pop() || '').toUpperCase().slice(0, 5)
+}
 </script>
 
 <template>
@@ -782,12 +786,12 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
               <div ref="agoraRoot" class="fill" />
 
               <!-- Nothing on the wire yet: the host hasn't gone on camera. -->
-              <div v-if="agoraState === 'joined' && !agoraLiveNow" class="placeholder over">
+              <div v-if="agoraState === 'joined' && !agoraLiveNow" class="stream-ph over">
                 <span class="dot" />
                 <p class="ph-title">Waiting for the host</p>
                 <p class="ph-sub">The video will appear here as soon as they go on camera.</p>
               </div>
-              <div v-else-if="agoraState !== 'joined'" class="placeholder over">
+              <div v-else-if="agoraState !== 'joined'" class="stream-ph over">
                 <template v-if="agoraState === 'error'">
                   <p class="ph-title">Couldn’t join the video</p>
                   <p class="ph-sub">{{ agoraError }}</p>
@@ -818,7 +822,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                 :autoplay="player.live"
                 :muted="player.live"
               />
-              <div v-if="videoError" class="placeholder over">
+              <div v-if="videoError" class="stream-ph over">
                 <p class="ph-title">Couldn’t play this stream</p>
                 <p class="ph-sub">{{ videoError }}</p>
                 <a :href="player.src" target="_blank" rel="noopener" class="btn danger">Open the stream directly</a>
@@ -826,7 +830,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             </div>
             <div v-else-if="player.kind === 'zoom'" class="fill">
               <div ref="zoomRoot" class="fill" />
-              <div v-if="zoomState !== 'joined'" class="placeholder over">
+              <div v-if="zoomState !== 'joined'" class="stream-ph over">
                 <template v-if="zoomState === 'error'">
                   <p class="ph-title">Couldn’t start Zoom here</p>
                   <p class="ph-sub">{{ zoomError }}</p>
@@ -837,7 +841,7 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             </div>
             <div v-else-if="player.kind === 'jitsi'" class="fill">
               <div ref="jitsiRoot" class="fill" />
-              <div v-if="jitsiState === 'loading' || jitsiState === 'error'" class="placeholder over">
+              <div v-if="jitsiState === 'loading' || jitsiState === 'error'" class="stream-ph over">
                 <template v-if="jitsiState === 'error'">
                   <p class="ph-title">Couldn’t start the video here</p>
                   <p class="ph-sub">{{ jitsiError }}</p>
@@ -846,21 +850,21 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                 <template v-else><span class="dot" /><p class="ph-title">Starting video…</p></template>
               </div>
             </div>
-            <div v-else-if="player.kind === 'join'" class="placeholder">
+            <div v-else-if="player.kind === 'join'" class="stream-ph">
               <span class="dot" />
               <p class="ph-title">This session is live</p>
               <p class="ph-sub">Your host runs on a platform that opens in a new tab.</p>
               <a :href="player.url" target="_blank" rel="noopener" class="btn danger">{{ player.label }}</a>
             </div>
-            <div v-else-if="player.kind === 'replay'" class="placeholder">
+            <div v-else-if="player.kind === 'replay'" class="stream-ph">
               <p class="ph-title">Session recording</p>
               <a :href="player.url" target="_blank" rel="noopener" class="btn">Open recording</a>
             </div>
-            <div v-else-if="player.kind === 'upcoming'" class="placeholder">
+            <div v-else-if="player.kind === 'upcoming'" class="stream-ph">
               <p class="ph-title">{{ countdown }}</p>
               <p class="ph-sub">The stream will appear here when the session goes live.</p>
             </div>
-            <div v-else class="placeholder">
+            <div v-else class="stream-ph">
               <p class="ph-title">No stream available</p>
               <p class="ph-sub">There’s no live stream or recording for this session yet.</p>
             </div>
@@ -890,6 +894,10 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
             <div class="when">
               <svg viewBox="0 0 24 24"><path d="M7 4v3M17 4v3M4 9h16M5 7h14v13H5z" /></svg>
               {{ dateTimeLabel }}
+            </div>
+            <div v-if="session.session_place" class="when">
+              <svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
+              {{ session.session_place }}
             </div>
 
             <div class="actions">
@@ -957,10 +965,33 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
                 <div class="cards">
                   <div v-for="sp in sponsors" :key="sp.id" class="scard">
                     <div class="sbanner">
-                      <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name">
-                      <span v-else>{{ sp.name }}</span>
+                      <AppImage :src="sp.logo_url" :alt="sp.name" />
                     </div>
                     <div class="sname">{{ sp.name }}</div>
+                  </div>
+                </div>
+              </section>
+            </template>
+
+            <template v-if="documents.length">
+              <hr>
+              <section>
+                <h3 class="h">Files and Documents</h3>
+                <div class="docs">
+                  <div v-for="d in documents" :key="d.url" class="doc">
+                    <span class="docico">
+                      <svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M14 3v5h5" /></svg>
+                    </span>
+                    <div class="docbody">
+                      <span class="docname">{{ d.name }}</span>
+                      <span class="dockind">{{ docKind(d.name) }} FILE</span>
+                    </div>
+                    <a :href="d.url" target="_blank" rel="noopener" class="docact" title="Open">
+                      <svg viewBox="0 0 24 24"><path d="M14 3h7v7M21 3l-9 9M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" /></svg>
+                    </a>
+                    <a :href="d.url" download class="docact" title="Download">
+                      <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+                    </a>
                   </div>
                 </div>
               </section>
@@ -1299,8 +1330,8 @@ const sponsors = computed(() => session.value?.sponsors ?? [])
 .main { min-width: 0; }
 .screen { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #0b1020; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 30px rgba(15,23,42,.14); }
 .frame, .fill { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px; color: #cbd5e1; }
-.placeholder.over { background: rgba(11,16,32,.92); }
+.stream-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px; color: #cbd5e1; }
+.stream-ph.over { background: rgba(11,16,32,.92); }
 .ph-title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #fff; }
 .ph-sub { margin: 0; font-size: .86rem; color: #94a3b8; max-width: 380px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,.6); animation: pulse 1.6s infinite; }
@@ -1362,9 +1393,20 @@ hr { border: none; border-top: 1px solid #eef0f3; margin: 18px 0; }
 .prole { font-size: .78rem; color: #64748b; margin-top: 3px; line-height: 1.35; }
 
 .scard { border: 1px solid #eef0f3; border-radius: 12px; overflow: hidden; }
-.sbanner { aspect-ratio: 16 / 7; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; color: #94a3b8; font-weight: 700; padding: 10px; }
-.sbanner img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.sbanner { aspect-ratio: 16 / 7; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px; }
+.sbanner :deep(.app-img) { object-fit: contain; }
 .sname { padding: 10px 12px; font-size: .84rem; font-weight: 700; color: #334155; }
+
+.docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.doc { display: flex; align-items: center; gap: 10px; border: 1px solid #eef0f3; border-radius: 10px; padding: 10px 12px; }
+.docico { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 8px; background: #fef2f2; color: #ef4444; display: flex; align-items: center; justify-content: center; }
+.docico svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.docbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.docname { font-size: .84rem; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dockind { font-size: .68rem; color: #94a3b8; font-weight: 700; letter-spacing: .3px; }
+.docact { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.docact:hover { background: #f4f5f8; color: var(--brand-primary); }
+.docact svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Engagement panel */
 .panel { position: sticky; top: 12px; background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); overflow: hidden; display: flex; flex-direction: column; height: min(680px, calc(100vh - 90px)); }

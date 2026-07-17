@@ -113,7 +113,7 @@ const extraSpeakers = computed(() => Math.max(0, props.session.speakers.length -
         </div>
         <div v-if="session.sponsors?.length" class="sponsors">
           <span v-for="sp in session.sponsors.slice(0, 3)" :key="sp.id" class="sponsor" :title="sp.name">
-            <AppImage :src="sp.logo_url" :alt="sp.name" />
+            <UserAvatar :src="sp.logo_url" :name="sp.name" />
           </span>
         </div>
       </div>

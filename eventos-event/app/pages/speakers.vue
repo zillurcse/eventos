@@ -15,7 +15,7 @@ const savedOnly = ref(false)
 onMounted(() => {
   if (!store.loaded) store.fetchSpeakers()
   // Prefetch the agenda so the profile modal's schedule renders instantly.
-  if (!sessionsStore.loaded && !sessionsStore.loading) sessionsStore.fetchSessions()
+  sessionsStore.fetchSessions()
   bookmarks.fetch()
 })
 

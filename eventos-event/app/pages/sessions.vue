@@ -18,7 +18,7 @@ const tz = ref('UTC')
 
 onMounted(async () => {
   bookmarks.fetch()
-  if (!store.loaded) await store.fetchSessions()
+  await store.fetchSessions()
   tz.value = store.eventTimezone
   buildDays()
   // Default to the event's first day (or today if it's within the range).

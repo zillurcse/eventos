@@ -28,10 +28,10 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 
 <template>
   <div class="page">
-    <ReceptionAdStrip v-if="feed.ads.length" :ads="feed.ads" class="banner" />
-
     <div class="grid">
       <div class="col">
+        <ReceptionAdStrip v-if="feed.ads.length" :ads="feed.ads" class="banner" />
+
         <div class="search">
           <input v-model="searchTerm" type="text" placeholder="Search...">
           <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
@@ -58,11 +58,11 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 </template>
 
 <style scoped>
-.page { display: flex; flex-direction: column; gap: 18px; }
+.page { display: flex; flex-direction: column; }
 .banner { width: 100%; }
 
-.grid { display: grid; grid-template-columns: minmax(0, 620px) 300px; gap: 20px; justify-content: center; align-items: start; }
-.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.grid { display: grid; grid-template-columns: minmax(0, 1008px) 432px; justify-content: center; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 32px; min-width: 0; padding: 32px; box-sizing: border-box; }
 .rail { position: sticky; top: 16px; }
 
 .search { position: relative; }
@@ -78,6 +78,7 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 
 @media (max-width: 920px) {
   .grid { grid-template-columns: 1fr; }
+  .col { padding: 16px; }
   .rail { position: static; }
 }
 </style>

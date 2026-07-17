@@ -295,6 +295,7 @@ onMounted(load)
                 :model-value="img.image_url"
                 :aspect="2"
                 collection="ad_image"
+                :gallery-path="`/events/${id}/gallery`"
                 card-width="220px"
                 hint="Recommended 2:1 ratio."
                 @update:model-value="setImageUrl(img, $event)"

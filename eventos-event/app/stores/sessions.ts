@@ -19,6 +19,11 @@ export interface SessionTrack {
   color?: string | null
 }
 
+export interface SessionDocument {
+  name: string
+  url: string
+}
+
 export interface AgendaSession {
   id: string
   title: string
@@ -34,6 +39,7 @@ export interface AgendaSession {
   icon_url: string | null
   tags: string[]
   sponsors: SessionSponsor[]
+  documents: SessionDocument[]
   is_featured: boolean
   is_stream: boolean
   stream_link: string | null
@@ -68,6 +74,11 @@ export const useSessionsStore = defineStore('sessions', {
     loading: false,
     loaded: false,
     error: false,
+    // The subdomain `data` was fetched for. A stale store from a previously
+    // viewed event must not be mistaken for "loaded" once the tab switches
+    // events (deep link, ?subdomain= change) — that silently searches the
+    // wrong event's session list and every lookup by id comes up empty.
+    loadedSubdomain: null as string | null,
   }),
 
   getters: {
@@ -80,9 +91,13 @@ export const useSessionsStore = defineStore('sessions', {
   },
 
   actions: {
+    /** Safe to call unconditionally — no-ops once `data` is fresh for the
+     *  current subdomain, refetches when it isn't. */
     async fetchSessions() {
       const sub = useEventSubdomain()
       if (!sub) { this.error = true; return }
+      if (this.loading) return
+      if (this.loaded && this.loadedSubdomain === sub) return
 
       this.loading = true
       this.error = false
@@ -93,6 +108,7 @@ export const useSessionsStore = defineStore('sessions', {
         })
         this.data = res.data
         this.loaded = true
+        this.loadedSubdomain = sub
       } catch {
         this.error = true
       } finally {
