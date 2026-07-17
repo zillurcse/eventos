@@ -10,7 +10,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="card">
+  <div class="px-5 py-5">
     <div class="flex items-center gap-3 mb-4">
       <div class="w-9 h-9 rounded-xl bg-brand-soft grid place-items-center shrink-0">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">

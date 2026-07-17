@@ -28,6 +28,7 @@ const nav = reactive<any>({
   feed_tabs:    { items: mk(DEFAULT_FEED) },
   modules:      Object.fromEntries(MODULES.map(m => [m.key, true])),
   welcome_video: { type: 'youtube', url: '', show_after_login: false, show_on_home: false },
+  nav_bar:      { icons: true, labels: true },
 })
 
 const saving = ref(false)
@@ -39,6 +40,7 @@ async function load() {
   if (n.feed_tabs?.items?.length)    nav.feed_tabs.items = n.feed_tabs.items
   if (n.modules)                     Object.assign(nav.modules, n.modules)
   if (n.welcome_video)               Object.assign(nav.welcome_video, n.welcome_video)
+  if (n.nav_bar)                     Object.assign(nav.nav_bar, n.nav_bar)
 }
 
 async function save() {
@@ -77,7 +79,7 @@ onMounted(load)
     </div>
 
     <!-- Sections -->
-    <div class="flex flex-col gap-4">
+    <div class="card p-0! divide-y divide-line">
       <NavigationWebAppTabs
         :tabs="nav.web_app_tabs"
         @save="save"
@@ -97,6 +99,11 @@ onMounted(load)
       <NavigationWelcomeVideo
         :video="nav.welcome_video"
         @save="save"
+      />
+
+      <NavigationNavBar
+        :nav-bar="nav.nav_bar"
+        @change="save"
       />
     </div>
 
