@@ -13,11 +13,16 @@ use Illuminate\Support\Carbon;
  */
 trait NormalizesTimestamps
 {
-    protected function utcDates(array $data, array $keys): array
+    /**
+     * @param  string|null  $timezone  Zone to assume for a naive input (no
+     *                                 offset in the string). Ignored when the
+     *                                 input already carries its own offset.
+     */
+    protected function utcDates(array $data, array $keys, ?string $timezone = null): array
     {
         foreach ($keys as $key) {
             if (array_key_exists($key, $data) && $data[$key] !== null) {
-                $data[$key] = Carbon::parse($data[$key])->utc();
+                $data[$key] = Carbon::parse($data[$key], $timezone)->utc();
             }
         }
 

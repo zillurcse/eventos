@@ -80,27 +80,33 @@ onMounted(loadDrawerData)
 
 // ── Choose Day options (derived from the event's date range) ───────────────────
 
+const eventTz = computed(() => event.value?.resolved_timezone || event.value?.timezone || 'UTC')
+
+// Pure Y-M-D arithmetic (no Date/local-tz involved) so the list of pickable
+// days can't drift a day depending on the organizer's own browser timezone.
+function nextDateStr(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10)
+}
+
 const dayOptions = computed<{ value: string, label: string }[]>(() => {
   if (!event.value?.starts_at) return []
-  const start = new Date(event.value.starts_at)
-  const end   = event.value.ends_at ? new Date(event.value.ends_at) : start
-  if (Number.isNaN(start.getTime())) return []
+  const tz    = eventTz.value
+  const start = tzDateInput(event.value.starts_at, tz)
+  const end   = event.value.ends_at ? tzDateInput(event.value.ends_at, tz) : start
+  if (!start) return []
 
   const out: { value: string, label: string }[] = []
-  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-  const last   = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  let cursor = start
   let guard = 0
-  while (cursor <= last && guard++ < 366) {
-    const value = [
-      cursor.getFullYear(),
-      String(cursor.getMonth() + 1).padStart(2, '0'),
-      String(cursor.getDate()).padStart(2, '0'),
-    ].join('-')
+  while (cursor <= end && guard++ < 366) {
     out.push({
-      value,
-      label: cursor.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }),
+      value: cursor,
+      label: new Date(`${cursor}T12:00:00Z`).toLocaleDateString([], {
+        weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      }),
     })
-    cursor.setDate(cursor.getDate() + 1)
+    cursor = nextDateStr(cursor)
   }
   return out
 })
@@ -289,6 +295,7 @@ async function save() {
         <AppInput v-model="draft.end_time" label="Schedule End" type="time" required />
       </div>
     </div>
+    <p class="text-[.76rem] text-muted mb-1">Times are in the event's timezone ({{ eventTz }}).</p>
     <p v-if="timeError" class="error mb-3">{{ timeError }}</p>
     <div v-else class="mb-3" />
 

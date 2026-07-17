@@ -9,6 +9,7 @@ interface Session {
   title: string
   starts_at: string | null
   ends_at: string | null
+  timezone?: string | null
   status: 'scheduled' | 'live' | 'ended' | 'canceled'
   session_place: string | null
   is_featured: boolean
@@ -42,9 +43,8 @@ const STATUS_DOT: Record<string, string> = {
   canceled:  'bg-red-400',
 }
 
-function fmtTime(iso: string | null): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+function fmtTime(iso: string | null, tz?: string | null): string {
+  return tzTimeLabel(iso, tz || 'UTC')
 }
 
 function duration(s: Session): string {
@@ -141,8 +141,8 @@ function remove(s: Session) { openMenuId.value = null; emit('remove', s) }
             <!-- Time range + duration -->
             <div class="flex items-center gap-2 mb-2 flex-wrap">
               <span class="text-[.82rem] font-semibold text-muted">
-                {{ s.starts_at ? fmtTime(s.starts_at) : 'TBD' }}
-                <template v-if="s.ends_at"> — {{ fmtTime(s.ends_at) }}</template>
+                {{ s.starts_at ? fmtTime(s.starts_at, s.timezone) : 'TBD' }}
+                <template v-if="s.ends_at"> — {{ fmtTime(s.ends_at, s.timezone) }}</template>
               </span>
               <span
                 v-if="duration(s)"

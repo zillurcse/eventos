@@ -7,7 +7,6 @@ const store = useSessionsStore()
 const bookmarks = useBookmarksStore()
 
 // ── Filters state ────────────────────────────────────────────────────────
-const view = ref<'list' | 'grid'>('list')
 const search = ref('')
 const activeTrack = ref<number | 'all'>('all')
 const selectedTags = ref<Set<string>>(new Set())
@@ -18,6 +17,7 @@ const tz = ref('UTC')
 
 onMounted(async () => {
   bookmarks.fetch()
+  store.fetchAds()
   await store.fetchSessions()
   tz.value = store.eventTimezone
   buildDays()
@@ -112,190 +112,225 @@ const filtered = computed<AgendaSession[]>(() => {
 
 function resetTags() { selectedTags.value = new Set() }
 function resetSpeakers() { selectedSpeakers.value = new Set() }
+function clearAdvanceFilters() {
+  selectedTags.value = new Set()
+  selectedSpeakers.value = new Set()
+  savedOnly.value = false
+}
+const hasAdvanceFilters = computed(() => selectedTags.value.size > 0 || selectedSpeakers.value.size > 0 || savedOnly.value)
+
+// ── Time-of-day grouping (matches the reference layout: a header per start
+// time, up to 3 cards, "View all sessions" to reveal the rest) ────────────
+function fmtGroupTime(iso: string) {
+  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz.value }).format(new Date(iso))
+}
+
+interface TimeGroup { key: string, label: string, sessions: AgendaSession[], live: boolean }
+
+const groups = computed<TimeGroup[]>(() => {
+  const map = new Map<string, AgendaSession[]>()
+  const order: string[] = []
+  for (const s of filtered.value) {
+    const key = s.starts_at || 'tba'
+    if (!map.has(key)) { map.set(key, []); order.push(key) }
+    map.get(key)!.push(s)
+  }
+  order.sort((a, b) => {
+    if (a === 'tba') return 1
+    if (b === 'tba') return -1
+    return new Date(a).getTime() - new Date(b).getTime()
+  })
+  const now = Date.now()
+  return order.map((key) => {
+    const list = map.get(key)!
+    const live = key !== 'tba' && list.some((s) => {
+      const start = s.starts_at ? new Date(s.starts_at).getTime() : null
+      const end = s.ends_at ? new Date(s.ends_at).getTime() : null
+      return start !== null && end !== null && now >= start && now <= end
+    })
+    return { key, label: key === 'tba' ? 'Time TBA' : fmtGroupTime(key), sessions: list, live }
+  })
+})
+
+const expandedGroups = ref<Set<string>>(new Set())
+function expandGroup(key: string) {
+  const next = new Set(expandedGroups.value)
+  next.add(key)
+  expandedGroups.value = next
+}
 </script>
 
 <template>
-  <div>
-    <div class="head">
-      <h1>Sessions</h1>
-      <p class="sub">The event agenda.</p>
-    </div>
+  <div class="page">
+    <div class="grid">
+      <!-- All main content -->
+      <div class="col">
+        <ReceptionAdStrip v-if="store.ads.length" :ads="store.ads" class="banner" />
 
-    <!-- Day selector -->
-    <div v-if="days.length" class="days">
-      <button
-        v-for="d in days"
-        :key="d"
-        type="button"
-        class="day"
-        :class="{ active: selectedDay === d }"
-        @click="selectedDay = d"
-      >
-        <strong>{{ dayLabel(d, 'day') }}</strong>
-        <span>{{ dayLabel(d, 'weekday') }}</span>
-      </button>
-    </div>
-
-    <div class="layout">
-      <!-- Sidebar -->
-      <aside class="side">
-        <div class="viewbar">
-          <button class="vw" :class="{ on: view === 'list' }" type="button" title="List view" @click="view = 'list'">
-            <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
-          </button>
-          <button class="vw" :class="{ on: view === 'grid' }" type="button" title="Grid view" @click="view = 'grid'">
-            <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>
-          </button>
+        <!-- Day selector -->
+        <div v-if="days.length" class="days">
+          <ReceptionCardCarousel>
+            <button
+              v-for="d in days"
+              :key="d"
+              type="button"
+              class="day"
+              :class="{ active: selectedDay === d }"
+              @click="selectedDay = d"
+            >
+              <strong>{{ dayLabel(d, 'day') }}</strong>
+              <span>{{ dayLabel(d, 'weekday') }}</span>
+            </button>
+          </ReceptionCardCarousel>
         </div>
 
-        <div class="box">
+        <div class="toprow">
           <div class="search">
             <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
             <input v-model="search" type="text" placeholder="Search…">
           </div>
-
-          <label class="tzlabel">Timezone</label>
-          <select v-model="tz" class="tz">
+          <select v-model="tz" class="fselect" title="Timezone">
             <option v-for="z in tzOptions" :key="z" :value="z">{{ z }}</option>
           </select>
-
-          <p class="afhead">Advance Filter</p>
-
-          <div class="group">
-            <div class="grouphead"><span>Bookmarks</span></div>
-            <div class="chips">
-              <button type="button" class="chip" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
-                Saved only{{ bookmarks.count('session') ? ` (${bookmarks.count('session')})` : '' }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="store.tags.length" class="group">
-            <div class="grouphead">
-              <span>Tags</span>
-              <button v-if="selectedTags.size" type="button" class="reset" @click="resetTags">Reset</button>
-            </div>
-            <div class="chips">
-              <button
-                v-for="t in store.tags"
-                :key="t"
-                type="button"
-                class="chip"
-                :class="{ on: selectedTags.has(t) }"
-                @click="toggleTag(t)"
-              >{{ t }}</button>
-            </div>
-          </div>
-
-          <div v-if="store.speakerOptions.length" class="group">
-            <div class="grouphead">
-              <span>Speakers</span>
-              <button v-if="selectedSpeakers.size" type="button" class="reset" @click="resetSpeakers">Reset</button>
-            </div>
-            <div class="chips col">
-              <button
-                v-for="sp in store.speakerOptions"
-                :key="sp.id"
-                type="button"
-                class="spk"
-                :class="{ on: selectedSpeakers.has(sp.id) }"
-                @click="toggleSpeaker(sp.id)"
-              >
-                <span class="spkav">
-                  <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name || ''">
-                </span>
-                <span class="spkname">{{ sp.name }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Main -->
-      <section class="main">
-        <div class="tracks">
-          <button
-            type="button"
-            class="tk"
-            :class="{ on: activeTrack === 'all' }"
-            @click="activeTrack = 'all'"
-          >All Tracks</button>
-          <button
-            v-for="t in store.tracks"
-            :key="t.id"
-            type="button"
-            class="tk"
-            :class="{ on: activeTrack === t.id }"
-            @click="activeTrack = t.id"
-          >{{ t.name }}</button>
+          <select v-model="activeTrack" class="fselect" title="Track">
+            <option value="all">Tracks : All</option>
+            <option v-for="t in store.tracks" :key="t.id" :value="t.id">{{ t.name }}</option>
+          </select>
         </div>
 
         <div v-if="store.loading && !store.loaded" class="state">Loading sessions…</div>
         <div v-else-if="store.error" class="state">Couldn’t load sessions. Please try again.</div>
         <div v-else-if="!filtered.length" class="state">No sessions match your filters.</div>
 
-        <div v-else class="list" :class="{ grid: view === 'grid' }">
-          <SessionsCard v-for="s in filtered" :key="s.id" :session="s" :tz="tz" />
+        <template v-else>
+          <div v-for="g in groups" :key="g.key" class="tgroup">
+            <div class="tghead">
+              <span v-if="g.live" class="live"><i />LIVE</span>
+              <strong>{{ g.label }}</strong>
+              <span class="count">| {{ g.sessions.length }} Session{{ g.sessions.length === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="tgrid">
+              <SessionsCard
+                v-for="s in (expandedGroups.has(g.key) ? g.sessions : g.sessions.slice(0, 3))"
+                :key="s.id"
+                :session="s"
+                :tz="tz"
+              />
+            </div>
+            <button
+              v-if="g.sessions.length > 3 && !expandedGroups.has(g.key)"
+              type="button"
+              class="viewall"
+              @click="expandGroup(g.key)"
+            >View all sessions</button>
+          </div>
+        </template>
+      </div>
+
+      <!-- Advance Filter box, and nothing else -->
+      <aside class="rail">
+        <div class="afhead">
+          <span>Advance Filter</span>
+          <button v-if="hasAdvanceFilters" type="button" class="clearall" @click="clearAdvanceFilters">Clear All</button>
         </div>
-      </section>
+
+        <div class="group">
+          <div class="grouphead"><span>Bookmarks</span></div>
+          <div class="chips">
+            <button type="button" class="chip" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
+              Saved only{{ bookmarks.count('session') ? ` (${bookmarks.count('session')})` : '' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="store.speakerOptions.length" class="group">
+          <div class="grouphead">
+            <span>Speakers</span>
+            <button v-if="selectedSpeakers.size" type="button" class="reset" @click="resetSpeakers">Reset</button>
+          </div>
+          <div class="chips">
+            <button
+              v-for="sp in store.speakerOptions"
+              :key="sp.id"
+              type="button"
+              class="chip"
+              :class="{ on: selectedSpeakers.has(sp.id) }"
+              @click="toggleSpeaker(sp.id)"
+            >{{ sp.name }}</button>
+          </div>
+        </div>
+
+        <div v-if="store.tags.length" class="group">
+          <div class="grouphead">
+            <span>Tags</span>
+            <button v-if="selectedTags.size" type="button" class="reset" @click="resetTags">Reset</button>
+          </div>
+          <div class="chips">
+            <button
+              v-for="t in store.tags"
+              :key="t"
+              type="button"
+              class="chip"
+              :class="{ on: selectedTags.has(t) }"
+              @click="toggleTag(t)"
+            >{{ t }}</button>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
-.head { margin-bottom: 16px; }
-.head h1 { margin: 0; font-size: 1.4rem; font-weight: 800; color: #1e293b; }
-.sub { margin: 4px 0 0; color: #64748b; font-size: .9rem; }
-
-.days { display: flex; gap: 10px; background: #fff; border-radius: 14px; padding: 10px; margin-bottom: 18px; overflow-x: auto; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.days { background: #fff; border-radius: 14px; padding: 10px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .day { flex: 1 0 auto; min-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 16px; border: none; border-radius: 10px; background: #fff; color: #64748b; cursor: pointer; }
 .day strong { font-size: .95rem; font-weight: 800; color: #334155; }
 .day span { font-size: .82rem; }
 .day.active { background: var(--brand-primary); }
 .day.active strong, .day.active span { color: #fff; }
 
-.layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
-@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+.page { display: flex; flex-direction: column; }
+.grid { display: grid; grid-template-columns: minmax(0, 1008px) 432px; justify-content: center; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 32px; padding: 32px; box-sizing: border-box; min-width: 0; }
 
-.side { display: flex; flex-direction: column; gap: 14px; }
-.viewbar { display: flex; gap: 8px; background: #fff; border-radius: 12px; padding: 10px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.vw { width: 40px; height: 40px; border-radius: 10px; border: none; background: #f4f5f8; color: #64748b; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-.vw.on { background: var(--brand-primary); color: #fff; }
-.vw svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.toprow { display: flex; gap: 10px; }
+.search { flex: 1; display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; padding: 0 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.search svg { width: 18px; height: 18px; fill: none; stroke: #94a3b8; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.search input { border: none; background: none; outline: none; padding: 13px 0; width: 100%; font: inherit; font-size: .9rem; color: #334155; }
+.fselect { flex: 0 0 auto; min-width: 170px; border: none; border-radius: 12px; padding: 0 14px; font: inherit; font-size: .86rem; color: #334155; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+@media (max-width: 640px) { .toprow { flex-wrap: wrap; } .fselect { flex: 1 1 auto; min-width: 0; } }
+.tghead { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tghead strong { font-size: .92rem; font-weight: 800; color: #1e293b; }
+.tghead .count { color: #64748b; font-size: .86rem; }
+.live { display: inline-flex; align-items: center; gap: 5px; background: #ef4444; color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .4px; padding: 3px 9px; border-radius: 6px; }
+.live i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
 
-.box { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.search { display: flex; align-items: center; gap: 8px; background: #f4f5f8; border-radius: 10px; padding: 0 12px; }
-.search svg { width: 17px; height: 17px; fill: none; stroke: #94a3b8; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
-.search input { border: none; background: none; outline: none; padding: 11px 0; width: 100%; font: inherit; font-size: .88rem; color: #334155; }
+.tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 860px) { .tgrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .tgrid { grid-template-columns: 1fr; } }
 
-.tzlabel { display: block; margin: 14px 0 6px; font-size: .78rem; font-weight: 600; color: #64748b; }
-.tz { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: .86rem; color: #334155; background: #fff; }
+.viewall { display: block; width: 100%; margin-top: 14px; padding: 10px 0; border: none; border-top: 1px solid #e6e8ec; background: none; color: var(--brand-primary); font-weight: 700; font-size: .86rem; cursor: pointer; }
+.viewall:hover { color: color-mix(in srgb, var(--brand-primary) 80%, #000); }
 
-.afhead { margin: 18px 0 8px; font-size: .82rem; font-weight: 700; color: #334155; }
-.group { border-top: 1px solid #eef0f3; padding-top: 12px; margin-top: 12px; }
+.state { background: #fff; border-radius: 14px; padding: 48px 0; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+
+.rail { background: #fff; border-radius: 14px; padding: 32px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 24px; position: sticky; top: 16px; }
+.afhead { display: flex; align-items: center; justify-content: space-between; font-size: .92rem; font-weight: 800; color: #1e293b; }
+.clearall { border: none; background: none; color: var(--brand-primary); font-size: .8rem; font-weight: 600; cursor: pointer; }
+
+.group { border-top: 1px solid #eef0f3; padding-top: 24px; }
 .grouphead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .grouphead span { font-size: .84rem; font-weight: 700; color: #334155; }
 .reset { border: none; background: none; color: var(--brand-primary); font-size: .76rem; font-weight: 600; cursor: pointer; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.chips.col { flex-direction: column; flex-wrap: nowrap; max-height: 280px; overflow-y: auto; }
 .chip { border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 999px; padding: 6px 12px; font-size: .78rem; cursor: pointer; }
 .chip.on { border-color: var(--brand-primary); color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, #fff); }
 
-.spk { display: flex; align-items: center; gap: 9px; border: 1px solid transparent; background: none; border-radius: 10px; padding: 6px 8px; cursor: pointer; text-align: left; width: 100%; }
-.spk:hover { background: #f7f8fa; }
-.spk.on { border-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 8%, #fff); }
-.spkav { width: 30px; height: 30px; border-radius: 50%; background: var(--brand-primary); overflow: hidden; flex: 0 0 auto; }
-.spkav img { width: 100%; height: 100%; object-fit: cover; }
-.spkname { font-size: .82rem; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.main { min-width: 0; }
-.tracks { display: flex; gap: 6px; background: #fff; border-radius: 14px; padding: 8px; margin-bottom: 16px; overflow-x: auto; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.tk { flex: 0 0 auto; border: none; background: none; color: #64748b; font-weight: 700; font-size: .86rem; padding: 8px 16px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
-.tk:hover { color: var(--brand-primary); }
-.tk.on { color: var(--brand-primary); border-bottom: 2px solid var(--brand-primary); border-radius: 0; }
-
-.state { background: #fff; border-radius: 14px; padding: 48px 0; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.list { display: flex; flex-direction: column; gap: 14px; }
-.list.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+@media (max-width: 920px) {
+  .grid { grid-template-columns: 1fr; }
+  .col { padding: 16px; }
+  .rail { position: static; margin: 0 16px 16px; }
+}
 </style>

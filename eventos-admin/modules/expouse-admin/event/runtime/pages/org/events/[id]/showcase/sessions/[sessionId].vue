@@ -174,15 +174,14 @@ const spkSaving    = ref(false)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isoToDate(iso: string | null): string {
-  if (!iso) return ''
-  return iso.slice(0, 10)
+// Stored as a UTC instant; the form always shows/edits wall-clock time in the
+// session's own timezone (falls back to the event's), not the browser's.
+function isoToDate(iso: string | null, tz: string): string {
+  return tzDateInput(iso, tz)
 }
 
-function isoToTime(iso: string | null): string {
-  if (!iso) return ''
-  // ISO stored as UTC; display in local time
-  return new Date(iso).toTimeString().slice(0, 5)
+function isoToTime(iso: string | null, tz: string): string {
+  return tzTimeInput(iso, tz)
 }
 
 function buildDatetime(date: string, time: string): string | null {
@@ -232,9 +231,10 @@ async function load() {
     // Populate basic form
     basic.title              = s.title
     basic.description        = s.description ?? ''
-    basic.date               = isoToDate(s.starts_at)
-    basic.start_time         = isoToTime(s.starts_at)
-    basic.end_time           = isoToTime(s.ends_at)
+    const tz = s.timezone || 'UTC'
+    basic.date               = isoToDate(s.starts_at, tz)
+    basic.start_time         = isoToTime(s.starts_at, tz)
+    basic.end_time           = isoToTime(s.ends_at, tz)
     basic.track_id           = s.track?.id ?? ''
     basic.session_place      = s.session_place ?? ''
     basic.logo_url           = s.logo_url ?? null
@@ -667,7 +667,10 @@ onMounted(load)
 
         <!-- Date + time -->
         <div class="card mb-5 p-5">
-          <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Schedule</h3>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-[.9rem] text-ink m-0">Schedule</h3>
+            <span class="text-[.76rem] text-muted">Times shown in {{ session.timezone || 'UTC' }}</span>
+          </div>
           <div class="mb-4">
             <label class="block mb-1.5">Date <span class="text-[#dc2626]">*</span></label>
             <input v-model="basic.date" type="date" class="m-0 w-full max-w-xs">

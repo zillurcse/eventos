@@ -58,7 +58,7 @@ const grouped = computed(() => {
 
   const map = new Map<string, Session[]>()
   for (const s of list) {
-    const key = s.starts_at ? s.starts_at.slice(0, 10) : '__none__'
+    const key = s.starts_at ? tzDateInput(s.starts_at, s.timezone || 'UTC') : '__none__'
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(s)
   }

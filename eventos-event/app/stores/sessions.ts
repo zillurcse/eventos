@@ -63,6 +63,13 @@ export interface SessionsPayload {
   sessions: AgendaSession[]
 }
 
+export interface SessionsAd {
+  id: string | number
+  title: string
+  placement: string
+  images: Array<{ image_url?: string, url?: string, redirect_url?: string, is_active?: boolean, [k: string]: any }>
+}
+
 /**
  * The public "Sessions" (agenda) payload for the event this subdomain resolves
  * to. Mirrors stores/reception.ts — a single public GET scoped to the subdomain.
@@ -79,6 +86,8 @@ export const useSessionsStore = defineStore('sessions', {
     // events (deep link, ?subdomain= change) — that silently searches the
     // wrong event's session list and every lookup by id comes up empty.
     loadedSubdomain: null as string | null,
+    ads: [] as SessionsAd[],
+    adsLoaded: false,
   }),
 
   getters: {
@@ -113,6 +122,26 @@ export const useSessionsStore = defineStore('sessions', {
         this.error = true
       } finally {
         this.loading = false
+      }
+    },
+
+    /** The "main ads" strip (organizer's AD Managements, targeted to the
+     *  Sessions page) — shown as a banner above the day tabs. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: SessionsAd[], sidebar: SessionsAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'sessions' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the page still works without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
   },

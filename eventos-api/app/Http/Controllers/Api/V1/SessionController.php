@@ -61,7 +61,11 @@ class SessionController extends Controller
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
-        $data  = $this->utcDates($data, ['starts_at', 'ends_at']);
+
+        // A bare "2026-07-17T14:00:00" (no offset) is wall-clock time in the
+        // event's own zone, not the app's UTC default — otherwise a Dhaka
+        // organizer's 2pm gets stored as 2pm UTC (8pm Dhaka) instead of 8am UTC.
+        $data = $this->utcDates($data, ['starts_at', 'ends_at'], $data['timezone'] ?? $event->resolvedTimezone());
 
         $session = Session::create([
             'event_id'   => $event->id,
@@ -92,7 +96,7 @@ class SessionController extends Controller
 
     public function update(string $uuid, Request $request): JsonResponse
     {
-        $session = Session::where('uuid', $uuid)->firstOrFail();
+        $session = Session::with('event')->where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
             'title'              => ['sometimes', 'string', 'max:250'],
@@ -121,6 +125,7 @@ class SessionController extends Controller
         $coreUpdate = $this->utcDates(
             collect($data)->except($metaKeys)->toArray(),
             ['starts_at', 'ends_at'],
+            $data['timezone'] ?? $session->resolvedTimezone(),
         );
 
         if ($metaUpdate) {
