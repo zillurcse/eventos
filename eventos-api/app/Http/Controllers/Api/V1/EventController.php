@@ -60,7 +60,10 @@ class EventController extends Controller
             'capacity' => $data['capacity'] ?? null,
             'is_public' => $data['is_public'] ?? false,
             'cover_file_id' => $data['cover_file_id'] ?? null,
-            'meta' => isset($data['location']) ? ['location' => $data['location']] : null,
+            'meta' => array_filter([
+                'location' => $data['location'] ?? null,
+                'sector' => $data['sector'] ?? null,
+            ]) ?: null,
             'created_by' => $request->user()->id,
         ]);
 
@@ -82,10 +85,18 @@ class EventController extends Controller
         $event = Event::where('uuid', $uuid)->firstOrFail();
         $data = $this->utcDates($this->validateEvent($request, creating: false), ['starts_at', 'ends_at']);
 
-        // location is delivery-dependent and lives in meta, not its own column.
+        // Location and sector are delivery-dependent/free-form and live in meta, not their own columns.
+        $metaUpdates = [];
         if (array_key_exists('location', $data)) {
-            $data['meta'] = array_merge($event->meta ?? [], ['location' => $data['location']]);
+            $metaUpdates['location'] = $data['location'];
             unset($data['location']);
+        }
+        if (array_key_exists('sector', $data)) {
+            $metaUpdates['sector'] = $data['sector'];
+            unset($data['sector']);
+        }
+        if ($metaUpdates) {
+            $data['meta'] = array_merge($event->meta ?? [], $metaUpdates);
         }
 
         $event->update($data + ['updated_by' => $request->user()->id]);
@@ -484,9 +495,18 @@ class EventController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'capacity' => ['nullable', 'integer', 'min:0'],
             'is_public' => ['nullable', 'boolean'],
-            // Delivery-dependent location, stored in meta (address for in-person, url for online).
+            // Free-text industry/category, stored in meta (no fixed enum on the backend).
+            'sector' => ['nullable', 'string', 'max:120'],
+            // Delivery-dependent location, stored in meta (address fields for in-person, url for online).
             'location' => ['nullable', 'array'],
-            'location.address' => ['nullable', 'string', 'max:500'],
+            'location.venue' => ['nullable', 'string', 'max:255'],
+            'location.street' => ['nullable', 'string', 'max:255'],
+            'location.address_line_1' => ['nullable', 'string', 'max:255'],
+            'location.address_line_2' => ['nullable', 'string', 'max:255'],
+            'location.country' => ['nullable', 'string', 'max:120'],
+            'location.state' => ['nullable', 'string', 'max:120'],
+            'location.city' => ['nullable', 'string', 'max:120'],
+            'location.zip' => ['nullable', 'string', 'max:20'],
             'location.url' => ['nullable', 'string', 'max:500'],
             // RLS scopes `files` to the active org, so exists() also enforces ownership.
             'cover_file_id' => ['nullable', 'integer', Rule::exists('files', 'id')],

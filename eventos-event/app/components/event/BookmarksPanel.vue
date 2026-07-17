@@ -10,14 +10,14 @@ const delegates = useDelegatesStore()
 const sessions = useSessionsStore()
 
 type Tab = 'exhibitors' | 'sponsors' | 'speakers' | 'delegates' | 'schedule'
-const tab = ref<Tab>('exhibitors')
+const tab = ref<Tab>('speakers')
 
 const tabs: Array<{ key: Tab, label: string }> = [
+  { key: 'speakers', label: 'Speakers' },
+  { key: 'schedule', label: 'Sessions' },
   { key: 'exhibitors', label: 'Exhibitors' },
   { key: 'sponsors', label: 'Sponsors' },
-  { key: 'speakers', label: 'Speakers' },
   { key: 'delegates', label: 'Delegates' },
-  { key: 'schedule', label: 'Schedule' },
 ]
 
 // Delegates are paginated server-side, so saved people are resolved by id
@@ -61,10 +61,15 @@ interface Row {
   type: BookmarkType
   title: string
   sub: string
+  place?: string
   image: string | null
-  round: boolean
   to: string
   open?: () => void
+}
+
+function ordinal(n: number) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0] ?? 'th')
 }
 
 function whenLabel(iso: string | null, endIso: string | null) {
@@ -73,8 +78,11 @@ function whenLabel(iso: string | null, endIso: string | null) {
   const part = (opts: Intl.DateTimeFormatOptions, d: Date) =>
     new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(d)
   const d = new Date(iso)
-  const date = part({ month: 'short', day: 'numeric' }, d).toUpperCase()
-  const time = (x: Date) => part({ hour: '2-digit', minute: '2-digit', hour12: true }, x)
+  const day = Number(part({ day: 'numeric' }, d))
+  const mo = part({ month: 'short' }, d)
+  const yr = part({ year: 'numeric' }, d)
+  const date = `${ordinal(day)} ${mo}, ${yr}`
+  const time = (x: Date) => part({ hour: 'numeric', minute: '2-digit', hour12: true }, x)
   return `${date} | ${endIso ? `${time(d)} - ${time(new Date(endIso))}` : time(d)}`
 }
 
@@ -83,12 +91,13 @@ const rows = computed<Row[]>(() => {
     case 'exhibitors':
     case 'sponsors': {
       const want = tab.value === 'sponsors' ? 'sponsor' : 'exhibitor'
+      const label = want === 'sponsor' ? 'Sponsor' : 'Exhibitor'
       return exhibitors.all
         .filter(e => e.type === want && bookmarks.isOn('exhibitor', e.id))
         .map(e => ({
           id: e.id, type: 'exhibitor' as const,
-          title: e.name, sub: e.booth ? `Booth ${e.booth}` : (e.category || ''),
-          image: e.logo_url, round: false, to: '/exhibitors',
+          title: e.name, sub: e.booth ? `${e.booth}, ${label}` : label,
+          image: e.logo_url, to: '/exhibitors',
           open: () => exhibitors.open(e),
         }))
     }
@@ -98,7 +107,7 @@ const rows = computed<Row[]>(() => {
         .map(s => ({
           id: s.id, type: 'speaker' as const,
           title: s.name || '?', sub: [s.designation, s.company].filter(Boolean).join(' · '),
-          image: s.image_url, round: true, to: '/speakers',
+          image: s.image_url, to: '/speakers',
           open: () => speakers.open(s),
         }))
     case 'delegates':
@@ -107,17 +116,17 @@ const rows = computed<Row[]>(() => {
         .map(d => ({
           id: d.id, type: 'delegate' as const,
           title: d.name || '?', sub: [d.job_title, d.company].filter(Boolean).join(' · '),
-          image: d.avatar_url, round: true, to: '/delegates',
+          image: d.avatar_url, to: '/delegates',
         }))
     case 'schedule':
       return sessions.sessions
         .filter(s => bookmarks.isOn('session', s.id))
         .map(s => ({
           id: s.id, type: 'session' as const,
-          title: s.title, sub: whenLabel(s.starts_at, s.ends_at),
+          title: s.title, sub: whenLabel(s.starts_at, s.ends_at), place: s.session_place || '',
           // icon_url may hold a catalog icon key (not a URL) for newer sessions;
           // only use it as an image when it actually points somewhere.
-          image: (s.icon_url && /^https?:\/\//.test(s.icon_url) ? s.icon_url : null) || s.logo_url, round: false, to: '/sessions',
+          image: (s.icon_url && /^https?:\/\//.test(s.icon_url) ? s.icon_url : null) || s.logo_url, to: '/sessions',
         }))
   }
   return []
@@ -137,7 +146,6 @@ function go(row: Row) {
   <div class="overlay" @click.self="emit('close')">
     <div class="panel" role="dialog" aria-modal="true" aria-label="Bookmarks">
       <header class="head">
-        <svg class="bmi" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         <h2>Bookmarks</h2>
         <button class="x" type="button" aria-label="Close" @click="emit('close')">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -159,27 +167,64 @@ function go(row: Row) {
         <p v-if="loading && !rows.length" class="empty">Loading bookmarks…</p>
         <p v-else-if="!rows.length" class="empty">Nothing saved here yet — tap the bookmark icon on a card to save it.</p>
 
-        <article v-for="r in rows" :key="r.id" class="row">
-          <button class="hit" type="button" @click="go(r)">
-            <!-- A saved list mixes people with things: a speaker with no photo
-                 gets their initials, a session with no cover gets the placeholder. -->
-            <span class="thumb" :class="{ round: r.round }">
-              <UserAvatar
-                v-if="r.type === 'speaker' || r.type === 'delegate'"
-                :src="r.image" :name="r.title"
-              />
-              <AppImage v-else :src="r.image" :alt="r.title" />
-            </span>
-            <span class="txt">
-              <strong>{{ r.title }}</strong>
-              <small v-if="r.sub">{{ r.sub }}</small>
-            </span>
-            <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
-          </button>
-          <button class="del" type="button" title="Remove bookmark" @click="bookmarks.toggle(r.type, r.id)">
-            <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" /></svg>
-          </button>
-        </article>
+        <!-- Speakers / Delegates: compact thumb row -->
+        <template v-if="tab === 'speakers' || tab === 'delegates'">
+          <article v-for="r in rows" :key="r.id" class="row">
+            <button class="hit" type="button" @click="go(r)">
+              <span class="thumb">
+                <UserAvatar :src="r.image" :name="r.title" />
+              </span>
+              <span class="txt">
+                <strong>{{ r.title }}</strong>
+                <small v-if="r.sub">{{ r.sub }}</small>
+              </span>
+            </button>
+            <button class="del" type="button" title="Remove bookmark" @click="bookmarks.toggle(r.type, r.id)">
+              <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </article>
+        </template>
+
+        <!-- Sessions: date/time row + cover photo + title + place -->
+        <template v-else-if="tab === 'schedule'">
+          <article v-for="r in rows" :key="r.id" class="scard">
+            <div class="stop">
+              <span class="swhen">{{ r.sub }}</span>
+              <button class="del" type="button" title="Remove bookmark" @click="bookmarks.toggle(r.type, r.id)">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
+            <button class="shit" type="button" @click="go(r)">
+              <span class="scover"><AppImage :src="r.image" :alt="r.title" /></span>
+              <strong class="stitle">{{ r.title }}</strong>
+              <span v-if="r.place" class="splace">
+                <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>
+                {{ r.place }}
+              </span>
+            </button>
+          </article>
+        </template>
+
+        <!-- Exhibitors / Sponsors: cover photo card with logo + name strip -->
+        <template v-else>
+          <article v-for="r in rows" :key="r.id" class="xcard">
+            <button class="xhit" type="button" @click="go(r)">
+              <span class="xcover">
+                <AppImage :src="r.image" :alt="r.title" />
+              </span>
+              <span class="xbody">
+                <span class="xmark"><AppImage :src="r.image" :alt="r.title" /></span>
+                <span class="xtext">
+                  <strong>{{ r.title }}</strong>
+                  <small v-if="r.sub">{{ r.sub }}</small>
+                </span>
+              </span>
+            </button>
+            <button class="xdel" type="button" title="Remove bookmark" @click="bookmarks.toggle(r.type, r.id)">
+              <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </article>
+        </template>
       </div>
     </div>
   </div>
@@ -190,34 +235,61 @@ function go(row: Row) {
 .panel { background: #fff; width: min(480px, 94vw); height: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: -12px 0 40px rgba(15,23,42,.22); animation: slide-in .22s ease; }
 @keyframes slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-.head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; background: #f1f2f6; }
-.bmi { width: 22px; height: 22px; fill: none; stroke: #334155; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #1e293b; flex: 1; }
-.x { border: none; background: #ef4444; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.x:hover { background: #dc2626; }
-.x svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; }
+.head { display: flex; align-items: center; gap: 10px; padding: 18px 20px 14px; }
+.head h2 { margin: 0; font-size: 1.15rem; font-weight: 700; color: #1e293b; flex: 1; }
+.x { border: none; background: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.x:hover { background: #f1f2f6; }
+.x svg { width: 15px; height: 15px; fill: none; stroke: #475569; stroke-width: 2; stroke-linecap: round; }
 
-.tabs { display: flex; gap: 4px; padding: 0 10px; border-bottom: 1px solid #eef0f3; overflow-x: auto; }
+.tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid #eef0f3; overflow-x: auto; }
 .tab { flex: 0 0 auto; border: none; background: none; padding: 13px 12px 11px; font: inherit; font-size: .88rem; font-weight: 600; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: #475569; }
 .tab.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
 
-.list { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.list { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .empty { margin: 0; padding: 28px 0; text-align: center; color: #94a3b8; font-size: .88rem; }
 
-.row { display: flex; align-items: center; gap: 8px; border: 1px solid #eef0f3; border-radius: 12px; padding: 10px 12px; }
+.row { display: flex; align-items: center; gap: 8px; border: 1px solid #eef0f3; border-radius: 14px; padding: 10px 14px; transition: border-color .15s ease; }
+.row:hover, .row:focus-within { border-color: var(--brand-primary); }
 .hit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; border: none; background: none; padding: 0; cursor: pointer; text-align: left; font: inherit; }
-.thumb { width: 46px; height: 46px; flex: 0 0 auto; border: 1px solid #eef0f3; border-radius: 8px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.thumb.round { border-radius: 50%; }
-.thumb img { width: 100%; height: 100%; object-fit: contain; }
-.thumb.round img { object-fit: cover; }
-.ini { font-size: .9rem; font-weight: 700; color: color-mix(in srgb, var(--brand-primary) 60%, #cbd5e1); }
-.txt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.txt strong { font-size: .9rem; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.txt small { color: #64748b; font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chev { width: 17px; height: 17px; margin-left: auto; flex: 0 0 auto; fill: none; stroke: #475569; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.thumb { width: 46px; height: 46px; flex: 0 0 auto; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.txt strong { font-size: .92rem; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txt small { color: #94a3b8; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.del { flex: 0 0 auto; border: none; background: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; color: #ef4444; display: inline-flex; align-items: center; justify-content: center; }
-.del:hover { background: #fee2e2; }
-.del svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.del { flex: 0 0 auto; border: none; background: none; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; color: #cbd5e1; display: inline-flex; align-items: center; justify-content: center; transition: color .15s ease; }
+.row:hover .del, .row:focus-within .del,
+.scard:hover .del, .scard:focus-within .del { color: var(--brand-primary); }
+.del:hover { background: color-mix(in srgb, var(--brand-primary) 10%, transparent); }
+.del svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* ── Sessions: date/time strip + cover photo + title + place ── */
+.scard { box-sizing: border-box; height: 282px; display: flex; flex-direction: column; border: 1px solid #eef0f3; border-radius: 16px; padding: 12px 14px 14px; transition: border-color .15s ease; }
+.scard:hover, .scard:focus-within { border-color: var(--brand-primary); }
+.stop { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.swhen { color: #94a3b8; font-size: .8rem; }
+.shit { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; border: none; background: none; padding: 0; margin-top: 10px; cursor: pointer; text-align: left; font: inherit; }
+.scover { flex: 0 0 156px; display: block; border-radius: 10px; overflow: hidden; background: #f1f5f9; }
+.scover img { width: 100%; height: 100%; object-fit: cover; }
+.stitle { flex: 0 0 auto; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 10px; font-size: .92rem; font-weight: 700; color: #1e293b; line-height: 1.35; }
+.splace { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; margin-top: 6px; color: #94a3b8; font-size: .8rem; overflow: hidden; }
+.splace svg { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.splace span, .splace { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+
+/* ── Exhibitors / Sponsors: cover photo + logo/name strip ── */
+.xcard { position: relative; box-sizing: border-box; height: 200px; display: flex; flex-direction: column; border: 1px solid #eef0f3; border-radius: 16px; overflow: hidden; transition: border-color .15s ease; }
+.xcard:hover, .xcard:focus-within { border-color: var(--brand-primary); }
+.xhit { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; border: none; background: none; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+.xcover { flex: 1; min-height: 0; display: block; background: #f1f5f9; }
+.xcover img { width: 100%; height: 100%; object-fit: cover; }
+.xbody { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 14px 14px; }
+.xmark { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1px solid #eef0f3; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.xmark img { width: 100%; height: 100%; object-fit: cover; }
+.xtext { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.xtext strong { font-size: .92rem; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xtext small { color: #94a3b8; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xdel { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border: none; border-radius: 9px; background: #fff; color: #cbd5e1; box-shadow: 0 2px 6px rgba(15,23,42,.18); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s ease, color .15s ease; }
+.xcard:hover .xdel, .xcard:focus-within .xdel { opacity: 1; color: var(--brand-primary); }
+.xdel svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 </style>

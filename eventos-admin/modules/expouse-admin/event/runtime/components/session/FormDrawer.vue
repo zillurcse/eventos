@@ -31,6 +31,8 @@ interface DraftShape {
 
 const props = defineProps<{
   eventId: string
+  initialDate?: string
+  initialTime?: string
 }>()
 
 const emit = defineEmits<{
@@ -40,9 +42,17 @@ const emit = defineEmits<{
 
 const api = useApi()
 
+function addHour(time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  return `${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 function freshDraft(): DraftShape {
   return {
-    title: '', description: '', date: '', start_time: '', end_time: '',
+    title: '', description: '',
+    date: props.initialDate || '',
+    start_time: props.initialTime || '',
+    end_time: props.initialTime ? addHour(props.initialTime) : '',
     track_id: '', session_place: '', logo_url: null, icon_url: null, capacity: '',
     speaker_ids: [], sponsors: [], documents: [], tags: [],
     is_featured: false, is_allowed_to_rate: false,

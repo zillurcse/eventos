@@ -47,6 +47,7 @@ function clearAll() {
 
 onMounted(() => {
   if (!store.loaded) store.fetchExhibitors()
+  if (!store.adsLoaded) store.fetchAds()
   bookmarks.fetch()
 })
 
@@ -91,28 +92,35 @@ const filtered = computed<Exhibitor[]>(() => {
 
 <template>
   <div class="grid">
-    <!-- Left rail: search + filters -->
-    <aside class="rail">
-      <div class="search">
-        <input v-model="search" type="text" placeholder="Search">
-        <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
+    <!-- Exhibitor grid -->
+    <section class="main">
+      <ReceptionAdStrip v-if="store.ads.length" :ads="store.ads" class="banner" />
+
+      <div class="toprow">
+        <div class="search">
+          <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
+          <input v-model="search" type="text" placeholder="Search">
+        </div>
+        <select v-model="type" class="fselect" title="Type">
+          <option v-for="t in typeOptions" :key="t.key" :value="t.key">Type : {{ t.label }}</option>
+        </select>
       </div>
 
-      <div class="card">
-        <div class="ct"><span>Type</span></div>
-        <div class="opts">
-          <button
-            v-for="t in typeOptions"
-            :key="t.key"
-            type="button"
-            class="opt"
-            :class="{ on: type === t.key }"
-            @click="type = t.key"
-          >
-            {{ t.label }}
-            <svg v-if="type === t.key" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
-          </button>
-        </div>
+      <div class="head"><h1>Exhibitors ({{ filtered.length }})</h1></div>
+
+      <div v-if="store.loading && !store.loaded" class="state">Loading exhibitors…</div>
+      <div v-else-if="store.error" class="state">Couldn’t load exhibitors. Please try again.</div>
+      <div v-else-if="!filtered.length" class="state">No exhibitors match your filters.</div>
+
+      <div v-else class="cards">
+        <ExhibitorsCard v-for="e in filtered" :key="e.id" :exhibitor="e" />
+      </div>
+    </section>
+
+    <!-- Right rail: filters -->
+    <aside class="rail">
+      <div v-if="anyFilterActive || category || type !== 'all' || savedOnly || search" class="rail-head">
+        <button type="button" class="clear" @click="clearAll">Clear All</button>
       </div>
 
       <!-- Configured "Manage Filters" facets -->
@@ -127,25 +135,14 @@ const filtered = computed<Exhibitor[]>(() => {
         <div v-if="openFilters[f.id]" class="opts">
           <template v-for="(h, hi) in f.headings" :key="hi">
             <div v-if="h.heading" class="ghead">{{ h.heading }}</div>
-            <button
-              v-for="opt in h.options"
-              :key="hi + '::' + opt"
-              type="button"
-              class="opt"
-              :class="{ on: isOptOn(f.id, opt) }"
-              @click="toggleOpt(f.id, opt)"
-            >
+            <label v-for="opt in h.options" :key="hi + '::' + opt" class="cb">
+              <input type="checkbox" :checked="isOptOn(f.id, opt)" @change="toggleOpt(f.id, opt)">
+              <span class="box"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg></span>
               {{ opt }}
-              <svg v-if="isOptOn(f.id, opt)" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
-            </button>
+            </label>
           </template>
         </div>
       </div>
-
-      <button v-if="anyFilterActive || category || type !== 'all' || savedOnly || search" type="button" class="clear" @click="clearAll">
-        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg>
-        Clear all filters
-      </button>
 
       <div class="card">
         <div class="ct">
@@ -196,36 +193,32 @@ const filtered = computed<Exhibitor[]>(() => {
       </div>
     </aside>
 
-    <!-- Exhibitor grid -->
-    <section class="main">
-      <div class="head">
-        <h1>Exhibitors</h1>
-        <p class="sub">Exhibitors and sponsors at this event.</p>
-      </div>
-
-      <div v-if="store.loading && !store.loaded" class="state">Loading exhibitors…</div>
-      <div v-else-if="store.error" class="state">Couldn’t load exhibitors. Please try again.</div>
-      <div v-else-if="!filtered.length" class="state">No exhibitors match your filters.</div>
-
-      <div v-else class="cards">
-        <ExhibitorsCard v-for="e in filtered" :key="e.id" :exhibitor="e" />
-      </div>
-    </section>
-
     <ExhibitorsDetailModal v-if="store.selected" :exhibitor="store.selected" />
   </div>
 </template>
 
 <style scoped>
-.grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+.grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
 @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
 
+.main { min-width: 0; }
+.banner { width: 100%; margin-bottom: 16px; }
+.toprow { display: flex; gap: 10px; }
+.search { flex: 1; display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; padding: 0 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.search svg { width: 18px; height: 18px; fill: none; stroke: #94a3b8; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.search input { border: none; background: none; outline: none; padding: 13px 0; width: 100%; font: inherit; font-size: .9rem; color: #334155; }
+.fselect { flex: 0 0 auto; min-width: 170px; border: none; border-radius: 12px; padding: 0 14px; font: inherit; font-size: .86rem; color: #334155; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+@media (max-width: 640px) { .toprow { flex-wrap: wrap; } .fselect { flex: 1 1 auto; min-width: 0; } }
+
+.head { margin: 18px 0 16px; }
+.head h1 { margin: 0; font-size: 1.4rem; font-weight: 800; color: #1e293b; }
+.state { background: #fff; border-radius: 14px; padding: 48px 0; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+
+/* ── Right rail: filters ── */
 .rail { display: flex; flex-direction: column; gap: 16px; }
-.search { position: relative; }
-.search input { width: 100%; border: none; background: #fff; border-radius: 12px; padding: 14px 46px 14px 18px; font: inherit; font-size: .95rem; color: #334155; outline: none; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.search input::placeholder { color: #94a3b8; }
-.search input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 40%, transparent); }
-.search svg { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: none; stroke: var(--brand-primary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.rail-head { display: flex; justify-content: flex-end; }
+.clear { border: none; background: none; cursor: pointer; color: var(--brand-primary); font: inherit; font-size: .85rem; font-weight: 700; padding: 2px 6px; }
 
 .card { background: #fff; border-radius: 14px; padding: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .ct { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 12px; border-bottom: 1px solid #eef0f3; color: #334155; font-weight: 600; }
@@ -242,14 +235,13 @@ const filtered = computed<Exhibitor[]>(() => {
 .chev { transition: transform .18s ease; }
 .chev.open { transform: rotate(180deg); }
 .ghead { padding: 8px 6px 2px; color: #94a3b8; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.clear { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; border: none; background: none; cursor: pointer; color: var(--brand-primary); font: inherit; font-size: .85rem; font-weight: 600; padding: 2px 6px; }
-.clear svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .chk { width: 17px; height: 17px; fill: none; stroke: var(--brand-primary); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-.main { min-width: 0; }
-.head { margin-bottom: 16px; }
-.head h1 { margin: 0; font-size: 1.4rem; font-weight: 800; color: #1e293b; }
-.sub { margin: 4px 0 0; color: #64748b; font-size: .9rem; }
-.state { background: #fff; border-radius: 14px; padding: 48px 0; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+/* Checkbox rows (configured filter facets) */
+.cb { display: flex; align-items: center; gap: 10px; padding: 8px 6px; cursor: pointer; font-size: .88rem; color: #334155; }
+.cb input { position: absolute; opacity: 0; width: 0; height: 0; }
+.box { flex: 0 0 auto; width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
+.box svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .1s; }
+.cb input:checked + .box { background: var(--brand-primary); border-color: var(--brand-primary); }
+.cb input:checked + .box svg { opacity: 1; }
 </style>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-defineProps<{ today: number, upcoming: number, hasCurrent: boolean }>()
+import type { Meeting } from '~/stores/meetings'
+
+defineProps<{ today: number, upcoming: number, current: Meeting | null, joining: boolean }>()
+defineEmits<{ join: [] }>()
 </script>
 
 <template>
@@ -22,7 +25,19 @@ defineProps<{ today: number, upcoming: number, hasCurrent: boolean }>()
       </div>
     </div>
 
-    <div v-if="!hasCurrent" class="empty">
+    <!-- A confirmed meeting whose window is open right now — join directly. -->
+    <div v-if="current" class="current">
+      <span class="cav"><UserAvatar :src="current.counterpart?.avatar_url" :name="current.counterpart?.name" /></span>
+      <div class="cmeta">
+        <strong>{{ current.counterpart?.name || 'Attendee' }}</strong>
+        <small>Meeting is live now</small>
+      </div>
+      <button type="button" class="join" :disabled="joining" @click="$emit('join')">
+        {{ joining ? 'Joining…' : 'Join' }}
+      </button>
+    </div>
+
+    <div v-else-if="!today && !upcoming" class="empty">
       <svg viewBox="0 0 24 24"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20a6 6 0 0 1 12 0M17 11a3 3 0 1 0 0-6M15 14a6 6 0 0 1 7 6" /></svg>
       <p>No current meetings.</p>
     </div>
@@ -48,4 +63,12 @@ defineProps<{ today: number, upcoming: number, hasCurrent: boolean }>()
 .empty { margin-top: 18px; padding: 20px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 10px; color: #cbd5e1; }
 .empty svg { width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .empty p { margin: 0; color: #94a3b8; font-size: .82rem; }
+
+.current { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eef0f3; display: flex; align-items: center; gap: 10px; }
+.cav { width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto; overflow: hidden; }
+.cmeta { min-width: 0; flex: 1; }
+.cmeta strong { display: block; font-size: .86rem; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmeta small { color: #16a34a; font-size: .74rem; font-weight: 600; }
+.join { flex: 0 0 auto; border: none; border-radius: 9px; padding: 8px 14px; background: var(--brand-primary); color: #fff; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.join:disabled { opacity: .6; cursor: default; }
 </style>

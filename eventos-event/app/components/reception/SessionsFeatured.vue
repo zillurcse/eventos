@@ -9,19 +9,37 @@ const bookmarks = useBookmarksStore()
 
 const visible = computed(() => props.limit ? props.sessions.slice(0, props.limit) : props.sessions)
 
+// A session's own resolved timezone (organizer override, or the event's),
+// always sent by the backend — falls back to UTC only if that's ever missing.
+function zoneOf(s: ReceptionSession): string {
+  return s.timezone || 'UTC'
+}
+
 const heading = computed(() => {
   const first = props.sessions[0]
   if (!first?.starts_at) return ''
-  return new Date(first.starts_at).toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  })
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: zoneOf(first),
+  }).format(new Date(first.starts_at))
 })
 
-// Ticks so "Starts in X" pills stay accurate without a page refresh.
+// Ticks so "Starts in X" pills and the live/upcoming/ended phase stay
+// accurate without a page refresh.
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
 onMounted(() => { ticker = setInterval(() => (now.value = Date.now()), 15_000) })
 onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
+
+/** Live now / ended / upcoming, derived from the session's own window in
+ *  real time — not the organizer's possibly-stale status field. */
+function phase(s: ReceptionSession): 'live' | 'upcoming' | 'ended' {
+  const start = s.starts_at ? new Date(s.starts_at).getTime() : null
+  const end = s.ends_at ? new Date(s.ends_at).getTime() : null
+  if (start === null) return 'ended'
+  if (now.value < start) return 'upcoming'
+  if (end !== null && now.value > end) return 'ended'
+  return 'live'
+}
 
 function startsInLabel(s: ReceptionSession): string {
   if (!s.starts_at) return 'Starts soon'
@@ -44,8 +62,13 @@ function liveProgress(s: ReceptionSession): number {
 
 function timeRange(s: ReceptionSession): string {
   if (!s.starts_at) return 'Time to be announced'
-  const t = (d: string) => new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  return s.ends_at ? `${t(s.starts_at)} - ${t(s.ends_at)}` : t(s.starts_at)
+  const zone = zoneOf(s)
+  const t = (d: string) => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', timeZone: zone }).format(new Date(d))
+  const range = s.ends_at ? `${t(s.starts_at)} - ${t(s.ends_at)}` : t(s.starts_at)
+  const tzName = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short', timeZone: zone })
+    .formatToParts(new Date(s.starts_at))
+    .find(p => p.type === 'timeZoneName')?.value
+  return tzName ? `${range} ${tzName}` : range
 }
 
 function calendarLink(s: ReceptionSession): string | null {
@@ -154,22 +177,23 @@ function calendarLink(s: ReceptionSession): string | null {
           </div>
         </div>
 
-        <span v-if="s.status === 'scheduled'" class="starts-in">
+        <span v-if="phase(s) === 'upcoming'" class="starts-in">
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="13" r="8" />
             <path d="M12 9v4l2.5 2.5M9 1h6" />
           </svg>
           {{ startsInLabel(s) }}
         </span>
-        <NuxtLink v-else :to="`/session/${s.id}`" class="join">Join Now</NuxtLink>
+        <NuxtLink v-else-if="phase(s) === 'live'" :to="`/session/${s.id}`" class="join">Join Now</NuxtLink>
+        <span v-else class="ended">Session Ended</span>
         <span class="accent" />
-        <div v-if="s.status === 'live'" class="sessions-progress">
+        <div v-if="phase(s) === 'live'" class="sessions-progress">
           <div class="sessions-progress-bar" :style="{ width: `${liveProgress(s)}%` }" />
         </div>
       </article>
     </div>
 
-    <div class="viewall">
+    <div v-if="visible.length < sessions.length" class="viewall">
       <span class="line" />
       <NuxtLink to="/sessions" class="viewall-btn">View all {{ title.toLowerCase() }}</NuxtLink>
       <span class="line" />
@@ -467,6 +491,21 @@ function calendarLink(s: ReceptionSession): string | null {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.ended {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  padding: 12px 14px;
+  max-height: 42px;
+  border-radius: 10px;
+  border: 1px solid #E8E8EE;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 14px;
+  align-self: flex-start;
 }
 .sessions-progress {
   position: absolute;

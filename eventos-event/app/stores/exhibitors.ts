@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ReceptionAd } from './reception'
 
 export interface ExhibitorProduct {
   id: number
@@ -105,6 +106,11 @@ export const useExhibitorsStore = defineStore('exhibitors', {
     detail: null as ExhibitorDetail | null,
     detailLoading: false,
     detailError: false,
+
+    // "Main ads" strip (organizer's AD Managements, targeted to the
+    // Exhibitors page) — shown atop the directory, like the Event Feed's.
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   getters: {
@@ -158,6 +164,24 @@ export const useExhibitorsStore = defineStore('exhibitors', {
         this.detailError = true
       } finally {
         this.detailLoading = false
+      }
+    },
+
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'exhibitors' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the directory still works without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
   },

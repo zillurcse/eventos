@@ -232,6 +232,7 @@ export function draftToPayload(draft: Draft, eventId: string) {
     filter_id: draft.filter_id,
     filter_selections: plain(draft.filter_selections),
     spotlight_type: draft.spotlight_type,
+    spotlight_url: draft.spotlight_url,
     spotlight_file_id: draft.spotlight_file_id,
     cta: plain(draft.cta),
     social: plain(draft.social),
