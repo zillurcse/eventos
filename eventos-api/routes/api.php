@@ -41,8 +41,11 @@ use App\Http\Controllers\Api\V1\ParticipantController;
 use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GamificationController;
+use App\Http\Controllers\Api\V1\ExhibitorScanningController;
+use App\Http\Controllers\Api\V1\GateScanningController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\LoungeController;
+use App\Http\Controllers\Api\V1\LeadGenerationController;
 use App\Http\Controllers\Api\V1\ExhibitorContactController;
 use App\Http\Controllers\Api\V1\ExhibitorInboxController;
 use App\Http\Controllers\Api\V1\MeetingController;
@@ -430,6 +433,24 @@ Route::prefix('v1')->group(function () {
                 // and take the stage on their own session.
                 Route::post('/events/{uuid}/speakers/{participation}/reset-password', [SpeakerController::class, 'resetPassword']);
             });
+
+            // ── Lead Generation (Onsite): event-wide view over booth leads ──
+            Route::get('/events/{uuid}/leads', [LeadGenerationController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/leads/export', [LeadGenerationController::class, 'export'])->middleware('perm:events.view');
+
+            // ── Gates Scanning (Onsite): venue-gate analytics + gate CRUD ──
+            Route::get('/events/{uuid}/gates', [GateScanningController::class, 'index'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/gates/no-shows', [GateScanningController::class, 'noShows'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/gates/no-shows/export', [GateScanningController::class, 'exportNoShows'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/gates', [GateScanningController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/gates/{station}', [GateScanningController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/gates/{station}', [GateScanningController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Exhibitors Scanning (Onsite): booth footfall analytics + booth CRUD ──
+            Route::get('/events/{uuid}/booths', [ExhibitorScanningController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/booths', [ExhibitorScanningController::class, 'store'])->middleware('perm:events.manage');
+            Route::match(['put', 'patch'], '/events/{uuid}/booths/{station}', [ExhibitorScanningController::class, 'update'])->middleware('perm:events.manage');
+            Route::delete('/events/{uuid}/booths/{station}', [ExhibitorScanningController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Event advertisements (AD Managements) ──
             Route::get('/events/{uuid}/ads', [EventAdController::class, 'index'])->middleware('perm:events.view');
