@@ -65,10 +65,18 @@ class RegistrationService
 
             $contact->projectDynamic($projection)->save();
 
-            $participation = Participation::firstOrCreate(
+            // role is privileged (not $fillable); match on it but set it via
+            // forceFill on first creation so mass-assignment can't drop it.
+            $participation = Participation::firstOrNew(
                 ['event_id' => $event->id, 'contact_id' => $contact->id, 'role' => 'attendee'],
-                ['status' => 'registered', 'registration_submission_id' => $result['submission']->id],
             );
+            if (! $participation->exists) {
+                $participation->forceFill([
+                    'role' => 'attendee',
+                    'status' => 'registered',
+                    'registration_submission_id' => $result['submission']->id,
+                ])->save();
+            }
             $participation->projectDynamic($projection)->save();
 
             $order = null;

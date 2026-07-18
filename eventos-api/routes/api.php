@@ -98,8 +98,8 @@ Route::prefix('v1')->group(function () {
     // ── Public ──────────────────────────────────────────────
     Route::get('/health', HealthController::class)->name('health');
     Route::get('/plans', [PlanController::class, 'index']);
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     // ── Attendee sign-in channels (Settings › Access authentication) ──
     // A one-time code emailed to the attendee. Rate-limited inside the
@@ -122,14 +122,23 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/ads', [PublicSiteController::class, 'ads']);
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::get('/public/sessions/{uuid}/zoom-signature', [PublicSiteController::class, 'zoomSignature']);
-    Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
+    // Unauthenticated write endpoints — per-IP throttle. 20/min/IP tolerates a
+    // real person checking a couple of addresses or resubmitting a multi-step
+    // form, while capping automated abuse: check-email is an account-existence
+    // oracle, and form/register submissions are spammable. (throttle:N,M keys
+    // guest requests by client IP.)
+    Route::middleware('throttle:20,1')->group(function () {
+        Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
-    // Public form rendering + submission (the form uuid is the render token).
+        // Public form submission (the form uuid is the render token).
+        Route::post('/forms/{uuid}/submit', [FormController::class, 'submit']);
+
+        // Public registration (event uuid + its published registration form).
+        Route::post('/events/{uuid}/register', [RegistrationController::class, 'register']);
+    });
+
+    // Public form rendering (read-only; the form uuid is the render token).
     Route::get('/forms/{uuid}', [FormController::class, 'render']);
-    Route::post('/forms/{uuid}/submit', [FormController::class, 'submit']);
-
-    // Public registration (event uuid + its published registration form).
-    Route::post('/events/{uuid}/register', [RegistrationController::class, 'register']);
 
     // ── Authenticated (any signed-in user; no tenant required) ──
     Route::middleware('auth:sanctum')->group(function () {
@@ -330,13 +339,13 @@ Route::prefix('v1')->group(function () {
 
         // ── Tenant-scoped (resolves org → sets RLS GUC → rate limit) ──
         Route::middleware(['tenant', 'throttle:api'])->group(function () {
-            Route::get('/organization', [OrganizationController::class, 'current']);
+            Route::get('/organization', [OrganizationController::class, 'current'])->middleware('perm:events.view');
 
             // Global icon catalog for icon-picker fields (e.g. Participate Profile).
             Route::get('/icons', [IconController::class, 'index']);
 
             // Image uploads → MinIO (event covers, etc.) under the tenant GUC.
-            Route::post('/uploads', [FileUploadController::class, 'store']);
+            Route::post('/uploads', [FileUploadController::class, 'store'])->middleware('perm:events.view');
 
             // ── Organizer team self-service (§6.1) ──
             Route::get('/assignable-roles', [MembershipController::class, 'roles'])->middleware('perm:members.manage');
@@ -345,7 +354,7 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], '/members/{membership}', [MembershipController::class, 'update'])->middleware('perm:members.manage');
             Route::delete('/members/{membership}', [MembershipController::class, 'destroy'])->middleware('perm:members.manage');
 
-            Route::get('/subscription', [SubscriptionController::class, 'current']);
+            Route::get('/subscription', [SubscriptionController::class, 'current'])->middleware('perm:events.view');
             Route::post('/subscription/change', [SubscriptionController::class, 'change'])
                 ->middleware('perm:settings.manage');
 

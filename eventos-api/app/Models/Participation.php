@@ -18,7 +18,13 @@ class Participation extends Model
 {
     use BelongsToOrganization, SoftDeletes, HasUuid, Auditable, HasDynamicFields;
 
-    protected $guarded = [];
+    // `role` (privilege) and `organization_id` (tenant) are intentionally absent:
+    // organization_id is set by the BelongsToOrganization creating hook, and
+    // role is set via forceFill at the trusted create sites only.
+    protected $fillable = [
+        'event_id', 'contact_id', 'status', 'ticket_id', 'registration_submission_id',
+        'profile_data', 'networking_opt_in', 'checked_in_at', 'meta',
+    ];
 
     protected $casts = [
         'profile_data' => 'array',

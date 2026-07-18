@@ -9,6 +9,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,6 +36,20 @@ class AppServiceProvider extends ServiceProvider
             $user = $request->user();
 
             return Limit::perMinute(60)->by($user ? 'user:'.$user->id : (string) $request->ip());
+        });
+
+        // Login brute-force brake. Two limits, Laravel enforces the stricter:
+        //   - per account+IP: a shared-NAT office won't lock out one user
+        //     because a colleague fat-fingered their password (6/min);
+        //   - per IP: one host spraying many distinct emails is still bounded
+        //     (20/min), which the account key alone would miss.
+        RateLimiter::for('login', function (Request $request) {
+            $email = Str::lower((string) $request->input('email'));
+
+            return [
+                Limit::perMinute(6)->by($email.'|'.$request->ip()),
+                Limit::perMinute(20)->by($request->ip()),
+            ];
         });
     }
 }

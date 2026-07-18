@@ -60,6 +60,10 @@ class ResolveTenant
             }
         }
 
-        return $requested;
+        // Default-deny: never trust the raw X-Organization-Id header for an
+        // ordinary user with no matching membership — doing so would spoof the
+        // tenant context and the RLS GUC into another org. Only platform staff
+        // (who legitimately operate cross-tenant) may pin an org by header.
+        return $user?->isPlatformStaff() ? $requested : null;
     }
 }

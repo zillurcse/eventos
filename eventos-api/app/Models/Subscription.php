@@ -11,7 +11,15 @@ class Subscription extends Model
 {
     use BelongsToOrganization;
 
-    protected $guarded = [];
+    // plan_id is fillable ONLY because the plan-change flow validates it against
+    // the plans table — if that validation is removed, move plan_id to forceFill
+    // (entitlement-escalation vector). status is excluded (set via forceFill in
+    // the billing gateway); organization_id is set by the trait's creating hook.
+    protected $fillable = [
+        'plan_id', 'gateway', 'gateway_subscription_id', 'quantity', 'trial_ends_at',
+        'current_period_start', 'current_period_end', 'cancel_at_period_end',
+        'canceled_at', 'ends_at',
+    ];
 
     protected $casts = [
         'trial_ends_at' => 'datetime',

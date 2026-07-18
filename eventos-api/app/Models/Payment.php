@@ -9,7 +9,12 @@ class Payment extends Model
 {
     use BelongsToOrganization;
 
-    protected $guarded = [];
+    // amount_cents and status are excluded (money/state) — pre-locked ahead of a
+    // gateway/webhook writer, which must set them via forceFill. organization_id
+    // is set by the BelongsToOrganization creating hook.
+    protected $fillable = [
+        'invoice_id', 'gateway', 'gateway_payment_id', 'currency', 'method', 'paid_at',
+    ];
 
     protected $casts = [
         'meta' => 'array',

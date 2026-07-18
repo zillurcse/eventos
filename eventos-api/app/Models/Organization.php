@@ -16,7 +16,12 @@ class Organization extends Model
 {
     use HasUuid, SoftDeletes;
 
-    protected $guarded = [];
+    // status (governance) and owner_user_id (ownership) are set via forceFill at
+    // their trusted write sites (provisioner + super-admin), never mass-assigned.
+    protected $fillable = [
+        'name', 'slug', 'default_locale', 'default_timezone', 'default_currency',
+        'billing_email', 'data_region', 'meta',
+    ];
 
     protected $casts = ['meta' => 'array'];
 

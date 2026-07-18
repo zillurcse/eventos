@@ -14,7 +14,12 @@ class Membership extends Model
 {
     use SoftDeletes;
 
-    protected $guarded = [];
+    // organization_id + status are included on purpose: Membership has no
+    // BelongsToOrganization auto-fill, so the org must be mass-assigned at
+    // create (and it, plus status, only ever receive server/validated values).
+    protected $fillable = [
+        'user_id', 'organization_id', 'status', 'invited_by', 'invited_at', 'joined_at',
+    ];
 
     protected $casts = [
         'invited_at' => 'datetime',

@@ -10,7 +10,11 @@ class ExhibitorMember extends Model
 {
     use SoftDeletes;
 
-    protected $guarded = [];
+    // role and permissions are privilege columns (booth ACL) — set via forceFill
+    // only at the member-management write sites.
+    protected $fillable = [
+        'exhibitor_id', 'contact_id', 'participation_id', 'is_lead_capturer',
+    ];
 
     public function exhibitor(): BelongsTo
     {

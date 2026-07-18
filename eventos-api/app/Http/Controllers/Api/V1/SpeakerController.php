@@ -94,12 +94,14 @@ class SpeakerController extends Controller
                 $contact->update(['user_id' => $user->id]);
             }
 
-            return Participation::create([
+            $participation = new Participation([
                 'event_id'   => $event->id,
                 'contact_id' => $contact->id,
-                'role'       => 'speaker',
                 'status'     => 'confirmed',
             ]);
+            $participation->forceFill(['role' => 'speaker'])->save(); // role: privileged, not $fillable
+
+            return $participation;
         });
 
         $participation->update([

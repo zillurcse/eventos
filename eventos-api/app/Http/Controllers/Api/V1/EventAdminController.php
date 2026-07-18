@@ -93,7 +93,8 @@ class EventAdminController extends Controller
 
         // Removing web-app *admin* rights should not evict them from the event
         // they may also be attending — drop the role, keep the participation.
-        $participation->update(['role' => 'attendee']);
+        // role is privileged (not $fillable) → forceFill.
+        $participation->forceFill(['role' => 'attendee'])->save();
 
         return response()->json(['status' => 'success']);
     }

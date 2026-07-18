@@ -66,7 +66,8 @@ class AdminOrganizationController extends Controller
         ]);
 
         $org = Organization::on('pgsql_admin')->where('uuid', $uuid)->firstOrFail();
-        $org->update(['status' => $data['status']]);
+        // status is privileged (not $fillable) — super-admin governance only.
+        $org->forceFill(['status' => $data['status']])->save();
 
         return response()->json(['data' => ['id' => $org->uuid, 'status' => $org->status]]);
     }

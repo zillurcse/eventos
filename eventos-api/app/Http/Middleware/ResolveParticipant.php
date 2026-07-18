@@ -84,14 +84,21 @@ class ResolveParticipant
             return null;
         }
 
-        return Participation::on('pgsql_admin')->firstOrCreate(
+        // organization_id + role are privileged (not $fillable). The tenant GUC
+        // isn't set yet here (this runs before tenant->set), so the trait can't
+        // auto-fill the org — set both explicitly via forceFill on first create.
+        $participation = Participation::on('pgsql_admin')->firstOrNew(
             ['event_id' => $event->id, 'contact_id' => $member->contact_id],
-            [
+        );
+        if (! $participation->exists) {
+            $participation->forceFill([
                 'organization_id' => $event->organization_id,
                 'role' => 'exhibitor',
                 'status' => 'registered',
                 'meta' => ['exhibitor_member_id' => $member->id],
-            ],
-        );
+            ])->save();
+        }
+
+        return $participation;
     }
 }

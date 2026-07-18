@@ -49,10 +49,12 @@ class ExhibitorMemberController extends Controller
             $contact->update(['user_id' => $user->id]);
         }
 
-        $member = ExhibitorMember::updateOrCreate(
+        $member = ExhibitorMember::firstOrNew(
             ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
-            ['role' => $data['role'] ?? 'staff', 'is_lead_capturer' => $data['is_lead_capturer'] ?? false],
         );
+        $member->fill(['is_lead_capturer' => $data['is_lead_capturer'] ?? false]);
+        // role is privileged (not $fillable) — validated to admin/staff upstream.
+        $member->forceFill(['role' => $data['role'] ?? 'staff'])->save();
 
         return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }

@@ -9,6 +9,7 @@ use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -33,4 +34,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // Give throttled API clients a machine-readable retry hint in the body,
+        // not just the Retry-After header. The original rate-limit headers are
+        // preserved on the response. retry_after stays null (never 0) when the
+        // exception carries no Retry-After header.
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            if ($request->is('api/*')) {
+                $retryAfter = $e->getHeaders()['Retry-After'] ?? null;
+
+                return response()->json([
+                    'message' => 'Too many attempts. Please try again later.',
+                    'retry_after' => $retryAfter !== null ? (int) $retryAfter : null,
+                ], 429)->withHeaders($e->getHeaders());
+            }
+        });
     })->create();

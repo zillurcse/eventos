@@ -190,12 +190,12 @@ class SpeakerImportController extends Controller
             $profile = $profile->put('category', $category);
         }
 
-        $participation = Participation::create([
+        $participation = new Participation([
             'event_id' => $target->id,
             'contact_id' => $source->contact_id, // same person, same login
-            'role' => 'speaker',
             'status' => 'confirmed',
         ]);
+        $participation->forceFill(['role' => 'speaker'])->save(); // role: privileged, not $fillable
 
         $participation->update(['profile_data' => $profile->all()]);
 

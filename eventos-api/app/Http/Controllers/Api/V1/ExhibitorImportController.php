@@ -179,7 +179,7 @@ class ExhibitorImportController extends Controller
             ->except(self::EVENT_BOUND_PROFILE_KEYS)
             ->all();
 
-        $exhibitor = Exhibitor::create([
+        $exhibitor = new Exhibitor([
             'event_id' => $target->id,
             'type' => $source->type,
             'name' => $source->name,
@@ -193,9 +193,9 @@ class ExhibitorImportController extends Controller
             // organizer assigns one. Never point at the old event's package row.
             'package_id' => $packages[$source->package?->name ?? ''] ?? null,
             'profile_data' => $profile,
-            'status' => 'active',
-            'created_by' => $request->user()?->id,
         ]);
+        // status (governance) + created_by (attribution) are not $fillable.
+        $exhibitor->forceFill(['status' => 'active', 'created_by' => $request->user()?->id])->save();
 
         if ($include['members'] ?? false) {
             $this->copyMembers($source, $exhibitor);
@@ -224,13 +224,16 @@ class ExhibitorImportController extends Controller
     private function copyMembers(Exhibitor $source, Exhibitor $exhibitor): void
     {
         foreach ($source->members as $member) {
-            ExhibitorMember::create([
+            $copy = new ExhibitorMember([
                 'exhibitor_id' => $exhibitor->id,
                 'contact_id' => $member->contact_id,
-                'role' => $member->role,
                 'is_lead_capturer' => $member->is_lead_capturer,
-                'permissions' => $member->permissions,
             ]);
+            // role + permissions are privileged (not $fillable).
+            $copy->forceFill([
+                'role' => $member->role,
+                'permissions' => $member->permissions,
+            ])->save();
         }
 
         if ($source->admin_contact_id) {

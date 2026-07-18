@@ -12,7 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 class Role extends Model
 {
-    protected $guarded = [];
+    // organization_id, scope and is_system are privilege/tenant columns; the app
+    // never creates roles at runtime (seeder-only), so only descriptive fields
+    // are mass-assignable.
+    protected $fillable = [
+        'name', 'description',
+    ];
 
     protected $casts = ['is_system' => 'boolean'];
 

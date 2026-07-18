@@ -35,16 +35,16 @@ class OrganizationProvisioner
                 'email_verified_at' => now(),
             ]);
 
-            $org = Organization::create([
+            $org = new Organization([
                 'name' => $orgName,
                 'slug' => $this->uniqueSlug($orgName),
-                'status' => 'active',
-                'owner_user_id' => $user->id,
                 'default_currency' => 'USD',
                 'default_timezone' => 'UTC',
                 'default_locale' => 'en',
                 'billing_email' => $email,
             ]);
+            // status + owner_user_id are privileged (not $fillable).
+            $org->forceFill(['status' => 'active', 'owner_user_id' => $user->id])->save();
 
             // Activate tenant context so RLS accepts the org-scoped inserts and
             // BelongsToOrganization auto-fills organization_id.
@@ -65,15 +65,16 @@ class OrganizationProvisioner
             }
 
             if ($free = Plan::where('slug', 'free')->first()) {
-                Subscription::create([
-                    'organization_id' => $org->id,
+                // organization_id auto-fills from the tenant context set above;
+                // status is privileged (not $fillable) → forceFill.
+                $subscription = new Subscription([
                     'plan_id' => $free->id,
-                    'status' => 'active',
                     'gateway' => 'manual',
                     'quantity' => 1,
                     'current_period_start' => now(),
                     'current_period_end' => now()->addMonth(),
                 ]);
+                $subscription->forceFill(['status' => 'active'])->save();
             }
 
             return ['user' => $user, 'organization' => $org, 'membership' => $membership];

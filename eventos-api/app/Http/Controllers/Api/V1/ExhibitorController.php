@@ -78,7 +78,7 @@ class ExhibitorController extends Controller
             $this->assertEmailUniqueForEvent($email, $event->id);
         }
 
-        $exhibitor = Exhibitor::create([
+        $exhibitor = new Exhibitor([
             'event_id' => $event->id,
             'type' => $data['type'] ?? 'exhibitor',
             'name' => $data['name'],
@@ -88,9 +88,9 @@ class ExhibitorController extends Controller
             'logo_file_id' => $request->filled('logo_file_id') ? $data['logo_file_id'] : null,
             'website' => $request->input('website_url'),
             'profile_data' => $this->profileFrom($request),
-            'status' => 'active',
-            'created_by' => $request->user()->id,
         ]);
+        // status (governance) + created_by (attribution) are not $fillable.
+        $exhibitor->forceFill(['status' => 'active', 'created_by' => $request->user()->id])->save();
 
         // Provision the exhibitor-admin login and email them a 6-digit access code.
         $adminInvited = false;
@@ -133,7 +133,14 @@ class ExhibitorController extends Controller
         // so a single tab (e.g. Permissions) can save without wiping the rest.
         $profile = array_merge($exhibitor->profile_data ?? [], $this->profileFrom($request));
 
-        $exhibitor->update($cols + ['profile_data' => $profile, 'updated_by' => $request->user()->id]);
+        // status (governance) + updated_by (attribution) are not $fillable.
+        $privileged = ['updated_by' => $request->user()->id];
+        if (array_key_exists('status', $cols)) {
+            $privileged['status'] = $cols['status'];
+            unset($cols['status']);
+        }
+        $exhibitor->fill($cols + ['profile_data' => $profile]);
+        $exhibitor->forceFill($privileged)->save();
 
         return response()->json(['data' => new ExhibitorResource($exhibitor->fresh(self::WITH)->loadCount('members'))]);
     }
@@ -179,10 +186,10 @@ class ExhibitorController extends Controller
                 ['name' => $exhibitor->name, 'email_verified_at' => now()],
             );
             $contact->update(['user_id' => $user->id]);
-            ExhibitorMember::updateOrCreate(
+            $member = ExhibitorMember::firstOrNew(
                 ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
-                ['role' => 'admin'],
             );
+            $member->forceFill(['role' => 'admin'])->save(); // role: privileged, not $fillable
             $exhibitor->update(['admin_contact_id' => $contact->id]);
         }
 
@@ -307,10 +314,11 @@ class ExhibitorController extends Controller
         }
 
         // The `admin` membership is what makes them an exhibitor admin (§6.3).
-        ExhibitorMember::updateOrCreate(
+        // role is privileged (not $fillable) → forceFill.
+        $member = ExhibitorMember::firstOrNew(
             ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
-            ['role' => 'admin'],
         );
+        $member->forceFill(['role' => 'admin'])->save();
 
         $exhibitor->update(['admin_contact_id' => $contact->id]);
 

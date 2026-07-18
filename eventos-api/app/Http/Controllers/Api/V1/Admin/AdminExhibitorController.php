@@ -110,9 +110,10 @@ class AdminExhibitorController extends Controller
             if ($member->trashed()) {
                 $member->restore();
             }
-            $member->update(['role' => 'admin']);
+            $member->forceFill(['role' => 'admin'])->save(); // role: privileged, not $fillable
         } else {
-            $member = new ExhibitorMember(['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id, 'role' => 'admin']);
+            $member = new ExhibitorMember(['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id]);
+            $member->forceFill(['role' => 'admin']); // role: privileged, not $fillable
             $member->setConnection('pgsql_admin');
             $member->save();
         }
@@ -133,7 +134,8 @@ class AdminExhibitorController extends Controller
             'status' => ['required', Rule::in(['draft', 'active', 'suspended'])],
         ]);
 
-        $exhibitor->update(['status' => $data['status']]);
+        // status is privileged (not $fillable) — super-admin governance only.
+        $exhibitor->forceFill(['status' => $data['status']])->save();
 
         return response()->json([
             'data' => $this->present($exhibitor->fresh(['organization', 'event', 'members' => fn ($q) => $q->with('contact')])),

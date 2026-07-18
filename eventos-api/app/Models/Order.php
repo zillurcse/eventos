@@ -10,7 +10,12 @@ class Order extends Model
 {
     use BelongsToOrganization, HasUuid;
 
-    protected $guarded = [];
+    // status and the *_cents money columns are excluded — OrderService computes
+    // them server-side and sets them via forceFill. organization_id is set by
+    // the BelongsToOrganization creating hook.
+    protected $fillable = [
+        'event_id', 'number', 'buyer_user_id', 'buyer_email', 'discount_code_id', 'payment_id',
+    ];
 
     protected $casts = [
         'meta' => 'array',

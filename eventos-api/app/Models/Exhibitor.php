@@ -18,7 +18,13 @@ class Exhibitor extends Model
 {
     use BelongsToOrganization, SoftDeletes, HasUuid, Auditable, HasDynamicFields;
 
-    protected $guarded = [];
+    // status (governance) and created_by/updated_by (attribution) are set via
+    // forceFill at their write sites. organization_id is set by the trait's
+    // creating hook.
+    protected $fillable = [
+        'event_id', 'type', 'package_id', 'name', 'slug', 'description', 'website',
+        'logo_file_id', 'tier_rank', 'admin_contact_id', 'placements', 'profile_data', 'email',
+    ];
 
     protected $casts = [
         'placements' => 'array',

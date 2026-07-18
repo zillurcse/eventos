@@ -169,15 +169,16 @@ class EventAccess
                 ->first();
 
             if (! $participation) {
-                $participation = Participation::create([
+                $participation = new Participation([
                     'event_id' => $event->id,
                     'contact_id' => $contact->id,
-                    'role' => $staff ? 'staff' : 'attendee',
                     'status' => 'confirmed',
                 ]);
+                // role: privileged, not $fillable.
+                $participation->forceFill(['role' => $staff ? 'staff' : 'attendee'])->save();
             } elseif ($staff && $participation->role !== 'staff') {
                 // Promoting an existing attendee to event admin.
-                $participation->update(['role' => 'staff']);
+                $participation->forceFill(['role' => 'staff'])->save();
             }
 
             return [$user, $participation];

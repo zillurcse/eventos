@@ -225,10 +225,14 @@ class SessionController extends Controller
             ['first_name' => $data['first_name'] ?? null, 'last_name' => $data['last_name'] ?? null],
         );
 
-        $participation = Participation::firstOrCreate(
+        // role is privileged (not $fillable); match on it but set it via
+        // forceFill on first creation so mass-assignment can't drop it.
+        $participation = Participation::firstOrNew(
             ['event_id' => $session->event_id, 'contact_id' => $contact->id, 'role' => 'speaker'],
-            ['status' => 'confirmed'],
         );
+        if (! $participation->exists) {
+            $participation->forceFill(['role' => 'speaker', 'status' => 'confirmed'])->save();
+        }
 
         $session->speakers()->syncWithoutDetaching([
             $participation->id => ['role' => $data['role'] ?? 'speaker'],

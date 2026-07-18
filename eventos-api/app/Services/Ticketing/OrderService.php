@@ -48,17 +48,20 @@ class OrderService
             $discount = $this->applyDiscount($event, $discountCode, $subtotal);
             $total = max(0, $subtotal - $discount);
 
-            $order = Order::create([
+            $order = new Order([
                 'event_id' => $event->id,
                 'number' => $this->orderNumber(),
                 'buyer_user_id' => $contact->user_id,
                 'buyer_email' => $contact->email,
+            ]);
+            // status + money are server-computed and not $fillable — set here.
+            $order->forceFill([
                 'status' => $total === 0 ? 'paid' : 'pending',
                 'subtotal_cents' => $subtotal,
                 'discount_cents' => $discount,
                 'tax_cents' => 0,
                 'total_cents' => $total,
-            ]);
+            ])->save();
 
             $tickets = collect();
 

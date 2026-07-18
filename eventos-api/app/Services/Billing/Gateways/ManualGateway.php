@@ -19,23 +19,24 @@ class ManualGateway implements PaymentGateway
 
     public function changePlan(Subscription $subscription, Plan $plan): void
     {
-        $subscription->update([
+        $subscription->fill([
             'plan_id' => $plan->id,
             'gateway' => 'manual',
-            'status' => 'active',
             'cancel_at_period_end' => false,
             'canceled_at' => null,
             'current_period_start' => now(),
             'current_period_end' => now()->addMonth(),
         ]);
+        // status is privileged (not $fillable).
+        $subscription->forceFill(['status' => 'active'])->save();
     }
 
     public function cancel(Subscription $subscription): void
     {
-        $subscription->update([
-            'status' => 'canceled',
+        $subscription->fill([
             'cancel_at_period_end' => true,
             'canceled_at' => now(),
         ]);
+        $subscription->forceFill(['status' => 'canceled'])->save();
     }
 }
