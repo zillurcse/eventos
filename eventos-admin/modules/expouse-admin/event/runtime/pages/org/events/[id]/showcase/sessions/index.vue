@@ -144,7 +144,11 @@ async function load() {
     ])
     event.value = evtRes.data
     sessions.value = sesRes.data
-    if (!selectedDay.value && dayOptions.value.length) selectedDay.value = dayOptions.value[0].value
+    if (!selectedDay.value && dayOptions.value.length) {
+      const today = tzDateInput(new Date().toISOString(), eventTz.value)
+      const match = dayOptions.value.find(d => d.value === today)
+      selectedDay.value = match ? match.value : dayOptions.value[0].value
+    }
   } catch { /* */ }
 }
 
