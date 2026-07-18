@@ -7,7 +7,12 @@ import type { NoteType } from '~/stores/notes'
  * trigger's bounding rect, so it survives cards with `overflow: hidden`
  * (delegates) or hover-only visibility (speakers' .reveal actions).
  */
-const props = defineProps<{ type: NoteType, id: string, calendarLink?: string | null }>()
+const props = defineProps<{ type: NoteType, id: string, calendarLink?: string | null, block?: boolean }>()
+
+// Template has two root nodes (trigger button + Teleport), so Vue can't
+// auto-inherit fallthrough attrs (e.g. a caller's `class="note-fill"`) onto
+// the button — bind $attrs.class there explicitly instead (see template).
+defineOptions({ inheritAttrs: false })
 
 const notes = useNotesStore()
 const bookmarks = useBookmarksStore()
@@ -75,27 +80,41 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <button
-    ref="trigger" class="act note" :class="{ on: hasNote }" type="button"
-    :title="hasNote ? 'Edit note' : 'Add note'" @click.stop="isOpen ? close() : open()"
-  >
-    <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+  <button ref="trigger" class="act note" :class="[{ on: hasNote, block }, $attrs.class]" type="button"
+    :title="hasNote ? 'Edit note' : 'Add note'" @click.stop="isOpen ? close() : open()">
+    <svg viewBox="0 0 24 24">
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
+    </svg>
+    <span v-if="block">{{ hasNote ? 'Edit Note' : 'Add Note' }}</span>
   </button>
 
   <Teleport to="body">
     <div v-if="isOpen" ref="pop" class="note-pop" :style="style">
       <div class="pop-head">
         <button class="picon active" type="button" title="Note">
-          <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+          <svg viewBox="0 0 24 24">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+          </svg>
         </button>
-        <button class="picon" :class="{ on: bookmarked }" type="button" title="Bookmark" @click="bookmarks.toggle(type, id)">
-          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+        <button class="picon" :class="{ on: bookmarked }" type="button" title="Bookmark"
+          @click="bookmarks.toggle(type, id)">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 3h12v18l-6-4-6 4z" />
+          </svg>
         </button>
-        <a v-if="calendarLink" class="picon" :href="calendarLink" target="_blank" rel="noopener" title="Add to calendar">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M12 14v6M9 17h6" /></svg>
+        <a v-if="calendarLink" class="picon" :href="calendarLink" target="_blank" rel="noopener"
+          title="Add to calendar">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18M12 14v6M9 17h6" />
+          </svg>
         </a>
         <button class="pclose" type="button" title="Close" @click="close">
-          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
         </button>
       </div>
 
@@ -110,42 +129,193 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .act.note {
-  width: 34px; height: 34px; border-radius: 10px; border: 1px solid #dfe3ea; background: #fff;
-  color: var(--brand-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #dfe3ea;
+  background: #fff;
+  color: var(--brand-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-.act.note svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.act.note.on { background: var(--brand-primary); color: #fff; border-color: var(--brand-primary); }
+
+.act.note svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.act.note.on {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: var(--brand-primary);
+}
+
+.act.note.block {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  gap: 8px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 24%, #fff);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.act.note.block span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act.note.block.on {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: var(--brand-primary);
+}
 
 .note-pop {
-  position: fixed; z-index: 200; width: 272px; background: #fff; border-radius: 14px;
-  box-shadow: 0 16px 40px rgba(15,23,42,.22); border: 1px solid #eef0f3; overflow: hidden;
+  position: fixed;
+  z-index: 200;
+  width: 272px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .22);
+  border: 1px solid #eef0f3;
+  overflow: hidden;
   animation: pop-in .14s ease;
 }
-@keyframes pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
-.pop-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #f1f2f6; }
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f2f6;
+}
+
 .picon {
-  width: 30px; height: 30px; border-radius: 8px; border: none; background: #f4f5f8; color: #64748b;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: #f4f5f8;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
 }
-.picon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.picon.active { background: var(--brand-primary); color: #fff; }
-.picon.on { color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 14%, #fff); }
+
+.picon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.picon.active {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.picon.on {
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 14%, #fff);
+}
+
 .pclose {
-  margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--brand-primary);
-  color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-.pclose svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+.pclose svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
 
 .pop-text {
-  display: block; width: 100%; height: 190px; border: none; resize: none; padding: 14px; font: inherit;
-  font-size: .86rem; color: #334155; box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 190px;
+  border: none;
+  resize: none;
+  padding: 14px;
+  font: inherit;
+  font-size: .86rem;
+  color: #334155;
+  box-sizing: border-box;
 }
-.pop-text:focus { outline: none; }
-.pop-text::placeholder { color: #94a3b8; }
 
-.pop-foot { display: flex; justify-content: flex-end; padding: 10px 14px; border-top: 1px solid #f1f2f6; }
-.pop-save { border: none; background: none; color: var(--brand-primary); font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; padding: 4px; }
-.pop-save:disabled { color: #cbd5e1; cursor: default; }
-.pop-save:not(:disabled):hover { text-decoration: underline; }
+.pop-text:focus {
+  outline: none;
+}
+
+.pop-text::placeholder {
+  color: #94a3b8;
+}
+
+.pop-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border-top: 1px solid #f1f2f6;
+}
+
+.pop-save {
+  border: none;
+  background: none;
+  color: var(--brand-primary);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.pop-save:disabled {
+  color: #cbd5e1;
+  cursor: default;
+}
+
+.pop-save:not(:disabled):hover {
+  text-decoration: underline;
+}
 </style>

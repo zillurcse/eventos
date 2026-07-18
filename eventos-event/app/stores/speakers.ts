@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ReceptionAd } from './reception'
 
 export interface Speaker {
   id: string
@@ -36,6 +37,8 @@ export const useSpeakersStore = defineStore('speakers', {
     // Local connection state keyed by speaker id (optimistic, this session).
     connected: {} as Record<string, 'pending' | 'error'>,
     selected: null as Speaker | null,
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   actions: {
@@ -62,6 +65,26 @@ export const useSpeakersStore = defineStore('speakers', {
 
     open(speaker: Speaker) { this.selected = speaker },
     close() { this.selected = null },
+
+    /** The "main ads" strip (organizer's AD Managements, targeted to the
+     *  Speakers page) — shown as a banner above the search/sort toolbar. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'speakers' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the directory still works without them.
+      } finally {
+        this.adsLoaded = true
+      }
+    },
 
     /** Send a connection request to a speaker (requires being signed in). */
     async connect(speaker: Speaker) {
