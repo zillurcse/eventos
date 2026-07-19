@@ -27,6 +27,13 @@ const now = Date.now()
 const ongoing = computed(() => filtered.value.filter(e => !e.ends_at || new Date(e.ends_at).getTime() >= now))
 const past = computed(() => filtered.value.filter(e => e.ends_at && new Date(e.ends_at).getTime() < now))
 
+// Each section shows a single row (3 cards) until "View All" is expanded.
+const PREVIEW = 3
+const showAllOngoing = ref(false)
+const showAllPast = ref(false)
+const ongoingShown = computed(() => showAllOngoing.value ? ongoing.value : ongoing.value.slice(0, PREVIEW))
+const pastShown = computed(() => showAllPast.value ? past.value : past.value.slice(0, PREVIEW))
+
 function openCreate() {
   editingId.value = null
   Object.assign(form, { name: '', format: 'venue', starts_at: '', ends_at: '', cover_file_id: null, cover_url: null })
@@ -70,12 +77,14 @@ async function remove(e: any) {
 }
 
 const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+function fmtDate(d: Date) {
+  return `${WD[d.getDay()]}, ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
 function dateRange(s: string | null, e: string | null) {
   if (!s) return 'Dates TBD'
-  const d = new Date(s); const a = `${MO[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`
-  if (!e) return `${a}, ${d.getFullYear()}`
-  const d2 = new Date(e)
-  return `${a} - ${MO[d2.getMonth()]} ${String(d2.getDate()).padStart(2, '0')}, ${d2.getFullYear()}`
+  const a = fmtDate(new Date(s))
+  return e ? `${a} - ${fmtDate(new Date(e))}` : a
 }
 
 onMounted(load)
@@ -83,32 +92,43 @@ onMounted(load)
 
 <template>
   <div>
+    <header class="page-head">
+      <h1 class="page-title">My Events</h1>
+      <p class="page-lede">
+        In just a few simple steps, host a successful event and engage with attendees worldwide.
+        This is everything you need to get going.
+        <a class="lede-link" href="https://help.expouse.com/events" target="_blank" rel="noopener">Learn More</a>
+      </p>
+    </header>
+
     <div class="toolbar">
       <div class="search">
         <AppIcon name="search" />
-        <input v-model="q" placeholder="Search events">
+        <input v-model="q" placeholder="Search...">
       </div>
       <div class="flex-1" />
-      <button class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> Create event</button>
+      <button class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> Create New Event</button>
     </div>
 
     <EventsEmptyState
       v-if="!events.length"
       title="No events yet"
       description="Create your first event to get started."
-      cta-label="Create event"
+      cta-label="Create New Event"
       @cta="openCreate"
     />
 
     <template v-else>
       <section class="mb-[30px]">
-        <h2 class="section-title flex items-center gap-2">
-          Ongoing Events
-          <span v-if="ongoing.length" class="badge">{{ ongoing.length }}</span>
-        </h2>
+        <div class="section-head">
+          <h2 class="section-title">Ongoing</h2>
+          <button v-if="ongoing.length > PREVIEW" class="view-all" @click="showAllOngoing = !showAllOngoing">
+            {{ showAllOngoing ? 'Show Less' : 'View All' }}
+          </button>
+        </div>
         <div v-if="ongoing.length" class="cards-grid">
           <EntityCard
-            v-for="e in ongoing" :key="e.id"
+            v-for="e in ongoingShown" :key="e.id"
             :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
             <template #meta>
               {{ fmtLabel[e.format] || e.format }}
@@ -125,13 +145,15 @@ onMounted(load)
       </section>
 
       <section>
-        <h2 class="section-title flex items-center gap-2">
-          Past Events
-          <span v-if="past.length" class="badge">{{ past.length }}</span>
-        </h2>
+        <div class="section-head">
+          <h2 class="section-title">Past Events</h2>
+          <button v-if="past.length > PREVIEW" class="view-all" @click="showAllPast = !showAllPast">
+            {{ showAllPast ? 'Show Less' : 'View All' }}
+          </button>
+        </div>
         <div v-if="past.length" class="cards-grid">
           <EntityCard
-            v-for="e in past" :key="e.id"
+            v-for="e in pastShown" :key="e.id"
             :title="e.name" :status="e.status" :cover-url="e.cover_url" :seed="e.id" :to="`/org/events/${e.id}`">
             <template #meta>
               {{ fmtLabel[e.format] || e.format }}
@@ -177,3 +199,51 @@ onMounted(load)
     </Modal>
   </div>
 </template>
+
+<style scoped>
+.page-head {
+  margin-bottom: 22px;
+}
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.page-lede {
+  margin-top: 6px;
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.lede-link {
+  color: var(--brand);
+  font-weight: 600;
+}
+.lede-link:hover {
+  text-decoration: underline;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 14px;
+}
+.section-head .section-title {
+  margin: 0;
+}
+.view-all {
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 650;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.view-all:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+</style>
