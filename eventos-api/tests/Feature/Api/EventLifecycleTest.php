@@ -79,13 +79,15 @@ class EventLifecycleTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['data' => ['theme', 'modules_enabled', 'branding']]);
 
+        // NOTE: the subdomain is deliberately NOT settable here — the settings
+        // endpoint unsets `domain` (EventController) because subdomain management
+        // lives on the dedicated /events/{uuid}/domain endpoint. So we only assert
+        // the theme round-trips.
         $this->putJson("/api/v1/events/{$uuid}/settings", [
             'theme' => ['primary' => '#6352e7', 'mode' => 'light'],
-            'domain' => ['subdomain' => 'lifecycle'],
         ])
             ->assertOk()
-            ->assertJsonPath('data.theme.primary', '#6352e7')
-            ->assertJsonPath('data.domain.subdomain', 'lifecycle');
+            ->assertJsonPath('data.theme.primary', '#6352e7');
 
         // Publish.
         $this->postJson("/api/v1/events/{$uuid}/publish", ['status' => 'published'])

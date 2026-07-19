@@ -203,7 +203,10 @@ class AuthController extends Controller
     {
         $current = $request->user()->currentAccessToken();
 
-        if ($current instanceof PersonalAccessToken && ! $current->user_agent) {
+        // Only backfill a real, persisted token. A TransientToken (or the Mockery
+        // mock Sanctum::actingAs installs in tests) is `instanceof` this class but
+        // has no DB row, so forceFill()->save() on it would blow up.
+        if ($current instanceof PersonalAccessToken && $current->exists && ! $current->user_agent) {
             $this->rememberDevice($current, $request);
         }
     }

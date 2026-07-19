@@ -66,7 +66,7 @@ class ExhibitorController extends Controller
             'event' => ['required', 'string'],
             'type' => ['nullable', 'in:exhibitor,sponsor'],
             'name' => ['required', 'string', 'max:180'],
-            'email' => ['required', 'email'],   // exhibitor-admin login email
+            'email' => ['nullable', 'email'],   // optional: exhibitor-admin login email (no email → no login provisioned)
             'package_id' => ['required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['nullable', 'integer'],
         ]);
