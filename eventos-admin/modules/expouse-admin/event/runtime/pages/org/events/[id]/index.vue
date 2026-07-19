@@ -51,7 +51,7 @@ onMounted(() => {
     </div>
 
     <!-- Quick Actions -->
-    <QuickActions :event-id="id" class="mt-7" />
+    <QuickActions :event-id="id" :counts="ov.quick_counts" class="mt-7" @refresh="load" />
   </div>
 
   <!-- Loading state -->

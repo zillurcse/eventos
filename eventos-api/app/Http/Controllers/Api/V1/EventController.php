@@ -8,10 +8,13 @@ use App\Http\Resources\EventResource;
 use App\Http\Resources\SessionResource;
 use App\Models\Event;
 use App\Models\BadgeDesign;
+use App\Models\BreakoutRoom;
 use App\Models\EmailTemplate;
 use App\Models\EventSetting;
 use App\Models\Exhibitor;
+use App\Models\Meeting;
 use App\Models\Membership;
+use App\Models\Participation;
 use App\Models\Session;
 use App\Services\Auth\EventAccess;
 use App\Services\Email\EventTemplateSeeder;
@@ -430,6 +433,17 @@ class EventController extends Controller
         $badges = BadgeDesign::where('event_id', $event->id)->count();
         $emailTemplates = EmailTemplate::where('event_id', $event->id)->count();
 
+        // Live tallies powering the Quick Actions cards.
+        $quickCounts = [
+            'users' => Participation::where('event_id', $event->id)->count(),
+            'sessions' => $sessions,
+            'meetings' => Meeting::where('event_id', $event->id)->count(),
+            'booths' => $exhibitors,
+            'rooms' => BreakoutRoom::where('event_id', $event->id)->count(),
+            'upcoming_sessions' => Session::where('event_id', $event->id)
+                ->where('starts_at', '>', now())->count(),
+        ];
+
         // Generate + persist the mobile-app credentials once (stub, not yet
         // wired to a real mobile login).
         $meta = $event->meta ?? [];
@@ -462,6 +476,7 @@ class EventController extends Controller
             'ends_at' => $event->ends_at?->toIso8601String(),
             'cover_url' => $event->coverFile ? Storage::disk($event->coverFile->disk)->url($event->coverFile->path) : null,
             'counts' => ['exhibitors' => $exhibitors, 'sessions' => $sessions],
+            'quick_counts' => $quickCounts,
             'checklist' => $checklist,
             'completed' => collect($checklist)->where('done', true)->count(),
             'total' => count($checklist),
