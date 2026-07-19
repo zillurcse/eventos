@@ -110,10 +110,13 @@ abstract class TestCase extends BaseTestCase
             $membership->setConnection($conn)->roles()->sync([$owner->id]);
         }
 
-        $hasSub = Subscription::on($conn)->withoutGlobalScopes()
-            ->where('organization_id', $org->id)->exists();
-        if (! $hasSub && ($free = Plan::on($conn)->where('slug', 'free')->first())) {
-            $sub = (new Subscription)->setConnection($conn);
+        // Reset the committed subscription to the Free baseline on every call.
+        // Because this row is committed (not rolled back), a suite that switches
+        // plans via actAsPlan() would otherwise leak that plan into later tests.
+        if ($free = Plan::on($conn)->where('slug', 'free')->first()) {
+            $sub = Subscription::on($conn)->withoutGlobalScopes()
+                ->where('organization_id', $org->id)->first()
+                ?? (new Subscription)->setConnection($conn);
             $sub->forceFill([
                 'organization_id' => $org->id,
                 'plan_id' => $free->id,
@@ -165,5 +168,26 @@ abstract class TestCase extends BaseTestCase
         return $this->postJson('/api/v1/events', $payload)
             ->assertCreated()
             ->json('data');
+    }
+
+    /**
+     * Switch the committed test subscription to the given plan slug. Used by
+     * suites that legitimately need more than the Free plan's single event.
+     * organizerUser() resets the plan to Free on its next call, so this never
+     * leaks across tests.
+     */
+    protected function actAsPlan(string $slug): Plan
+    {
+        $conn = self::ADMIN_CONN;
+        $org = $this->tenantOrg ?? Organization::on($conn)->where('slug', self::ORG_SLUG)->firstOrFail();
+        $plan = Plan::on($conn)->where('slug', $slug)->firstOrFail();
+
+        Subscription::on($conn)->withoutGlobalScopes()
+            ->where('organization_id', $org->id)
+            ->update(['plan_id' => $plan->id]);
+
+        app(\App\Services\Billing\FeatureGate::class)->flush();
+
+        return $plan;
     }
 }

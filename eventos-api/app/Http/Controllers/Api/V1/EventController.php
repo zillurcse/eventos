@@ -16,7 +16,9 @@ use App\Models\Meeting;
 use App\Models\Membership;
 use App\Models\Participation;
 use App\Models\Session;
+use App\Models\Organization;
 use App\Services\Auth\EventAccess;
+use App\Services\Billing\FeatureGate;
 use App\Services\Email\EventTemplateSeeder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -48,8 +50,10 @@ class EventController extends Controller
         return response()->json(['data' => new EventResource($event)]);
     }
 
-    public function store(Request $request, TenantContext $tenant, EventTemplateSeeder $templateSeeder): JsonResponse
+    public function store(Request $request, TenantContext $tenant, EventTemplateSeeder $templateSeeder, FeatureGate $gate): JsonResponse
     {
+        $this->enforceEventQuota($tenant, $gate);
+
         $data = $this->validateEvent($request, creating: true);
         $data = $this->utcDates($data, ['starts_at', 'ends_at']);
 
@@ -83,6 +87,31 @@ class EventController extends Controller
         ]);
 
         return response()->json(['data' => new EventResource($event->load('coverFile'))], 201);
+    }
+
+    /**
+     * Enforce the active plan's `quota.events` limit before creating an event
+     * (architecture §6.2). A null quota means unlimited (e.g. Enterprise).
+     * Event::count() is tenant-scoped via the global scope + RLS.
+     */
+    protected function enforceEventQuota(TenantContext $tenant, FeatureGate $gate): void
+    {
+        $orgId = $tenant->id();
+        if (! $orgId) {
+            return;
+        }
+
+        $org = Organization::find($orgId);
+        $limit = $org ? $gate->quota($org, 'quota.events') : null;
+        if ($limit === null) {
+            return; // unlimited / undefined
+        }
+
+        abort_if(
+            Event::count() >= $limit,
+            403,
+            "You've reached your plan's limit of {$limit} event(s). Upgrade your plan to create more.",
+        );
     }
 
     public function update(string $uuid, Request $request): JsonResponse

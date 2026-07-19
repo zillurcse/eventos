@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminMembershipController;
 use App\Http\Controllers\Api\V1\Admin\AdminMetricsController;
 use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
 use App\Http\Controllers\Api\V1\Admin\AdminExhibitorController;
+use App\Http\Controllers\Api\V1\Admin\AdminPlanChangeRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
@@ -167,6 +168,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/plans', [AdminPlanController::class, 'index']);
             Route::post('/plans', [AdminPlanController::class, 'store']);
             Route::match(['put', 'patch'], '/plans/{uuid}', [AdminPlanController::class, 'update']);
+
+            // Organizer plan-change requests: review + approve/reject.
+            Route::get('/plan-change-requests', [AdminPlanChangeRequestController::class, 'index']);
+            Route::post('/plan-change-requests/{uuid}/approve', [AdminPlanChangeRequestController::class, 'approve']);
+            Route::post('/plan-change-requests/{uuid}/reject', [AdminPlanChangeRequestController::class, 'reject']);
 
             // ── Account & access management (all login types, cross-tenant §2.1) ──
             // Platform staff + global user accounts.
@@ -355,7 +361,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('/members/{membership}', [MembershipController::class, 'destroy'])->middleware('perm:members.manage');
 
             Route::get('/subscription', [SubscriptionController::class, 'current'])->middleware('perm:events.view');
-            Route::post('/subscription/change', [SubscriptionController::class, 'change'])
+            Route::get('/subscription/change-request', [SubscriptionController::class, 'changeRequest'])
+                ->middleware('perm:events.view');
+            Route::post('/subscription/change-request', [SubscriptionController::class, 'requestChange'])
+                ->middleware('perm:settings.manage');
+            Route::delete('/subscription/change-request', [SubscriptionController::class, 'cancelChangeRequest'])
                 ->middleware('perm:settings.manage');
 
             // ── Events module (§6.3) ──

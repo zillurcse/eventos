@@ -34,21 +34,52 @@ class OrganizationAndBillingTest extends TestCase
             ->assertJsonStructure(['data']);
     }
 
-    public function test_changing_plan_validates_the_slug(): void
+    public function test_requesting_a_plan_validates_the_slug(): void
     {
         $this->actingAsOrganizer();
 
-        $this->postJson('/api/v1/subscription/change', ['plan' => 'does-not-exist'])
+        $this->postJson('/api/v1/subscription/change-request', ['plan' => 'does-not-exist'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['plan']);
     }
 
-    public function test_changing_plan_switches_the_subscription(): void
+    public function test_requesting_a_plan_creates_a_pending_request_without_switching(): void
+    {
+        $this->actingAsOrganizer(); // Free plan
+
+        $this->postJson('/api/v1/subscription/change-request', ['plan' => 'pro'])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.requested_plan.slug', 'pro');
+
+        // The subscription is NOT switched — it waits for admin approval.
+        $this->getJson('/api/v1/subscription')
+            ->assertOk()
+            ->assertJsonPath('data.plan.slug', 'free');
+
+        $this->getJson('/api/v1/subscription/change-request')
+            ->assertOk()
+            ->assertJsonPath('data.requested_plan.slug', 'pro');
+    }
+
+    public function test_requesting_the_current_plan_is_rejected(): void
+    {
+        $this->actingAsOrganizer(); // already on Free
+
+        $this->postJson('/api/v1/subscription/change-request', ['plan' => 'free'])
+            ->assertStatus(422);
+    }
+
+    public function test_a_pending_request_can_be_withdrawn(): void
     {
         $this->actingAsOrganizer();
 
-        $this->postJson('/api/v1/subscription/change', ['plan' => 'free'])
+        $this->postJson('/api/v1/subscription/change-request', ['plan' => 'pro'])->assertCreated();
+
+        $this->deleteJson('/api/v1/subscription/change-request')->assertOk();
+
+        $this->getJson('/api/v1/subscription/change-request')
             ->assertOk()
-            ->assertJsonStructure(['data']);
+            ->assertJsonPath('data', null);
     }
 }

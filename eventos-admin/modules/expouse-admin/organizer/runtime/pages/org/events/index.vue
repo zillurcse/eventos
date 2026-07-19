@@ -3,9 +3,15 @@ definePageMeta({ middleware: 'organizer', title: 'Events', subtitle: 'Create and
 
 const api = useApi()
 const events = ref<any[]>([])
+const sub = ref<any>(null)
 const q = ref('')
 const error = ref('')
 const saving = ref(false)
+
+// Plan quota: null limit means unlimited (e.g. Enterprise). Mirrors the
+// backend `quota.events` gate so the UI can prevent a doomed create attempt.
+const eventLimit = computed<number | null>(() => sub.value?.plan?.limits?.max_events ?? null)
+const atLimit = computed(() => eventLimit.value != null && events.value.length >= eventLimit.value)
 
 const showModal = ref(false)
 const editingId = ref<string | null>(null)
@@ -17,6 +23,7 @@ const fmtLabel: Record<string, string> = { venue: 'In-person', online: 'Online',
 
 async function load() {
   try { events.value = (await api<any>('/events')).data } catch { /* no perm */ }
+  try { sub.value = (await api<any>('/subscription')).data } catch { /* none yet */ }
 }
 
 const filtered = computed(() => {
@@ -107,8 +114,19 @@ onMounted(load)
         <input v-model="q" placeholder="Search...">
       </div>
       <div class="flex-1" />
-      <button class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> Create New Event</button>
+      <span v-if="eventLimit != null" class="usage" :class="{ maxed: atLimit }">
+        {{ events.length }} / {{ eventLimit }} events
+      </span>
+      <NuxtLink v-if="atLimit" to="/org/plans" class="btn">
+        <AppIcon name="layers" class="w-4 h-4" /> Upgrade to add events
+      </NuxtLink>
+      <button v-else class="btn" @click="openCreate"><AppIcon name="plus" class="w-4 h-4" /> Create New Event</button>
     </div>
+
+    <p v-if="atLimit" class="limit-note">
+      You've used all {{ eventLimit }} events on the <strong>{{ sub?.plan?.name }}</strong> plan.
+      <NuxtLink to="/org/plans" class="lede-link">Upgrade your plan</NuxtLink> to create more.
+    </p>
 
     <EventsEmptyState
       v-if="!events.length"
@@ -246,4 +264,29 @@ onMounted(load)
   color: var(--brand-dark);
   text-decoration: underline;
 }
+.usage {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: #f7f7fb;
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.usage.maxed {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.limit-note {
+  margin: -8px 0 22px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.limit-note strong { color: var(--ink); }
 </style>

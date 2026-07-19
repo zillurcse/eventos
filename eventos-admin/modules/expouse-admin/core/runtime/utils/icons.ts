@@ -33,6 +33,10 @@ export const ICON_PATHS: Record<string, string[]> = {
   download: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   pencil: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z'],
   'chevron-down': ['M6 9l6 6 6-6'],
+  x: ['M18 6L6 18', 'M6 6l12 12'],
+  'arrow-right': ['M5 12h14', 'M12 5l7 7-7 7'],
+  'arrow-up': ['M12 19V5', 'M5 12l7-7 7 7'],
+  'arrow-down': ['M12 5v14', 'M19 12l-7 7-7-7'],
 }
 
 export const ICON_NAMES = Object.keys(ICON_PATHS)

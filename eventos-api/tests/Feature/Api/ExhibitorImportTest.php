@@ -27,6 +27,7 @@ class ExhibitorImportTest extends TestCase
         parent::setUp();
 
         $this->actingAsOrganizer();
+        $this->actAsPlan('enterprise'); // this suite needs several events (Free caps at 1)
         $this->lastYear = $this->createEvent(['name' => 'Expo 2025'])['id'];
         $this->thisYear = $this->createEvent(['name' => 'Expo 2026'])['id'];
     }

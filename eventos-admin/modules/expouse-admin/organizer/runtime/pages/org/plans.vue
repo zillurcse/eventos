@@ -4,19 +4,23 @@ definePageMeta({ middleware: 'organizer', title: 'Plans', subtitle: 'View your c
 const api = useApi()
 const plans = ref<any[]>([])
 const sub = ref<any>(null)
+const pendingReq = ref<any>(null)
 const loading = ref(true)
 const changingSlug = ref<string | null>(null)
+const canceling = ref(false)
 const error = ref('')
 
 async function load() {
   loading.value = true
   try { plans.value = (await api<any>('/plans')).data } catch { /* no perm */ }
   try { sub.value = (await api<any>('/subscription')).data } catch { /* none yet */ }
+  try { pendingReq.value = (await api<any>('/subscription/change-request')).data } catch { /* none */ }
   loading.value = false
 }
 
 const currentSlug = computed(() => sub.value?.plan?.slug ?? null)
 const currentPlan = computed(() => sub.value?.plan ?? null)
+const pendingSlug = computed(() => pendingReq.value?.requested_plan?.slug ?? null)
 
 function price(p: any) {
   const v = (p?.price_cents ?? 0) / 100
@@ -77,17 +81,45 @@ function description(p: any) { return DESCRIPTIONS[p?.slug] || 'Everything you n
 
 function isPopular(p: any) { return p.slug === 'pro' }
 
+// Requesting a plan doesn't switch immediately — it raises a request for a
+// platform super-admin to approve, which then activates the plan. Clicking
+// "Choose Plan" opens a confirmation modal rather than a native alert.
+const confirmPlan = ref<any>(null)
+const isUpgrade = computed(() => {
+  if (!confirmPlan.value || !currentPlan.value) return true
+  return (confirmPlan.value.price_cents ?? 0) >= (currentPlan.value.price_cents ?? 0)
+})
+
+function askChange(p: any) {
+  if (p.slug === currentSlug.value || pendingReq.value) return
+  confirmPlan.value = p
+}
+
 async function change(p: any) {
-  if (p.slug === currentSlug.value) return
-  if (!confirm(`Switch your subscription to the ${p.name} plan?`)) return
   error.value = ''
   changingSlug.value = p.slug
   try {
-    sub.value = (await api<any>('/subscription/change', { method: 'POST', body: { plan: p.slug } })).data
+    pendingReq.value = (await api<any>('/subscription/change-request', { method: 'POST', body: { plan: p.slug } })).data
+    confirmPlan.value = null
   } catch (e: any) {
-    error.value = e?.data?.message || 'Could not change your plan. You may not have permission.'
+    error.value = e?.data?.message || 'Could not submit your request. You may not have permission.'
+    confirmPlan.value = null
   } finally {
     changingSlug.value = null
+  }
+}
+
+async function cancelReq() {
+  if (!confirm('Withdraw your pending plan-change request?')) return
+  error.value = ''
+  canceling.value = true
+  try {
+    await api('/subscription/change-request', { method: 'DELETE' })
+    pendingReq.value = null
+  } catch (e: any) {
+    error.value = e?.data?.message || 'Could not cancel the request.'
+  } finally {
+    canceling.value = false
   }
 }
 
@@ -139,6 +171,21 @@ onMounted(load)
 
     <p v-if="error" class="error mt-3">{{ error }}</p>
 
+    <!-- Pending request banner ------------------------------------------- -->
+    <div v-if="pendingReq" class="pending-banner">
+      <span class="pending-ico"><AppIcon name="bell" /></span>
+      <div class="min-w-0 flex-1">
+        <div class="pending-title">Plan change requested — awaiting approval</div>
+        <div class="pending-sub">
+          Your request to switch to <strong>{{ pendingReq.requested_plan?.name }}</strong>
+          is pending review by a platform admin.
+        </div>
+      </div>
+      <button class="pending-cancel" type="button" :disabled="canceling" @click="cancelReq">
+        {{ canceling ? 'Canceling…' : 'Cancel request' }}
+      </button>
+    </div>
+
     <!-- Upgrade plan ------------------------------------------------------ -->
     <h2 class="block-title mt-8">Upgrade plan</h2>
     <p class="block-sub">View your current plan and upgrade when you need more.</p>
@@ -172,17 +219,73 @@ onMounted(load)
             Current Plan
           </button>
           <button
+            v-else-if="p.slug === pendingSlug"
+            class="plan-cta is-pending"
+            type="button"
+            disabled
+          >
+            Requested - pending
+          </button>
+          <button
             v-else
             class="plan-cta"
             type="button"
-            :disabled="changingSlug === p.slug"
-            @click="change(p)"
+            :disabled="changingSlug === p.slug || !!pendingReq"
+            @click="askChange(p)"
           >
-            {{ changingSlug === p.slug ? 'Switching…' : 'Choose Plan' }}
+            {{ changingSlug === p.slug ? 'Requesting…' : 'Choose Plan' }}
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Choose-plan confirmation modal ----------------------------------- -->
+    <Transition name="modal-fade">
+      <div v-if="confirmPlan" class="modal-overlay" @click.self="confirmPlan = null">
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <button class="modal-x" type="button" aria-label="Close" @click="confirmPlan = null">
+            <AppIcon name="x" />
+          </button>
+
+          <div class="modal-badge" :class="{ down: !isUpgrade }">
+            <AppIcon :name="isUpgrade ? 'arrow-up' : 'arrow-down'" />
+          </div>
+
+          <h3 class="modal-title">{{ isUpgrade ? 'Upgrade' : 'Switch' }} to {{ confirmPlan.name }}?</h3>
+          <p class="modal-sub">
+            We'll send a request to switch your subscription to the
+            <strong>{{ confirmPlan.name }}</strong> plan. A platform admin will
+            review and approve it before it takes effect.
+          </p>
+
+          <div class="modal-compare">
+            <div class="cmp-col">
+              <span class="cmp-label">Current</span>
+              <span class="cmp-name">{{ currentPlan?.name || '—' }}</span>
+              <span class="cmp-price">{{ currentPlan ? price(currentPlan) : '—' }}</span>
+            </div>
+            <div class="cmp-arrow"><AppIcon name="arrow-right" /></div>
+            <div class="cmp-col to">
+              <span class="cmp-label">New plan</span>
+              <span class="cmp-name">{{ confirmPlan.name }}</span>
+              <span class="cmp-price">{{ price(confirmPlan) }} <em>/{{ interval(confirmPlan) }}</em></span>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-btn ghost" type="button" @click="confirmPlan = null">Cancel</button>
+            <button
+              class="modal-btn primary"
+              type="button"
+              :disabled="changingSlug === confirmPlan.slug"
+              @click="change(confirmPlan)"
+            >
+              {{ changingSlug === confirmPlan.slug ? 'Requesting…' : 'Confirm request' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -233,4 +336,134 @@ onMounted(load)
 .plan-cta:hover:not(:disabled) { background: var(--brand-dark); }
 .plan-cta:disabled { opacity: 0.7; cursor: default; }
 .plan-cta.is-current { background: #eef0f4; color: var(--muted); }
+.plan-cta.is-pending { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+
+/* Pending request banner */
+.pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+}
+.pending-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #b45309;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.pending-ico :deep(svg) { width: 18px; height: 18px; }
+.pending-title { font-weight: 700; color: var(--ink); font-size: 0.92rem; }
+.pending-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+.pending-sub strong { color: var(--ink); }
+.pending-cancel {
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  font-weight: 650;
+  font-size: 0.85rem;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pending-cancel:hover:not(:disabled) { background: #fef3c7; }
+.pending-cancel:disabled { opacity: 0.6; cursor: default; }
+
+/* Choose-plan confirmation modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 20, 32, 0.5);
+  backdrop-filter: blur(3px);
+}
+.modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 30px 28px 24px;
+  box-shadow: 0 24px 60px -12px rgba(17, 20, 32, 0.35);
+  text-align: center;
+}
+.modal-x {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: #f4f4f7;
+  color: var(--muted);
+  cursor: pointer;
+}
+.modal-x:hover { background: #ececf1; color: var(--ink); }
+.modal-x :deep(svg) { width: 16px; height: 16px; }
+.modal-badge {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.modal-badge.down { background: #fff1f2; color: #e11d48; }
+.modal-badge :deep(svg) { width: 24px; height: 24px; }
+.modal-title { font-size: 1.25rem; font-weight: 800; color: var(--ink); }
+.modal-sub { margin: 8px auto 0; max-width: 360px; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+.modal-sub strong { color: var(--ink); }
+
+.modal-compare {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 22px 0 24px;
+}
+.cmp-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fafafc;
+}
+.cmp-col.to { border-color: var(--brand); background: var(--brand-soft); }
+.cmp-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
+.cmp-name { font-size: 1rem; font-weight: 800; color: var(--ink); }
+.cmp-price { font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
+.cmp-price em { font-style: normal; font-weight: 600; color: var(--muted); font-size: 0.8rem; }
+.cmp-arrow { display: grid; place-items: center; color: var(--faint); }
+.cmp-arrow :deep(svg) { width: 18px; height: 18px; }
+
+.modal-actions { display: flex; gap: 12px; }
+.modal-btn { flex: 1; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 0.92rem; cursor: pointer; }
+.modal-btn.ghost { background: #f4f4f7; border: 1px solid var(--line); color: var(--ink); }
+.modal-btn.ghost:hover { background: #ececf1; }
+.modal-btn.primary { background: var(--brand); border: 0; color: #fff; }
+.modal-btn.primary:hover:not(:disabled) { background: var(--brand-dark); }
+.modal-btn.primary:disabled { opacity: 0.7; cursor: default; }
+
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s ease; }
+.modal-fade-enter-active .modal-card, .modal-fade-leave-active .modal-card { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+.modal-fade-enter-from .modal-card, .modal-fade-leave-to .modal-card { transform: translateY(12px) scale(0.97); opacity: 0; }
 </style>

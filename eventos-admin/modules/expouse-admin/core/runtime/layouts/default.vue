@@ -18,6 +18,7 @@ const nav = computed<NavItem[]>(() => {
     { to: '/organizers', label: 'Organizers', icon: 'briefcase' },
     { to: '/exhibitors', label: 'Exhibitors', icon: 'store' },
     { to: '/plans', label: 'Plans', icon: 'layers' },
+    { to: '/plan-requests', label: 'Plan Requests', icon: 'bell' },
   ]
   if (auth.isOrganizer) return [
     { to: '/org', label: 'Overview', icon: 'grid' },

@@ -44,6 +44,25 @@ class EventLifecycleTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['ends_at']);
     }
 
+    public function test_event_creation_is_blocked_once_the_plan_quota_is_reached(): void
+    {
+        $this->actingAsOrganizer(); // Free plan: max_events = 1
+
+        $this->createEvent(['name' => 'The Only One']); // first is allowed
+
+        $this->postJson('/api/v1/events', ['name' => 'One Too Many', 'format' => 'venue'])
+            ->assertStatus(403);
+    }
+
+    public function test_an_unlimited_plan_lifts_the_event_quota(): void
+    {
+        $this->actingAsOrganizer();
+        $this->actAsPlan('enterprise'); // max_events = null (unlimited)
+
+        $this->createEvent(['name' => 'First']);
+        $this->createEvent(['name' => 'Second']); // would 403 on Free
+    }
+
     public function test_full_event_lifecycle(): void
     {
         $this->actingAsOrganizer();
