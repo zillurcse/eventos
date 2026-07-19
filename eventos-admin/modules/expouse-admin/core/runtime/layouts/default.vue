@@ -23,6 +23,7 @@ const nav = computed<NavItem[]>(() => {
     { to: '/org', label: 'Overview', icon: 'grid' },
     { to: '/org/events', label: 'Events', icon: 'calendar' },
     { to: '/org/team', label: 'Team', icon: 'users' },
+    { to: '/org/plans', label: 'Plans', icon: 'layers' },
   ]
   if (auth.isExhibitor) {
     const items: NavItem[] = [
