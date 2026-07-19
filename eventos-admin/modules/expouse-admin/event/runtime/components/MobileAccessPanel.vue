@@ -116,7 +116,7 @@ watch(() => props.username, v => { localUsername.value = v })
   <div class="flex flex-col gap-4">
 
     <!-- ── Mobile access info card ───────────────────────── -->
-    <div class="card mb-0!">
+    <div class="card mb-0! order-2">
       <!-- Card header row -->
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-3 min-w-0">
@@ -182,7 +182,7 @@ watch(() => props.username, v => { localUsername.value = v })
     </div>
 
     <!-- ── Credentials card ───────────────────────────────── -->
-    <div class="card mb-0!">
+    <div class="card mb-0! order-1">
       <!-- Credentials header -->
       <div class="flex items-center justify-between gap-3 mb-4">
         <input

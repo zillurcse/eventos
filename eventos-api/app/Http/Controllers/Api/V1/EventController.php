@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\EventResource;
 use App\Http\Resources\SessionResource;
 use App\Models\Event;
+use App\Models\BadgeDesign;
+use App\Models\EmailTemplate;
 use App\Models\EventSetting;
 use App\Models\Exhibitor;
 use App\Models\Membership;
@@ -425,6 +427,8 @@ class EventController extends Controller
         $exhibitors = Exhibitor::where('event_id', $event->id)->count();
         $sessions = Session::where('event_id', $event->id)->count();
         $team = Membership::where('status', 'active')->count();   // RLS-scoped to this org
+        $badges = BadgeDesign::where('event_id', $event->id)->count();
+        $emailTemplates = EmailTemplate::where('event_id', $event->id)->count();
 
         // Generate + persist the mobile-app credentials once (stub, not yet
         // wired to a real mobile login).
@@ -442,10 +446,11 @@ class EventController extends Controller
 
         $checklist = [
             ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details'],
-            ['key' => 'branding', 'label' => 'Branding & Cover', 'done' => (bool) $event->cover_file_id, 'to' => 'details'],
-            ['key' => 'exhibitors', 'label' => 'Exhibitor & Booth Details', 'done' => $exhibitors > 0, 'to' => 'showcase/exhibitors'],
-            ['key' => 'sessions', 'label' => 'Sessions & Agenda', 'done' => $sessions > 0, 'to' => 'sessions'],
-            ['key' => 'team', 'label' => 'Team Member Access', 'done' => $team > 1, 'to' => 'team'],
+            ['key' => 'branding', 'label' => 'Branding & Theme Setup', 'done' => (bool) $event->cover_file_id, 'to' => 'details/branding'],
+            ['key' => 'exhibitors', 'label' => 'Exhibitors & Booth Details', 'done' => $exhibitors > 0, 'to' => 'showcase/exhibitors'],
+            ['key' => 'badge', 'label' => 'Badge & QR Setup', 'done' => $badges > 0, 'to' => 'onsite/badge-templates'],
+            ['key' => 'team', 'label' => 'Team Member Access Setup', 'done' => $team > 1, 'to' => 'team'],
+            ['key' => 'email', 'label' => 'Email Template Configuration', 'done' => $emailTemplates > 0, 'to' => 'mail/email-builder'],
             ['key' => 'publish', 'label' => 'Review & Publish Event', 'done' => $event->status === 'published', 'to' => null],
         ];
 
