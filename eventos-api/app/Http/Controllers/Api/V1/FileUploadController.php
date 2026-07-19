@@ -37,7 +37,10 @@ class FileUploadController extends Controller
                 $isFeed => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf'],
                 $isChat => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf,doc,docx,xls,xlsx,csv,ppt,pptx,txt'],
                 $isDocument => ['required', 'file', 'max:20480', 'mimes:pdf,ppt,pptx,doc,docx,xls,xlsx,csv,txt,key,png,jpg,jpeg,webp'],
-                default => ['required', 'file', 'image', 'max:5120'],
+                // Explicit raster list — NOT the `image` rule, which admits SVG
+                // (inline-script XSS) and is served public under tenant-trusted
+                // origins. Mirrors the other branches' allow-lists.
+                default => ['required', 'file', 'mimes:png,jpg,jpeg,webp,gif', 'max:5120'],
             },
             'collection' => ['nullable', Rule::in([
                 'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
@@ -62,7 +65,7 @@ class FileUploadController extends Controller
             'collection' => $collection,
             'disk' => 's3',
             'path' => $path,
-            'filename' => $upload->getClientOriginalName(),
+            'filename' => $this->safeFilename($upload->getClientOriginalName(), $ext),
             'mime_type' => $upload->getMimeType(),
             'size_bytes' => $upload->getSize(),
             'visibility' => 'public',
@@ -77,5 +80,29 @@ class FileUploadController extends Controller
             'mime_type' => $file->mime_type,
             'filename' => $file->filename,
         ]], 201);
+    }
+
+    /**
+     * A safe *display* filename. The stored path is already a UUID (no traversal),
+     * so this is purely the human-readable name we persist and echo back. We strip
+     * control chars / NUL, drop any path the client embedded, collapse trailing
+     * extension runs so a double-extension ("invoice.pdf.svg") can't masquerade,
+     * then re-append the single extension the upload actually validated as.
+     */
+    private function safeFilename(string $original, string $ext): string
+    {
+        // Strip NUL + control chars first (a NUL could truncate downstream), then
+        // reduce to a bare basename so "../../x" and "..\\x" carry no path.
+        $clean = preg_replace('/[\x00-\x1F\x7F]/u', '', $original) ?? '';
+        $stem = basename(str_replace('\\', '/', $clean));
+
+        // Drop every trailing ".<ext>" run, then re-attach one trustworthy ext.
+        $stem = preg_replace('/(\.[A-Za-z0-9]{1,8})+$/', '', $stem) ?? '';
+        $stem = mb_substr(trim($stem), 0, 120);
+        if ($stem === '') {
+            $stem = 'file';
+        }
+
+        return $ext !== '' ? "{$stem}.{$ext}" : $stem;
     }
 }
