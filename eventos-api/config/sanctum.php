@@ -5,6 +5,25 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Laravel\Sanctum\Sanctum;
 
+/*
+|------------------------------------------------------------------------------
+| Token-only authentication — the stateful cookie flow is intentionally OFF
+|------------------------------------------------------------------------------
+| This app authenticates with Sanctum personal access tokens (Bearer header)
+| end to end (AuthController::login/register → plainTextToken; both frontends'
+| useApi.ts attach it). The SPA stateful cookie flow is deliberately NOT wired:
+| `EnsureFrontendRequestsAreStateful` is absent from the middleware stack and
+| there is no `StartSession` on the api group, so the `stateful` and
+| `middleware` blocks below are DORMANT — nothing reads them at runtime. They
+| are kept as stock scaffolding only. `guard => ['web']` is still consulted by
+| the token guard each request but always falls through (no session to find).
+|
+| ⚠️ Do NOT assume cookie auth works because this config exists. Re-enabling it
+|    means adding EnsureFrontendRequestsAreStateful + session on api, and it
+|    interacts with CORS: a credentialed flow forbids the wildcard in
+|    config/cors.php (see the note there). Revisit both files together.
+*/
+
 return [
 
     /*

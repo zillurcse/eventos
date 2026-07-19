@@ -227,8 +227,6 @@ MAIL_USERNAME=<mailbox>
 MAIL_PASSWORD=<mailbox password>
 MAIL_FROM_ADDRESS="noreply@expouse.com"
 MAIL_FROM_NAME="EventOS"
-
-SANCTUM_STATEFUL_DOMAINS=admin.expouse.com,api.expouse.com,expouse.com,*.expouse.com
 ```
 
 > **Mail:** since cPanel is already on this VPS, the simplest option is to create a mailbox
