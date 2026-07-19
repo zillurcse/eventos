@@ -21,6 +21,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // H-3: refuse to run in production with debug on. Combined with the
+        // api/* JSON error rendering (bootstrap/app.php), APP_DEBUG=true would
+        // leak stack traces + env in 500s. Fail loudly at boot — including during
+        // deploy-time artisan — rather than silently at the first error.
+        if ($this->app->environment('production') && config('app.debug') === true) {
+            throw new \RuntimeException(
+                'APP_DEBUG must be false in production. Refusing to boot with debug enabled.'
+            );
+        }
+
         // Per-tenant API rate limiting, keyed on org and sized by the plan's
         // api_rate quota (architecture §4.4). Falls back to per-user/IP.
         RateLimiter::for('api', function (Request $request) {
