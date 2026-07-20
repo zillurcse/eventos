@@ -20,6 +20,10 @@ export interface CollectionOptions<TItem, TForm extends object> {
   required: keyof TForm
   /** Form → request body. Defaults to the form as-is. */
   toBody?: (form: TForm) => Record<string, unknown>
+  /** Form → display item, used while buffering in "add" mode (before the
+   *  exhibitor exists, so the POST that would return the real item can't run
+   *  yet). Given a negative temporary id to key the row on. */
+  toItem: (form: TForm, tempId: number) => TItem
   /** Confirm text for a removal. */
   confirmText: (item: TItem) => string
   /** Singular noun for error messages ("Could not add {noun}."). */
@@ -33,6 +37,8 @@ export interface ExhibitorCollection<TItem, TForm extends object> {
   remove: (item: TItem) => Promise<void>
   reset: () => void
   set: (items: TItem[]) => void
+  /** POST every buffered item against a freshly-created exhibitor. */
+  flush: (exhibitorId: string) => Promise<void>
 }
 
 /**
@@ -51,6 +57,12 @@ export function useExhibitorCollection<TItem extends { id: number }, TForm exten
   const items = ref([]) as Ref<TItem[]>
   const form = reactive({ ...options.blank }) as TForm
 
+  // Items added before the exhibitor exists (the "add" drawer). Each holds the
+  // request body to POST once we have an id; the matching display row lives in
+  // `items` keyed on the same negative tempId. Flushed by create().
+  const pending = ref<{ tempId: number, body: Record<string, unknown> }[]>([])
+  let tempSeq = -1
+
   const base = () => `/exhibitors/${exhibitorId.value}/${options.path}`
 
   function reset() {
@@ -58,12 +70,22 @@ export function useExhibitorCollection<TItem extends { id: number }, TForm exten
   }
 
   async function add() {
-    if (!exhibitorId.value || !form[options.required]) return
+    if (!form[options.required]) return
+
+    const body = options.toBody ? options.toBody(form) : { ...form }
+
+    // No exhibitor yet → buffer locally; create() will flush these.
+    if (!exhibitorId.value) {
+      const tempId = tempSeq--
+      items.value.push(options.toItem(form, tempId))
+      pending.value.push({ tempId, body })
+      reset()
+      return
+    }
 
     error.value = ''
     saving.value = true
     try {
-      const body = options.toBody ? options.toBody(form) : { ...form }
       const r = await api<{ data: TItem }>(base(), { method: 'POST', body })
       items.value.push(r.data)
       reset()
@@ -75,7 +97,14 @@ export function useExhibitorCollection<TItem extends { id: number }, TForm exten
   }
 
   async function remove(item: TItem) {
-    if (!exhibitorId.value || !confirm(options.confirmText(item))) return
+    if (!confirm(options.confirmText(item))) return
+
+    // Buffered row (never persisted) → drop it locally, nothing to DELETE.
+    if (item.id < 0 || !exhibitorId.value) {
+      items.value = items.value.filter(x => x.id !== item.id)
+      pending.value = pending.value.filter(p => p.tempId !== item.id)
+      return
+    }
 
     try {
       await api(`${base()}/${item.id}`, { method: 'DELETE' })
@@ -89,7 +118,17 @@ export function useExhibitorCollection<TItem extends { id: number }, TForm exten
 
   function set(next: TItem[]) {
     items.value = next ?? []
+    pending.value = []
   }
 
-  return { items, form, add, remove, reset, set }
+  async function flush(id: string) {
+    if (!pending.value.length) return
+    const path = `/exhibitors/${id}/${options.path}`
+    for (const p of pending.value) {
+      await api(path, { method: 'POST', body: p.body })
+    }
+    pending.value = []
+  }
+
+  return { items, form, add, remove, reset, set, flush }
 }

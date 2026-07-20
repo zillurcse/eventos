@@ -29,7 +29,8 @@ class ExhibitorController extends Controller
     /** Builder/UI fields stored in profile_data (not real columns). */
     private const PROFILE_KEYS = [
         'stall_no', 'phone_code', 'phone', 'rating', 'featured', 'premium', 'about',
-        'street', 'city', 'state', 'zip', 'country', 'location_url', 'website_url',
+        'venue', 'street', 'address_line1', 'address_line2',
+        'city', 'state', 'zip', 'country', 'location_url', 'website_url',
         'tags', 'filter_id', 'filter_selections', 'spotlight_type', 'spotlight_url', 'spotlight_file_id',
         'cta', 'social', 'contact', 'entitlements',
     ];

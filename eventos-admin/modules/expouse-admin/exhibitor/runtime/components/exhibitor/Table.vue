@@ -3,9 +3,9 @@ import { computed } from 'vue'
 import { TYPE_OPTIONS } from '../../utils/exhibitor'
 
 const {
-  exhibitors, packages, openAdd,
+  eventId, exhibitors, packages, openAdd,
   search, filterType, filterPackage, resetFilters, filtered,
-  packageName, toggleActions, actionsOpenId, openEdit, remove,
+  packageName, toggleActions, actionsOpenId, remove,
   openResetPassword, toggleStatus, previous,
 } = useExhibitorContext()
 
@@ -118,10 +118,10 @@ const columns = [
             </svg>
           </button>
           <div v-if="actionsOpenId === row.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-48 overflow-hidden divide-y divide-line">
-            <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="openEdit(row); actionsOpenId = null">
+            <NuxtLink :to="`/org/events/${eventId}/showcase/exhibitors/${row.id}`" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] no-underline hover:bg-[#f7f8fa] text-ink transition-colors" @click="actionsOpenId = null">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               Edit
-            </button>
+            </NuxtLink>
             <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="toggleStatus(row)">
               <template v-if="isActive(row)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dc2626]"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>

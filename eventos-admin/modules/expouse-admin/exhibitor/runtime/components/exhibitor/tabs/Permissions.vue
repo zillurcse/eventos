@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { entitlements, subSaving, subError, savePermissions } = useExhibitorContext()
+const { entitlements, subSaving, subError, savePermissions, drawerMode } = useExhibitorContext()
+
+const isAdd = computed(() => drawerMode.value === 'add')
 </script>
 
 <template>
@@ -20,7 +22,11 @@ const { entitlements, subSaving, subError, savePermissions } = useExhibitorConte
       </div>
     </div>
     <p v-if="subError" class="error mt-3">{{ subError }}</p>
-    <div class="flex pt-4 mt-2">
+    <!-- No exhibitor to PUT to yet — these ride along with "Add Exhibitor". -->
+    <p v-if="isAdd" class="muted text-[.84rem] pt-4 mt-2">
+      These permissions are applied when you create the exhibitor.
+    </p>
+    <div v-else class="flex pt-4 mt-2">
       <button class="btn flex-1 py-3 tracking-widest" :disabled="subSaving" @click="savePermissions">
         {{ subSaving ? 'SAVING…' : 'SAVE PERMISSIONS' }}
       </button>

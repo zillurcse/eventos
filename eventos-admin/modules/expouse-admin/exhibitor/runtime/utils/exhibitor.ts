@@ -39,7 +39,8 @@ export interface Exhibitor {
   featured?: boolean
   premium?: boolean
   about?: string
-  street?: string; city?: string; state?: string; zip?: string; country?: string
+  venue?: string; street?: string; address_line1?: string; address_line2?: string
+  city?: string; state?: string; zip?: string; country?: string
   location_url?: string; website_url?: string
   tags?: string[]
   filter_id?: string
@@ -70,7 +71,8 @@ export interface Draft {
   phone_code: string; phone: string
   rating: boolean; featured: boolean; premium: boolean
   about: string
-  street: string; city: string; state: string; zip: string; country: string
+  venue: string; street: string; address_line1: string; address_line2: string
+  city: string; state: string; zip: string; country: string
   location_url: string; website_url: string
   tags: string[]; filter_id: string
   // Selections against the event's "Manage Filters": filterId → heading → chosen options.
@@ -131,7 +133,8 @@ export function freshDraft(): Draft {
     phone_code: '+880', phone: '',
     rating: false, featured: false, premium: false,
     about: '',
-    street: '', city: '', state: '', zip: '', country: '',
+    venue: '', street: '', address_line1: '', address_line2: '',
+    city: '', state: '', zip: '', country: '',
     location_url: '', website_url: '',
     tags: [], filter_id: '', filter_selections: {},
     spotlight_type: 'image', spotlight_url: '', spotlight_file_id: null,
@@ -185,7 +188,10 @@ export function draftFromExhibitor(e: Exhibitor): Draft {
     featured: !!e.featured,
     premium: !!e.premium,
     about: e.about || '',
+    venue: e.venue || '',
     street: e.street || '',
+    address_line1: e.address_line1 || '',
+    address_line2: e.address_line2 || '',
     city: e.city || '',
     state: e.state || '',
     zip: e.zip || '',
@@ -221,7 +227,10 @@ export function draftToPayload(draft: Draft, eventId: string) {
     featured: draft.featured,
     premium: draft.premium,
     about: draft.about,
+    venue: draft.venue,
     street: draft.street,
+    address_line1: draft.address_line1,
+    address_line2: draft.address_line2,
     city: draft.city,
     state: draft.state,
     zip: draft.zip,

@@ -42,6 +42,12 @@ export function useExhibitorManager(eventId: string) {
     path: 'members',
     blank: MEMBER_FORM,
     required: 'email',
+    // Buffered display row (add drawer) — mirror the shape the API would return.
+    toItem: (f, id) => ({
+      id,
+      role: f.role,
+      contact: { name: [f.first_name, f.last_name].filter(Boolean).join(' ') || undefined, email: f.email },
+    }),
     confirmText: m => `Remove ${m.contact?.email || 'this member'}?`,
     noun: 'member',
   })
@@ -49,6 +55,7 @@ export function useExhibitorManager(eventId: string) {
     path: 'documents',
     blank: DOC_FORM,
     required: 'title',
+    toItem: (f, id) => ({ id, title: f.title, url: f.url }),
     confirmText: d => `Remove "${d.title}"?`,
     noun: 'document',
   })
@@ -56,6 +63,7 @@ export function useExhibitorManager(eventId: string) {
     path: 'projects',
     blank: PROJECT_FORM,
     required: 'name',
+    toItem: (f, id) => ({ id, name: f.name, description: f.description, status: f.status }),
     confirmText: p => `Remove "${p.name}"?`,
     noun: 'project',
   })
@@ -69,9 +77,18 @@ export function useExhibitorManager(eventId: string) {
       description: f.description || undefined,
       price_cents: f.price ? Math.round(Number(f.price) * 100) : undefined,
     }),
+    toItem: (f, id) => ({
+      id,
+      name: f.name,
+      description: f.description,
+      price_cents: f.price ? Math.round(Number(f.price) * 100) : null,
+    }),
     confirmText: p => `Remove "${p.name}"?`,
     noun: 'product',
   })
+
+  // All buffered sub-resource lists, flushed together after a create().
+  const collections = [memberList, documentList, projectList, productList]
 
   // ── Table ────────────────────────────────────────────────────────────
   const table = useExhibitorTable(exhibitors, packages)
@@ -109,26 +126,37 @@ export function useExhibitorManager(eventId: string) {
     editingId.value = null
     activeTab.value = 'Details'
     error.value = ''
+    subError.value = ''
+    // The tabs are live in the add drawer now: start every sub-list empty and
+    // its form blank so nothing carries over from a previous edit/add.
+    for (const c of collections) { c.set([]); c.reset() }
+    entitlements.value = mergeFeatures(null)
     drawerMode.value = 'add'
   }
 
-  async function openEdit(e: Exhibitor) {
-    // Open on the loaded-but-empty state first: the drawer is on screen while
-    // the full record (with its sub-resources) is still in flight.
-    editingId.value = e.id
+  // The record currently open in the full-page edit screen. Drives the top-bar
+  // Deactivate toggle and Reset Password button (which need its status/email).
+  const current = ref<Exhibitor | null>(null)
+
+  /**
+   * Load one exhibitor by uuid into the draft + sub-lists for the full-page
+   * editor. Renders on the loaded-but-empty state first (the page is on screen
+   * while the full record and its sub-resources are still in flight).
+   */
+  async function loadForEdit(uuid: string) {
+    editingId.value = uuid
     activeTab.value = 'Details'
     error.value = ''
     subError.value = ''
+    current.value = null
     Object.assign(draft, freshDraft())
-    memberList.set([])
-    documentList.set([])
-    projectList.set([])
-    productList.set([])
+    for (const c of collections) { c.set([]); c.reset() }
     entitlements.value = mergeFeatures(null)
     drawerMode.value = 'edit'
 
     try {
-      const full = (await api<{ data: Exhibitor }>(`/exhibitors/${e.id}`)).data
+      const full = (await api<{ data: Exhibitor }>(`/exhibitors/${uuid}`)).data
+      current.value = full
       Object.assign(draft, draftFromExhibitor(full))
       memberList.set(full.members ?? [])
       documentList.set(full.documents ?? [])
@@ -140,21 +168,36 @@ export function useExhibitorManager(eventId: string) {
     }
   }
 
+  // Name + package are required; an admin email is optional but, if given, valid.
+  const canCreate = computed(() =>
+    !!draft.name.trim()
+    && !!draft.package_id
+    && (!draft.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())))
+
   // ── Create / update / delete ─────────────────────────────────────────
   async function create() {
     error.value = ''
     saving.value = true
     const adminEmail = draft.email
     try {
-      const res = await api<{ admin_invited?: boolean }>('/exhibitors', {
+      // Entitlements ride along in the create payload (stored in profile_data);
+      // the sub-resources (members/docs/…) need the new id, so they're flushed
+      // once we have it.
+      const res = await api<{ data: { id: string }, admin_invited?: boolean }>('/exhibitors', {
         method: 'POST',
-        body: draftToPayload(draft, eventId),
+        body: { ...draftToPayload(draft, eventId), entitlements: JSON.parse(JSON.stringify(entitlements.value)) },
       })
+      const newId = res.data.id
+      const flushError = await flushCollections(newId)
+
       drawerMode.value = null
       await load()
       toast.success('Exhibitor created', res?.admin_invited
         ? { description: `A 6-digit access code was emailed to ${adminEmail}.` }
         : undefined)
+      // The exhibitor exists; only some buffered sub-items failed. Say so rather
+      // than let them vanish silently.
+      if (flushError) toast.error(flushError)
     } catch (e) {
       error.value = exhibitorError(e, 'Could not create.')
       toast.error(error.value)
@@ -163,17 +206,35 @@ export function useExhibitorManager(eventId: string) {
     }
   }
 
-  async function update() {
+  /** POST every buffered sub-resource against the new exhibitor. Returns a
+   *  user-facing message if any collection failed, else ''. */
+  async function flushCollections(newId: string): Promise<string> {
+    let message = ''
+    for (const c of collections) {
+      try {
+        await c.flush(newId)
+      } catch (e) {
+        if (!message) message = exhibitorError(e, 'Exhibitor created, but some items could not be saved.')
+      }
+    }
+    return message
+  }
+
+  async function update(): Promise<boolean> {
     error.value = ''
     saving.value = true
     try {
-      await api(`/exhibitors/${editingId.value}`, { method: 'PUT', body: draftToPayload(draft, eventId) })
+      const res = await api<{ data: Exhibitor }>(`/exhibitors/${editingId.value}`, { method: 'PUT', body: draftToPayload(draft, eventId) })
+      // Keep the top-bar record (status/name/email) in step with what was saved.
+      if (res?.data) current.value = res.data
       drawerMode.value = null
       await load()
       toast.success('Exhibitor updated')
+      return true
     } catch (e) {
       error.value = exhibitorError(e, 'Could not update.')
       toast.error(error.value)
+      return false
     } finally {
       saving.value = false
     }
@@ -262,8 +323,8 @@ export function useExhibitorManager(eventId: string) {
     // list + meta
     eventId, exhibitors, packages, filters,
     // drawer / editing
-    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput,
-    init, load, loadMeta, openAdd, openEdit, create, update, remove, toggleStatus,
+    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, current,
+    init, load, loadMeta, openAdd, loadForEdit, create, update, remove, toggleStatus,
     pickSpotlight, addTag, removeTag, addCta,
     // table (search / filters / paging / row menu)
     ...table,

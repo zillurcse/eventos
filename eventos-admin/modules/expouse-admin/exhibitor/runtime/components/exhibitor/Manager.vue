@@ -21,7 +21,6 @@ const previousOpen = mgr.previous.open
     <ExhibitorTable />
 
     <ExhibitorAddDrawer v-if="drawerMode === 'add'" />
-    <ExhibitorEditDrawer v-if="drawerMode === 'edit'" />
     <ExhibitorPreviousDrawer v-if="previousOpen" />
     <ExhibitorResetPasswordModal v-if="resetTarget" />
   </div>
