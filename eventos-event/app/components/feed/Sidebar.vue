@@ -15,7 +15,7 @@ const feed = useFeedStore()
 interface FilterMeta { filter: FeedFilter, icon: string }
 
 const FILTER_META: Record<string, FilterMeta> = {
-  all: { filter: 'all', icon: 'M4 8h16M4 14h16' },
+  all: { filter: 'all', icon: 'M3 4h18l-7 8v6l-4 2v-8z' },
   images: { filter: 'image', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
   image: { filter: 'image', icon: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z' },
   video: { filter: 'video', icon: 'M3 6h13v12H3zM16 10l5-3v10l-5-3z' },
@@ -33,8 +33,8 @@ const FILTER_META: Record<string, FilterMeta> = {
 const DEFAULT_FILTERS: { key: string, label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'images', label: 'Images' },
-  { key: 'video', label: 'Video' },
-  { key: 'pdf', label: 'Pdf' },
+  { key: 'video', label: 'Videos' },
+  { key: 'pdf', label: 'PDFs' },
   { key: 'polls', label: 'Polls' },
   { key: 'offers', label: 'Offers' },
   { key: 'looking_for', label: 'Looking For' },
@@ -71,16 +71,15 @@ watch(filters, (list) => {
     <div class="card">
       <p class="title">Filter By</p>
       <nav class="list">
-        <button
-          v-for="f in filters"
-          :key="f.key"
-          type="button"
-          class="item"
-          :class="{ on: feed.filter === f.key }"
-          @click="feed.setFilter(f.key)"
-        >
-          <span class="ic"><svg viewBox="0 0 24 24"><path :d="f.icon" /></svg></span>
-          {{ f.label }}
+        <button v-for="f in filters" :key="f.key" type="button" class="item" :class="{ on: feed.filter === f.key }"
+          @click="feed.setFilter(f.key)">
+          <span class="ic"><svg viewBox="0 0 24 24">
+              <path :d="f.icon" />
+            </svg></span>
+          <span>{{ f.label }}</span>
+          <svg v-if="feed.filter === f.key" class="check" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m5 12 4.2 4.2L19 6.5" />
+          </svg>
         </button>
       </nav>
     </div>
@@ -88,14 +87,91 @@ watch(filters, (list) => {
 </template>
 
 <style scoped>
-.rail { display: flex; flex-direction: column; gap: 24px; padding: 32px; box-sizing: border-box; }
-.card { background: #fff; border-radius: 14px; padding: 18px 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.title { margin: 0 6px 6px; padding-bottom: 12px; border-bottom: 1px solid #eef0f3; color: #334155; font-weight: 700; font-size: 1rem; }
-.list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-.item { display: flex; align-items: center; gap: 14px; border: none; background: none; border-radius: 10px; padding: 11px 10px; cursor: pointer; font: inherit; font-size: .98rem; color: #475569; text-align: left; }
-.item:hover { background: #f7f8fa; }
-.ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; background: #f1f5f9; color: #64748b; display: inline-flex; align-items: center; justify-content: center; }
-.ic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.item.on { color: var(--brand-primary); font-weight: 700; }
-.item.on .ic { background: var(--brand-primary); color: #fff; }
+.rail {
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e6e7ed;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 0;
+}
+
+.title {
+  margin: 0 0 16px;
+  color: #343741;
+  font-weight: 750;
+  font-size: 1.14rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #e4e5eb;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  color: #666a72;
+  text-align: left;
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.item:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 48%, #e4e5eb);
+  background: #fbfaff;
+}
+
+.ic {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  color: #676b70;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ic svg,
+.check {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.check {
+  margin-left: auto;
+  width: 23px;
+  height: 23px;
+}
+
+.item.on {
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  color: var(--brand-primary);
+  font-weight: 650;
+}
+
+.item.on .ic {
+  color: var(--brand-primary);
+}
 </style>

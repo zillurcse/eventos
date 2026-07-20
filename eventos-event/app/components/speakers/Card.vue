@@ -54,37 +54,39 @@ const connectState = computed(() => store.connected[props.speaker.id])
 
 <style scoped>
 .card {
+  --reveal-h: 52px;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   background: #fff;
   border-radius: 12px;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 500ms ease-in;
   border: 1px solid #E8E8EE;
-  padding: 0
+  padding: 0;
+  overflow: hidden;
+  transition: border-color .18s ease, box-shadow .18s ease;
 }
 
 .card:hover,
 .card:focus-within {
   box-shadow: 0 10px 26px rgba(15, 23, 42, .12);
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--brand-primary) 45%, #fff);
 }
 
 .thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 12px 12px 0px 0px;
+  height: 100cqw;
+  flex-shrink: 0;
+  border-radius: 12px 12px 0 0;
   overflow: hidden;
   background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
-  transition: aspect-ratio .22s ease;
+  transition: height .22s ease;
 }
 
 .card:hover .thumb,
 .card:focus-within .thumb {
-  aspect-ratio: 2 / 1.6;
+  height: calc(100cqw - var(--reveal-h));
 }
 
 .thumb :deep(.ua) {
@@ -172,15 +174,16 @@ const connectState = computed(() => store.connected[props.speaker.id])
    area grows into, so the card's total height stays constant — the content
    slides up from the bottom rather than pushing the card taller. */
 .reveal {
-  max-height: 0;
+  height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height .22s ease, opacity .18s ease;
+  flex-shrink: 0;
+  transition: height .22s ease, opacity .18s ease;
 }
 
 .card:hover .reveal,
 .card:focus-within .reveal {
-  max-height: 68px;
+  height: var(--reveal-h);
   opacity: 1;
 }
 
@@ -195,8 +198,12 @@ const connectState = computed(() => store.connected[props.speaker.id])
 }
 
 @media (hover: none) {
+  .thumb {
+    height: calc(100cqw - var(--reveal-h));
+  }
+
   .reveal {
-    max-height: 68px;
+    height: var(--reveal-h);
     opacity: 1;
   }
 
