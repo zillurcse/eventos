@@ -10,6 +10,7 @@ defineProps<{
   modelValue?: string | null
   categories?: SpeakerCategory[]
   busy?: boolean
+  placeholder?: string
 }>()
 
 const emit = defineEmits<{
@@ -72,8 +73,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       :class="open ? 'border-brand' : 'border-[#d7dae1]'"
       @click="toggle"
     >
-      <span class="text-[#5f6b7a] text-[.6rem] leading-none">▼</span>
-      <span v-if="modelValue" class="text-ink text-[.9rem]">{{ modelValue }}</span>
+      <span class="text-[#5f6b7a] text-[.6rem] leading-none order-2 ml-auto">▼</span>
+      <span v-if="modelValue" class="text-ink text-[.9rem] order-1">{{ modelValue }}</span>
+      <span v-else-if="placeholder" class="text-[#9aa0ac] text-[.9rem] order-1">{{ placeholder }}</span>
     </button>
 
     <!-- Panel (in-flow so it is never clipped by the drawer's scroll area) -->

@@ -71,17 +71,20 @@ export function useExhibitorManager(eventId: string) {
     path: 'products',
     blank: PRODUCT_FORM,
     required: 'name',
-    // The form takes dollars; the API stores cents.
+    // The form takes dollars; the API stores cents. The builder fields (image,
+    // button, attachment, job-offer flag) live in the product's meta jsonb.
     toBody: f => ({
       name: f.name,
       description: f.description || undefined,
       price_cents: f.price ? Math.round(Number(f.price) * 100) : undefined,
+      meta: productMeta(f),
     }),
     toItem: (f, id) => ({
       id,
       name: f.name,
       description: f.description,
       price_cents: f.price ? Math.round(Number(f.price) * 100) : null,
+      meta: productMeta(f),
     }),
     confirmText: p => `Remove "${p.name}"?`,
     noun: 'product',

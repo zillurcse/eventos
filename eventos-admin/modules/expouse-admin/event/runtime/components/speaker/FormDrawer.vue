@@ -64,6 +64,11 @@ function freshDraft(): DraftShape {
 
 const draft = reactive<DraftShape>(freshDraft())
 
+// The backend stores a single `name`, but the form splits it into first / last.
+// Seed both from the existing row on edit; recombine on save.
+const firstName = ref('')
+const lastName  = ref('')
+
 if (props.speaker) {
   const s = props.speaker
   Object.assign(draft, {
@@ -78,6 +83,9 @@ if (props.speaker) {
     tags: [...(s.tags ?? [])], can_rate: s.can_rate,
     is_featured: s.is_featured, is_public: s.is_public,
   })
+  const parts = (s.name ?? '').trim().split(/\s+/)
+  firstName.value = parts.shift() ?? ''
+  lastName.value  = parts.join(' ')
 }
 
 // ── Category select ──────────────────────────────────────────────────────────
@@ -135,44 +143,52 @@ function onTagKey(e: KeyboardEvent) {
 // ── Save ─────────────────────────────────────────────────────────────────────
 
 function save() {
+  draft.name = [firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' ')
   emit('save', { ...draft })
 }
 </script>
 
 <template>
   <Drawer :title="editing ? 'Edit Speaker' : 'Add Speaker'" @close="emit('close')">
-    <!-- Photo -->
+    <!-- ── Basic Details ─────────────────────────────────────────────────── -->
+    <h3 class="text-[1rem] font-bold text-ink m-0 mb-4">Basic Details</h3>
+
+    <!-- Image -->
     <div class="mb-5">
-      <FormField label="Photo">
+      <FormField label="Image">
         <ImageField
           :model-value="draft.image_url"
           :aspect="1"
           :output-width="400"
           :output-height="400"
           collection="avatar"
-          card-width="160px"
-          hint="Square image recommended"
+          card-width="96px"
           :gallery-path="`/events/${eventId}/gallery`"
           @update:model-value="draft.image_url = (Array.isArray($event) ? $event[0] : $event) || null"
         />
       </FormField>
     </div>
 
-    <!-- Basic info -->
-    <div class="mb-5 flex flex-col gap-3">
-      <AppInput v-model="draft.name"        label="Full Name"             required placeholder="e.g. Jane Smith" />
-      <AppInput v-model="draft.email"       label="Email Address"         required type="email" placeholder="jane@example.com" />
-      <AppInput v-model="draft.designation" label="Designation"           placeholder="e.g. CEO" />
-      <AppInput v-model="draft.company"     label="Company / Organisation" placeholder="Acme Corp" />
+    <!-- Name -->
+    <div class="mb-4 grid grid-cols-2 gap-3">
+      <AppInput v-model="firstName" label="First Name" required placeholder="Enter First Name" />
+      <AppInput v-model="lastName"  label="Last Name"  placeholder="Enter Last Name" />
     </div>
 
-    <!-- Category (optional) -->
-    <div class="mb-5">
-      <FormField label="Category" hint="Optional. Group speakers by topic or track.">
+    <div class="mb-4 flex flex-col gap-4">
+      <AppInput v-model="draft.email"       label="Email"          required type="email" placeholder="Enter Email" />
+      <AppInput v-model="draft.designation" label="Designation"    placeholder="Enter Designation" />
+      <AppInput v-model="draft.company"     label="Company Name"   placeholder="Enter Company Name" />
+    </div>
+
+    <!-- Category -->
+    <div class="mb-4">
+      <FormField label="Category">
         <SpeakerCategorySelect
           v-model="draft.category"
           :categories="categories"
           :busy="catBusy"
+          placeholder="Select Category"
           @add="onAddCategory"
           @rename="emit('rename-category', $event)"
           @remove="emit('remove-category', $event)"
@@ -180,42 +196,94 @@ function save() {
       </FormField>
     </div>
 
-    <!-- Presentation -->
-    <div class="mb-5 flex flex-col gap-3">
-      <AppInput v-model="draft.presentation_title" label="Presentation Title" placeholder="e.g. Scaling engineering teams" />
-      <FormField label="Presentation File" hint="PDF, PPT or DOC, up to 20 MB.">
+    <!-- Bio -->
+    <div class="mb-6">
+      <FormField label="Bio">
+        <DescriptionEditor
+          v-model="draft.bio"
+          :toolbar="['bold', 'italic', 'underline', 'bulletList', 'orderedList', 'link']"
+        />
+      </FormField>
+    </div>
+
+    <!-- ── Presentation Details ──────────────────────────────────────────── -->
+    <h3 class="text-[1rem] font-bold text-ink m-0 mb-4 pt-2 border-t border-line">Presentation Details</h3>
+
+    <div class="mb-4">
+      <AppInput v-model="draft.presentation_title" label="Presentation Title" placeholder="Enter Presentation Title" />
+    </div>
+
+    <div class="mb-6">
+      <FormField label="Presentation File" hint="DOC, PPT, PDF | 5MB (Maximum)">
         <div v-if="draft.presentation_file" class="flex items-center justify-between gap-2 border border-line rounded-[11px] px-3 py-2.5">
           <a :href="draft.presentation_file" target="_blank" class="text-brand text-[.85rem] truncate">
             {{ draft.presentation_file_name || 'View file' }}
           </a>
           <button type="button" class="bg-transparent border-0 cursor-pointer text-[#dc2626] text-[.85rem]" @click="clearPresentationFile">Remove</button>
         </div>
-        <label v-else class="flex items-center justify-center border border-dashed border-[#d7dae1] rounded-[11px] px-3 py-3 cursor-pointer text-muted text-[.85rem] hover:border-brand">
-          <span>{{ presUploading ? 'Uploading…' : '+ Upload presentation file' }}</span>
-          <input type="file" class="hidden" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.csv,.txt,.key" @change="onPresentationFile">
+        <label v-else class="flex items-center border border-line rounded-[11px] overflow-hidden cursor-pointer hover:border-brand">
+          <span class="px-3.5 py-2.5 bg-[#f2f1fb] text-brand font-[650] text-[.82rem] shrink-0">Choose File</span>
+          <span class="px-3 text-muted text-[.85rem] truncate">{{ presUploading ? 'Uploading…' : 'No File Chosen' }}</span>
+          <input type="file" class="hidden" accept=".pdf,.ppt,.pptx,.doc,.docx" @change="onPresentationFile">
         </label>
       </FormField>
     </div>
 
-    <!-- Bio -->
-    <div class="mb-5">
-      <AppTextarea v-model="draft.bio" label="Bio" :rows="4" placeholder="Short biography…" />
+    <!-- ── Social Links ──────────────────────────────────────────────────── -->
+    <h3 class="text-[1rem] font-bold text-ink m-0 mb-4 pt-2 border-t border-line">Social Links</h3>
+
+    <div class="mb-4 flex flex-col gap-3">
+      <AppInput v-model="draft.facebook" placeholder="Facebook URL">
+        <template #suffix>
+          <span class="w-7 h-7 rounded-md bg-[#f2f3f5] grid place-items-center text-[#1877f2]">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 8.5H14c-.6 0-1 .4-1 1V11h2.5l-.4 2.5H13V20h-2.5v-6.5H8.5V11h2V9c0-1.9 1.1-3 2.8-3H15.5v2.5Z"/></svg>
+          </span>
+        </template>
+      </AppInput>
+
+      <AppInput v-model="draft.linkedin" placeholder="LinkedIn URL">
+        <template #suffix>
+          <span class="w-7 h-7 rounded-md bg-[#f2f3f5] grid place-items-center text-[#0a66c2]">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 8.5H4.5V20h2.44V8.5ZM5.72 4.5a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8ZM20 20h-2.44v-6c0-1.5-.54-2.2-1.6-2.2-.85 0-1.35.57-1.57 1.12-.08.2-.1.47-.1.75V20H11.9s.03-9.4 0-11.5h2.44v1.63c.32-.5.9-1.2 2.2-1.2 1.6 0 2.9 1.05 2.9 3.3V20Z"/></svg>
+          </span>
+        </template>
+      </AppInput>
+
+      <AppInput v-model="draft.twitter" placeholder="Twitter URL">
+        <template #suffix>
+          <span class="w-7 h-7 rounded-md bg-[#f2f3f5] grid place-items-center text-ink">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 3H21l-6.6 7.5L22 21h-6l-4.7-6-5.4 6H3l7-8L2 3h6.1l4.2 5.6L18.9 3Zm-2.1 16.2h1.2L7.3 4.7H6L16.8 19.2Z"/></svg>
+          </span>
+        </template>
+      </AppInput>
+
+      <AppInput v-model="draft.instagram" placeholder="Instagram URL">
+        <template #suffix>
+          <span class="w-7 h-7 rounded-md bg-[#f2f3f5] grid place-items-center text-[#c13584]">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.2"/><circle cx="16.6" cy="7.4" r="1" fill="currentColor" stroke="none"/></svg>
+          </span>
+        </template>
+      </AppInput>
+
+      <!-- WhatsApp: fixed wa.me prefix + number -->
+      <div class="flex items-center border border-line rounded-[11px] overflow-hidden focus-within:border-brand">
+        <span class="px-3 py-2.5 bg-[#f2f3f5] text-muted text-[.85rem] shrink-0 border-r border-line">https://wa.me/</span>
+        <input
+          v-model="draft.whatsapp"
+          type="text"
+          placeholder="Enter WhatsApp Number"
+          class="flex-1 min-w-0 border-0 shadow-none! focus:shadow-none! m-0 text-[.85rem]"
+        >
+        <span class="w-7 h-7 mr-2 rounded-md bg-[#f2f3f5] grid place-items-center text-[#25d366] shrink-0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 00-7.7 13.6L3 21l4.6-1.2A9 9 0 1012 3Zm0 16.3a7.3 7.3 0 01-3.7-1l-.27-.16-2.73.72.73-2.66-.18-.28A7.3 7.3 0 1112 19.3Zm4-5.3c-.22-.11-1.3-.64-1.5-.71-.2-.08-.35-.11-.5.1-.14.22-.57.72-.7.87-.13.15-.26.16-.48.05a6 6 0 01-1.76-1.08 6.6 6.6 0 01-1.22-1.52c-.13-.22 0-.34.1-.45.1-.1.22-.26.33-.4.11-.13.14-.22.22-.37.07-.15.03-.28-.02-.4-.05-.1-.5-1.2-.68-1.65-.18-.43-.36-.37-.5-.38h-.42c-.15 0-.4.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.17.92 2.32c.11.15 1.6 2.44 3.87 3.42.54.23.96.37 1.29.48.54.17 1.03.15 1.42.09.43-.06 1.3-.53 1.49-1.05.18-.51.18-.95.13-1.04-.05-.09-.2-.14-.42-.25Z"/></svg>
+        </span>
+      </div>
     </div>
 
-    <!-- Social links -->
-    <div class="mb-5 flex flex-col gap-3">
-      <p class="text-muted text-[.85rem] mb-0 mt-0 font-medium">Social Links</p>
-      <AppInput v-model="draft.linkedin"  placeholder="LinkedIn URL" />
-      <AppInput v-model="draft.twitter"   placeholder="Twitter / X URL" />
-      <AppInput v-model="draft.facebook"  placeholder="Facebook URL" />
-      <AppInput v-model="draft.instagram" placeholder="Instagram URL" />
-      <AppInput v-model="draft.whatsapp"  placeholder="WhatsApp number" />
-    </div>
-
-    <!-- Tags -->
+    <!-- Custom Tags -->
     <div class="mb-5">
-      <FormField label="Tags">
-        <div class="flex flex-wrap gap-1.5 mb-2">
+      <FormField label="Custom Tags">
+        <div v-if="draft.tags.length" class="flex flex-wrap gap-1.5 mb-2">
           <span
             v-for="(tag, i) in draft.tags" :key="i"
             class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
@@ -229,7 +297,7 @@ function save() {
         </div>
         <AppInput
           v-model="tagInput"
-          placeholder="Type a tag and press Enter or comma"
+          placeholder="Add tag & press enter"
           @keydown="onTagKey"
           @blur="addTag"
         />
@@ -237,23 +305,23 @@ function save() {
     </div>
 
     <!-- Options -->
-    <div class="mb-5 flex flex-col gap-3">
-      <AppCheckbox v-model="draft.can_rate"    label="Attendees can rate this speaker" description="Show a rating widget on the speaker's profile" />
-      <AppCheckbox v-model="draft.is_featured" label="Featured speaker" description="Highlighted in the event showcase" />
-      <AppCheckbox v-model="draft.is_public"   label="Public speaker data" description="Visible to all event attendees" />
+    <div class="mb-5 flex flex-col gap-3 pt-4 border-t border-line">
+      <AppCheckbox v-model="draft.can_rate"    label="Attendees can rate this speaker" />
+      <AppCheckbox v-model="draft.is_featured" label="Featured Speaker" />
+      <AppCheckbox v-model="draft.is_public"   label="Public speaker data" />
     </div>
 
     <p v-if="error" class="error mt-3">{{ error }}</p>
 
     <div class="modal-actions border-t border-line pt-4 mt-5">
-      <button class="btn ghost" @click="emit('close')">Cancel</button>
       <button
         class="btn"
-        :disabled="!draft.name.trim() || !draft.email.trim() || saving"
+        :disabled="!firstName.trim() || !draft.email.trim() || saving"
         @click="save"
       >
-        {{ saving ? 'Saving…' : editing ? 'UPDATE' : 'ADD' }}
+        {{ saving ? 'Saving…' : editing ? 'Update Speaker' : 'Add Speaker' }}
       </button>
+      <button class="btn ghost" @click="emit('close')">Cancel</button>
     </div>
   </Drawer>
 </template>

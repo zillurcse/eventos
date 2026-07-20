@@ -17,7 +17,19 @@ export interface ExhibitorMemberContact { name?: string; email?: string; can_log
 export interface ExhibitorMember { id: number; role: string; contact?: ExhibitorMemberContact }
 export interface ExhibitorDocument { id: number; title: string; url: string }
 export interface ExhibitorProject { id: number; name: string; description?: string; status?: string }
-export interface ExhibitorProduct { id: number; name: string; description?: string; price_cents: number | null }
+/** Rich product fields kept in ExhibitorProduct.meta (jsonb) — no dedicated
+ *  columns, matching the "Add Product" builder form. */
+export interface ProductMeta {
+  image_url?: string
+  image_file_id?: number | null
+  button_label?: string
+  button_url?: string
+  attachment_url?: string
+  attachment_name?: string
+  attachment_file_id?: number | null
+  is_job_offer?: boolean
+}
+export interface ExhibitorProduct { id: number; name: string; description?: string; price_cents: number | null; meta?: ProductMeta }
 
 /** A row in the exhibitors table. The edit drawer additionally loads the
  *  sub-resources below, which the list endpoint does not return. */
@@ -97,7 +109,13 @@ export const EXHIBITOR_LIMIT = 50
 export const MEMBER_FORM = { email: '', first_name: '', last_name: '', role: 'staff', password: '' }
 export const DOC_FORM = { title: '', url: '' }
 export const PROJECT_FORM = { name: '', description: '', status: '' }
-export const PRODUCT_FORM = { name: '', description: '', price: '' }
+export const PRODUCT_FORM = {
+  name: '', description: '', price: '',
+  image_url: '', image_file_id: null as number | null,
+  button_label: '', button_url: '',
+  attachment_url: '', attachment_name: '', attachment_file_id: null as number | null,
+  is_job_offer: false,
+}
 
 // `countable: false` → on/off toggle only (no quantity limit stepper).
 // Keep the Leads keys in sync with the Exhibitor Packages catalogue
@@ -146,6 +164,20 @@ export function freshDraft(): Draft {
 
 export function featureLabel(key: string) {
   return ALL_FEATURES.find(f => f.key === key)?.label ?? key
+}
+
+/** Collect the builder fields of the product form into its meta payload. */
+export function productMeta(f: typeof PRODUCT_FORM): ProductMeta {
+  return {
+    image_url: f.image_url || undefined,
+    image_file_id: f.image_file_id ?? undefined,
+    button_label: f.button_label || undefined,
+    button_url: f.button_url || undefined,
+    attachment_url: f.attachment_url || undefined,
+    attachment_name: f.attachment_name || undefined,
+    attachment_file_id: f.attachment_file_id ?? undefined,
+    is_job_offer: f.is_job_offer,
+  }
 }
 
 /**
