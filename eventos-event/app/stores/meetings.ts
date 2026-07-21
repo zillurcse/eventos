@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { JoinConfig } from '~/stores/rooms'
+import type { ReceptionAd } from '~/stores/reception'
 
 export interface MeetingPerson {
   name: string
@@ -67,6 +68,8 @@ export const useMeetingsStore = defineStore('meetings', {
     acting: {} as Record<string, boolean>,
     joining: {} as Record<string, boolean>,
     joinError: '' as string,
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   getters: {
@@ -91,6 +94,25 @@ export const useMeetingsStore = defineStore('meetings', {
         this.error = true
       } finally {
         this.loading = false
+      }
+    },
+
+    /** The organizer's "main ads" strip targeted at the Meetings page. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'meetings' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — the page works fine without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
 
