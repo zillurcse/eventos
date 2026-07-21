@@ -65,7 +65,7 @@ class ParticipantBadgeController extends Controller
         $eventId = (int) $request->attributes->get('event_id');
         $current = Participation::findOrFail((int) $request->attributes->get('participation_id'));
 
-        return Participation::with(['contact', 'event.settings', 'event.coverFile'])
+        return Participation::with(['contact', 'event.settings', 'event.coverFile', 'event.primaryVenue'])
             ->where('event_id', $eventId)
             ->where('contact_id', $current->contact_id)
             ->orderBy('id')

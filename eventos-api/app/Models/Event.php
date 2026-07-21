@@ -72,6 +72,12 @@ class Event extends Model
         return $this->hasMany(Form::class);
     }
 
+    /** Where the event physically happens — printed on badges, shown on the site. */
+    public function primaryVenue(): BelongsTo
+    {
+        return $this->belongsTo(Venue::class, 'primary_venue_id');
+    }
+
     /** Resolve a session/event home zone: session → event → org → UTC (§6.3.1). */
     public function resolvedTimezone(): string
     {

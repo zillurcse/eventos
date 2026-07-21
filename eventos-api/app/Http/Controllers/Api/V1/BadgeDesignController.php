@@ -164,6 +164,9 @@ class BadgeDesignController extends Controller
                 'items' => [
                     ['type' => 'h1', 'key' => 'event_name', 'label' => 'Event Name', 'value' => 'Event Name', 'icon' => 'mdi:calendar-text'],
                     ['type' => 'avatar', 'key' => 'event_logo', 'label' => 'Event Logo', 'value' => 'Event Logo', 'icon' => 'mdi:image-filter-center-focus'],
+                    ['type' => 'p', 'key' => 'event_dates', 'label' => 'Event Dates', 'value' => '12 – 14 Mar 2026', 'icon' => 'mdi:calendar-range'],
+                    ['type' => 'p', 'key' => 'event_venue', 'label' => 'Venue', 'value' => 'Venue', 'icon' => 'mdi:map-marker'],
+                    ['type' => 'p', 'key' => 'event_city', 'label' => 'City', 'value' => 'City', 'icon' => 'mdi:city'],
                 ],
             ],
             [

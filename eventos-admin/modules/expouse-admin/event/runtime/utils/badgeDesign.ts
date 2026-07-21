@@ -31,15 +31,35 @@ function obj(v: any): Record<string, any> {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {}
 }
 
+/** CSS's fixed 96dpi: 1mm = 96/25.4 px. 105mm ≈ 397px. */
+const PX_PER_MM = 96 / 25.4
+
+/**
+ * The canvas the design was authored on, in px.
+ *
+ * Derived from the millimetre preset, *not* from `page_config.pageWidth` —
+ * which cannot be trusted. The editor's page store initialises pageWidth to
+ * 105/148 (millimetres in a field that is meant to hold pixels) and only
+ * converts to px inside saveBadgeConfig(), so any design saved without opening
+ * the badge-size modal persists a 105 × 148 "pixel" canvas. Boxes are still
+ * positioned in px against a ~397px page, so scaling to that canvas pushes
+ * every element outside the badge and renders a blank card.
+ *
+ * Millimetres are the reliable half of the pair because the editor lays its
+ * page out in mm (`width: ${presetWidth}mm` in preview-badge.vue) and the
+ * browser resolves that at the same 96dpi — so this returns the canvas the
+ * boxes were actually dragged around on.
+ */
 export function badgePageSize(badgeJson: any) {
   const cfg = badgeJson?.page_config ?? {}
+  const widthMm = Number(cfg.presetWidth) || 105
+  const heightMm = Number(cfg.presetHeight) || 148
+
   return {
-    // 105 × 148 mm at CSS's fixed 96dpi ≈ 397 × 559 px — the units the editor
-    // authors box positions in.
-    width: Number(cfg.pageWidth) || 397,
-    height: Number(cfg.pageHeight) || 559,
-    widthMm: Number(cfg.presetWidth) || 105,
-    heightMm: Number(cfg.presetHeight) || 148,
+    width: Math.round(widthMm * PX_PER_MM),
+    height: Math.round(heightMm * PX_PER_MM),
+    widthMm,
+    heightMm,
   }
 }
 
@@ -62,10 +82,31 @@ export function badgePunch(badgeJson: any) {
   }
 }
 
+/**
+ * Box keys that no longer match the token vocabulary.
+ *
+ * The element library used to offer Full Name under the key `name`; it was
+ * renamed to `full_name` (BadgeRenderData::KEYS) after designs had already been
+ * saved with the old key. A box carrying a retired key is still a request for
+ * that person's name, so it is translated rather than left to print the literal
+ * placeholder "Full Name" on everybody's badge.
+ */
+const KEY_ALIASES: Record<string, string> = {
+  name: 'full_name',
+}
+
+/** The token a box asks for, after retired keys are translated. */
+export function badgeKey(box: any): string | undefined {
+  const key = box?.key
+  if (!key) return undefined
+  return KEY_ALIASES[key] ?? key
+}
+
 /** The merged value for a box, or undefined when nothing overrides it. */
 function merged(box: any, data: BadgeData): string | undefined {
-  if (!data || !box?.key) return undefined
-  return data[box.key]
+  const key = badgeKey(box)
+  if (!data || !key) return undefined
+  return data[key]
 }
 
 /** Text to draw: this person's value when there is one, else the design's. */
@@ -83,7 +124,10 @@ export function badgeText(box: any, data?: BadgeData): string {
  */
 export function badgeImage(box: any, data?: BadgeData): string {
   const value = merged(box, data)
-  if (value !== undefined) return value
+  // Truthiness, not `!== undefined`: an attendee with no photo and an event
+  // with no logo both merge to '', and falling through to the artwork the
+  // designer placed beats leaving a hole in the badge.
+  if (value) return value
   const src = box?.properties?.src?.url
   if (src) return src
   return typeof box?.text === 'string' && box.text.startsWith('http') ? box.text : ''

@@ -318,7 +318,7 @@ class GuestBadgeController extends Controller
     /** @return \Illuminate\Support\Collection<int, Participation> */
     private function guestsOf(ParticipationGroup $batch)
     {
-        return Participation::with(['contact', 'event.settings'])
+        return Participation::with(['contact', 'event.settings', 'event.coverFile', 'event.primaryVenue'])
             ->whereIn('id', DB::table('participation_group_member')
                 ->where('group_id', $batch->id)
                 ->pluck('participation_id'))

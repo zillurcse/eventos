@@ -64,16 +64,13 @@ const capturing = ref<Badge | null>(null)
 const captureFront = ref<HTMLElement | null>(null)
 const captureBack = ref<HTMLElement | null>(null)
 
-/** The design's print size in millimetres — what the PDF page is cut to. */
-function pageSizeMm(b: Badge) {
-  const cfg = b.design?.badge_json?.page_config ?? {}
-  return { width: Number(cfg.presetWidth) || 105, height: Number(cfg.presetHeight) || 148 }
-}
-
-/** Canvas pixel size the design was authored at (105mm ≈ 397px at 96dpi). */
-function pageSizePx(b: Badge) {
-  const cfg = b.design?.badge_json?.page_config ?? {}
-  return { width: Number(cfg.pageWidth) || 397, height: Number(cfg.pageHeight) || 559 }
+/**
+ * Print size in mm (what the PDF page is cut to) and the pixel canvas the
+ * design was authored at, both from the one helper the renderer uses — see
+ * `badgePageSize` for why `page_config.pageWidth` is not read directly.
+ */
+function pageSize(b: Badge) {
+  return badgePageSize(b.design?.badge_json)
 }
 
 async function download(b: Badge) {
@@ -91,7 +88,7 @@ async function download(b: Badge) {
 
     await nextTick()
 
-    const mm = pageSizeMm(b)
+    const mm = { width: pageSize(b).widthMm, height: pageSize(b).heightMm }
     const shoot = (el: HTMLElement) => html2canvas(el, {
       scale: 3, // ~300dpi at these sizes, enough for a printed badge
       backgroundColor: null,
@@ -205,8 +202,8 @@ onMounted(load)
           :badge-json="capturing.design.badge_json"
           :data="capturing.data"
           side="front"
-          :max-width="pageSizePx(capturing).width"
-          :max-height="pageSizePx(capturing).height"
+          :max-width="pageSize(capturing).width"
+          :max-height="pageSize(capturing).height"
         />
       </div>
       <div v-if="hasBack(capturing)" ref="captureBack">
@@ -214,8 +211,8 @@ onMounted(load)
           :badge-json="capturing.design.badge_json"
           :data="capturing.data"
           side="back"
-          :max-width="pageSizePx(capturing).width"
-          :max-height="pageSizePx(capturing).height"
+          :max-width="pageSize(capturing).width"
+          :max-height="pageSize(capturing).height"
         />
       </div>
     </div>

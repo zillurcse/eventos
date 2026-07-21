@@ -18,8 +18,12 @@ export interface PageState {
 // Define the store
 export const usePageStore = defineStore("page", {
   state: (): PageState => ({
-    pageWidth: 105, // default values
-    pageHeight: 148,
+    // pageWidth/pageHeight are PIXELS, presetWidth/presetHeight MILLIMETRES.
+    // A6 (105 × 148 mm) at 96dpi ≈ 397 × 559 px. These used to default to the
+    // mm numbers, so any design saved without opening the size modal persisted
+    // a 105px-wide canvas and rendered blank everywhere outside the editor.
+    pageWidth: 397,
+    pageHeight: 559,
     presetWidth: 105,
     presetHeight: 148,
     showModal: false,

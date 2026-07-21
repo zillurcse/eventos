@@ -31,7 +31,8 @@ class BadgeRenderData
     public const KEYS = [
         'full_name', 'first_name', 'last_name', 'designation', 'company',
         'country', 'email', 'phone', 'role_label', 'guest_type',
-        'event_name', 'event_logo', 'avatar', 'qrcode',
+        'event_name', 'event_logo', 'event_dates', 'event_venue', 'event_city',
+        'avatar', 'qrcode',
     ];
 
     /**
@@ -64,7 +65,14 @@ class BadgeRenderData
             'guest_type' => $guestType ?: '',
             'event_name' => $event?->name ?? '',
             'event_logo' => $event ? $this->eventLogo($event) : '',
-            'avatar' => $profile['image_url'] ?? $profile['avatar_url'] ?? '',
+            'event_dates' => $event ? $this->eventDates($event) : '',
+            'event_venue' => $event?->primaryVenue?->name ?? '',
+            'event_city' => $event?->primaryVenue?->city ?? '',
+            // Same ladder the delegate directory reads (DelegateController), so
+            // the face on someone's badge is the face everyone else sees next
+            // to their name: meta wins (imports and admin edits write there),
+            // then the profile form's own field, then the legacy key.
+            'avatar' => $meta['avatar_url'] ?? $profile['avatar_url'] ?? $profile['image_url'] ?? '',
             // Scanned at the gates. `participations.uuid` is what
             // CheckInController already looks up, so a printed badge and the
             // attendee's on-screen badge resolve to the same person.
@@ -95,11 +103,43 @@ class BadgeRenderData
             'guest_type' => $guestType ?: '',
             'event_name' => $event->name,
             'event_logo' => $this->eventLogo($event),
+            'event_dates' => $this->eventDates($event),
+            'event_venue' => $event->primaryVenue?->name ?: 'Hall 4, Expo Centre',
+            'event_city' => $event->primaryVenue?->city ?: 'Dhaka',
             'avatar' => '',
             // A real-looking but meaningless uuid: the preview QR must scan to
             // nothing rather than to somebody else's participation.
             'qrcode' => '00000000-0000-0000-0000-000000000000',
         ];
+    }
+
+    /**
+     * The run of the event as one printable line, in the event's own timezone —
+     * "12 – 14 Mar 2026", collapsed to "14 Mar 2026" for a single day and to
+     * "28 Feb – 3 Mar 2026" when it straddles a month. A badge has room for one
+     * short line, not a formatted range per locale.
+     */
+    private function eventDates(Event $event): string
+    {
+        $tz = $event->resolvedTimezone();
+        $start = $event->starts_at?->setTimezone($tz);
+        $end = $event->ends_at?->setTimezone($tz);
+
+        if (! $start) {
+            return '';
+        }
+
+        if (! $end || $start->isSameDay($end)) {
+            return $start->format('j M Y');
+        }
+
+        // Drop the repeated month/year from the first date where they match, so
+        // the common case reads "12 – 14 Mar 2026" rather than twice as long.
+        $from = $start->isSameMonth($end) && $start->isSameYear($end)
+            ? $start->format('j')
+            : ($start->isSameYear($end) ? $start->format('j M') : $start->format('j M Y'));
+
+        return "{$from} – {$end->format('j M Y')}";
     }
 
     /** Branding logo from event settings, absolute so any app can render it. */

@@ -77,11 +77,19 @@ const scale = computed(() =>
           alt=""
         >
 
+        <!-- The frame is drawn whether or not there is a photo: someone who
+             never uploaded one should get the badge the design promises, with
+             an empty portrait, not a hole where the portrait was. -->
         <div
-          v-else-if="box.type === 'avatar' && badgeImage(box, data)"
+          v-else-if="box.type === 'avatar'"
           :style="badgeAvatarStyle(box).container"
         >
-          <img :src="badgeImage(box, data)" :style="badgeAvatarStyle(box).image" alt="">
+          <img
+            v-if="badgeImage(box, data)"
+            :src="badgeImage(box, data)"
+            :style="badgeAvatarStyle(box).image"
+            alt=""
+          >
         </div>
 
         <Qrcode
