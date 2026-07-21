@@ -3,7 +3,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: false },
 
-  modules: ['@pinia/nuxt', 'vue-sonner/nuxt'],
+  // nuxt-qrcode provides <Qrcode>, which BadgeRender uses to draw the scannable
+  // code on the attendee's badge — the same component the admin's badge editor
+  // and preview use, so both apps render a design identically.
+  modules: ['@pinia/nuxt', 'vue-sonner/nuxt', 'nuxt-qrcode'],
 
   css: ['~/assets/main.css'],
 

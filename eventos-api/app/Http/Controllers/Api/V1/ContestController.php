@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ContestEntryResource;
 use App\Http\Resources\ContestResource;
 use App\Models\Contest;
+use App\Models\ContestEntry;
 use App\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,6 +69,83 @@ class ContestController extends Controller
     public function destroy(int $contest): JsonResponse
     {
         Contest::findOrFail($contest)->delete();
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Attendee entries in a contest, for the organizer's review drawer. Covers
+     * both moderation (approve/reject when allow_moderate_entries is on) and
+     * picking winners on an `admin` contest.
+     */
+    public function entries(Request $request, int $contest): JsonResponse
+    {
+        $model = Contest::findOrFail($contest);
+
+        $data = $request->validate([
+            'status' => ['nullable', Rule::in(['all', 'pending', 'approved', 'rejected'])],
+            'sort' => ['nullable', Rule::in(['recent', 'top'])],
+        ]);
+
+        $query = ContestEntry::where('contest_id', $model->id)
+            ->where('kind', 'entry')
+            ->with('participation.contact');
+
+        if (! empty($data['status']) && $data['status'] !== 'all') {
+            $query->where('status', $data['status']);
+        }
+
+        ($data['sort'] ?? 'recent') === 'top'
+            ? $query->orderByDesc('like_count')->orderByDesc('id')
+            : $query->orderByDesc('id');
+
+        $entries = $query->limit(300)->get();
+
+        return response()->json([
+            'data' => ContestEntryResource::collection($entries)->toArray($request),
+            'meta' => [
+                'counts' => ContestEntry::where('contest_id', $model->id)->where('kind', 'entry')
+                    ->groupBy('status')->selectRaw('status, count(*) as c')->pluck('c', 'status'),
+                'winner_number' => (int) $model->winner_number,
+                'winner_chooser' => $model->winner_chooser,
+            ],
+        ]);
+    }
+
+    /** Approve/reject an entry, or flag it as a winner. */
+    public function updateEntry(Request $request, int $contest, string $entry): JsonResponse
+    {
+        $model = Contest::findOrFail($contest);
+        $row = ContestEntry::where('contest_id', $model->id)->where('uuid', $entry)->firstOrFail();
+
+        $data = $request->validate([
+            'status' => ['sometimes', Rule::in(['pending', 'approved', 'rejected'])],
+            'is_winner' => ['sometimes', 'boolean'],
+            'rank' => ['nullable', 'integer', 'min:1', 'max:1000'],
+        ]);
+
+        if (array_key_exists('status', $data)) {
+            $row->status = $data['status'];
+        }
+
+        if (array_key_exists('is_winner', $data)) {
+            $row->is_winner = (bool) $data['is_winner'];
+            // A winner is by definition an accepted entry.
+            if ($row->is_winner) {
+                $row->status = 'approved';
+            }
+            $row->rank = $row->is_winner ? ($data['rank'] ?? $row->rank) : null;
+        }
+
+        $row->save();
+
+        return response()->json(['data' => (new ContestEntryResource($row))->toArray($request)]);
+    }
+
+    public function destroyEntry(int $contest, string $entry): JsonResponse
+    {
+        $model = Contest::findOrFail($contest);
+        ContestEntry::where('contest_id', $model->id)->where('uuid', $entry)->firstOrFail()->delete();
 
         return response()->json(['status' => 'success']);
     }

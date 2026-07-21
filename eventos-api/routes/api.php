@@ -1,74 +1,81 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AdminExhibitorController;
 use App\Http\Controllers\Api\V1\Admin\AdminMembershipController;
 use App\Http\Controllers\Api\V1\Admin\AdminMetricsController;
 use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
-use App\Http\Controllers\Api\V1\Admin\AdminExhibitorController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanChangeRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminPlanController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BadgeDesignController;
 use App\Http\Controllers\Api\V1\BlogPostController;
 use App\Http\Controllers\Api\V1\BookmarkController;
-use App\Http\Controllers\Api\V1\BriefcaseController;
-use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\BoothController;
 use App\Http\Controllers\Api\V1\BreakoutRoomController;
+use App\Http\Controllers\Api\V1\BriefcaseController;
+use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CheckInController;
+use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\ContestController;
 use App\Http\Controllers\Api\V1\CtaController;
 use App\Http\Controllers\Api\V1\DelegateController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
-use App\Http\Controllers\Api\V1\ChatController;
-use App\Http\Controllers\Api\V1\CheckInStationController;
 use App\Http\Controllers\Api\V1\DiscountCodeController;
 use App\Http\Controllers\Api\V1\DomainController;
 use App\Http\Controllers\Api\V1\EmailTemplateController;
+use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\EventAdminController;
 use App\Http\Controllers\Api\V1\EventController;
-use App\Http\Controllers\Api\V1\OtpAuthController;
-use App\Http\Controllers\Api\V1\ParticipantProfileController;
-use App\Http\Controllers\Api\V1\SocialAuthController;
+use App\Http\Controllers\Api\V1\ExhibitorContactController;
+use App\Http\Controllers\Api\V1\ExhibitorController;
+use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
+use App\Http\Controllers\Api\V1\ExhibitorImportController;
+use App\Http\Controllers\Api\V1\ExhibitorInboxController;
+use App\Http\Controllers\Api\V1\ExhibitorMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorPackageController;
+use App\Http\Controllers\Api\V1\ExhibitorProductController;
+use App\Http\Controllers\Api\V1\ExhibitorProjectController;
+use App\Http\Controllers\Api\V1\ExhibitorScanningController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfCatalogController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfLeadAnalyticsController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfLeadController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfLeadExportController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfLeadQualificationController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfRecommendationController;
+use App\Http\Controllers\Api\V1\ExhibitorSelfServiceController;
+use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
 use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\FeedModerationController;
 use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\FloorController;
-use App\Http\Controllers\Api\V1\BadgeDesignController;
-use App\Http\Controllers\Api\V1\IconController;
-use App\Http\Controllers\Api\V1\ParticipantController;
-use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\FormController;
-use App\Http\Controllers\Api\V1\GamificationController;
-use App\Http\Controllers\Api\V1\ExhibitorScanningController;
-use App\Http\Controllers\Api\V1\GateScanningController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
-use App\Http\Controllers\Api\V1\LoungeController;
+use App\Http\Controllers\Api\V1\GamificationController;
+use App\Http\Controllers\Api\V1\GateScanningController;
+use App\Http\Controllers\Api\V1\GuestBadgeController;
+use App\Http\Controllers\Api\V1\IconController;
 use App\Http\Controllers\Api\V1\LeadGenerationController;
-use App\Http\Controllers\Api\V1\ExhibitorContactController;
-use App\Http\Controllers\Api\V1\ExhibitorInboxController;
+use App\Http\Controllers\Api\V1\LoungeController;
 use App\Http\Controllers\Api\V1\MeetingController;
 use App\Http\Controllers\Api\V1\MembershipController;
+use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\NotificationTemplateController;
 use App\Http\Controllers\Api\V1\OrganizationController;
-use App\Http\Controllers\Api\V1\PresenceController;
-use App\Http\Controllers\Api\V1\ExhibitorController;
-use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
-use App\Http\Controllers\Api\V1\ExhibitorMemberController;
-use App\Http\Controllers\Api\V1\ExhibitorImportController;
-use App\Http\Controllers\Api\V1\ExhibitorPackageController;
-use App\Http\Controllers\Api\V1\ExhibitorProductController;
-use App\Http\Controllers\Api\V1\ExhibitorProjectController;
-use App\Http\Controllers\Api\V1\ExhibitorSelfCatalogController;
-use App\Http\Controllers\Api\V1\ExhibitorSelfLeadController;
-use App\Http\Controllers\Api\V1\ExhibitorSelfMemberController;
-use App\Http\Controllers\Api\V1\ExhibitorSelfServiceController;
-use App\Http\Controllers\Api\V1\ExhibitorSpaceController;
+use App\Http\Controllers\Api\V1\OtpAuthController;
+use App\Http\Controllers\Api\V1\ParticipantBadgeController;
+use App\Http\Controllers\Api\V1\ParticipantController;
+use App\Http\Controllers\Api\V1\ParticipantContestController;
+use App\Http\Controllers\Api\V1\ParticipantProfileController;
+use App\Http\Controllers\Api\V1\ParticipantSurveyController;
 use App\Http\Controllers\Api\V1\PlanController;
+use App\Http\Controllers\Api\V1\PresenceController;
 use App\Http\Controllers\Api\V1\PublicSiteController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\RoomController;
@@ -78,6 +85,7 @@ use App\Http\Controllers\Api\V1\ServiceOrderController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\SessionEngagementController;
 use App\Http\Controllers\Api\V1\SessionPollController;
+use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SpeakerController;
 use App\Http\Controllers\Api\V1\SpeakerImportController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
@@ -238,8 +246,27 @@ Route::prefix('v1')->group(function () {
 
             // Lead capture CRM: list/filter, edit rating/status/notes, export.
             Route::get('/leads', [ExhibitorSelfLeadController::class, 'index']);
+            // Per-teammate roll-up of every connection the booth has made.
+            Route::get('/leads/team', [ExhibitorSelfLeadController::class, 'team']);
+            // Recommended Leads: attendees scored on their interest in this
+            // booth, with routing + outreach. Declared before /leads/{lead} so
+            // "recommended" is never read as a lead uuid.
+            Route::get('/leads/recommended', [ExhibitorSelfRecommendationController::class, 'index']);
+            Route::get('/leads/recommended/{participation}', [ExhibitorSelfRecommendationController::class, 'show']);
+            Route::post('/leads/recommended/{participation}/assign', [ExhibitorSelfRecommendationController::class, 'assign']);
+            Route::post('/leads/recommended/{participation}/connect', [ExhibitorSelfRecommendationController::class, 'connect']);
+            Route::post('/leads/recommended/{participation}/dismiss', [ExhibitorSelfRecommendationController::class, 'dismiss']);
+            Route::delete('/leads/recommended/{participation}/dismiss', [ExhibitorSelfRecommendationController::class, 'restore']);
+            // Qualification board (BANT + pipeline stages) and its one write.
+            Route::get('/leads/pipeline', [ExhibitorSelfLeadQualificationController::class, 'index']);
+            // Lead quality, funnel, sources, busiest hours, rep leaderboard.
+            Route::get('/leads/analytics', [ExhibitorSelfLeadAnalyticsController::class, 'index']);
+            // Deliberate export: pick columns + filters, see the count, download.
+            Route::get('/leads/export/summary', [ExhibitorSelfLeadExportController::class, 'summary']);
+            Route::post('/leads/export/download', [ExhibitorSelfLeadExportController::class, 'download']);
             Route::post('/leads', [ExhibitorSelfLeadController::class, 'store']);
             Route::post('/leads/export', [ExhibitorSelfLeadController::class, 'export']);
+            Route::patch('/leads/{lead}/qualification', [ExhibitorSelfLeadQualificationController::class, 'update']);
             Route::match(['put', 'patch'], '/leads/{lead}', [ExhibitorSelfLeadController::class, 'update']);
             Route::delete('/leads/{lead}', [ExhibitorSelfLeadController::class, 'destroy']);
 
@@ -263,6 +290,25 @@ Route::prefix('v1')->group(function () {
             Route::post('/feed/{post}/comments', [FeedController::class, 'comment']);
             Route::post('/feed/{post}/reactions', [FeedController::class, 'react']);
             Route::post('/feed/{post}/poll/vote', [FeedController::class, 'votePoll']);
+            // Contests ("Contests" tab): browse, enter, like and comment.
+            Route::get('/contests', [ParticipantContestController::class, 'index']);
+            Route::get('/contests/{contest}', [ParticipantContestController::class, 'show']);
+            Route::get('/contests/{contest}/entries', [ParticipantContestController::class, 'entries']);
+            Route::post('/contests/{contest}/entries', [ParticipantContestController::class, 'store']);
+            Route::delete('/contest-entries/{entry}', [ParticipantContestController::class, 'destroy']);
+            Route::post('/contest-entries/{entry}/like', [ParticipantContestController::class, 'like']);
+            Route::get('/contest-entries/{entry}/comments', [ParticipantContestController::class, 'comments']);
+            Route::post('/contest-entries/{entry}/comments', [ParticipantContestController::class, 'comment']);
+            // Surveys ("Surveys" tab): answer the organizer's questionnaires.
+            // Under `my/` because the organizer's own survey list lives at
+            // /events/{uuid}/surveys — identical URIs would shadow each other,
+            // and Laravel would hand both audiences to whichever is declared first.
+            // The attendee's own badge(s) ("My Badges" tab). One per
+            // participation, so a speaker who also staffs a booth gets both.
+            Route::get('/my/badges', [ParticipantBadgeController::class, 'index']);
+            Route::get('/my/surveys', [ParticipantSurveyController::class, 'index']);
+            Route::get('/my/surveys/{survey}', [ParticipantSurveyController::class, 'show']);
+            Route::post('/my/surveys/{survey}/responses', [ParticipantSurveyController::class, 'store']);
             // Attendee media uploads (feed images/video/PDF) → MinIO, under the
             // event's org GUC set by the participant middleware.
             Route::post('/uploads', [FileUploadController::class, 'store']);
@@ -496,11 +542,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/contests/{contest}', [ContestController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/contests/{contest}', [ContestController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/contests/{contest}', [ContestController::class, 'destroy'])->middleware('perm:events.manage');
+            // Attendee entries, for moderation and for picking the winners of
+            // an `admin`-judged contest.
+            Route::get('/contests/{contest}/entries', [ContestController::class, 'entries'])->middleware('perm:events.view');
+            Route::patch('/contests/{contest}/entries/{entry}', [ContestController::class, 'updateEntry'])->middleware('perm:events.manage');
+            Route::delete('/contests/{contest}/entries/{entry}', [ContestController::class, 'destroyEntry'])->middleware('perm:events.manage');
 
             // ── Surveys (Event Engagement) ──
             Route::get('/events/{uuid}/surveys', [SurveyController::class, 'index'])->middleware('perm:events.view');
             Route::post('/events/{uuid}/surveys', [SurveyController::class, 'store'])->middleware('perm:events.manage');
             Route::get('/surveys/{survey}', [SurveyController::class, 'show'])->middleware('perm:events.view');
+            // Results: per-question roll-up + the individual attendee responses.
+            Route::get('/surveys/{survey}/responses', [SurveyController::class, 'responses'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/surveys/{survey}', [SurveyController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/surveys/{survey}', [SurveyController::class, 'destroy'])->middleware('perm:events.manage');
 
@@ -602,11 +655,25 @@ Route::prefix('v1')->group(function () {
 
             // ── Badge designs (badge.expouse canvas editor) ──
             Route::get('/events/{uuid}/badge-designs/element-library', [BadgeDesignController::class, 'elementLibrary'])->middleware('perm:events.view');
+            // Placeholder values for previewing a design with nobody behind it.
+            Route::get('/events/{uuid}/badge-designs/sample-data', [BadgeDesignController::class, 'sampleData'])->middleware('perm:events.view');
+            // One starter design per audience, for an event with none.
+            Route::post('/events/{uuid}/badge-designs/seed-defaults', [BadgeDesignController::class, 'seedDefaults'])->middleware('perm:events.manage');
             Route::get('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'index'])->middleware('perm:events.view');
             Route::post('/events/{uuid}/badge-designs', [BadgeDesignController::class, 'store'])->middleware('perm:events.manage');
             Route::get('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'show'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/badge-designs/{badgeDesign}', [BadgeDesignController::class, 'destroy'])->middleware('perm:events.manage');
+
+            // ── Guest badges (press / VVIP passes for people never registered) ──
+            // A batch is a participation group; its guests are participations
+            // with role=guest, so their QR works at the gates like anyone's.
+            Route::get('/events/{uuid}/guest-badges', [GuestBadgeController::class, 'index'])->middleware('perm:events.view');
+            Route::post('/events/{uuid}/guest-badges', [GuestBadgeController::class, 'store'])->middleware('perm:events.manage');
+            Route::get('/guest-badges/{batch}', [GuestBadgeController::class, 'show'])->middleware('perm:events.view');
+            Route::post('/guest-badges/{batch}/guests', [GuestBadgeController::class, 'importGuests'])->middleware('perm:events.manage');
+            Route::post('/guest-badges/{batch}/deliver', [GuestBadgeController::class, 'deliver'])->middleware('perm:events.manage');
+            Route::delete('/guest-badges/{batch}', [GuestBadgeController::class, 'destroy'])->middleware('perm:events.manage');
 
             // ── Announcements (§6.6) ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');

@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\SurveyResource;
 use App\Models\Event;
 use App\Models\Form;
+use App\Models\FormFieldValue;
 use App\Models\Survey;
+use App\Models\SurveyResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Surveys (Event Engagement). A survey's questions are a `form` (key=survey)
@@ -30,6 +33,7 @@ class SurveyController extends Controller
 
         $surveys = Survey::where('event_id', $event->id)
             ->with('form.fields.options')
+            ->withCount('responses')
             ->orderByDesc('id')
             ->get();
 
@@ -101,12 +105,79 @@ class SurveyController extends Controller
             $model->form->update(['name' => $model->title]);
         }
         if ($request->has('questions')) {
+            // Rewriting the questions drops the form_fields, and their values
+            // cascade with them — so a survey people have answered is frozen.
+            if (SurveyResponse::where('survey_id', $model->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'questions' => 'Attendees have already answered this survey, so its questions can no longer be changed.',
+                ]);
+            }
+
             $form = $model->form;
             $form->fields()->delete();
             $this->syncFields($form, $data['questions'] ?? []);
         }
 
         return response()->json(['data' => new SurveyResource($model->fresh()->load('form.fields.options'))]);
+    }
+
+    /**
+     * Results: a per-question roll-up plus the individual responses attendees
+     * submitted on the event site (ParticipantSurveyController). An anonymous
+     * survey still stores which participation answered — that's what enforces
+     * one response each — but the respondent is never named back here.
+     */
+    public function responses(int $survey): JsonResponse
+    {
+        $model = Survey::with('form.fields.options')->withCount('responses')->findOrFail($survey);
+        $fields = $model->form?->fields ?? collect();
+
+        $responses = SurveyResponse::where('survey_id', $model->id)
+            ->with('participation.contact')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+
+        // field_id => [submission_id => value], decoded once for both views.
+        $values = FormFieldValue::whereIn('submission_id', $responses->pluck('submission_id')->filter())
+            ->get()
+            ->groupBy('field_id')
+            ->map(fn ($rows) => $rows->mapWithKeys(
+                fn ($r) => [$r->submission_id => json_decode((string) $r->value, true)]
+            ));
+
+        return response()->json([
+            'data' => [
+                'survey' => new SurveyResource($model),
+                'total' => $responses->count(),
+                'questions' => $fields->map(function ($field) use ($values, $responses) {
+                    $answers = $values[$field->id] ?? collect();
+                    $answered = $answers->filter(fn ($v) => $v !== null && $v !== []);
+
+                    return [
+                        'id' => $field->id,
+                        'label' => $field->label,
+                        'type' => $field->type,
+                        'answered' => $answered->count(),
+                        'options' => in_array($field->type, ['select', 'radio', 'multiselect'], true)
+                            ? $this->optionTally($field, $answered, $responses->count())
+                            : [],
+                        // Free text / dates / files are listed rather than tallied.
+                        'answers' => in_array($field->type, ['select', 'radio', 'multiselect'], true)
+                            ? []
+                            : $answered->values()->take(200)->all(),
+                    ];
+                })->values(),
+                'responses' => $responses->map(fn (SurveyResponse $r) => [
+                    'id' => $r->id,
+                    'respondent' => $model->is_anonymous ? null : $this->respondentName($r),
+                    'submitted_at' => $r->submitted_at?->toIso8601String(),
+                    'answers' => $fields->mapWithKeys(fn ($f) => [
+                        $f->id => ($values[$f->id] ?? collect())[$r->submission_id] ?? null,
+                    ]),
+                ])->values(),
+            ],
+        ]);
     }
 
     public function destroy(int $survey): JsonResponse
@@ -134,6 +205,35 @@ class SurveyController extends Controller
             'questions.*.options' => ['nullable', 'array'],
             'questions.*.options.*.label' => ['required_with:questions.*.options', 'string', 'max:180'],
         ]);
+    }
+
+    /** How often each offered choice was picked, as a count and a share. */
+    private function optionTally($field, $answers, int $total): array
+    {
+        return $field->options->map(function ($option) use ($answers, $total) {
+            $value = $option->value ?? $option->label;
+
+            $count = $answers->filter(fn ($a) => is_array($a)
+                ? in_array($value, $a, true)
+                : $a === $value)->count();
+
+            return [
+                'label' => $option->label,
+                'value' => $value,
+                'count' => $count,
+                'percent' => $total > 0 ? round($count / $total * 100) : 0,
+            ];
+        })->values()->all();
+    }
+
+    private function respondentName(SurveyResponse $response): ?string
+    {
+        $contact = $response->participation?->contact;
+        if (! $contact) {
+            return null;
+        }
+
+        return trim(($contact->first_name ?? '').' '.($contact->last_name ?? '')) ?: $contact->email;
     }
 
     /** Replace a form's questions with the given ordered list. */

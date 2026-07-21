@@ -25,6 +25,7 @@ const typeLabel = (k: string) => QUESTION_TYPES.find(t => t.key === k)?.label ??
 const typeHasOptions = (k: string) => !!QUESTION_TYPES.find(t => t.key === k)?.hasOptions
 
 interface Question {
+  id?: number
   label: string
   type: QuestionType
   is_required: boolean
@@ -40,7 +41,27 @@ interface Survey {
   opens_at: string | null
   closes_at: string | null
   questions_count: number
+  response_count: number
   questions: Question[]
+}
+
+/** What attendees sent back, as the results drawer renders it. */
+interface Results {
+  total: number
+  questions: {
+    id: number
+    label: string
+    type: QuestionType
+    answered: number
+    options: { label: string, value: string, count: number, percent: number }[]
+    answers: (string | string[])[]
+  }[]
+  responses: {
+    id: number
+    respondent: string | null
+    submitted_at: string | null
+    answers: Record<number, string | string[] | null>
+  }[]
 }
 
 const surveys = ref<Survey[]>([])
@@ -62,8 +83,37 @@ async function load() {
   } catch { toast.error('Could not load surveys.') } finally { loading.value = false }
 }
 
+// ── Results drawer ──────────────────────────────────────────────────────────
+const results = reactive({ open: false, loading: false, title: '', anonymous: false, tab: 'summary' as 'summary' | 'responses' })
+const data = ref<Results | null>(null)
+
+async function openResults(s: Survey) {
+  results.open = true
+  results.loading = true
+  results.title = s.title
+  results.anonymous = s.is_anonymous
+  results.tab = 'summary'
+  data.value = null
+  try {
+    data.value = (await api<any>(`/surveys/${s.id}/responses`)).data
+  } catch {
+    toast.error('Could not load responses.')
+    results.open = false
+  } finally { results.loading = false }
+}
+
+/** One answer as a readable cell — options are values, so map them to labels. */
+function answerText(questionId: number, value: string | string[] | null): string {
+  if (value === null || value === undefined || (Array.isArray(value) && !value.length)) return '—'
+  const q = data.value?.questions.find(x => x.id === questionId)
+  const label = (v: string) => q?.options.find(o => o.value === v)?.label ?? v
+  return Array.isArray(value) ? value.map(label).join(', ') : label(String(value))
+}
+
 // ── Drawer (create / edit) ──────────────────────────────────────────────────
-const drawer = reactive({ open: false, mode: 'create' as 'create' | 'edit', surveyId: 0 })
+// `locked`: once attendees have answered, the questions are frozen — rewriting
+// them would delete the answers with the fields they hang off.
+const drawer = reactive({ open: false, mode: 'create' as 'create' | 'edit', surveyId: 0, locked: false })
 const saving = ref(false)
 const error = ref('')
 
@@ -90,7 +140,7 @@ const fromLocalInput = (v: string): string | null => (v ? new Date(v).toISOStrin
 
 function openCreate() {
   Object.assign(form, freshForm())
-  drawer.mode = 'create'; drawer.surveyId = 0
+  drawer.mode = 'create'; drawer.surveyId = 0; drawer.locked = false
   activeQuestion.value = 0
   error.value = ''; drawer.open = true
 }
@@ -109,7 +159,7 @@ function openEdit(s: Survey) {
       options: (q.options || []).map(o => ({ label: o.label, value: o.value })),
     })),
   })
-  drawer.mode = 'edit'; drawer.surveyId = s.id
+  drawer.mode = 'edit'; drawer.surveyId = s.id; drawer.locked = s.response_count > 0
   activeQuestion.value = 0
   error.value = ''; drawer.open = true
 }
@@ -165,12 +215,15 @@ async function save() {
     is_anonymous: form.is_anonymous,
     opens_at: fromLocalInput(form.opens_at),
     closes_at: fromLocalInput(form.closes_at),
-    questions: form.questions.map(q => ({
-      label: q.label.trim(),
-      type: q.type,
-      is_required: q.is_required,
-      options: typeHasOptions(q.type) ? (q.options || []).filter(o => o.label.trim()) : undefined,
-    })),
+    // An answered survey's questions are frozen — send the details only.
+    ...(drawer.locked ? {} : {
+      questions: form.questions.map(q => ({
+        label: q.label.trim(),
+        type: q.type,
+        is_required: q.is_required,
+        options: typeHasOptions(q.type) ? (q.options || []).filter(o => o.label.trim()) : undefined,
+      })),
+    }),
   }
   try {
     if (drawer.mode === 'create') await api(`/events/${id}/surveys`, { method: 'POST', body })
@@ -265,17 +318,95 @@ onMounted(load)
             </div>
             <div class="text-[.76rem] text-muted flex flex-wrap gap-x-3 gap-y-0.5">
               <span>{{ s.questions_count }} question{{ s.questions_count === 1 ? '' : 's' }}</span>
+              <span>· {{ s.response_count }} response{{ s.response_count === 1 ? '' : 's' }}</span>
               <span v-if="s.is_anonymous">· anonymous</span>
             </div>
 
             <div class="flex items-center gap-1.5 mt-auto pt-2">
               <button class="btn ghost text-[.78rem] px-2.5 py-1" @click="openEdit(s)">Edit</button>
+              <button class="btn ghost text-[.78rem] px-2.5 py-1" @click="openResults(s)">Results</button>
               <button class="text-[#dc2626] text-[.78rem] font-medium px-2 hover:underline ml-auto" @click="remove(s)">Delete</button>
             </div>
           </div>
         </div>
       </template>
     </div>
+
+    <!-- ── Results Drawer ───────────────────────────────────────────────── -->
+    <Drawer v-if="results.open" :title="`Results — ${results.title}`" @close="results.open = false">
+      <div v-if="results.loading" class="py-10 text-center text-muted text-[.88rem]">Loading responses…</div>
+
+      <template v-else-if="data">
+        <div class="flex items-center gap-3 mb-4 flex-wrap">
+          <div class="text-[.85rem]">
+            <span class="font-bold text-ink text-[1.1rem]">{{ data.total }}</span>
+            <span class="muted"> response{{ data.total === 1 ? '' : 's' }}</span>
+          </div>
+          <div class="inline-flex bg-[#f7f7fa] border border-line rounded-xl p-1 gap-1 ml-auto">
+            <button
+              v-for="t in (['summary', 'responses'] as const)" :key="t"
+              class="px-3.5 py-1.5 rounded-lg text-[.8rem] font-semibold capitalize transition-colors"
+              :class="results.tab === t ? 'bg-[#6352e7] text-white' : 'text-muted hover:text-ink'"
+              @click="results.tab = t"
+            >{{ t }}</button>
+          </div>
+        </div>
+
+        <p v-if="!data.total" class="muted text-center py-10">No one has answered this survey yet.</p>
+
+        <!-- Per-question roll-up -->
+        <template v-else-if="results.tab === 'summary'">
+          <div v-for="q in data.questions" :key="q.id" class="border border-line rounded-xl p-3.5 mb-3">
+            <div class="font-semibold text-ink text-[.9rem]">{{ q.label }}</div>
+            <div class="muted text-[.76rem] mb-2.5">{{ typeLabel(q.type) }} · {{ q.answered }} answered</div>
+
+            <div v-if="q.options.length" class="flex flex-col gap-2">
+              <div v-for="o in q.options" :key="o.value">
+                <div class="flex items-center justify-between text-[.8rem] mb-1">
+                  <span class="text-ink">{{ o.label }}</span>
+                  <span class="muted">{{ o.count }} · {{ o.percent }}%</span>
+                </div>
+                <div class="h-1.5 rounded-full bg-[#f1f1f5] overflow-hidden">
+                  <div class="h-full rounded-full bg-[#6352e7]" :style="{ width: `${o.percent}%` }" />
+                </div>
+              </div>
+            </div>
+
+            <ul v-else-if="q.answers.length" class="list-none p-0 m-0 flex flex-col gap-1.5 max-h-52 overflow-y-auto">
+              <li v-for="(a, i) in q.answers" :key="i" class="text-[.82rem] text-ink bg-[#f9f9fb] rounded-lg px-2.5 py-1.5 wrap-break-word">
+                <a v-if="q.type === 'file'" :href="String(a)" target="_blank" rel="noopener" class="text-brand font-medium">View file</a>
+                <template v-else>{{ Array.isArray(a) ? a.join(', ') : a }}</template>
+              </li>
+            </ul>
+
+            <p v-else class="muted text-[.8rem] m-0">No answers yet.</p>
+          </div>
+        </template>
+
+        <!-- Individual responses -->
+        <template v-else>
+          <div v-for="r in data.responses" :key="r.id" class="border border-line rounded-xl p-3.5 mb-3">
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <span class="font-semibold text-ink text-[.86rem]">
+                {{ results.anonymous ? 'Anonymous' : (r.respondent || 'Unknown attendee') }}
+              </span>
+              <span class="muted text-[.76rem]">{{ fmtWhen(r.submitted_at) }}</span>
+            </div>
+            <div v-for="q in data.questions" :key="q.id" class="mb-2 last:mb-0">
+              <div class="muted text-[.74rem]">{{ q.label }}</div>
+              <div class="text-[.84rem] text-ink wrap-break-word">
+                <a v-if="q.type === 'file' && r.answers[q.id]" :href="String(r.answers[q.id])" target="_blank" rel="noopener" class="text-brand font-medium">View file</a>
+                <template v-else>{{ answerText(q.id, r.answers[q.id]) }}</template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </template>
+
+      <div class="modal-actions border-t border-line pt-4 mt-2">
+        <button class="btn ghost" @click="results.open = false">CLOSE</button>
+      </div>
+    </Drawer>
 
     <!-- ── Create / Edit Drawer ─────────────────────────────────────────── -->
     <Drawer
@@ -313,7 +444,11 @@ onMounted(load)
       <!-- Question builder -->
       <p class="text-muted text-[.8rem] mb-3 mt-6 font-bold uppercase tracking-wide border-t border-line pt-5">Questions</p>
 
-      <div class="flex flex-wrap gap-2 mb-4">
+      <p v-if="drawer.locked" class="text-[.82rem] text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-xl px-3 py-2.5 mb-4">
+        Attendees have started answering this survey, so its questions are locked — changing them would delete the answers already collected.
+      </p>
+
+      <div v-if="!drawer.locked" class="flex flex-wrap gap-2 mb-4">
         <button
           v-for="t in QUESTION_TYPES" :key="t.key"
           type="button"
@@ -325,7 +460,16 @@ onMounted(load)
         </button>
       </div>
 
-      <div v-if="!form.questions.length" class="text-center border border-dashed border-line rounded-xl py-8 mb-4 text-muted text-[.85rem]">
+      <!-- Locked: the questions as they stand, read-only. -->
+      <ol v-if="drawer.locked" class="list-none p-0 m-0 mb-4 flex flex-col gap-2">
+        <li v-for="(q, i) in form.questions" :key="i" class="border border-line rounded-xl p-3 flex items-center gap-2">
+          <span class="w-6 h-6 rounded-md grid place-items-center shrink-0 bg-[#f1f1f5] text-muted text-[.7rem] font-bold">{{ i + 1 }}</span>
+          <span class="flex-1 font-medium text-ink text-[.88rem] truncate">{{ q.label }}</span>
+          <span class="text-[.72rem] text-muted px-1.5 py-0.5 bg-white border border-line rounded shrink-0">{{ typeLabel(q.type) }}</span>
+        </li>
+      </ol>
+
+      <div v-else-if="!form.questions.length" class="text-center border border-dashed border-line rounded-xl py-8 mb-4 text-muted text-[.85rem]">
         No questions yet. Add one above.
       </div>
 

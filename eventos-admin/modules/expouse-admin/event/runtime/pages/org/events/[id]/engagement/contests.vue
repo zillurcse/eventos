@@ -247,6 +247,62 @@ async function remove(c: Contest) {
   } catch (e: any) { toast.error(e?.data?.message || 'Could not delete contest.') }
 }
 
+// ── Entries drawer (moderation + picking winners) ───────────────────────────
+interface Entry {
+  id: string
+  body: string | null
+  attachments: { kind: string, url: string, name?: string | null }[]
+  status: 'pending' | 'approved' | 'rejected'
+  is_winner: boolean
+  rank: number | null
+  like_count: number
+  comment_count: number
+  author: string
+  author_avatar: string | null
+  author_headline: string | null
+  created_at: string | null
+}
+
+const entriesDrawer = reactive({
+  open: false,
+  contest: null as Contest | null,
+  status: 'all' as 'all' | 'pending' | 'approved' | 'rejected',
+  loading: false,
+})
+const entries = ref<Entry[]>([])
+const entryCounts = ref<Record<string, number>>({})
+
+async function openEntries(c: Contest) {
+  entriesDrawer.contest = c
+  entriesDrawer.status = c.allow_moderate_entries ? 'pending' : 'all'
+  entriesDrawer.open = true
+  await loadEntries()
+}
+
+async function loadEntries() {
+  if (!entriesDrawer.contest) return
+  entriesDrawer.loading = true
+  try {
+    const res = await api<any>(`/contests/${entriesDrawer.contest.id}/entries`, {
+      query: { status: entriesDrawer.status, sort: 'top' },
+    })
+    entries.value = res.data
+    entryCounts.value = res.meta?.counts ?? {}
+  } catch { toast.error('Could not load entries.') } finally { entriesDrawer.loading = false }
+}
+
+async function decide(entry: Entry, patch: Record<string, any>) {
+  if (!entriesDrawer.contest) return
+  try {
+    await api(`/contests/${entriesDrawer.contest.id}/entries/${entry.id}`, { method: 'PATCH', body: patch })
+    // Reload rather than patch in place: the status tabs and their counts both
+    // shift when an entry is approved or rejected.
+    await loadEntries()
+  } catch (e: any) { toast.error(e?.data?.message || 'Could not update that entry.') }
+}
+
+const winnersPicked = computed(() => entries.value.filter(e => e.is_winner).length)
+
 const phaseStyle: Record<Phase, string> = {
   upcoming: 'bg-blue-50 text-blue-700',
   ongoing: 'bg-green-50 text-green-700',
@@ -334,6 +390,7 @@ onMounted(load)
 
               <div class="flex items-center gap-1.5 mt-auto pt-2 flex-wrap">
                 <button class="btn ghost text-[.78rem] px-2.5 py-1" @click="openEdit(c)">Edit</button>
+                <button class="btn ghost text-[.78rem] px-2.5 py-1" @click="openEntries(c)">Entries</button>
                 <button class="text-[#dc2626] text-[.78rem] font-medium px-2 hover:underline ml-auto" @click="remove(c)">Delete</button>
               </div>
             </div>
@@ -521,6 +578,82 @@ onMounted(load)
           </button>
         </div>
       </template>
+    </Drawer>
+
+    <!-- ── Entries: moderation + winners ────────────────────────────────── -->
+    <Drawer
+      v-if="entriesDrawer.open && entriesDrawer.contest"
+      :title="`Entries · ${entriesDrawer.contest.title}`"
+      @close="entriesDrawer.open = false"
+    >
+      <p class="muted text-[.85rem] mt-0 mb-3">
+        <template v-if="entriesDrawer.contest.winner_chooser === 'most_likes'">
+          Winners are the {{ entriesDrawer.contest.winner_number }} most-liked entries — they're picked automatically when the contest ends.
+        </template>
+        <template v-else>
+          Mark up to {{ entriesDrawer.contest.winner_number }} winner{{ entriesDrawer.contest.winner_number === 1 ? '' : 's' }}.
+          Attendees see them once the contest ends. ({{ winnersPicked }} marked)
+        </template>
+      </p>
+
+      <div class="inline-flex bg-[#f7f7fa] border border-line rounded-xl p-1 gap-1 mb-4">
+        <button
+          v-for="s in (['pending', 'approved', 'rejected', 'all'] as const)" :key="s"
+          class="px-3 py-1.5 rounded-lg text-[.78rem] font-semibold capitalize transition-colors"
+          :class="entriesDrawer.status === s ? 'bg-[#6352e7] text-white' : 'text-muted hover:text-ink'"
+          @click="entriesDrawer.status = s; loadEntries()"
+        >
+          {{ s }}<span v-if="entryCounts[s]" class="ml-1 opacity-70">{{ entryCounts[s] }}</span>
+        </button>
+      </div>
+
+      <div v-if="entriesDrawer.loading" class="muted text-center py-10 text-[.88rem]">Loading entries…</div>
+      <div v-else-if="!entries.length" class="muted text-center py-10 text-[.88rem]">No entries in this state.</div>
+
+      <div v-else class="flex flex-col gap-3">
+        <div v-for="e in entries" :key="e.id" class="border border-line rounded-xl p-3">
+          <div class="flex items-center gap-2.5 mb-2">
+            <img v-if="e.author_avatar" :src="e.author_avatar" class="w-8 h-8 rounded-full object-cover" :alt="e.author">
+            <div class="min-w-0">
+              <div class="font-semibold text-ink text-[.86rem] truncate">{{ e.author }}</div>
+              <div class="text-muted text-[.74rem] truncate">{{ e.author_headline || 'Attendee' }} · {{ fmtWhen(e.created_at) }}</div>
+            </div>
+            <span class="ml-auto text-[.75rem] font-semibold text-[#e11d48]">{{ e.like_count }} ♥</span>
+            <span v-if="e.is_winner" class="px-2 py-0.5 rounded-full text-[.68rem] font-bold bg-[#fef3c7] text-[#b45309]">Winner</span>
+          </div>
+
+          <p v-if="e.body" class="text-[.85rem] text-ink whitespace-pre-line m-0 mb-2">{{ e.body }}</p>
+
+          <div v-if="e.attachments.length" class="flex flex-wrap gap-2 mb-2">
+            <a v-for="a in e.attachments" :key="a.url" :href="a.url" target="_blank" class="w-20 h-20 rounded-lg overflow-hidden bg-[#f1f1f5] block">
+              <video v-if="a.kind === 'video'" :src="a.url" class="w-full h-full object-cover" muted />
+              <img v-else :src="a.url" class="w-full h-full object-cover" :alt="a.name || 'Entry'">
+            </a>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button
+              v-if="e.status !== 'approved'"
+              class="btn ghost text-[.76rem] px-2.5 py-1"
+              @click="decide(e, { status: 'approved' })"
+            >Approve</button>
+            <button
+              v-if="e.status !== 'rejected'"
+              class="text-[#dc2626] text-[.76rem] font-medium px-2 hover:underline"
+              @click="decide(e, { status: 'rejected' })"
+            >Reject</button>
+            <button
+              v-if="entriesDrawer.contest.winner_chooser === 'admin'"
+              class="btn ghost text-[.76rem] px-2.5 py-1 ml-auto"
+              @click="decide(e, { is_winner: !e.is_winner })"
+            >{{ e.is_winner ? 'Remove winner' : 'Mark winner' }}</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions border-t border-line pt-4 mt-4">
+        <button class="btn ghost" @click="entriesDrawer.open = false">CLOSE</button>
+      </div>
     </Drawer>
   </div>
 </template>

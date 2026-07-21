@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // The event navigation. Only Reception is wired today; the rest render as
 // "coming soon" placeholders (no dead routes) per the current build scope.
-interface Tab { key: string, label: string, to?: string, icon: string }
+// A tab's `detail` is the prefix of the singular route its items open
+// (/contests → /contest/{id}), so the tab stays lit on the detail page.
+interface Tab { key: string, label: string, to?: string, detail?: string, icon: string }
 
 const tabs: Tab[] = [
   { key: 'reception', label: 'Reception', to: '/reception', icon: 'M4 20v-8l8-6 8 6v8h-6v-6h-4v6z' },
@@ -14,11 +16,15 @@ const tabs: Tab[] = [
   { key: 'expolens', label: 'ExpoLens', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 7h3l1-2h8l1 2h3v12H4z' },
   { key: 'rooms', label: 'Rooms', to: '/rooms', icon: 'M4 20V6l8-3 8 3v14M4 20h16M9 20v-5h6v5' },
   { key: 'exhibitors', label: 'Exhibitors', to: '/exhibitors', icon: 'M4 9l1-4h14l1 4M4 9v11h16V9M4 9h16M9 20v-6h6v6' },
-  { key: 'contests', label: 'Contests', icon: 'M7 4h10v3a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M9 15h6l-1 5h-4z' },
+  { key: 'contests', label: 'Contests', to: '/contests', detail: '/contest/', icon: 'M7 4h10v3a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M9 15h6l-1 5h-4z' },
+  { key: 'surveys', label: 'Surveys', to: '/surveys', icon: 'M9 4h6a1 1 0 0 1 1 1v1h2v14H6V6h2V5a1 1 0 0 1 1-1zM9 12l1.5 1.5L14 10' },
   { key: 'badges', label: 'My Badges', icon: 'M6 3h12v10l-6 4-6-4zM9 20h6' },
 ]
 
 const route = useRoute()
+
+const isActive = (t: Tab) =>
+  route.path === t.to || (!!t.detail && route.path.startsWith(t.detail))
 </script>
 
 <template>
@@ -29,7 +35,7 @@ const route = useRoute()
           v-if="t.to"
           :to="t.to"
           class="tab"
-          :class="{ active: route.path === t.to }"
+          :class="{ active: isActive(t) }"
         >
           <svg viewBox="0 0 24 24"><path :d="t.icon" /></svg>
           <span>{{ t.label }}</span>

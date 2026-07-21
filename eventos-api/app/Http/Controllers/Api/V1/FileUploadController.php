@@ -28,8 +28,11 @@ class FileUploadController extends Controller
         // feed posts (≤ 80 MB); `chat` mirrors it plus office docs for message
         // attachments. Every other collection is image-only (≤ 5 MB).
         $collectionInput = $request->input('collection');
-        $isDocument = in_array($collectionInput, ['document', 'session_doc'], true);
-        $isFeed = $collectionInput === 'feed';
+        // A survey's `file` question takes whatever the organizer asked for —
+        // a CV, a photo, a signed form — so it follows the document rules.
+        $isDocument = in_array($collectionInput, ['document', 'session_doc', 'survey_response'], true);
+        // Contest entries carry the same attendee-shot photo/video as feed posts.
+        $isFeed = in_array($collectionInput, ['feed', 'contest_entry'], true);
         $isChat = $collectionInput === 'chat';
 
         $data = $request->validate([
@@ -45,7 +48,8 @@ class FileUploadController extends Controller
             'collection' => ['nullable', Rule::in([
                 'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
                 'ad_image', 'lounge', 'breakout_room_poster', 'session_doc', 'session_icon', 'session_logo',
-                'exhibitor_logo', 'exhibitor_spotlight', 'ctas', 'chat', 'contest_banner',
+                'exhibitor_logo', 'exhibitor_spotlight', 'ctas', 'chat', 'contest_banner', 'contest_entry',
+                'survey_response',
             ])],
         ]);
 

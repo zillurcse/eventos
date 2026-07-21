@@ -4,12 +4,32 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * One attendee's answers to a survey. The answers themselves live on the linked
+ * `form_submission` as form_field_values (architecture §6.6/§6.12).
+ */
 class SurveyResponse extends Model
 {
     use BelongsToOrganization;
 
     protected $guarded = [];
+
+    public function survey(): BelongsTo
+    {
+        return $this->belongsTo(Survey::class);
+    }
+
+    public function participation(): BelongsTo
+    {
+        return $this->belongsTo(Participation::class);
+    }
+
+    public function submission(): BelongsTo
+    {
+        return $this->belongsTo(FormSubmission::class, 'submission_id');
+    }
 
     protected $casts = [
         'meta' => 'array',

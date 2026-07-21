@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // Single-row event header: logo + title, section tabs, and utility/account
 // icons all in one bar (replaces the old separate EventTopbar + EventNav).
-interface Tab { key: string, label: string, to?: string, icon: string }
+// `detail` is the prefix of the singular route a tab's items open
+// (/contests → /contest/{id}), so the tab stays lit on the detail page.
+interface Tab { key: string, label: string, to?: string, detail?: string, icon: string }
 
 /**
  * Where each section lives and what it looks like. The *organizer* owns which
@@ -14,7 +16,7 @@ interface Tab { key: string, label: string, to?: string, icon: string }
  * "Coming soon": the organizer switched it on and expects to see it, and quietly
  * dropping it would look like the setting didn't save.
  */
-const TAB_META: Record<string, { to?: string, icon: string }> = {
+const TAB_META: Record<string, { to?: string, detail?: string, icon: string }> = {
   reception: { to: '/reception', icon: 'M4 20v-8l8-6 8 6v8h-6v-6h-4v6z' },
   // Admin slugs the label, so "EVENT FEED" arrives as `event_feed`; the app's
   // own default list has always called it `feed`. Both point at the same page.
@@ -28,9 +30,13 @@ const TAB_META: Record<string, { to?: string, icon: string }> = {
   lounge: { to: '/lounge', icon: 'M4 12v-2a3 3 0 0 1 6 0v2h4v-2a3 3 0 0 1 6 0v2M3 12h18v6H3zM6 18v2M18 18v2' },
   rooms: { to: '/rooms', icon: 'M4 20V6l8-3 8 3v14M4 20h16M9 20v-5h6v5' },
   sponsors: { icon: 'M12 3l2.6 5.3 5.9.8-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z' },
-  contests: { icon: 'M7 4h10v3a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M9 15h6l-1 5h-4z' },
+  contests: { to: '/contests', detail: '/contest/', icon: 'M7 4h10v3a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M9 15h6l-1 5h-4z' },
   expolens: { icon: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3' },
-  my_badges: { icon: 'M12 3l7 4v5c0 4.4-3 8.3-7 9-4-0.7-7-4.6-7-9V7z' },
+  // Admin slugs the label, so "My Badges" arrives as `my_badges`; `badges` is
+  // the app's own shorter name for it. Both point at the same page, the way
+  // event_feed/feed do.
+  my_badges: { to: '/badges', icon: 'M12 3l7 4v5c0 4.4-3 8.3-7 9-4-0.7-7-4.6-7-9V7z' },
+  badges: { to: '/badges', icon: 'M12 3l7 4v5c0 4.4-3 8.3-7 9-4-0.7-7-4.6-7-9V7z' },
 }
 
 /** A tab the organizer enabled that this build has never heard of. */
@@ -49,6 +55,7 @@ const DEFAULT_TABS: { key: string, label: string }[] = [
   { key: 'sponsors', label: 'Sponsors' },
   { key: 'rooms', label: 'Rooms' },
   { key: 'contests', label: 'Contests' },
+  { key: 'my_badges', label: 'My Badges' },
 ]
 
 const route = useRoute()
@@ -63,9 +70,13 @@ const tabs = computed<Tab[]>(() => {
     key: t.key,
     label: t.label,
     to: TAB_META[t.key]?.to,
+    detail: TAB_META[t.key]?.detail,
     icon: TAB_META[t.key]?.icon ?? FALLBACK_ICON,
   }))
 })
+
+const isActive = (t: Tab) =>
+  route.path === t.to || (!!t.detail && route.path.startsWith(t.detail))
 
 const showTabIcons = computed(() => site.navigation?.icons ?? true)
 const tabAlignment = computed(() => site.navigation?.alignment || 'left')
@@ -144,7 +155,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
             v-if="t.to"
             :to="t.to"
             class="tab"
-            :class="{ active: route.path === t.to }"
+            :class="{ active: isActive(t) }"
           >
             <svg v-if="showTabIcons" viewBox="0 0 24 24"><path :d="t.icon" /></svg>
             <span>{{ t.label }}</span>

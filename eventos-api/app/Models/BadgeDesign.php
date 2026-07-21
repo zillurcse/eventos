@@ -23,6 +23,7 @@ class BadgeDesign extends Model
         'font_json' => 'array',
         'back_json' => 'array',
         'layers' => 'array',
+        'meta' => 'array',
         'is_default' => 'boolean',
     ];
 

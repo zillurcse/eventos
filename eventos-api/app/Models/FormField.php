@@ -28,6 +28,6 @@ class FormField extends Model
 
     public function options(): HasMany
     {
-        return $this->hasMany(FormFieldOption::class, 'field_id');
+        return $this->hasMany(FormFieldOption::class, 'field_id')->orderBy('sort_order');
     }
 }

@@ -33,6 +33,10 @@ class BadgeDesignResource extends JsonResource
             'padding_bottom' => $this->padding_bottom,
             'padding_left' => $this->padding_left,
             'badge_for' => $this->badge_for,
+            // Guest sub-type ("Media", "VVIP") lives here — one `guest`
+            // audience, as many guest designs as the event needs.
+            'guest_type' => $this->meta['guest_type'] ?? null,
+            'meta' => $this->meta ?? (object) [],
             'layers' => $this->layers ?? [],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
