@@ -73,6 +73,7 @@ use App\Http\Controllers\Api\V1\ParticipantBadgeController;
 use App\Http\Controllers\Api\V1\ParticipantController;
 use App\Http\Controllers\Api\V1\ParticipantContestController;
 use App\Http\Controllers\Api\V1\ParticipantProfileController;
+use App\Http\Controllers\Api\V1\ProfileFormController;
 use App\Http\Controllers\Api\V1\ParticipantSurveyController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\PresenceController;
@@ -692,6 +693,20 @@ Route::prefix('v1')->group(function () {
                 Route::get('/forms/{uuid}/edit', [FormController::class, 'show']);
                 Route::match(['put', 'patch'], '/forms/{uuid}', [FormController::class, 'update']);
                 Route::post('/forms/{uuid}/publish', [FormController::class, 'publish']);
+            });
+
+            // ── Event Settings › Profile: per-audience profile forms ──
+            Route::middleware('perm:forms.manage')->group(function () {
+                Route::get('/events/{uuid}/profile-forms', [ProfileFormController::class, 'index']);
+                Route::get('/events/{uuid}/profile-forms/{audience}', [ProfileFormController::class, 'show']);
+                Route::match(['put', 'patch'], '/events/{uuid}/profile-forms/{audience}', [ProfileFormController::class, 'update']);
+                Route::post('/events/{uuid}/profile-forms/{audience}/publish', [ProfileFormController::class, 'publish']);
+                Route::delete('/events/{uuid}/profile-forms/{audience}', [ProfileFormController::class, 'destroy']);
+                Route::get('/events/{uuid}/profile-forms/{audience}/submissions', [ProfileFormController::class, 'submissions']);
+                Route::post('/events/{uuid}/profile-forms/{audience}/submissions/export', [ProfileFormController::class, 'submissionsExport']);
+                Route::get('/profile-submissions/{uuid}', [ProfileFormController::class, 'submissionShow']);
+                Route::patch('/profile-submissions/{uuid}', [ProfileFormController::class, 'submissionReview']);
+                Route::delete('/profile-submissions/{uuid}', [ProfileFormController::class, 'submissionDestroy']);
             });
 
             // Email builder

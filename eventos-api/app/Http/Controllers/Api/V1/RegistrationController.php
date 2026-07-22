@@ -38,8 +38,14 @@ class RegistrationController extends Controller
         $discount = $request->input('discount_code');
         $password = $request->input('password');
 
+        // A profile form is collected per surface, so signup validates only the
+        // fields it actually renders (Event Settings › Profile › "Add field to
+        // user registration"). A legacy registration form has no surfaces and
+        // keeps full validation.
+        $only = $form->isProfileForm() ? $form->registrationKeys() : null;
+
         $result = $service->register(
-            $event, $form, $request->except(['tickets', 'discount_code', 'password']), $lines, $discount, $password,
+            $event, $form, $request->except(['tickets', 'discount_code', 'password']), $lines, $discount, $password, $only,
         );
 
         return response()->json([
@@ -56,9 +62,13 @@ class RegistrationController extends Controller
     }
 
     /**
-     * The event's published registration form, or a lazily-provisioned default
-     * (first_name/last_name/email/phone/company/job_title from config) so any
-     * published event can take signups without the organizer building a form.
+     * The form signup collects through, in priority order:
+     *   1. the published ATTENDEE PROFILE form (Event Settings › Profile) —
+     *      where organizers now design registration fields;
+     *   2. a legacy standalone `registration` form, for events built before
+     *      the Profile section existed;
+     *   3. a lazily-provisioned default set from config, so any published
+     *      event can take signups without the organizer building anything.
      * Runs under the already-set tenant GUC, so RLS + org scoping apply.
      */
     protected function resolveRegistrationForm(Event $event): Form
@@ -66,9 +76,10 @@ class RegistrationController extends Controller
         $form = Form::on('pgsql_admin')
             ->with('fields.options')
             ->where('event_id', $event->id)
-            ->where('key', 'registration')
+            ->whereIn('key', ['profile.attendee', 'registration'])
             ->where('status', 'published')
-            ->latest('id')
+            ->orderByRaw("case when key = 'profile.attendee' then 0 else 1 end")
+            ->orderByDesc('id')
             ->first();
 
         if ($form) {

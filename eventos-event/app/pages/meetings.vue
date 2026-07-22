@@ -206,7 +206,7 @@ const emptyText = computed(() =>
 .new svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .state { background: #fff; border-radius: 14px; padding: 48px 20px; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch; }
 @media (max-width: 860px) { .cards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
 .err { color: #dc2626; font-size: .86rem; margin: 0; text-align: center; }

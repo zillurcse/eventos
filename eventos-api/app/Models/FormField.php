@@ -15,6 +15,7 @@ class FormField extends Model
     protected $casts = [
         'validation' => 'array',
         'default_value' => 'array',
+        'meta' => 'array',
         'is_default' => 'boolean',
         'is_required' => 'boolean',
         'is_unique' => 'boolean',

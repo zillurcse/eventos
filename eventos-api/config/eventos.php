@@ -44,6 +44,80 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Profile forms (Event Settings › Profile)
+    |--------------------------------------------------------------------------
+    | One form per audience, auto-provisioned as a draft the first time the
+    | organizer opens the Profile settings page. Seeded fields carry
+    | is_default = true — the builder lets organizers hide them (meta.visible)
+    | but not delete them, so the projection keys the rest of the platform
+    | relies on (first_name, email, company…) never disappear.
+    |
+    | meta.surfaces controls where a field is collected:
+    |   registration — the event-site signup step
+    |   onboarding   — the post-login "complete your profile" modal
+    |   public       — the shareable / embeddable public form (/f/{uuid})
+    */
+    'profile_defaults' => [
+
+        'attendee' => [
+            ['key' => 'first_name', 'label' => 'First name', 'type' => 'text',   'is_required' => true,  'is_pii' => true],
+            ['key' => 'last_name',  'label' => 'Last name',  'type' => 'text',   'is_required' => true,  'is_pii' => true],
+            ['key' => 'email',      'label' => 'Email',      'type' => 'email',  'is_required' => true,  'is_unique' => true, 'is_pii' => true],
+            ['key' => 'phone',      'label' => 'Phone',      'type' => 'phone',  'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'gender',     'label' => 'Gender',     'type' => 'select', 'meta' => ['width' => 50], 'options' => ['Male', 'Female', 'Non-binary', 'Prefer not to say']],
+            ['key' => 'country',    'label' => 'Country',    'type' => 'select', 'meta' => ['width' => 50], 'options' => ['United States', 'United Kingdom', 'India', 'United Arab Emirates', 'Germany', 'France', 'Singapore', 'Australia', 'Canada', 'Other']],
+            ['key' => 'city',       'label' => 'City',       'type' => 'text',   'meta' => ['width' => 50]],
+            ['key' => 'company',    'label' => 'Company',    'type' => 'text',   'meta' => ['width' => 50, 'show_to_others' => true]],
+            ['key' => 'job_title',  'label' => 'Designation', 'type' => 'text',  'meta' => ['width' => 50, 'show_to_others' => true]],
+            ['key' => 'purpose_of_visit', 'label' => 'Purpose of visit', 'type' => 'select', 'meta' => ['surfaces' => ['registration' => false]], 'options' => ['Networking', 'Buying / sourcing', 'Learning & sessions', 'Exploring the industry', 'Other']],
+        ],
+
+        'speaker' => [
+            ['key' => 'first_name', 'label' => 'First name', 'type' => 'text',     'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'last_name',  'label' => 'Last name',  'type' => 'text',     'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'email',      'label' => 'Email',      'type' => 'email',    'is_required' => true, 'is_unique' => true, 'is_pii' => true],
+            ['key' => 'phone',      'label' => 'Phone',      'type' => 'phone',    'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'company',    'label' => 'Company / Organization', 'type' => 'text', 'meta' => ['width' => 50, 'show_to_others' => true]],
+            ['key' => 'job_title',  'label' => 'Designation', 'type' => 'text',    'meta' => ['width' => 50, 'show_to_others' => true]],
+            ['key' => 'headline',   'label' => 'Headline',   'type' => 'text',     'meta' => ['show_to_others' => true]],
+            ['key' => 'bio',        'label' => 'Bio',        'type' => 'textarea', 'meta' => ['show_to_others' => true]],
+            ['key' => 'talk_title', 'label' => 'Proposed talk title', 'type' => 'text'],
+            ['key' => 'talk_abstract', 'label' => 'Talk abstract', 'type' => 'textarea'],
+            ['key' => 'linkedin',   'label' => 'LinkedIn',   'type' => 'link',     'meta' => ['width' => 50, 'show_to_others' => true]],
+            ['key' => 'headshot',   'label' => 'Headshot',   'type' => 'file'],
+        ],
+
+        'exhibitor' => [
+            ['key' => 'company_name',  'label' => 'Company name',   'type' => 'text',     'is_required' => true],
+            ['key' => 'contact_name',  'label' => 'Contact person', 'type' => 'text',     'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'email',         'label' => 'Contact email',  'type' => 'email',    'is_required' => true, 'is_unique' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'phone',         'label' => 'Phone',          'type' => 'phone',    'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'website',       'label' => 'Website',        'type' => 'link',     'meta' => ['width' => 50]],
+            ['key' => 'description',   'label' => 'About the company', 'type' => 'textarea'],
+            ['key' => 'booth_preference', 'label' => 'Booth preference', 'type' => 'select', 'options' => ['Standard booth', 'Corner booth', 'Island booth', 'No preference']],
+        ],
+
+        'sponsor' => [
+            ['key' => 'company_name', 'label' => 'Company name',   'type' => 'text',     'is_required' => true],
+            ['key' => 'contact_name', 'label' => 'Contact person', 'type' => 'text',     'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'email',        'label' => 'Contact email',  'type' => 'email',    'is_required' => true, 'is_unique' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'phone',        'label' => 'Phone',          'type' => 'phone',    'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'website',      'label' => 'Website',        'type' => 'link',     'meta' => ['width' => 50]],
+            ['key' => 'sponsorship_tier', 'label' => 'Sponsorship tier of interest', 'type' => 'select', 'options' => ['Platinum', 'Gold', 'Silver', 'Community']],
+            ['key' => 'message',      'label' => 'Message',        'type' => 'textarea'],
+        ],
+
+        'organizer' => [
+            ['key' => 'first_name', 'label' => 'First name', 'type' => 'text',  'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'last_name',  'label' => 'Last name',  'type' => 'text',  'is_required' => true, 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'email',      'label' => 'Email',      'type' => 'email', 'is_required' => true, 'is_unique' => true, 'is_pii' => true],
+            ['key' => 'phone',      'label' => 'Phone',      'type' => 'phone', 'is_pii' => true, 'meta' => ['width' => 50]],
+            ['key' => 'job_title',  'label' => 'Role',       'type' => 'text',  'meta' => ['width' => 50]],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Domains
     |--------------------------------------------------------------------------
     | apex           — platform apex; every event gets <subdomain>.<apex> free

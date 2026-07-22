@@ -174,16 +174,29 @@ async function onVerifyOtp() {
 }
 
 async function startRegister() {
-  let fields = DEFAULT_FIELDS
-  try {
-    if (site.registrationFormUuid) {
+  // Signup collects whatever the organizer designed in admin › Event Settings ›
+  // Profile › Attendee, limited to the fields flagged "Add field to user
+  // registration". Older events with only a standalone registration form fall
+  // back to that, and an event with neither gets the built-in defaults.
+  let fields: Field[] = site.registrationFields.map(f => ({
+    key: f.key,
+    label: f.label,
+    help_text: f.help_text,
+    type: f.type,
+    required: f.required,
+    options: (f.options || []).map(o => ({ label: o.label, value: o.value ?? o.label })),
+  }))
+
+  if (!fields.length && site.registrationFormUuid) {
+    try {
       const res = await api<{ data: any }>(`/forms/${site.registrationFormUuid}`)
       if (Array.isArray(res.data?.fields) && res.data.fields.length) fields = res.data.fields
-    }
-  } catch { /* fall back to the default field set */ }
+    } catch { /* fall back to the default field set */ }
+  }
+  if (!fields.length) fields = DEFAULT_FIELDS
 
   regFields.value = fields
-  for (const f of fields) regValues[f.key] = f.type === 'checkbox' ? [] : ''
+  for (const f of fields) regValues[f.key] = ['checkbox', 'multiselect'].includes(f.type) ? [] : ''
   const ef = fields.find(f => f.type === 'email' || f.key === 'email')
   if (ef) regValues[ef.key] = email.value     // prefill the email they just typed
   step.value = 'register'
@@ -350,7 +363,7 @@ function backToEmail() {
                 </label>
               </div>
 
-              <div v-else-if="f.type === 'checkbox'" class="opts">
+              <div v-else-if="['checkbox', 'multiselect'].includes(f.type)" class="opts">
                 <label v-for="o in f.options" :key="o.value" class="opt">
                   <input type="checkbox" :value="o.value" v-model="regValues[f.key]" /> {{ o.label }}
                 </label>

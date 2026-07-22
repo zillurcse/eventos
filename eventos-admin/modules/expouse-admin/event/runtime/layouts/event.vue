@@ -43,6 +43,7 @@ const sections = computed<any[]>(() => [
   ] },
   { key: 'settings', label: 'Event Settings', svg: I.doc, children: [
     { label: 'Login Setup', to: r('settings') },
+    { label: 'Profile', to: r('settings/profile') },
     { label: 'Form Builder', to: r('settings/forms') },
     { label: 'Domain', to: r('settings/domain') },
     { label: 'Video', to: r('settings/video') },

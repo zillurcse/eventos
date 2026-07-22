@@ -58,6 +58,17 @@ class PublicSiteController extends Controller
             ->latest('id')
             ->first();
 
+        // Published attendee profile form (Event Settings › Profile): signup
+        // renders its `registration` surface, the post-login modal its
+        // `onboarding` surface. Field meta carries both flags.
+        $profileForm = Form::on('pgsql_admin')
+            ->with('fields.options')
+            ->where('event_id', $event->id)
+            ->where('key', 'profile.attendee')
+            ->where('status', 'published')
+            ->latest('id')
+            ->first();
+
         return response()->json([
             'data' => [
                 'event' => [
@@ -105,6 +116,21 @@ class PublicSiteController extends Controller
                 'navigation' => $this->navigation($setting->navigation ?? []),
                 'subdomain' => $sub,
                 'registration_form_uuid' => $regForm?->uuid,
+                'profile_form' => $profileForm ? [
+                    'uuid' => $profileForm->uuid,
+                    'fields' => $profileForm->fields
+                        ->reject(fn ($f) => in_array($f->type, ['section_break', 'recaptcha'], true))
+                        ->filter(fn ($f) => ($f->meta['visible'] ?? true) !== false)
+                        ->map(fn ($f) => [
+                            'key' => $f->key,
+                            'label' => $f->label,
+                            'help_text' => $f->help_text,
+                            'type' => $f->type,
+                            'required' => (bool) $f->is_required,
+                            'meta' => $f->meta,
+                            'options' => $f->options->map(fn ($o) => ['label' => $o->label, 'value' => $o->value])->values(),
+                        ])->values(),
+                ] : null,
                 'powered_by' => 'EXPOUSE',
             ],
         ]);

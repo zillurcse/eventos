@@ -14,9 +14,9 @@ const contact = useExhibitorContactStore()
     <ExhibitorsContactModal v-if="contact.open" />
 
     <!-- Profile-completion onboarding (first-time attendees, if the organizer
-         turned it on). Shows before the welcome video so people set themselves
-         up before being greeted. -->
-    <EventOnboardingModal />
+         turned it on): a renderless gate that sends them to the /onboarding
+         page before they settle into Reception. -->
+    <EventOnboardingGate />
 
     <!-- The organizer's welcome video; decides for itself whether this is the
          moment to appear (after login / on the reception page). -->

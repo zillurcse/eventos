@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\EventSetting;
+use App\Models\Form;
+use App\Models\FormFieldValue;
+use App\Models\FormSubmission;
 use App\Models\Participation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,7 +76,13 @@ class ParticipantProfileController extends Controller
             // we stop asking. Skipping is allowed on purpose: a hard gate in
             // front of an event someone is already late for is a way to lose them.
             'complete_onboarding' => ['nullable', 'boolean'],
+            // Organizer-defined answers from the attendee profile form
+            // (Event Settings › Profile), keyed by field key. Filtered against
+            // the published form below — unknown keys never reach profile_data.
+            'custom' => ['nullable', 'array'],
         ]);
+
+        $custom = $this->acceptCustomFields($request, $participation, $data['custom'] ?? []);
 
         // First/last name live on the shared Contact record (name is global to
         // the person, not per-event), so they're saved there rather than into
@@ -85,9 +94,10 @@ class ParticipantProfileController extends Controller
         $profile = array_merge(
             $participation->profile_data ?? [],
             collect($data)
-                ->except(['complete_onboarding', 'first_name', 'last_name'])
+                ->except(['complete_onboarding', 'first_name', 'last_name', 'custom'])
                 ->filter(fn ($v) => $v !== null)
                 ->all(),
+            $custom,
         );
 
         $meta = $participation->meta ?? [];
@@ -103,6 +113,106 @@ class ParticipantProfileController extends Controller
             'data' => $this->profile($fresh),
             'meta' => ['needs_onboarding' => $this->needsOnboarding($request, $fresh)],
         ]);
+    }
+
+    /**
+     * Keep only answers for fields that exist on the event's PUBLISHED attendee
+     * profile form, sanitized to sane shapes. Accepted answers are also recorded
+     * as a form submission (source=onboarding) so the organizer's Profile ›
+     * Submissions list sees onboarding data alongside link/embed submissions.
+     *
+     * @return array<string,mixed>
+     */
+    private function acceptCustomFields(Request $request, Participation $participation, array $custom): array
+    {
+        if (empty($custom)) {
+            return [];
+        }
+
+        $form = Form::with('fields')
+            ->where('event_id', $request->attributes->get('event_id'))
+            ->where('key', 'profile.attendee')
+            ->where('status', 'published')
+            ->latest('id')
+            ->first();
+
+        if (! $form) {
+            return [];
+        }
+
+        $accepted = [];
+        $fieldIds = [];
+        foreach ($form->fields as $field) {
+            if (in_array($field->type, ['section_break', 'recaptcha'], true)) {
+                continue;
+            }
+            if (($field->meta['visible'] ?? true) === false || ! array_key_exists($field->key, $custom)) {
+                continue;
+            }
+            $value = $this->sanitizeCustomValue($custom[$field->key]);
+            if ($value !== null) {
+                $accepted[$field->key] = $value;
+                $fieldIds[$field->key] = $field->id;
+            }
+        }
+
+        if (empty($accepted)) {
+            return [];
+        }
+
+        // Attendee is already in the event — no review ladder for onboarding.
+        $submission = FormSubmission::create([
+            'form_id' => $form->id,
+            'form_version' => $form->version,
+            'event_id' => $form->event_id,
+            'owner_type' => 'participation',
+            'owner_id' => $participation->id,
+            'submitted_by_contact_id' => $participation->contact_id,
+            'status' => 'complete',
+            'source' => 'onboarding',
+            'review_status' => 'approved',
+            'submitted_at' => now(),
+            'meta' => array_filter([
+                'submitter_name' => $participation->contact?->fullName(),
+                'submitter_email' => $participation->contact?->email,
+            ]),
+        ]);
+
+        foreach ($accepted as $key => $value) {
+            FormFieldValue::create([
+                'submission_id' => $submission->id,
+                'field_id' => $fieldIds[$key],
+                'value' => json_encode($value),
+            ]);
+        }
+
+        return $accepted;
+    }
+
+    /** Strings, numbers, booleans, or arrays of short strings — nothing exotic. */
+    private function sanitizeCustomValue(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value === '' ? null : mb_substr($value, 0, 2000);
+        }
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return $value;
+        }
+        if (is_array($value)) {
+            $clean = collect($value)
+                ->filter(fn ($v) => is_scalar($v))
+                ->map(fn ($v) => mb_substr(trim((string) $v), 0, 300))
+                ->filter(fn ($v) => $v !== '')
+                ->take(20)
+                ->values()
+                ->all();
+
+            return empty($clean) ? null : $clean;
+        }
+
+        return null;
     }
 
     /**

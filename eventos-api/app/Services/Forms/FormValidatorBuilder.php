@@ -12,13 +12,21 @@ use Illuminate\Support\Facades\Validator;
  */
 class FormValidatorBuilder
 {
-    /** @return array<string, array<int,string>> rules keyed by field key */
-    public function rules(Form $form): array
+    /**
+     * @param  array<int,string>|null  $only  restrict to these field keys — the
+     *                                        surface actually shown (a required field the
+     *                                        surface hides must not fail validation)
+     * @return array<string, array<int,string>> rules keyed by field key
+     */
+    public function rules(Form $form, ?array $only = null): array
     {
         $rules = [];
 
         foreach ($form->fields as $field) {
-            if ($field->type === 'section_break') {
+            if (in_array($field->type, ['section_break', 'recaptcha'], true)) {
+                continue;
+            }
+            if ($only !== null && ! in_array($field->key, $only, true)) {
                 continue;
             }
             $rules[$field->key] = $this->rulesFor($field);
@@ -27,9 +35,9 @@ class FormValidatorBuilder
         return $rules;
     }
 
-    public function validate(Form $form, array $input): array
+    public function validate(Form $form, array $input, ?array $only = null): array
     {
-        return Validator::make($input, $this->rules($form), $this->messages($form))->validate();
+        return Validator::make($input, $this->rules($form, $only), $this->messages($form))->validate();
     }
 
     protected function rulesFor(FormField $field): array

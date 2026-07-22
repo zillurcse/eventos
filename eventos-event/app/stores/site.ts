@@ -46,6 +46,24 @@ export interface WelcomeVideo {
   show_on_home: boolean
 }
 
+/** A field of the published attendee profile form (admin › Event Settings ›
+ *  Profile). `meta.surfaces` says where it's collected — signup renders the
+ *  `registration` surface, the onboarding modal the `onboarding` surface. */
+export interface ProfileFormField {
+  key: string
+  label: string | null
+  help_text: string | null
+  type: string
+  required: boolean
+  meta: {
+    placeholder?: string
+    width?: number
+    surfaces?: { registration?: boolean, onboarding?: boolean, public?: boolean }
+    [k: string]: any
+  } | null
+  options: { label: string, value: string | null }[]
+}
+
 interface SitePayload {
   event: SiteEvent
   branding: SiteBranding
@@ -61,6 +79,7 @@ interface SitePayload {
   navigation: SiteNavigation
   subdomain: string
   registration_form_uuid: string | null
+  profile_form: { uuid: string, fields: ProfileFormField[] } | null
   powered_by: string
 }
 
@@ -86,6 +105,26 @@ export const useSiteStore = defineStore('site', {
     welcomeVideo: (s): WelcomeVideo | null => s.site?.navigation?.welcome_video ?? null,
     poweredBy: (s): string => s.site?.powered_by ?? 'EXPOUSE',
     registrationFormUuid: (s): string | null => s.site?.registration_form_uuid ?? null,
+    /** Registration-surface fields of the attendee profile form — what the
+     *  inline signup step collects. An email field is always kept: signup
+     *  creates a login, which cannot exist without an address, whatever the
+     *  organizer toggled. */
+    registrationFields(): ProfileFormField[] {
+      return (this.site?.profile_form?.fields ?? []).filter(f =>
+        !['section_break', 'recaptcha', 'file'].includes(f.type)
+        && ((f.meta?.surfaces?.registration ?? true) !== false || f.type === 'email'),
+      )
+    },
+    /** Onboarding-surface fields of the attendee profile form, minus the
+     *  basics the onboarding page already asks for natively. */
+    onboardingFields(): ProfileFormField[] {
+      const NATIVE = ['first_name', 'last_name', 'email', 'job_title', 'company', 'bio', 'interests']
+      return (this.site?.profile_form?.fields ?? []).filter(f =>
+        !NATIVE.includes(f.key)
+        && !['section_break', 'recaptcha', 'file'].includes(f.type)
+        && (f.meta?.surfaces?.onboarding ?? true) !== false,
+      )
+    },
   },
 
   actions: {

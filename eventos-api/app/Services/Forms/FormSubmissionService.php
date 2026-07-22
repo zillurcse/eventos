@@ -17,13 +17,17 @@ class FormSubmissionService
     public function __construct(protected FormValidatorBuilder $validator) {}
 
     /**
+     * @param  array<string,mixed>  $extra  extra submission attributes
+     *                                      (source, review_status, meta…)
+     * @param  array<int,string>|null  $only  validate only these field keys —
+     *                                        the keys the collecting surface actually shows
      * @return array{submission: FormSubmission, projection: array<string,mixed>}
      */
-    public function submit(Form $form, array $input, ?string $ownerType = null, ?int $ownerId = null): array
+    public function submit(Form $form, array $input, ?string $ownerType = null, ?int $ownerId = null, array $extra = [], ?array $only = null): array
     {
-        $validated = $this->validator->validate($form, $input);
+        $validated = $this->validator->validate($form, $input, $only);
 
-        $submission = DB::transaction(function () use ($form, $validated, $ownerType, $ownerId) {
+        $submission = DB::transaction(function () use ($form, $validated, $ownerType, $ownerId, $extra) {
             $submission = FormSubmission::create([
                 'form_id' => $form->id,
                 'form_version' => $form->version,
@@ -32,7 +36,7 @@ class FormSubmissionService
                 'owner_id' => $ownerId,
                 'status' => 'complete',
                 'submitted_at' => now(),
-            ]);
+            ] + $extra);
 
             foreach ($form->fields as $field) {
                 if ($field->type === 'section_break' || ! array_key_exists($field->key, $validated)) {

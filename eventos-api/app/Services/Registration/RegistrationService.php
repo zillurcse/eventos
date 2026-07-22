@@ -30,12 +30,14 @@ class RegistrationService
 
     /**
      * @param  array<int,array{ticket_type_id:int,quantity:int}>  $lines
+     * @param  array<int,string>|null  $only  field keys the signup surface renders
+     *                                        (profile forms collect per surface)
      * @return array{contact: Contact, participation: Participation, order: ?\App\Models\Order, tickets: Collection}
      */
-    public function register(Event $event, Form $form, array $input, array $lines = [], ?string $discount = null, ?string $password = null): array
+    public function register(Event $event, Form $form, array $input, array $lines = [], ?string $discount = null, ?string $password = null, ?array $only = null): array
     {
-        return DB::transaction(function () use ($event, $form, $input, $lines, $discount, $password) {
-            $validated = $this->validator->validate($form, $input);
+        return DB::transaction(function () use ($event, $form, $input, $lines, $discount, $password, $only) {
+            $validated = $this->validator->validate($form, $input, $only);
 
             $email = $validated['email'] ?? null;
             if (! $email) {
@@ -60,7 +62,18 @@ class RegistrationService
                 $contact->update(['user_id' => $user->id]);
             }
 
-            $result = $this->forms->submit($form, $input, 'contact', $contact->id);
+            // Recorded as an already-approved submission: signing up IS the
+            // approval, so it shows in Profile › Submissions as history rather
+            // than as something waiting on the organizer.
+            $result = $this->forms->submit($form, $input, 'contact', $contact->id, [
+                'source' => 'registration',
+                'review_status' => 'approved',
+                'submitted_by_contact_id' => $contact->id,
+                'meta' => array_filter([
+                    'submitter_name' => $contact->fullName() ?: null,
+                    'submitter_email' => $email,
+                ]),
+            ], $only);
             $projection = $result['projection'];
 
             $contact->projectDynamic($projection)->save();

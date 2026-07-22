@@ -49,7 +49,7 @@ class FileUploadController extends Controller
                 'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
                 'ad_image', 'lounge', 'breakout_room_poster', 'session_doc', 'session_icon', 'session_logo',
                 'exhibitor_logo', 'exhibitor_spotlight', 'ctas', 'chat', 'contest_banner', 'contest_entry',
-                'survey_response',
+                'survey_response', 'form_background',
             ])],
         ]);
 

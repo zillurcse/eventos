@@ -111,7 +111,10 @@ class FormController extends Controller
     {
         $form = $this->loadPublished($uuid);
 
-        return response()->json(['data' => new FormResource($form)]);
+        return response()->json([
+            'data' => new FormResource($form),
+            'event' => $this->eventBlock($form),
+        ]);
     }
 
     public function submit(string $uuid, Request $request, FormSubmissionService $service): JsonResponse
@@ -119,7 +122,24 @@ class FormController extends Controller
         $form = $this->loadPublished($uuid);
         $this->activateTenant($form);
 
-        $result = $service->submit($form, $request->all());
+        // Honeypot: a hidden input humans never see. Bots that fill it get a
+        // convincing 201 and nothing stored.
+        if ($request->filled('_hp')) {
+            return response()->json(['submission_id' => (string) \Illuminate\Support\Str::uuid()], 201);
+        }
+
+        $source = in_array($request->input('_source'), ['link', 'embed'], true)
+            ? $request->input('_source') : 'link';
+
+        // Profile forms are collected per surface: validate only what the
+        // public form actually shows. Other forms keep full validation.
+        $only = $form->isProfileForm() ? $form->surfaceKeys('public') : null;
+
+        $result = $service->submit($form, $request->except(['_source', '_hp']), null, null, [
+            'source' => $source,
+            'review_status' => 'pending',
+            'meta' => $this->submitterMeta($form, $request),
+        ], $only);
 
         return response()->json([
             'submission_id' => $result['submission']->uuid,
@@ -128,6 +148,65 @@ class FormController extends Controller
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
+
+    /** Snapshot who submitted (best-effort from the answers) + where from. */
+    protected function submitterMeta(Form $form, Request $request): array
+    {
+        $email = null;
+        $nameParts = [];
+
+        foreach ($form->fields as $field) {
+            $v = $request->input($field->key);
+            if (! is_string($v) || $v === '') {
+                continue;
+            }
+            if (! $email && $field->type === 'email' && filter_var($v, FILTER_VALIDATE_EMAIL)) {
+                $email = $v;
+            }
+            if (in_array($field->key, ['first_name', 'last_name', 'contact_name', 'company_name'], true)) {
+                $nameParts[$field->key] = $v;
+            }
+        }
+
+        $name = trim(($nameParts['first_name'] ?? '').' '.($nameParts['last_name'] ?? ''))
+            ?: ($nameParts['contact_name'] ?? $nameParts['company_name'] ?? null);
+
+        return array_filter([
+            'submitter_email' => $email,
+            'submitter_name' => $name,
+            'ip' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ]);
+    }
+
+    /** Public branding context so the hosted form page can dress itself. */
+    protected function eventBlock(Form $form): ?array
+    {
+        if (! $form->event_id) {
+            return null;
+        }
+
+        $event = Event::on('pgsql_admin')->with('coverFile')->find($form->event_id);
+        if (! $event) {
+            return null;
+        }
+
+        $setting = \App\Models\EventSetting::on('pgsql_admin')->where('event_id', $event->id)->first();
+        $branding = $setting->branding ?? [];
+        $theme = $setting->theme ?? [];
+        $cover = $event->coverFile;
+
+        return [
+            'uuid' => $event->uuid,
+            'name' => $event->name,
+            'starts_at' => $event->starts_at?->toIso8601String(),
+            'ends_at' => $event->ends_at?->toIso8601String(),
+            'location' => $event->meta['location'] ?? null,
+            'cover_url' => $cover ? \Illuminate\Support\Facades\Storage::disk($cover->disk)->url($cover->path) : null,
+            'logo_url' => $branding['logo_url'] ?? null,
+            'primary' => $theme['primary'] ?? '#6352e7',
+        ];
+    }
 
     /** Load a published form by its public render token, bypassing RLS. */
     protected function loadPublished(string $uuid): Form

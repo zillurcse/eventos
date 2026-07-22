@@ -97,7 +97,7 @@ const badge = computed(() => {
 </template>
 
 <style scoped>
-.card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 14px; }
+.card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 14px; height: 100%; }
 
 .top { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #eef0f3; }
 .badge { flex: 0 0 auto; font-size: .7rem; font-weight: 600; padding: 5px 10px; border-radius: 6px; white-space: nowrap; }
