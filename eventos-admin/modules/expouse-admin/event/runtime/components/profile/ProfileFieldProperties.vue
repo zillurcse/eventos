@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import type { BuilderField } from '../../utils/profileFormTypes'
+// Imported explicitly: the auto-import scan is seeded at dev-server start, so a
+// component added to this module mid-session does not resolve by name.
+import ProfileOptionsImport from './ProfileOptionsImport.vue'
 
 /**
  * Right pane of the profile form builder — properties of the selected field.
@@ -59,6 +63,19 @@ function addOption() {
 function removeOption(i: number) {
   props.field?.options.splice(i, 1)
 }
+
+const importing = ref(false)
+
+/** Long lists live in spreadsheets — typing 40 countries by hand is not a feature. */
+function applyImport(options: { label: string, value?: string }[], mode: 'replace' | 'append') {
+  if (!props.field) return
+  const kept = mode === 'append' ? props.field.options.filter(o => o.label.trim()) : []
+  const seen = new Set(kept.map(o => (o.value || o.label).trim().toLowerCase()))
+  const added = options.filter(o => !seen.has((o.value || o.label).toLowerCase()))
+  props.field.options = [...kept, ...added]
+  importing.value = false
+  toast.success(`${added.length} option${added.length === 1 ? '' : 's'} imported`)
+}
 </script>
 
 <template>
@@ -102,7 +119,13 @@ function removeOption(i: number) {
 
       <!-- ── Options ─────────────────────────────────────────── -->
       <div v-if="hasOptions" class="border-t border-line pt-4 mt-4">
-        <div class="font-bold text-[.92rem] mb-3">Options</div>
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <div class="font-bold text-[.92rem]">Options</div>
+          <button type="button" class="btn ghost sm" title="Import from Excel or CSV" @click="importing = true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+            Import
+          </button>
+        </div>
         <div v-for="(opt, i) in field.options" :key="i" class="flex items-center gap-2 mb-2">
           <input v-model="opt.label" class="m-0 flex-1" :placeholder="`Option ${i + 1}`">
           <button
@@ -115,6 +138,13 @@ function removeOption(i: number) {
         <button class="btn ghost sm" @click="addOption">
           <AppIcon name="plus" class="w-3.5 h-3.5" /> Add option
         </button>
+
+        <ProfileOptionsImport
+          v-if="importing"
+          :existing="field.options.filter(o => o.label.trim()).length"
+          @close="importing = false"
+          @apply="applyImport"
+        />
       </div>
 
       <!-- ── Rating scale ────────────────────────────────────── -->

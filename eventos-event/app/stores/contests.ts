@@ -65,7 +65,7 @@ export type EntrySort = 'recent' | 'top'
 /**
  * Contests ("Contests" tab) — the attendee side of Engagement › Contests. The
  * listing and every write go through the authed participant routes
- * `/events/{uuid}/contests`, so what comes back is already filtered to what the
+ * `/events/{uuid}/my/contests`, so what comes back is already filtered to what the
  * organizer lets this attendee see (private entries, comment visibility).
  */
 export const useContestsStore = defineStore('contests', {
@@ -112,7 +112,7 @@ export const useContestsStore = defineStore('contests', {
       this.loading = true
       this.error = false
       try {
-        const res = await useApi()<{ data: Contest[] }>(`/events/${uuid}/contests`)
+        const res = await useApi()<{ data: Contest[] }>(`/events/${uuid}/my/contests`)
         this.contests = res.data
         this.loaded = true
       } catch {
@@ -129,7 +129,7 @@ export const useContestsStore = defineStore('contests', {
       this.loading = true
       this.error = false
       try {
-        const res = await useApi()<{ data: Contest }>(`/events/${uuid}/contests/${id}`)
+        const res = await useApi()<{ data: Contest }>(`/events/${uuid}/my/contests/${id}`)
         this.current = res.data
       } catch {
         this.error = true
@@ -145,7 +145,7 @@ export const useContestsStore = defineStore('contests', {
 
       this.entriesLoading = true
       try {
-        const res = await useApi()<{ data: ContestEntry[] }>(`/events/${uuid}/contests/${id}/entries`, {
+        const res = await useApi()<{ data: ContestEntry[] }>(`/events/${uuid}/my/contests/${id}/entries`, {
           query: { sort: this.sort, mine: this.mineOnly ? 1 : 0 },
         })
         this.entries = res.data
@@ -173,7 +173,7 @@ export const useContestsStore = defineStore('contests', {
 
       this.submitting = true
       try {
-        const res = await useApi()<{ data: ContestEntry }>(`/events/${uuid}/contests/${id}/entries`, {
+        const res = await useApi()<{ data: ContestEntry }>(`/events/${uuid}/my/contests/${id}/entries`, {
           method: 'POST',
           body: payload,
         })

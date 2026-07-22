@@ -292,10 +292,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/feed/{post}/reactions', [FeedController::class, 'react']);
             Route::post('/feed/{post}/poll/vote', [FeedController::class, 'votePoll']);
             // Contests ("Contests" tab): browse, enter, like and comment.
-            Route::get('/contests', [ParticipantContestController::class, 'index']);
-            Route::get('/contests/{contest}', [ParticipantContestController::class, 'show']);
-            Route::get('/contests/{contest}/entries', [ParticipantContestController::class, 'entries']);
-            Route::post('/contests/{contest}/entries', [ParticipantContestController::class, 'store']);
+            // Under `my/` for the same reason as the surveys below: the
+            // organizer's own contest list lives at /events/{uuid}/contests,
+            // and identical URIs would shadow each other.
+            Route::get('/my/contests', [ParticipantContestController::class, 'index']);
+            Route::get('/my/contests/{contest}', [ParticipantContestController::class, 'show']);
+            Route::get('/my/contests/{contest}/entries', [ParticipantContestController::class, 'entries']);
+            Route::post('/my/contests/{contest}/entries', [ParticipantContestController::class, 'store']);
             Route::delete('/contest-entries/{entry}', [ParticipantContestController::class, 'destroy']);
             Route::post('/contest-entries/{entry}/like', [ParticipantContestController::class, 'like']);
             Route::get('/contest-entries/{entry}/comments', [ParticipantContestController::class, 'comments']);
