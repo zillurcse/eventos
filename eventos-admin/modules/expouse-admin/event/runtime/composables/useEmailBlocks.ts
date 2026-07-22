@@ -25,6 +25,8 @@ export interface Block {
   href?: string
   items?: SocialItem[]
   columns?: Block[][]
+  /** Per-column percentages, one per column. Absent = even split. */
+  widths?: number[]
   style: Record<string, any>
 }
 
@@ -36,6 +38,8 @@ export interface EmailSettings {
   textColor: string
   linkColor: string
   borderRadius: number
+  /** Optional CDN of `<network>.png` icons; falls back to branded chips. */
+  socialIconBaseUrl?: string
 }
 
 let seq = 0
@@ -83,7 +87,7 @@ export function createBlock(type: BlockType): Block {
     case 'social':
       return { ...base, items: [{ network: 'twitter', url: 'https://' }, { network: 'linkedin', url: 'https://' }, { network: 'instagram', url: 'https://' }], style: { align: 'center', iconSize: 28, color: '#64748b', paddingTop: 12, paddingBottom: 12 } }
     case 'columns':
-      return { ...base, columns: [[createBlock('text')], [createBlock('text')]], style: { gap: 16, paddingTop: 8, paddingBottom: 8 } }
+      return { ...base, columns: [[createBlock('text')], [createBlock('text')]], widths: [50, 50], style: { gap: 16, paddingTop: 8, paddingBottom: 8 } }
     case 'html':
       return { ...base, html: '<!-- Your custom HTML -->', style: { paddingTop: 8, paddingBottom: 8 } }
     case 'logo':
@@ -165,6 +169,123 @@ export function cloneBlock(block: Block): Block {
   const copy: Block = JSON.parse(JSON.stringify(block))
   walkBlocks([copy], b => { b.id = uid() })
   return copy
+}
+
+/** Coarse gallery buckets — mirrors EmailTemplate::CATEGORIES on the API. */
+export const CATEGORIES: { key: string, label: string }[] = [
+  { key: 'invitation', label: 'Invitation' },
+  { key: 'reminder', label: 'Reminder' },
+  { key: 'confirmation', label: 'Confirmation' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'system', label: 'System' },
+  { key: 'custom', label: 'Custom' },
+]
+
+/**
+ * Resize a columns block, keeping existing content and redistributing widths
+ * evenly. Removed columns' children are appended to the last surviving column
+ * rather than silently dropped.
+ */
+export function setColumnCount(block: Block, count: number) {
+  const cols = block.columns ?? (block.columns = [])
+  const n = Math.max(1, Math.min(4, count))
+
+  while (cols.length < n) cols.push([])
+  if (cols.length > n) {
+    const removed = cols.splice(n)
+    const last = cols[n - 1]!
+    for (const col of removed) last.push(...col)
+  }
+
+  block.widths = evenWidths(n)
+}
+
+/** Percentages summing to exactly 100, with the remainder on the last column. */
+export function evenWidths(count: number): number[] {
+  const each = Math.floor(100 / count)
+  const widths = Array.from({ length: count }, () => each)
+  widths[count - 1] = 100 - each * (count - 1)
+  return widths
+}
+
+/**
+ * Adjust one column's width and absorb the difference from the others, so the
+ * row always totals 100% and no column collapses below 5%.
+ */
+export function setColumnWidth(block: Block, index: number, value: number) {
+  const count = block.columns?.length ?? 0
+  if (!count) return
+
+  const widths = block.widths?.length === count ? [...block.widths] : evenWidths(count)
+  const others = count - 1
+  if (!others) { block.widths = [100]; return }
+
+  const next = Math.max(5, Math.min(100 - others * 5, Math.round(value)))
+  const remainder = 100 - next
+  const previousOthers = widths.reduce((sum, w, i) => (i === index ? sum : sum + w), 0)
+
+  block.widths = widths.map((w, i) => {
+    if (i === index) return next
+    // Keep the other columns' relative proportions while refitting to 100.
+    const share = previousOthers > 0 ? w / previousOthers : 1 / others
+    return Math.max(5, Math.round(remainder * share))
+  })
+
+  // Rounding can drift a point either way; settle it on the last other column.
+  const drift = 100 - block.widths.reduce((a, b) => a + b, 0)
+  const lastOther = block.widths.length - 1 === index ? block.widths.length - 2 : block.widths.length - 1
+  if (drift && lastOther >= 0) block.widths[lastOther]! += drift
+}
+
+export interface AuditIssue {
+  blockId: string | null
+  severity: 'error' | 'warning'
+  message: string
+}
+
+/**
+ * Pre-send checks for the problems that are invisible in the editor but obvious
+ * in an inbox: images with no alt text (many clients block images by default),
+ * placeholder links that were never filled in, and a missing preheader.
+ */
+export function auditDesign(
+  blocks: Block[],
+  opts: { subject?: string, preheader?: string } = {},
+): AuditIssue[] {
+  const issues: AuditIssue[] = []
+
+  if (!opts.subject?.trim()) {
+    issues.push({ blockId: null, severity: 'error', message: 'Subject line is empty.' })
+  }
+  if (!opts.preheader?.trim()) {
+    issues.push({ blockId: null, severity: 'warning', message: 'No preheader — inboxes will preview your first line of copy instead.' })
+  }
+
+  walkBlocks(blocks, (b) => {
+    if ((b.type === 'image' || b.type === 'video') && b.src && !b.alt?.trim()) {
+      issues.push({ blockId: b.id, severity: 'warning', message: `${b.type === 'video' ? 'Video thumbnail' : 'Image'} has no alt text.` })
+    }
+    if (b.type === 'image' && !b.src) {
+      issues.push({ blockId: b.id, severity: 'error', message: 'Image block has no image.' })
+    }
+    if (b.type === 'logo' && b.src && !b.alt?.trim()) {
+      issues.push({ blockId: b.id, severity: 'warning', message: 'Logo has no alt text.' })
+    }
+    if (b.type === 'button') {
+      if (!b.text?.trim()) issues.push({ blockId: b.id, severity: 'error', message: 'Button has no label.' })
+      if (!b.url || /^https?:\/\/$/.test(b.url.trim()) || b.url.trim() === '#') {
+        issues.push({ blockId: b.id, severity: 'error', message: `Button "${b.text || 'Untitled'}" has a placeholder link.` })
+      }
+    }
+    if (b.type === 'social') {
+      const unset = (b.items ?? []).filter(i => !i.url || /^https?:\/\/$/.test(i.url.trim()))
+      if (unset.length) {
+        issues.push({ blockId: b.id, severity: 'warning', message: `${unset.length} social link${unset.length > 1 ? 's are' : ' is'} still a placeholder.` })
+      }
+    }
+  })
+
+  return issues
 }
 
 export interface TemplatePreset {

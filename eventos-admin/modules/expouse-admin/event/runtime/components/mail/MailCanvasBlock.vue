@@ -50,6 +50,25 @@ function textStyle(extra: Record<string, any> = {}) {
 const editable = ref<HTMLElement | null>(null)
 let savedRange: Range | null = null
 
+// Typing `{{` offers the merge-variable catalogue inline.
+const ac = useMergeAutocomplete(builder.varGroups)
+
+function onEditableInput() {
+  syncFromDom()
+  if (editable.value) ac.update(editable.value)
+}
+
+function onEditableKeydown(e: KeyboardEvent) {
+  // The list owns the arrow/enter keys while it's open so they navigate it
+  // rather than moving the caret or inserting a line break.
+  if (ac.onKeydown(e)) e.preventDefault()
+}
+
+function pickSuggestion(s: { token: string, label: string, sample: string, group: string }) {
+  ac.select(s)
+  syncFromDom()
+}
+
 function syncFromDom() {
   if (!editable.value) return
   if (props.block.type === 'heading') props.block.text = editable.value.innerText
@@ -117,6 +136,19 @@ function addToColumn(colIndex: number, type: BlockType) {
   builder.select(b.id)
 }
 const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.type))
+
+/** Column width as a percentage, falling back to an even split. */
+function columnWidth(index: number): number {
+  const count = props.block.columns?.length ?? 1
+  return props.block.widths?.[index] ?? Math.floor(100 / count)
+}
+
+/** Warn in-canvas about the accessibility problems that only show in an inbox. */
+const missingAlt = computed(() =>
+  ['image', 'logo', 'video'].includes(props.block.type)
+  && !!props.block.src
+  && !props.block.alt?.trim(),
+)
 </script>
 
 <template>
@@ -173,6 +205,35 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
       <MailVariableMenu :groups="builder.varGroups.value" compact @insert="insertVariable" />
     </div>
 
+    <!-- alt-text warning: images are blocked by default in many clients -->
+    <div
+      v-if="missingAlt"
+      class="absolute bottom-1.5 left-1.5 z-20 flex items-center gap-1 rounded-md bg-[#fef3c7] text-[#92400e] text-[.68rem] font-semibold px-1.5 py-0.5 border border-[#fcd34d]"
+      title="Add alt text so the image still communicates when it's blocked or read aloud"
+    >⚠ No alt text</div>
+
+    <!-- merge-tag typeahead, anchored to the caret -->
+    <Teleport to="body">
+      <div
+        v-if="ac.open.value && ac.matches.value.length"
+        class="fixed z-[200] w-[260px] max-h-[240px] overflow-y-auto rounded-xl border border-line bg-white shadow-xl p-1"
+        :style="{ top: ac.position.top + 'px', left: ac.position.left + 'px' }"
+        @mousedown.prevent
+      >
+        <button
+          v-for="(s, i) in ac.matches.value"
+          :key="s.token"
+          type="button"
+          class="w-full text-left rounded-md px-2 py-1.5 cursor-pointer block border-0"
+          :class="i === ac.activeIndex.value ? 'bg-[#f0eefe]' : 'bg-transparent hover:bg-[#f7f7fb]'"
+          @click="pickSuggestion(s)"
+        >
+          <span class="block text-[.8rem] font-medium text-[#1f2430]">{{ s.label }}</span>
+          <span class="block text-[.68rem] font-mono text-[#8b93a7]">{{ s.token }}</span>
+        </button>
+      </div>
+    </Teleport>
+
     <div :style="cellStyle">
       <!-- heading -->
       <component
@@ -182,7 +243,8 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
         contenteditable
         class="outline-none whitespace-pre-wrap"
         :style="textStyle({ fontWeight: style.fontWeight || '700', color: style.color || '#0f172a', fontSize: (style.fontSize || 28) + 'px' })"
-        @input="syncFromDom"
+        @input="onEditableInput"
+        @keydown="onEditableKeydown"
         @keyup="saveRange"
         @mouseup="saveRange"
         @blur="saveRange"
@@ -195,7 +257,8 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
         contenteditable
         class="outline-none"
         :style="textStyle()"
-        @input="syncFromDom"
+        @input="onEditableInput"
+        @keydown="onEditableKeydown"
         @keyup="saveRange"
         @mouseup="saveRange"
         @blur="saveRange"
@@ -288,7 +351,8 @@ const paletteFor = (types: BlockType[]) => PALETTE.filter(p => types.includes(p.
         <div
           v-for="(col, ci) in block.columns"
           :key="ci"
-          class="flex-1 min-w-0 rounded-lg border border-dashed border-[#d9d6f3] bg-[#fbfbff]"
+          class="min-w-0 rounded-lg border border-dashed border-[#d9d6f3] bg-[#fbfbff]"
+          :style="{ flex: `0 0 calc(${columnWidth(ci)}% - ${((style.gap || 16) * ((block.columns?.length || 1) - 1)) / (block.columns?.length || 1)}px)` }"
         >
           <MailCanvasBlock v-for="child in col" :key="child.id" :block="child" nested />
           <div class="relative p-2 text-center">

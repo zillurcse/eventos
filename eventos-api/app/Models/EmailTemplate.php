@@ -4,11 +4,18 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EmailTemplate extends Model
 {
     use SoftDeletes, HasUuid;
+
+    /** Coarse buckets the builder's gallery filters on (`key` stays the trigger id). */
+    public const CATEGORIES = [
+        'invitation', 'reminder', 'confirmation', 'marketing', 'system', 'custom',
+    ];
 
     protected $guarded = [];
 
@@ -75,4 +82,20 @@ class EmailTemplate extends Model
         'opens_at' => 'datetime',
         'closes_at' => 'datetime',
     ];
+
+    /** @return HasMany<EmailTemplateVersion> newest first */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(EmailTemplateVersion::class, 'template_id')->orderByDesc('version');
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
+    }
+
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

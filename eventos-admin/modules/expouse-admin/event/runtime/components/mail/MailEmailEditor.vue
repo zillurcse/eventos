@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { Block, BlockType, EmailSettings, TemplatePreset } from '../../composables/useEmailBlocks'
+import type { Block, BlockType, EmailSettings, TemplatePreset, AuditIssue } from '../../composables/useEmailBlocks'
 import {
   createBlock, cloneBlock, findContext, walkBlocks,
-  defaultSettings, starterBlocks, PALETTE,
+  defaultSettings, starterBlocks, auditDesign, PALETTE, CATEGORIES,
 } from '../../composables/useEmailBlocks'
 import type { VarGroup } from './MailVariableMenu.vue'
 
@@ -10,6 +10,8 @@ interface TemplateDto {
   id: string
   name: string
   subject?: string | null
+  preheader?: string | null
+  category?: string | null
   from_name?: string | null
   from_email?: string | null
   reply_to?: string | null
@@ -26,6 +28,8 @@ const api = useApi()
 // ── document state ───────────────────────────────────────────────────────
 const name = ref(props.template?.name || 'Untitled email')
 const subject = ref(props.template?.subject || '')
+const preheader = ref(props.template?.preheader || '')
+const category = ref(props.template?.category || 'custom')
 const fromName = ref(props.template?.from_name || '')
 const fromEmail = ref(props.template?.from_email || '')
 const replyTo = ref(props.template?.reply_to || '')
@@ -39,10 +43,14 @@ const selectedId = ref<string | null>(null)
 const varGroups = ref<VarGroup[]>([])
 const mode = ref<'edit' | 'preview'>('edit')
 const device = ref<'desktop' | 'mobile'>('desktop')
-const showSettingsDrawer = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
+const savedAt = ref<Date | null>(null)
+const saveError = ref('')
 const showGallery = ref(!props.template)
+const showHistory = ref(false)
+const showSource = ref(false)
+const showAudit = ref(false)
 
 // ── undo / redo ──────────────────────────────────────────────────────────────
 const history = ref<string[]>([])
@@ -52,6 +60,7 @@ const historyPausing = ref(false)
 function snapshot() {
   if (historyPausing.value) return
   const snap = JSON.stringify({ blocks: JSON.parse(JSON.stringify(blocks)), settings: JSON.parse(JSON.stringify(settings)) })
+  if (history.value[historyIndex.value] === snap) return
   // drop redo tail
   history.value = history.value.slice(0, historyIndex.value + 1)
   history.value.push(snap)
@@ -87,6 +96,20 @@ const selectedBlock = computed<Block | null>(() => {
   walkBlocks(blocks, b => { if (b.id === selectedId.value) found = b })
   return found
 })
+
+// ── pre-send audit ───────────────────────────────────────────────────────
+const issues = computed<AuditIssue[]>(() =>
+  auditDesign(blocks, { subject: subject.value, preheader: preheader.value }),
+)
+const errorCount = computed(() => issues.value.filter(i => i.severity === 'error').length)
+
+function focusIssue(issue: AuditIssue) {
+  if (issue.blockId) {
+    selectedId.value = issue.blockId
+    mode.value = 'edit'
+    showAudit.value = false
+  }
+}
 
 // ── drag state ───────────────────────────────────────────────────────────
 const dragId = ref<string | null>(null)
@@ -124,14 +147,44 @@ provide('emailBuilder', {
   endBlockDrag: () => { dragId.value = null; dropIndex.value = null },
 })
 
-// mark dirty + snapshot on any document change
+// mark dirty + snapshot + refresh preview on any document change
 let snapTimer: ReturnType<typeof setTimeout> | null = null
 watch([blocks, settings], () => {
   dirty.value = true
   if (snapTimer) clearTimeout(snapTimer)
   snapTimer = setTimeout(snapshot, 400)
+  schedulePreview()
+  scheduleAutosave()
 }, { deep: true })
-watch([name, subject, fromName, fromEmail, replyTo], () => { dirty.value = true })
+
+watch([name, subject, preheader, category, fromName, fromEmail, replyTo], () => {
+  dirty.value = true
+  schedulePreview()
+  scheduleAutosave()
+})
+
+// ── autosave ─────────────────────────────────────────────────────────────
+/**
+ * Only runs once the template exists — a brand-new draft is not persisted
+ * until the author saves it deliberately, so opening the editor and closing it
+ * again doesn't litter the gallery with empty templates.
+ */
+const autosaveEnabled = computed(() => !!uuid.value)
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleAutosave() {
+  if (!autosaveEnabled.value) return
+  if (autosaveTimer) clearTimeout(autosaveTimer)
+  autosaveTimer = setTimeout(() => { if (dirty.value && !saving.value) save() }, 2500)
+}
+
+const saveLabel = computed(() => {
+  if (saving.value) return 'Saving…'
+  if (saveError.value) return saveError.value
+  if (dirty.value) return autosaveEnabled.value ? 'Unsaved' : 'Unsaved — save once to enable autosave'
+  if (savedAt.value) return `Saved ${savedAt.value.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  return ''
+})
 
 // ── palette add / drag ───────────────────────────────────────────────────
 function addBlock(type: BlockType, index?: number) {
@@ -184,30 +237,48 @@ function iconPaths(icon: string) {
 }
 // literals kept in script so "}}" never reaches Vue's mustache parser
 const VAR_EXAMPLE = '{{ variables }}'
+const OPEN_BRACES = '{{'
 const SUBJECT_PLACEHOLDER = "e.g. You're invited, {{ contact.first_name }}"
+const PREHEADER_PLACEHOLDER = 'Shown after the subject in the inbox list'
 
 // ── server-rendered preview ──────────────────────────────────────────────
 const previewHtml = ref('')
 const previewLoading = ref(false)
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+let previewToken = 0
+
+/**
+ * Debounced so a burst of typing produces one render, and sequenced with a
+ * token so a slow earlier response can't overwrite a newer one.
+ */
+function schedulePreview() {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(refreshPreview, 500)
+}
+
 async function refreshPreview() {
+  const token = ++previewToken
   previewLoading.value = true
   try {
     const res = await api<{ html: string }>('/email-templates/preview-draft', {
       method: 'POST',
-      body: { subject: subject.value, blocks, settings },
+      body: { subject: subject.value, preheader: preheader.value, blocks, settings },
     })
-    previewHtml.value = res.html
+    if (token === previewToken) previewHtml.value = res.html
+  } catch {
+    /* preview is advisory — a failure shouldn't interrupt editing */
   } finally {
-    previewLoading.value = false
+    if (token === previewToken) previewLoading.value = false
   }
 }
-watch(mode, m => { if (m === 'preview') refreshPreview() })
 
 // ── persistence ──────────────────────────────────────────────────────────
 function payload(status?: string) {
   return {
     name: name.value.trim() || 'Untitled email',
     subject: subject.value || null,
+    preheader: preheader.value || null,
+    category: category.value || 'custom',
     from_name: fromName.value || null,
     from_email: fromEmail.value || null,
     reply_to: replyTo.value || null,
@@ -220,17 +291,39 @@ function payload(status?: string) {
 async function save(status?: string): Promise<TemplateDto | null> {
   if (saving.value) return null
   saving.value = true
+  saveError.value = ''
   try {
     const res = uuid.value
       ? await api<{ data: TemplateDto }>(`/email-templates/${uuid.value}`, { method: 'PUT', body: payload(status) })
       : await api<{ data: TemplateDto }>('/email-templates', { method: 'POST', body: payload(status) })
     uuid.value = res.data.id
     dirty.value = false
+    savedAt.value = new Date()
     emit('saved', res.data)
     return res.data
+  } catch (e: any) {
+    saveError.value = e?.data?.message || 'Save failed'
+    return null
   } finally {
     saving.value = false
   }
+}
+
+/** Pull the server's copy back in after a version restore. */
+async function reloadFromServer() {
+  if (!uuid.value) return
+  const { data } = await api<{ data: TemplateDto }>(`/email-templates/${uuid.value}`)
+  name.value = data.name
+  subject.value = data.subject || ''
+  preheader.value = data.preheader || ''
+  category.value = data.category || 'custom'
+  historyPausing.value = true
+  blocks.splice(0, blocks.length, ...JSON.parse(JSON.stringify(data.blocks || [])))
+  Object.assign(settings, { ...defaultSettings(), ...(data.settings || {}) })
+  historyPausing.value = false
+  dirty.value = false
+  showHistory.value = false
+  nextTick(() => { snapshot(); refreshPreview() })
 }
 
 const testEmail = ref('')
@@ -259,7 +352,7 @@ function applyGalleryPreset(preset: TemplatePreset) {
   Object.assign(settings, newSettings)
   showGallery.value = false
   dirty.value = false
-  nextTick(snapshot)
+  nextTick(() => { snapshot(); refreshPreview() })
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -269,25 +362,69 @@ function onKeydown(e: KeyboardEvent) {
   if (ctrl && e.key === 's') { e.preventDefault(); save() }
 }
 
+/** Don't let a browser tab close swallow unsaved work. */
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty.value) e.preventDefault()
+}
+
+function requestClose() {
+  if (dirty.value && !confirm('You have unsaved changes. Close the editor anyway?')) return
+  emit('close')
+}
+
+/**
+ * The editor owns a route, so leaving is not only the Back button in its own
+ * topbar — browser Back/Forward and any in-app link would otherwise discard
+ * unsaved work silently. Does not fire for the `/new` → uuid rewrite, which is
+ * a param change on the same route (and happens with nothing pending anyway).
+ */
+onBeforeRouteLeave(() => {
+  if (!dirty.value) return true
+  return confirm('You have unsaved changes. Leave the editor anyway?')
+})
+
 onMounted(async () => {
   try { varGroups.value = (await api<{ data: VarGroup[] }>('/email-variables')).data } catch { /* non-fatal */ }
   snapshot()
+  refreshPreview()
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  if (autosaveTimer) clearTimeout(autosaveTimer)
+  if (previewTimer) clearTimeout(previewTimer)
+  if (snapTimer) clearTimeout(snapTimer)
+})
 </script>
 
 <template>
   <div class="fixed inset-0 z-[150] bg-[#eef0f4] flex flex-col">
     <!-- ───────── Topbar ───────── -->
     <header class="h-[58px] shrink-0 bg-white border-b border-line flex items-center gap-3 px-4">
-      <button class="w-9 h-9 rounded-lg border border-line bg-white grid place-items-center cursor-pointer hover:bg-[#f5f5fa]" title="Back" @click="emit('close')">
+      <button class="w-9 h-9 rounded-lg border border-line bg-white grid place-items-center cursor-pointer hover:bg-[#f5f5fa]" title="Back" @click="requestClose">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f6b7a" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6" /></svg>
       </button>
-      <input v-model="name" class="m-0 w-[260px] font-semibold border-transparent hover:border-line focus:border-[#6352e7] bg-transparent" placeholder="Template name">
-      <span v-if="dirty" class="text-[.72rem] text-[#b45309] bg-[#fef3c7] px-2 py-0.5 rounded-full">Unsaved</span>
+      <input v-model="name" class="m-0 w-[220px] font-semibold border-transparent hover:border-line focus:border-[#6352e7] bg-transparent" placeholder="Template name">
+      <span
+        v-if="saveLabel"
+        class="text-[.72rem] px-2 py-0.5 rounded-full whitespace-nowrap"
+        :class="saveError ? 'text-[#b91c1c] bg-[#fee2e2]' : dirty ? 'text-[#b45309] bg-[#fef3c7]' : 'text-[#15803d] bg-[#dcfce7]'"
+      >{{ saveLabel }}</span>
 
       <div class="ml-auto flex items-center gap-2">
+        <!-- pre-send audit -->
+        <button
+          class="relative flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-line bg-white cursor-pointer text-[.8rem] hover:bg-[#f5f5fa]"
+          :class="errorCount ? '!border-[#fca5a5] !text-[#b91c1c]' : issues.length ? '!border-[#fcd34d] !text-[#92400e]' : 'text-[#15803d]'"
+          :title="issues.length ? `${issues.length} thing${issues.length > 1 ? 's' : ''} to check before sending` : 'No issues found'"
+          @click="showAudit = !showAudit"
+        >
+          <span>{{ issues.length ? '⚠' : '✓' }}</span>
+          <span>{{ issues.length || 'Ready' }}</span>
+        </button>
+
         <!-- undo / redo -->
         <div class="flex border border-line rounded-lg overflow-hidden">
           <button class="w-8 h-8 grid place-items-center cursor-pointer bg-white hover:bg-[#f5f5fa] disabled:opacity-30 disabled:cursor-not-allowed border-r border-line" title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="undo">
@@ -297,15 +434,40 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7H11a6 6 0 0 0 0 12h6"/><path d="M17 3l4 4-4 4"/></svg>
           </button>
         </div>
+
         <div class="flex bg-[#f1f1f6] rounded-lg p-0.5">
           <button class="px-3 py-1.5 rounded-md text-[.82rem] cursor-pointer" :class="mode === 'edit' ? 'bg-white shadow-sm font-semibold' : 'text-[#5f6b7a]'" @click="mode = 'edit'">Edit</button>
           <button class="px-3 py-1.5 rounded-md text-[.82rem] cursor-pointer" :class="mode === 'preview' ? 'bg-white shadow-sm font-semibold' : 'text-[#5f6b7a]'" @click="mode = 'preview'">Preview</button>
         </div>
+
+        <button class="btn ghost sm" :disabled="!uuid" title="Version history" @click="showHistory = true">History</button>
+        <button class="btn ghost sm" title="View compiled HTML" @click="showSource = true">HTML</button>
         <button class="btn ghost sm" @click="testOpen = true">Send test</button>
         <button class="btn sm" :disabled="saving" @click="save()">{{ saving ? 'Saving…' : 'Save' }}</button>
-        <button class="btn sm" style="background:#16a34a" :disabled="saving" @click="save('published')" title="Save & mark ready to use">Save & publish</button>
+        <button class="btn sm" style="background:#16a34a" :disabled="saving" title="Save & mark ready to use" @click="save('published')">Save &amp; publish</button>
       </div>
     </header>
+
+    <!-- ───────── Audit panel ───────── -->
+    <div v-if="showAudit" class="shrink-0 bg-white border-b border-line px-4 py-3 max-h-[180px] overflow-y-auto">
+      <div class="flex items-center gap-2 mb-2">
+        <h4 class="m-0 text-[.8rem] font-bold uppercase tracking-wider text-[#8b93a7]">Before you send</h4>
+        <button class="ml-auto text-[#8b93a7] bg-transparent border-0 cursor-pointer text-[.8rem]" @click="showAudit = false">Close</button>
+      </div>
+      <p v-if="!issues.length" class="m-0 text-[.85rem] text-[#15803d]">✓ No issues found — alt text, links and subject all look good.</p>
+      <ul v-else class="list-none m-0 p-0 flex flex-col gap-1">
+        <li
+          v-for="(issue, i) in issues"
+          :key="i"
+          class="flex items-start gap-2 text-[.83rem]"
+          :class="issue.blockId ? 'cursor-pointer hover:underline' : ''"
+          @click="focusIssue(issue)"
+        >
+          <span :class="issue.severity === 'error' ? 'text-[#b91c1c]' : 'text-[#b45309]'">{{ issue.severity === 'error' ? '●' : '○' }}</span>
+          <span>{{ issue.message }}</span>
+        </li>
+      </ul>
+    </div>
 
     <div class="flex-1 flex min-h-0">
       <!-- ───────── Left palette ───────── -->
@@ -325,7 +487,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             <span class="text-[.68rem] text-[#5f6b7a]">{{ p.label }}</span>
           </button>
         </div>
-        <button class="w-full mt-4 text-[.78rem] text-[#6352e7] font-semibold border border-line rounded-lg py-2 cursor-pointer hover:bg-[#f5f3ff]" @click="selectedId = null; showSettingsDrawer = false">⚙ Email settings</button>
+        <button class="w-full mt-4 text-[.78rem] text-[#6352e7] font-semibold border border-line rounded-lg py-2 cursor-pointer hover:bg-[#f5f3ff]" @click="selectedId = null">⚙ Email settings</button>
         <button class="w-full mt-2 text-[.78rem] text-[#5f6b7a] font-semibold border border-line rounded-lg py-2 cursor-pointer hover:bg-[#f5f5fa]" @click="showGallery = true">📋 Templates</button>
       </aside>
 
@@ -333,17 +495,23 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       <main class="flex-1 overflow-y-auto p-6" @click="selectedId = null">
         <!-- preview -->
         <div v-if="mode === 'preview'" class="h-full flex flex-col items-center">
-          <div class="flex gap-2 mb-3">
+          <div class="flex gap-2 mb-3 items-center">
             <button class="btn ghost sm" :class="device === 'desktop' ? '!border-[#6352e7] !text-[#6352e7]' : ''" @click="device = 'desktop'">🖥 Desktop</button>
             <button class="btn ghost sm" :class="device === 'mobile' ? '!border-[#6352e7] !text-[#6352e7]' : ''" @click="device = 'mobile'">📱 Mobile</button>
-            <button class="btn ghost sm" @click="refreshPreview">↻ Refresh</button>
+            <span v-if="previewLoading" class="text-[#8b93a7] text-[.78rem]">Rendering…</span>
+            <span v-else class="text-[#8b93a7] text-[.78rem]">Updates as you edit</span>
           </div>
+          <!--
+            Sandboxed: an srcdoc iframe would otherwise inherit this origin, and
+            the document it renders is built from author-supplied HTML.
+          -->
           <iframe
             :srcdoc="previewHtml"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"
+            title="Email preview"
             class="bg-white rounded-xl shadow-lg border border-line transition-all"
             :style="{ width: device === 'mobile' ? '380px' : '760px', height: '100%', maxWidth: '100%' }"
           />
-          <p v-if="previewLoading" class="text-[#8b93a7] text-[.8rem] mt-2">Rendering…</p>
         </div>
 
         <!-- edit canvas -->
@@ -372,7 +540,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
               Drag a block here or click one on the left to start.
             </div>
           </div>
-          <p class="text-center text-[#a8aec0] text-[.74rem] mt-3">Tip: click any element to edit it. Insert <span class="font-mono">{{ VAR_EXAMPLE }}</span> for personalization.</p>
+          <p class="text-center text-[#a8aec0] text-[.74rem] mt-3">Tip: click any element to edit it. Type <span class="font-mono">{{ OPEN_BRACES }}</span> in any text to insert <span class="font-mono">{{ VAR_EXAMPLE }}</span>.</p>
         </div>
       </main>
 
@@ -382,6 +550,16 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         <div class="p-4 border-b border-line bg-[#fafafe]">
           <label class="text-[.76rem] font-semibold text-[#5f6b7a] flex items-center justify-between">Subject line <MailVariableMenu :groups="varGroups" compact @insert="t => subject += `{{ ${t} }}`" /></label>
           <input v-model="subject" class="m-0 mt-1" :placeholder="SUBJECT_PLACEHOLDER">
+
+          <label class="text-[.76rem] font-semibold text-[#5f6b7a] flex items-center justify-between mt-3">Preheader <MailVariableMenu :groups="varGroups" compact @insert="t => preheader += `{{ ${t} }}`" /></label>
+          <input v-model="preheader" class="m-0 mt-1" :placeholder="PREHEADER_PLACEHOLDER" maxlength="200">
+          <p class="text-[#8b93a7] text-[.7rem] mt-1 mb-0">The grey line after the subject in most inboxes.</p>
+
+          <label class="text-[.76rem] font-semibold text-[#5f6b7a] block mt-3 mb-1">Category</label>
+          <select v-model="category" class="m-0">
+            <option v-for="c in CATEGORIES" :key="c.key" :value="c.key">{{ c.label }}</option>
+          </select>
+
           <details class="mt-3">
             <summary class="text-[.76rem] font-semibold text-[#5f6b7a] cursor-pointer select-none">Sender details</summary>
             <label class="text-[.72rem] text-[#5f6b7a] block mt-2 mb-0.5">From name</label>
@@ -405,11 +583,28 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       @close="showGallery = false"
     />
 
+    <!-- version history -->
+    <MailVersionHistory
+      v-if="showHistory && uuid"
+      :template-id="uuid"
+      @restored="reloadFromServer"
+      @close="showHistory = false"
+    />
+
+    <!-- compiled HTML source -->
+    <MailSourceView
+      v-if="showSource"
+      :html="previewHtml"
+      :loading="previewLoading"
+      @close="showSource = false"
+    />
+
     <!-- send-test modal -->
     <div v-if="testOpen" class="fixed inset-0 z-[160] bg-black/35 grid place-items-center" @click.self="testOpen = false">
       <div class="bg-white rounded-2xl p-5 w-[380px] max-w-[92vw] shadow-xl">
         <h3 class="m-0 mb-1 text-[1.05rem]">Send a test email</h3>
         <p class="text-[#8b93a7] text-[.82rem] mt-0 mb-3">Variables render with sample data. Saves the template first.</p>
+        <p v-if="errorCount" class="text-[#b91c1c] text-[.8rem] mt-0 mb-2">⚠ {{ errorCount }} unresolved issue{{ errorCount > 1 ? 's' : '' }} — check the audit panel first.</p>
         <input v-model="testEmail" type="email" class="m-0" placeholder="you@example.com" @keyup.enter="sendTest">
         <p v-if="testMsg" class="text-[.82rem] mt-2" :class="testMsg.includes('✓') ? 'text-[#16a34a]' : 'text-[#dc2626]'">{{ testMsg }}</p>
         <div class="flex justify-end gap-2 mt-4">

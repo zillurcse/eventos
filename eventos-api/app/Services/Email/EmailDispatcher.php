@@ -21,8 +21,7 @@ class EmailDispatcher
     /** Render the template's blocks → compiled_html (cached on the template). */
     public function compile(EmailTemplate $template): string
     {
-        $design = $template->design ?? [];
-        $html = $this->renderer->render($design['blocks'] ?? [], $design['settings'] ?? []);
+        $html = $this->renderTemplate($template);
 
         $template->update(['compiled_html' => $html]);
 
@@ -36,11 +35,21 @@ class EmailDispatcher
      */
     public function preview(EmailTemplate $template, array $merge = []): string
     {
-        $design = $template->design ?? [];
-        $html = $this->renderer->render($design['blocks'] ?? [], $design['settings'] ?? []);
         $vars = array_replace_recursive($this->variables->sampleData(), $merge);
 
-        return $this->renderer->merge($html, $vars);
+        return $this->renderer->merge($this->renderTemplate($template), $vars);
+    }
+
+    /** The one place a template's stored design becomes HTML. */
+    protected function renderTemplate(EmailTemplate $template): string
+    {
+        $design = $template->design ?? [];
+
+        return $this->renderer->render(
+            $design['blocks'] ?? [],
+            $design['settings'] ?? [],
+            $template->preheader,
+        );
     }
 
     public function send(EmailTemplate $template, string $to, array $merge = [], string $trigger = 'test'): EmailSend

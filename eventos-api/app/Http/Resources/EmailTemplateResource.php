@@ -14,8 +14,10 @@ class EmailTemplateResource extends JsonResource
         return [
             'id' => $this->uuid,
             'key' => $this->key,
+            'category' => $this->category ?: 'custom',
             'name' => $this->name,
             'subject' => $this->subject,
+            'preheader' => $this->preheader,
             'from_name' => $this->from_name,
             'from_email' => $this->from_email,
             'reply_to' => $this->reply_to,
@@ -23,7 +25,11 @@ class EmailTemplateResource extends JsonResource
             'version' => (int) $this->version,
             'blocks' => $design['blocks'] ?? [],
             'settings' => $design['settings'] ?? [],
-            'has_compiled' => ! empty($this->compiled_html),
+            // The index omits the large compiled_html column and selects this
+            // flag instead; a single-model load still carries the column itself.
+            'has_compiled' => $this->resource->getAttribute('has_compiled') !== null
+                ? (bool) $this->resource->getAttribute('has_compiled')
+                : ! empty($this->compiled_html),
             'updated_at' => optional($this->updated_at)->toIso8601String(),
         ];
     }

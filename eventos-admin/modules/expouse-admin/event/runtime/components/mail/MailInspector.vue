@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { Block, EmailSettings } from '../../composables/useEmailBlocks'
-import { FONT_STACKS } from '../../composables/useEmailBlocks'
+import { FONT_STACKS, setColumnCount, setColumnWidth, evenWidths } from '../../composables/useEmailBlocks'
 import type { VarGroup } from './MailVariableMenu.vue'
 
 const props = defineProps<{ block: Block | null, settings: EmailSettings, varGroups: VarGroup[] }>()
 
 const { upload } = useUpload()
 const uploading = ref(false)
+const pickerOpen = ref(false)
 
 async function onImagePick(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -21,8 +22,49 @@ async function onImagePick(e: Event) {
   }
 }
 
+function onAssetChosen(url: string) {
+  if (props.block) props.block.src = url
+  pickerOpen.value = false
+}
+
 const ALIGNS = ['left', 'center', 'right'] as const
 const s = computed(() => props.block?.style ?? {})
+
+/** Images blocked by default in many clients — alt text is the fallback copy. */
+const altMissing = computed(() =>
+  !!props.block?.src && !props.block.alt?.trim(),
+)
+
+const columnWidths = computed(() => {
+  const count = props.block?.columns?.length ?? 0
+  if (!count) return []
+  return props.block?.widths?.length === count ? props.block.widths : evenWidths(count)
+})
+
+function onColumnCount(e: Event) {
+  if (props.block) setColumnCount(props.block, +(e.target as HTMLSelectElement).value)
+}
+
+function onColumnWidth(index: number, e: Event) {
+  if (props.block) setColumnWidth(props.block, index, +(e.target as HTMLInputElement).value)
+}
+
+/** Common layouts, so nobody has to nudge sliders to reach 2:1. */
+const WIDTH_PRESETS: Record<number, { label: string, widths: number[] }[]> = {
+  2: [
+    { label: '50 / 50', widths: [50, 50] },
+    { label: '67 / 33', widths: [67, 33] },
+    { label: '33 / 67', widths: [33, 67] },
+  ],
+  3: [
+    { label: 'Even', widths: [34, 33, 33] },
+    { label: 'Wide centre', widths: [25, 50, 25] },
+  ],
+}
+
+function applyPreset(widths: number[]) {
+  if (props.block) props.block.widths = [...widths]
+}
 
 function insertVar(token: string, key: 'text' | 'html' | 'url') {
   if (!props.block) return
@@ -60,6 +102,12 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
 
       <label class="ins-l">Link / accent color</label>
       <div class="ins-color"><input v-model="settings.linkColor" type="color"><input v-model="settings.linkColor" class="m-0"></div>
+
+      <label class="ins-l">Social icon base URL</label>
+      <input v-model="settings.socialIconBaseUrl" class="m-0" placeholder="https://cdn.example.com/icons">
+      <p class="text-[#8b93a7] text-[.72rem] mt-1 mb-0">
+        Optional. Expects <span class="font-mono">&lt;network&gt;.png</span> files. Leave blank to use built-in branded chips.
+      </p>
 
       <p class="text-[#8b93a7] text-[.78rem] mt-4 leading-relaxed">Select a block on the canvas to edit its content and style.</p>
     </template>
@@ -119,11 +167,15 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
         <label class="ins-l">Image</label>
         <div class="flex gap-2 items-center">
           <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>
+          <button class="btn ghost sm m-0" @click="pickerOpen = true">Library</button>
         </div>
         <label class="ins-l">Or image URL</label>
         <input v-model="block.src" class="m-0" placeholder="https://">
         <label class="ins-l">Alt text</label>
-        <input v-model="block.alt" class="m-0">
+        <input v-model="block.alt" class="m-0" placeholder="Describe the image">
+        <p v-if="altMissing" class="text-[#92400e] text-[.74rem] mt-1 mb-0">
+          ⚠ Many inboxes block images by default — alt text is what recipients see instead.
+        </p>
         <label class="ins-l">Link URL (optional)</label>
         <input v-model="block.href" class="m-0" placeholder="https://">
         <label class="ins-l">Width (%)</label>
@@ -174,11 +226,15 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
         <label class="ins-l">Logo image</label>
         <div class="flex gap-2 items-center">
           <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>
+          <button class="btn ghost sm m-0" @click="pickerOpen = true">Library</button>
         </div>
         <label class="ins-l">Or image URL</label>
         <input v-model="block.src" class="m-0" placeholder="https://…">
         <label class="ins-l">Alt text</label>
         <input v-model="block.alt" class="m-0" placeholder="Company logo">
+        <p v-if="altMissing" class="text-[#92400e] text-[.74rem] mt-1 mb-0">
+          ⚠ Add alt text — it stands in for the logo when images are blocked.
+        </p>
         <label class="ins-l">Link URL (optional)</label>
         <input v-model="block.href" class="m-0" placeholder="https://…">
         <label class="ins-l">Width (px)</label>
@@ -193,9 +249,12 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
         <label class="ins-l">Thumbnail image</label>
         <div class="flex gap-2 items-center">
           <label class="btn ghost sm cursor-pointer m-0">{{ uploading ? 'Uploading…' : 'Upload' }}<input type="file" accept="image/*" class="hidden" @change="onImagePick"></label>
+          <button class="btn ghost sm m-0" @click="pickerOpen = true">Library</button>
         </div>
         <label class="ins-l">Or thumbnail URL</label>
         <input v-model="block.src" class="m-0" placeholder="https://…">
+        <label class="ins-l">Alt text</label>
+        <input v-model="block.alt" class="m-0" placeholder="Watch the keynote highlights">
         <label class="ins-l">Video link URL</label>
         <input v-model="block.url" class="m-0" placeholder="https://youtube.com/…">
         <label class="ins-l">Corner radius (px)</label>
@@ -205,11 +264,37 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
       <!-- COLUMNS -->
       <template v-else-if="block.type === 'columns'">
         <label class="ins-l">Number of columns</label>
-        <select :value="block.columns?.length" class="m-0" @change="(e) => { const n = +(e.target as HTMLSelectElement).value; const cols = block.columns!; while (cols.length < n) cols.push([]); cols.length = n }">
-          <option :value="1">1</option><option :value="2">2</option><option :value="3">3</option>
+        <select :value="block.columns?.length" class="m-0" @change="onColumnCount">
+          <option :value="1">1</option><option :value="2">2</option><option :value="3">3</option><option :value="4">4</option>
         </select>
+
+        <template v-if="(block.columns?.length ?? 0) > 1">
+          <label class="ins-l">Column widths</label>
+          <div v-if="WIDTH_PRESETS[block.columns!.length]" class="flex gap-1.5 mb-2">
+            <button
+              v-for="p in WIDTH_PRESETS[block.columns!.length]"
+              :key="p.label"
+              class="flex-1 py-1 rounded-md border border-line bg-white cursor-pointer text-[.74rem] hover:border-[#6352e7] hover:text-[#6352e7]"
+              @click="applyPreset(p.widths)"
+            >{{ p.label }}</button>
+          </div>
+          <div v-for="(w, i) in columnWidths" :key="i" class="flex items-center gap-2 mb-1.5">
+            <span class="text-[.72rem] text-[#8b93a7] w-10 shrink-0">Col {{ i + 1 }}</span>
+            <input
+              type="range" min="5" max="95" :value="w" class="m-0 flex-1 accent-[#6352e7]"
+              @input="onColumnWidth(i, $event)"
+            >
+            <span class="text-[.74rem] font-mono text-[#5f6b7a] w-9 text-right shrink-0">{{ w }}%</span>
+          </div>
+          <p class="text-[#8b93a7] text-[.74rem] mt-1 mb-0">Widths always total 100%. Columns stack full-width on mobile.</p>
+        </template>
+
         <label class="ins-l">Gap (px)</label>
         <input v-model.number="block.style.gap" type="number" min="0" max="48" class="m-0">
+        <label class="ins-l">Vertical alignment</label>
+        <select v-model="block.style.verticalAlign" class="m-0">
+          <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
+        </select>
         <p class="text-[#8b93a7] text-[.78rem] mt-2">Use the <strong>+ Add</strong> buttons inside each column on the canvas to place content.</p>
       </template>
 
@@ -234,8 +319,20 @@ function removeSocial(i: number) { props.block?.items?.splice(i, 1) }
         <label class="ins-l">Block background</label>
         <div class="ins-color"><input :value="block.style.backgroundColor || '#ffffff'" type="color" @input="block.style.backgroundColor = ($event.target as HTMLInputElement).value"><input v-model="block.style.backgroundColor" class="m-0" placeholder="transparent"></div>
         <button v-if="block.style.backgroundColor" class="text-[.74rem] text-[#8b93a7] underline bg-transparent border-0 cursor-pointer mt-1" @click="block.style.backgroundColor = ''">Clear background</button>
+
+        <label class="ins-l flex items-center justify-between m-0 mt-3 cursor-pointer">
+          <span>Hide on mobile</span>
+          <input v-model="block.style.hideOnMobile" type="checkbox" class="w-4 h-4 m-0 accent-[#6352e7]">
+        </label>
+        <p class="text-[#8b93a7] text-[.72rem] mt-1 mb-0">Outlook ignores this and always shows the block.</p>
       </div>
     </template>
+
+    <MailAssetPicker
+      v-if="pickerOpen"
+      @select="onAssetChosen"
+      @close="pickerOpen = false"
+    />
   </div>
 </template>
 

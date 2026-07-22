@@ -716,6 +716,8 @@ Route::prefix('v1')->group(function () {
             Route::middleware('perm:email.manage')->group(function () {
                 Route::get('/email-templates', [EmailTemplateController::class, 'index']);
                 Route::get('/email-variables', [EmailTemplateController::class, 'variables']);
+                // Reusable imagery for the editor's asset picker (reads `files`).
+                Route::get('/email-assets', [EmailTemplateController::class, 'assets']);
                 Route::post('/email-templates', [EmailTemplateController::class, 'store']);
                 Route::post('/email-templates/preview-draft', [EmailTemplateController::class, 'previewDraft']);
                 Route::post('/email-templates/seed', [EmailTemplateController::class, 'seed']);
@@ -725,6 +727,12 @@ Route::prefix('v1')->group(function () {
                 Route::post('/email-templates/{uuid}/duplicate', [EmailTemplateController::class, 'duplicate']);
                 Route::post('/email-templates/{uuid}/preview', [EmailTemplateController::class, 'preview']);
                 Route::post('/email-templates/{uuid}/send-test', [EmailTemplateController::class, 'sendTest']);
+                // Cached compiled HTML for the gallery's lazy card previews.
+                Route::get('/email-templates/{uuid}/html', [EmailTemplateController::class, 'html']);
+                Route::post('/email-templates/{uuid}/compile', [EmailTemplateController::class, 'compile']);
+                Route::get('/email-templates/{uuid}/versions', [EmailTemplateController::class, 'versions']);
+                Route::post('/email-templates/{uuid}/versions/{version}/restore', [EmailTemplateController::class, 'restoreVersion'])
+                    ->whereNumber('version');
             });
         });
     });

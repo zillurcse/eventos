@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Block, EmailSettings } from '../../../../../composables/useEmailBlocks'
+import { CATEGORIES } from '../../../../../composables/useEmailBlocks'
 
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
@@ -7,13 +8,16 @@ interface TemplateDto {
   id: string
   name: string
   key?: string | null
+  category?: string | null
   subject?: string | null
+  preheader?: string | null
   from_name?: string | null
   from_email?: string | null
   reply_to?: string | null
   status?: string
   blocks?: Block[]
   settings?: Partial<EmailSettings>
+  has_compiled?: boolean
   updated_at?: string | null
 }
 
@@ -24,43 +28,31 @@ const eventId = route.params.id as string
 const templates = ref<TemplateDto[]>([])
 const loading = ref(true)
 const seeding = ref(false)
-const editing = ref<TemplateDto | null>(null)
-const editorOpen = ref(false)
 const search = ref('')
 const activeCategory = ref('all')
-
-const CATEGORIES: { key: string, label: string }[] = [
-  { key: 'all',          label: 'All' },
-  { key: 'admin',        label: 'Admin' },
-  { key: 'registration', label: 'Registration' },
-  { key: 'auth',         label: 'Auth' },
-  { key: 'onboarding',   label: 'Onboarding' },
-  { key: 'event',        label: 'Event Lifecycle' },
-  { key: 'engagement',   label: 'Engagement' },
-  { key: 'meeting',      label: 'Meetings' },
-  { key: 'session',      label: 'Sessions' },
-  { key: 'lead',         label: 'Leads' },
-  { key: 'action',       label: 'User Actions' },
-  { key: 'exhibitor',    label: 'Exhibitor' },
-  { key: 'post_event',   label: 'Post Event' },
-]
 
 const filtered = computed(() => {
   let list = templates.value
   if (activeCategory.value !== 'all') {
-    list = list.filter(t => (t.key ?? '').startsWith(activeCategory.value + '.') || t.key === activeCategory.value)
+    list = list.filter(t => (t.category || 'custom') === activeCategory.value)
   }
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
-    list = list.filter(t => t.name.toLowerCase().includes(q) || (t.subject ?? '').toLowerCase().includes(q))
+    list = list.filter(t =>
+      t.name.toLowerCase().includes(q)
+      || (t.subject ?? '').toLowerCase().includes(q)
+      || (t.preheader ?? '').toLowerCase().includes(q))
   }
   return list
 })
 
-// only show tabs that have at least one template
+// only show tabs that have at least one template behind them
 const visibleCategories = computed(() => {
-  const usedPrefixes = new Set(templates.value.map(t => (t.key ?? '').split('.')[0]))
-  return CATEGORIES.filter(c => c.key === 'all' || usedPrefixes.has(c.key))
+  const used = new Set(templates.value.map(t => t.category || 'custom'))
+  return [
+    { key: 'all', label: 'All' },
+    ...CATEGORIES.filter(c => used.has(c.key)),
+  ]
 })
 
 async function load() {
@@ -85,14 +77,16 @@ async function seedDefaults() {
   }
 }
 
+// The editor is its own route, so a design in progress survives a refresh and
+// Back returns here. The editor page fetches the full design itself.
+const editorRoute = (templateId: string) =>
+  `/org/events/${eventId}/mail/email-builder/${templateId}`
+
 function openNew() {
-  editing.value = null
-  editorOpen.value = true
+  return navigateTo(editorRoute('new'))
 }
-async function openEdit(t: TemplateDto) {
-  // index payload already carries blocks/settings, but refetch for the freshest design
-  editing.value = (await api<{ data: TemplateDto }>(`/email-templates/${t.id}`)).data
-  editorOpen.value = true
+function openEdit(t: TemplateDto) {
+  return navigateTo(editorRoute(t.id))
 }
 async function duplicate(t: TemplateDto) {
   await api(`/email-templates/${t.id}/duplicate`, { method: 'POST' })
@@ -102,9 +96,6 @@ async function remove(t: TemplateDto) {
   if (!confirm(`Delete template "${t.name}"?`)) return
   await api(`/email-templates/${t.id}`, { method: 'DELETE' })
   await load()
-}
-function onSaved() {
-  load()
 }
 function fmtDate(d?: string | null) {
   if (!d) return ''
@@ -173,16 +164,14 @@ onMounted(load)
         class="card !p-0 overflow-hidden cursor-pointer group hover:shadow-md transition-shadow"
         @click="openEdit(t)"
       >
-        <div class="h-[120px] bg-gradient-to-br from-[#f5f3ff] to-[#eef0fb] grid place-items-center border-b border-line">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#a99ff0" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
-        </div>
+        <MailTemplateThumb :template-id="t.id" />
         <div class="p-3.5">
           <div class="flex items-center gap-2">
             <h3 class="m-0 text-[.95rem] truncate flex-1">{{ t.name }}</h3>
             <span class="text-[.64rem] uppercase tracking-wide px-1.5 py-0.5 rounded" :class="t.status === 'published' ? 'text-[#15803d] bg-[#dcfce7]' : 'text-[#b45309] bg-[#fef3c7]'">{{ t.status || 'draft' }}</span>
           </div>
-          <div v-if="t.key" class="mt-1 mb-1">
-            <span class="text-[.62rem] text-[#6352e7] bg-[#f0eefe] px-1.5 py-0.5 rounded font-medium">{{ (t.key.split('.')[0] ?? t.key).replace('_', ' ') }}</span>
+          <div class="mt-1 mb-1">
+            <span class="text-[.62rem] text-[#6352e7] bg-[#f0eefe] px-1.5 py-0.5 rounded font-medium capitalize">{{ t.category || 'custom' }}</span>
           </div>
           <p class="muted text-[.78rem] mt-1 mb-2 truncate">{{ t.subject || 'No subject set' }}</p>
           <div class="flex items-center justify-between">
@@ -197,12 +186,5 @@ onMounted(load)
       </div>
     </div>
 
-    <MailEmailEditor
-      v-if="editorOpen"
-      :event-id="eventId"
-      :template="editing"
-      @close="editorOpen = false"
-      @saved="onSaved"
-    />
   </div>
 </template>
