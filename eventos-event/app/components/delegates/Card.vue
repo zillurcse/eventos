@@ -2,15 +2,12 @@
 import type { Delegate } from '~/stores/delegates'
 
 const props = defineProps<{ delegate: Delegate }>()
-const store = useDelegatesStore()
 const chat = useChatStore()
 const bookmarks = useBookmarksStore()
-const auth = useAuthStore()
 
 const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
-const connectState = computed(() => store.connected[props.delegate.id])
 
-// Touch devices have no hover — tapping the card pins the overlay instead.
+// Touch devices have no hover — tapping the card pins the reveal row instead.
 const pinned = ref(false)
 
 const contacting = ref(false)
@@ -24,97 +21,217 @@ async function contact() {
     contacting.value = false
   }
 }
-
-const subtitle = computed(() => {
-  const d = props.delegate
-  return [d.job_title, d.company].filter(Boolean).join(' · ')
-})
 </script>
 
 <template>
   <article class="card" :class="{ pinned }" @click="pinned = !pinned">
-    <span
-      class="status"
-      :class="{ on: delegate.online }"
-      :title="delegate.online ? 'Online' : 'Offline'"
-    />
-
-    <div class="avatar">
+    <div class="photo">
       <UserAvatar :src="delegate.avatar_url" :name="delegate.name" />
+      <button class="bm" :class="{ on: bookmarked }" type="button" :title="bookmarked ? 'Saved' : 'Save'"
+        @click.stop="bookmarks.toggle('delegate', delegate.id)">
+        <svg viewBox="0 0 24 24">
+          <path d="M6 3h12v18l-6-4-6 4z" />
+        </svg>
+      </button>
     </div>
 
     <div class="body">
       <h3 class="name">{{ delegate.name }}</h3>
-      <p v-if="subtitle" class="role">{{ subtitle }}</p>
+      <p v-if="delegate.job_title" class="role">{{ delegate.job_title }}</p>
+      <p v-if="delegate.company" class="co">{{ delegate.company }}</p>
     </div>
 
-    <!-- Hover veil: quick actions on a dark scrim (mock: Contact + Save) -->
-    <div class="veil" @click.stop>
-      <div class="vacts">
-        <button
-          class="vact"
-          :class="{ on: connectState === 'pending' }"
-          type="button"
-          :title="connectState === 'pending' ? 'Request sent' : 'Connect'"
-          @click="store.openConnect(delegate)"
-        >
-          <svg v-if="connectState === 'pending'" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
-          <svg v-else viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" /></svg>
+    <!-- Reveal row: slides the card taller instead of covering the photo. -->
+    <div class="reveal" @click.stop>
+      <div class="reveal-inner">
+        <EventNotePopover type="delegate" :id="delegate.id" block />
+        <button type="button" class="act chat" :disabled="contacting" @click="contact">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          </svg>
+          {{ contacting ? 'Opening…' : 'Chat' }}
         </button>
-        <button
-          class="vact"
-          :class="{ on: bookmarked }"
-          type="button"
-          :title="bookmarked ? 'Saved' : 'Save'"
-          @click="bookmarks.toggle('delegate', delegate.id)"
-        >
-          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4zM12 8v5M9.5 10.5h5" /></svg>
-        </button>
-        <EventNotePopover v-if="auth.isAuthed" type="delegate" :id="delegate.id" />
-      </div>
-
-      <button class="contact" type="button" :disabled="contacting" @click="contact">
-        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
-        {{ contacting ? 'Opening…' : 'Contact' }}
-      </button>
-
-      <div class="vinfo">
-        <small v-if="subtitle">{{ subtitle }}</small>
-        <strong>{{ delegate.name }}</strong>
       </div>
     </div>
   </article>
 </template>
 
 <style scoped>
-.card { position: relative; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.card {
+  --reveal-h: 56px;
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  /* box-shadow: 0 1px 2px rgba(15, 23, 42, .05); */
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  margin: 0;
+}
 
-.status { position: absolute; top: 10px; right: 10px; z-index: 3; width: 11px; height: 11px; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 2px #fff; }
-.status.on { background: #22c55e; }
+.card:hover,
+.card:focus-within,
+.card.pinned {
+  border-color: var(--brand-primary);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .1);
+}
 
-.avatar { position: relative; aspect-ratio: 1 / 1; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); display: flex; align-items: center; justify-content: center; }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.photo {
+  position: relative;
+  /* aspect-ratio: 11 / 10; */
+  max-height: 180px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+}
 
-.body { padding: 12px 14px 16px; text-align: center; }
-.name { margin: 0; font-size: .96rem; font-weight: 700; color: var(--brand-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.role { margin: 4px 0 0; color: #64748b; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.photo :deep(img),
+.photo :deep(svg) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  max-height: 180px;
+}
 
-/* ── Hover veil ── */
-.veil { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 14px; background: rgba(30,41,59,.82); opacity: 0; pointer-events: none; transition: opacity .18s ease; }
-.card:hover .veil, .card.pinned .veil, .card:focus-within .veil { opacity: 1; pointer-events: auto; }
+.bm {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--brand-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+}
 
-.vacts { position: absolute; top: 10px; right: 28px; display: flex; gap: 8px; }
-.vact { width: 34px; height: 34px; border-radius: 10px; border: none; background: #fff; color: var(--brand-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 3px rgba(15,23,42,.25); }
-.vact.on { background: var(--brand-primary); color: #fff; }
-.vact:disabled { cursor: default; }
-.vact svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.bm svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
-.contact { display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 999px; padding: 11px 24px; background: var(--brand-primary); color: #fff; font: inherit; font-size: .92rem; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(15,23,42,.35); }
-.contact:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
-.contact:disabled { opacity: .7; cursor: default; }
-.contact svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.bm.on {
+  background: var(--brand-primary);
+  color: #fff;
+}
 
-.vinfo { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
-.vinfo small { color: rgba(255,255,255,.75); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.vinfo strong { color: #fff; font-size: 1rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bm.on svg {
+  fill: currentColor;
+}
+
+.body {
+  padding: 14px 16px;
+}
+
+.name {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--brand-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role {
+  margin: 6px 0 0;
+  color: #64676A;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.co {
+  margin: 2px 0 0;
+  color: #64676A;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Reveal: Add Note / Chat, slides the card taller ── */
+.reveal {
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height .2s ease, opacity .15s ease;
+}
+
+.card:hover .reveal,
+.card:focus-within .reveal,
+.card.pinned .reveal {
+  height: var(--reveal-h);
+  opacity: 1;
+}
+
+.reveal-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+/* The note popover's own `block` styling already matches this look — just
+   make it share the row equally with the Chat button. */
+.reveal-inner :deep(.act) {
+  flex: 1;
+  min-width: 0;
+}
+
+.act.chat {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 24%, #fff);
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 10px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.act.chat:hover {
+  background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
+}
+
+.act.chat:disabled {
+  cursor: default;
+}
+
+.act.chat svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 </style>

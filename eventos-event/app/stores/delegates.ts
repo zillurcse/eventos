@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ReceptionAd } from './reception'
 
 export interface Delegate {
   id: string
@@ -45,6 +46,10 @@ export const useDelegatesStore = defineStore('delegates', {
     // Connect modal (opened from a delegate card's Connect action).
     connectTarget: null as Delegate | null,
     connectTab: 'connect' as 'connect' | 'meet',
+
+    // Organizer's AD Managements strip, targeted to the Delegates page.
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   actions: {
@@ -154,5 +159,23 @@ export const useDelegatesStore = defineStore('delegates', {
       this.connectTab = tab
     },
     closeConnect() { this.connectTarget = null },
+
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const sub = useEventSubdomain()
+      if (!sub) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'delegates' },
+          headers: { 'X-Event-Subdomain': sub },
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the directory still works without them.
+      } finally {
+        this.adsLoaded = true
+      }
+    },
   },
 })
