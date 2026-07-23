@@ -286,6 +286,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/profile', [ParticipantProfileController::class, 'show']);
             Route::match(['put', 'patch'], '/profile', [ParticipantProfileController::class, 'update']);
             Route::get('/feed', [FeedController::class, 'index']);
+            // Static segment — must precede /feed/{post}/* so it isn't captured.
+            Route::get('/feed/tags', [FeedController::class, 'networkingTags']);
             Route::post('/feed', [FeedController::class, 'store']);
             Route::get('/feed/{post}/comments', [FeedController::class, 'comments']);
             Route::post('/feed/{post}/comments', [FeedController::class, 'comment']);

@@ -60,10 +60,11 @@ const jobLine = computed(() => {
         <svg viewBox="0 0 24 24"><path d="M4 4h16v12H4zM9 21h6M9 16v5" /></svg>
         My Certificates
       </button>
-      <button type="button" class="row" disabled title="Coming soon">
+      <NuxtLink to="/profile/badge" class="row" :class="{ active: route.path === '/profile/badge' }">
         <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.4-3 8.3-7 9-4-.7-7-4.6-7-9V7z" /></svg>
         My Badge
-      </button>
+        <svg v-if="route.path === '/profile/badge'" class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+      </NuxtLink>
     </nav>
 
     <p class="group-title">Account Settings</p>

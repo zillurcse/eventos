@@ -181,6 +181,16 @@ export const useFeedStore = defineStore('feed', {
       this.fetchFeed(true)
     },
 
+    /** Distinct looking_for / offering tags circulating on the feed — the option
+     *  lists behind Profile › Looking & Offering. */
+    async fetchNetworkingTags(): Promise<{ looking_for: string[], offering: string[] }> {
+      const uuid = this.eventUuid()
+      if (!uuid) return { looking_for: [], offering: [] }
+      const api = useApi()
+      const res = await api<{ data: { looking_for: string[], offering: string[] } }>(`/events/${uuid}/feed/tags`)
+      return res.data
+    },
+
     /** Upload one feed media file (image/video/pdf) → returns its public URL. */
     async uploadMedia(file: File): Promise<UploadedMedia> {
       const uuid = this.eventUuid()

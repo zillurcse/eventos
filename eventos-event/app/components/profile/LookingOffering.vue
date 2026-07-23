@@ -2,24 +2,36 @@
 import { toast } from 'vue-sonner'
 
 const profile = useProfileStore()
+const feed = useFeedStore()
 
 const saving = ref(false)
 const lookingFor = ref<string[]>([])
 const offering = ref<string[]>([])
-const lookingInput = ref('')
-const offeringInput = ref('')
+
+// Option lists come from the tags people are actually using on the feed
+// (looking_for / offering posts). Loaded once when the tab mounts.
+const lookingOpts = ref<string[]>([])
+const offeringOpts = ref<string[]>([])
 
 watch(() => profile.data, (p) => {
   lookingFor.value = [...(p?.looking_for || [])]
   offering.value = [...(p?.offering || [])]
 }, { immediate: true })
 
-function addTag(list: typeof lookingFor, input: typeof lookingInput) {
-  const t = input.value.trim().replace(/,$/, '')
-  if (t && !list.value.includes(t) && list.value.length < 12) list.value.push(t)
-  input.value = ''
-}
-function removeTag(list: typeof lookingFor, i: number) { list.value.splice(i, 1) }
+// The user's own picks always belong in the list (checked), even a custom tag
+// the feed hasn't seen — otherwise a saved value would vanish from the dropdown.
+const lookingChoices = computed(() => Array.from(new Set([...lookingOpts.value, ...lookingFor.value])))
+const offeringChoices = computed(() => Array.from(new Set([...offeringOpts.value, ...offering.value])))
+
+onMounted(async () => {
+  try {
+    const t = await feed.fetchNetworkingTags()
+    lookingOpts.value = t.looking_for
+    offeringOpts.value = t.offering
+  } catch {
+    // Options are a convenience — typing a new tag still works without them.
+  }
+})
 
 async function save() {
   if (saving.value) return
@@ -42,28 +54,16 @@ function cancel() {
 
 <template>
   <div class="tab">
+    <p class="hint">Pick what you're looking for and what you can offer — drawn from what the community is talking about on the feed. This helps the right people find you.</p>
+
     <div class="section">
-      <p class="label">I'm looking for</p>
-      <div class="tags-box">
-        <span v-for="(t, i) in lookingFor" :key="i" class="tag">{{ t }}<button type="button" @click="removeTag(lookingFor, i)">×</button></span>
-        <input
-          v-model="lookingInput" type="text" placeholder="e.g. Investment, Partnership, Job opportunities"
-          @keydown.enter.prevent="addTag(lookingFor, lookingInput)"
-          @keydown="e => e.key === ',' && (e.preventDefault(), addTag(lookingFor, lookingInput))"
-        >
-      </div>
+      <p class="label">Looking for</p>
+      <ProfileMultiTagSelect v-model="lookingFor" :options="lookingChoices" placeholder="Select Options" />
     </div>
 
     <div class="section">
-      <p class="label">I'm offering</p>
-      <div class="tags-box">
-        <span v-for="(t, i) in offering" :key="i" class="tag">{{ t }}<button type="button" @click="removeTag(offering, i)">×</button></span>
-        <input
-          v-model="offeringInput" type="text" placeholder="e.g. Mentorship, Product demo, Services"
-          @keydown.enter.prevent="addTag(offering, offeringInput)"
-          @keydown="e => e.key === ',' && (e.preventDefault(), addTag(offering, offeringInput))"
-        >
-      </div>
+      <p class="label">Offering</p>
+      <ProfileMultiTagSelect v-model="offering" :options="offeringChoices" placeholder="Select Options" />
     </div>
 
     <div class="foot">
@@ -75,13 +75,9 @@ function cancel() {
 
 <style scoped>
 .tab { display: flex; flex-direction: column; gap: 22px; max-width: 720px; }
+.hint { margin: 0; color: #64748b; font-size: .88rem; line-height: 1.5; }
 .section { display: flex; flex-direction: column; gap: 8px; }
 .label { margin: 0; font-size: .88rem; font-weight: 700; color: #334155; }
-
-.tags-box { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid #d7dae1; border-radius: 12px; padding: 10px 12px; }
-.tags-box input { flex: 1; min-width: 200px; border: none; outline: none; font: inherit; font-size: .9rem; padding: 6px 4px; }
-.tag { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); border-radius: 999px; padding: 6px 12px; font-size: .84rem; font-weight: 600; }
-.tag button { border: none; background: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
 
 .foot { display: flex; align-items: center; gap: 16px; padding-top: 8px; border-top: 1px solid #f1f2f6; }
 .btn { border: none; border-radius: 10px; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; padding: 11px 22px; }

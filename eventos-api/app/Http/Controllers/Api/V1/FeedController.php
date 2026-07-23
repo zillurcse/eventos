@@ -70,6 +70,45 @@ class FeedController extends Controller
         );
     }
 
+    /**
+     * The distinct networking tags in circulation on this event's feed, split by
+     * kind. Feeds the Profile › Looking & Offering pickers so an attendee chooses
+     * from what people are actually looking for / offering rather than typing into
+     * the void. Published posts only — pending/rejected tags aren't public yet.
+     */
+    public function networkingTags(Request $request): JsonResponse
+    {
+        $rows = FeedPost::where('event_id', $request->attributes->get('event_id'))
+            ->where('status', 'published')
+            ->whereIn('meta->type', ['looking_for', 'offering'])
+            ->get(['meta']);
+
+        $buckets = ['looking_for' => [], 'offering' => []];
+        foreach ($rows as $row) {
+            $type = data_get($row->meta, 'type');
+            if (! isset($buckets[$type])) {
+                continue;
+            }
+            foreach ((array) data_get($row->meta, 'tags', []) as $tag) {
+                $tag = trim((string) $tag);
+                if ($tag !== '') {
+                    // Keyed by a lower-cased form so "Banker" and "banker" collapse;
+                    // the first-seen casing is what we surface.
+                    $buckets[$type][mb_strtolower($tag)] ??= $tag;
+                }
+            }
+        }
+
+        foreach ($buckets as &$bucket) {
+            $bucket = array_values($bucket);
+            natcasesort($bucket);
+            $bucket = array_values($bucket);
+        }
+        unset($bucket);
+
+        return response()->json(['data' => $buckets]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
