@@ -262,8 +262,24 @@ function backToEmail() {
           </div>
           <h1 class="event-name">{{ site.name }}</h1>
 
+          <!-- Social sign-in — only on the email step, only the channels the
+               organizer enabled, and only providers this platform actually has
+               an OAuth app for. -->
+          <template v-if="step === 'email' && socialChannels.length">
+            <p class="login-with">Login with</p>
+            <div class="social">
+              <button v-for="s in socialChannels" :key="s.key" type="button" class="social-btn" :class="s.key"
+                :title="s.label" @click="signInWith(s.key)">
+                <span v-if="s.key === 'google'">G</span>
+                <span v-else-if="s.key === 'facebook'">f</span>
+                <span v-else>in</span>
+              </button>
+            </div>
+          </template>
+
           <div class="divider">
-            <span>{{ step === 'register' ? 'create your account to join' : 'enter your email to login/ signup' }}</span>
+            <span>{{ step === 'register' ? 'create your account to join' : 'or enter your email to login/ signup'
+              }}</span>
           </div>
 
           <!-- OTP: enter the code we emailed -->
@@ -271,8 +287,8 @@ function backToEmail() {
             <p v-if="otpInfo" class="muted small otp-note">{{ otpInfo }}</p>
             <label class="field">
               <span class="icon">&#128273;</span>
-              <input v-model="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code"
-                     maxlength="6" placeholder="Enter 6-digit code" />
+              <input v-model="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+                placeholder="Enter 6-digit code" />
             </label>
 
             <p v-if="error" class="error">{{ error }}</p>
@@ -295,23 +311,26 @@ function backToEmail() {
             <form @submit.prevent="step === 'email' ? onContinue() : onSignIn()">
               <label class="field">
                 <span class="icon">&#128100;</span>
-                <input v-model="email" type="email" placeholder="Enter email address"
-                       autocomplete="username" :disabled="step === 'password'" />
+                <input v-model="email" type="email" placeholder="Enter email address" autocomplete="username"
+                  :disabled="step === 'password'" />
               </label>
 
               <label v-if="step === 'password'" class="field">
                 <span class="icon">&#128274;</span>
-                <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
+                <input v-model="password" type="password" placeholder="Enter password"
+                  autocomplete="current-password" />
               </label>
 
               <div class="forgot">
                 <a href="#" @click.prevent="forgot = !forgot">Forget password</a>
               </div>
-              <p v-if="forgot" class="muted small">Password resets are handled by the event organizer — please reach out to them.</p>
+              <p v-if="forgot" class="muted small">Password resets are handled by the event organizer — please reach out
+                to them.</p>
 
               <label v-if="step === 'email'" class="agree">
                 <input type="checkbox" v-model="agreed" />
-                <span>I agree to expouse <a href="#" @click.prevent>Terms of Service</a> and <a href="#" @click.prevent>Privacy Policy</a></span>
+                <span>I agree to expouse <a href="#" @click.prevent>Terms of Service</a> and <a href="#"
+                    @click.prevent>Privacy Policy</a></span>
               </label>
 
               <p v-if="error" class="error">{{ error }}</p>
@@ -329,20 +348,6 @@ function backToEmail() {
                 <a href="#" @click.prevent="backToEmail()">← Use a different email</a>
               </p>
             </form>
-
-            <!-- Social sign-in — only on the email step, only the channels the
-                 organizer enabled, and only providers this platform actually has
-                 an OAuth app for. -->
-            <template v-if="step === 'email' && socialChannels.length">
-              <div class="or"><span>or</span></div>
-              <div class="social">
-                <button
-                  v-for="s in socialChannels" :key="s.key"
-                  type="button" class="social-btn" :class="s.key"
-                  @click="signInWith(s.key)"
-                >{{ s.label }}</button>
-              </div>
-            </template>
           </template>
 
           <!-- Registration (signup) — inline, same page -->
@@ -397,98 +402,348 @@ function backToEmail() {
     <!-- Right: decorative artwork -->
     <section class="art" aria-hidden="true">
       <svg viewBox="0 0 800 900" preserveAspectRatio="xMidYMid slice">
-        <circle cx="560" cy="300" r="170" fill="var(--brand-accent)" opacity="0.85" />
-        <path d="M0 520 C 180 360 360 460 520 540 C 660 610 740 600 800 560 L800 900 L0 900 Z"
-              fill="var(--brand-primary)" opacity="0.55" />
-        <path d="M0 640 C 200 520 380 600 560 660 C 680 700 760 690 800 660 L800 900 L0 900 Z"
-              fill="var(--brand-primary)" opacity="0.9" />
+        <path d="M0 460 C 150 300 300 260 450 340 C 600 420 700 520 800 480 L800 900 L0 900 Z" fill="#6fb8ba"
+          opacity="0.85" />
+        <circle cx="640" cy="380" r="250" fill="#f0b86e" opacity="0.9" />
       </svg>
     </section>
   </div>
 </template>
 
 <style scoped>
-.landing { display: flex; min-height: 100vh; background: #eceef1; }
-.panel { flex: 0 0 42%; max-width: 560px; display: flex; align-items: center; justify-content: center; padding: 32px; overflow-y: auto; }
-.panel-inner { width: 100%; max-width: 340px; position: relative; min-height: 78vh; display: flex; flex-direction: column; }
-
-.brand-mark { margin-bottom: 10px; }
-.brand-mark img { max-height: 92px; max-width: 200px; object-fit: contain; border-radius: 12px; }
-.brand-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 92px; height: 92px; border-radius: 14px; color: #fff; font-weight: 800;
-  letter-spacing: 1px; background: var(--brand-primary);
+.landing {
+  display: flex;
+  min-height: 100vh;
+  background: #e5e5e5;
 }
-.event-name { color: var(--brand-primary); font-size: 1.5rem; font-weight: 800; margin: 6px 0 26px; }
 
-.divider { display: flex; align-items: center; gap: 12px; color: #6b7280; font-size: .92rem; margin-bottom: 18px; }
-.divider::before, .divider::after { content: ''; height: 1px; background: #d5d8dd; width: 26px; }
-.divider span { white-space: nowrap; }
+.panel {
+  flex: 0 0 42%;
+  max-width: 560px;
+  display: flex;
+  /* align-items: center; */
+  justify-content: center;
+  padding: 32px;
+  overflow-y: auto;
+}
 
-.field { display: flex; align-items: center; border-bottom: 2px solid #cfd3d9; }
-.field:focus-within { border-color: var(--brand-primary); }
-.field .icon { color: #9aa0a8; font-size: 1rem; padding: 0 8px 0 2px; }
-.field input { border: none; background: transparent; padding: 12px 4px; margin: 0; border-radius: 0; }
-.field input:focus { outline: none; }
-.field input:disabled { color: #6b7280; }
+.panel-inner {
+  width: 100%;
+  max-width: 330px;
+  position: relative;
+  min-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.panel-inner form,
+.panel-inner .notfound {
+  width: 100%;
+  text-align: left;
+}
+
+.brand-mark {
+  margin-bottom: 10px;
+}
+
+.brand-mark img {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  border-radius: 5px;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: var(--brand-primary);
+}
+
+.event-name {
+  color: var(--brand-primary);
+  font-size: 1.3rem;
+  line-height: 1.2;
+  font-weight: 700;
+  margin: 16px 0 28px;
+}
+
+.login-with {
+  color: #565656;
+  font-size: .92rem;
+  margin-bottom: 12px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #565656;
+  font-size: .92rem;
+  margin: 24px 0;
+  width: 100%;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  height: 1px;
+  background: #cfd0d2;
+  flex: 1;
+}
+
+.divider span {
+  white-space: nowrap;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid #cfd3d9;
+}
+
+.field:focus-within {
+  border-color: var(--brand-primary);
+}
+
+.field .icon {
+  color: #9aa0a8;
+  font-size: 1rem;
+  padding: 0 8px 0 2px;
+}
+
+.field input {
+  border: none;
+  background: transparent;
+  padding: 12px 4px;
+  margin: 0;
+  border-radius: 0;
+}
+
+.field input:focus {
+  outline: none;
+}
+
+.field input:disabled {
+  color: #6b7280;
+}
 
 /* Inline registration fields */
-.rfield { margin-bottom: 12px; }
-.rlabel { display: block; font-size: .8rem; font-weight: 600; color: #4b5563; margin-bottom: 3px; }
-.req { color: #dc2626; }
-.rfield input, .rfield select, .rfield textarea {
-  width: 100%; padding: 9px 10px; margin: 0; border: 1px solid #cfd3d9; border-radius: 8px; font: inherit; background: #fff;
+.rfield {
+  margin-bottom: 12px;
 }
-.rfield input:focus, .rfield select:focus, .rfield textarea:focus { outline: none; border-color: var(--brand-primary); }
-.opts { display: flex; flex-direction: column; gap: 5px; }
-.opt { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
-.opt input { width: auto; }
 
-.forgot { text-align: right; margin: 10px 0 4px; }
-.forgot a, .agree a { color: var(--brand-primary); font-weight: 600; }
-.small { font-size: .8rem; margin: 2px 0 0; }
+.rlabel {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 3px;
+}
 
-.agree { display: flex; gap: 9px; align-items: flex-start; margin: 16px 0 6px; font-size: .9rem; color: #4b5563; }
-.agree input { width: 16px; height: 16px; margin: 2px 0 0; flex: none; }
+.req {
+  color: #dc2626;
+}
+
+.rfield input,
+.rfield select,
+.rfield textarea {
+  width: 100%;
+  padding: 9px 10px;
+  margin: 0;
+  border: 1px solid #cfd3d9;
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.rfield input:focus,
+.rfield select:focus,
+.rfield textarea:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+}
+
+.opts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .9rem;
+}
+
+.opt input {
+  width: auto;
+}
+
+.forgot {
+  text-align: right;
+  margin: 10px 0 4px;
+}
+
+.forgot a,
+.agree a {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.small {
+  font-size: .8rem;
+  margin: 2px 0 0;
+}
+
+.agree {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 16px 0 6px;
+  font-size: .9rem;
+  color: #4b5563;
+}
+
+.agree input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  flex: none;
+}
 
 .continue {
-  margin-top: 18px; align-self: flex-start; border: none; cursor: pointer;
-  background: var(--brand-primary); color: #fff; font-weight: 700; letter-spacing: .4px;
-  padding: 12px 30px; border-radius: 999px; font-size: .9rem;
+  margin-top: 18px;
+  align-self: flex-start;
+  border: none;
+  cursor: pointer;
+  background: var(--brand-primary);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: .4px;
+  padding: 12px 30px;
+  border-radius: 999px;
+  font-size: .9rem;
 }
-.continue:disabled { opacity: .6; cursor: default; }
-.switch { margin-top: 14px; font-size: .86rem; }
-.switch a { color: var(--brand-primary); }
-.switch .sep { color: #cbd0d8; margin: 0 8px; }
 
-.otp-note { margin-bottom: 14px; }
+.continue:disabled {
+  opacity: .6;
+  cursor: default;
+}
 
-/* "or" divider between password and social sign-in. */
-.or { display: flex; align-items: center; gap: 12px; margin: 20px 0 16px; color: #9aa0a8; font-size: .78rem; }
-.or::before, .or::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+.switch {
+  margin-top: 14px;
+  font-size: .86rem;
+}
 
-.social { display: flex; flex-direction: column; gap: 10px; }
+.switch a {
+  color: var(--brand-primary);
+}
+
+.switch .sep {
+  color: #cbd0d8;
+  margin: 0 8px;
+}
+
+.otp-note {
+  margin-bottom: 14px;
+}
+
+.social {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
 .social-btn {
-  width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #d7dae1; background: #fff;
-  font: inherit; font-size: .9rem; font-weight: 600; color: #334155; cursor: pointer; transition: background .15s, border-color .15s;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #7b8190;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .16);
+  transition: transform .15s, box-shadow .15s;
 }
-.social-btn:hover { background: #f8fafc; border-color: #c7ccd5; }
-.social-btn.google:hover { border-color: #ea4335; }
-.social-btn.facebook:hover { border-color: #1877f2; }
-.social-btn.linkedin:hover { border-color: #0a66c2; }
 
-.error { color: #b91c1c; font-size: .88rem; margin-top: 12px; }
+.social-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .22);
+}
 
-.powered { margin-top: auto; padding-top: 28px; color: #9aa0a8; font-size: .7rem; letter-spacing: 1.5px; }
-.powered strong { display: block; color: #6b7280; font-size: 1rem; letter-spacing: .5px; margin-top: 2px; }
+.social-btn.google {
+  color: #ea4335;
+}
 
-.notfound { margin-top: 40px; }
+.social-btn.facebook {
+  color: #1877f2;
+}
 
-.art { flex: 1; background: #e7e9ec; overflow: hidden; }
-.art svg { width: 100%; height: 100%; display: block; }
+.social-btn.linkedin {
+  color: #0a66c2;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: .88rem;
+  margin-top: 12px;
+}
+
+.powered {
+  margin-top: auto;
+  padding-top: 28px;
+  color: #9aa0a8;
+  font-size: .7rem;
+  letter-spacing: 1.5px;
+}
+
+.powered strong {
+  display: block;
+  color: #6b7280;
+  font-size: 1rem;
+  letter-spacing: .5px;
+  margin-top: 2px;
+}
+
+.notfound {
+  margin-top: 40px;
+}
+
+.art {
+  flex: 1;
+  background: #eef0f2;
+  overflow: hidden;
+}
+
+.art svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 @media (max-width: 760px) {
-  .art { display: none; }
-  .panel { flex: 1; max-width: none; }
+  .art {
+    display: none;
+  }
+
+  .panel {
+    flex: 1;
+    max-width: none;
+  }
 }
 </style>
