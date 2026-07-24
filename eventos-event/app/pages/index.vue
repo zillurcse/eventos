@@ -310,13 +310,22 @@ function backToEmail() {
           <template v-else-if="step !== 'register'">
             <form @submit.prevent="step === 'email' ? onContinue() : onSignIn()">
               <label class="field">
-                <span class="icon">&#128100;</span>
+                <span class="icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="17" viewBox="0 0 14 17" fill="none">
+                    <path d="M12.4177 17.0002C12.0509 17.0002 11.7537 16.7029 11.7537 16.3362C11.7537 13.7365 9.63862 11.6214 7.03891 11.6214H6.04284C3.44312 11.6214 1.3281 13.7365 1.3281 16.3362C1.3281 16.7029 1.0308 17.0002 0.664048 17.0002C0.297294 17.0002 0 16.7029 0 16.3362C0 13.0041 2.71081 10.2933 6.04284 10.2933H7.03891C10.3709 10.2933 13.0817 13.0041 13.0817 16.3362C13.0817 16.7029 12.7845 17.0002 12.4177 17.0002Z" fill="#C4C4C4"/>
+                    <path d="M6.47451 8.96465C4.00296 8.96465 1.99219 6.95388 1.99219 4.48232C1.99219 2.01077 4.00296 0 6.47451 0C8.94606 0 10.9568 2.01077 10.9568 4.48232C10.9568 6.95388 8.94606 8.96465 6.47451 8.96465ZM6.47451 1.3281C4.73527 1.3281 3.32028 2.74308 3.32028 4.48232C3.32028 6.22157 4.73527 7.63655 6.47451 7.63655C8.21375 7.63655 9.62874 6.22157 9.62874 4.48232C9.62874 2.74308 8.21375 1.3281 6.47451 1.3281Z" fill="#C4C4C4"/>
+                  </svg>
+                </span>
                 <input v-model="email" type="email" placeholder="Enter email address" autocomplete="username"
                   :disabled="step === 'password'" />
               </label>
 
-              <label v-if="step === 'password'" class="field">
-                <span class="icon">&#128274;</span>
+              <label v-if="step === 'password'" class="field field-pass">
+                <span class="icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="14" viewBox="0 0 10 14" fill="none">
+                    <path d="M8.75 4.66667H8.125V3.33333C8.125 1.49333 6.725 0 5 0C3.275 0 1.875 1.49333 1.875 3.33333H3.125C3.125 2.22667 3.9625 1.33333 5 1.33333C6.0375 1.33333 6.875 2.22667 6.875 3.33333V4.66667H1.25C0.5625 4.66667 0 5.26667 0 6V12.6667C0 13.4 0.5625 14 1.25 14H8.75C9.4375 14 10 13.4 10 12.6667V6C10 5.26667 9.4375 4.66667 8.75 4.66667ZM8.75 12.6667H1.25V6H8.75V12.6667ZM5 10.6667C5.6875 10.6667 6.25 10.0667 6.25 9.33333C6.25 8.6 5.6875 8 5 8C4.3125 8 3.75 8.6 3.75 9.33333C3.75 10.0667 4.3125 10.6667 5 10.6667Z" fill="#C4C4C4"/>
+                  </svg>
+                </span>
                 <input v-model="password" type="password" placeholder="Enter password"
                   autocomplete="current-password" />
               </label>
@@ -353,9 +362,9 @@ function backToEmail() {
           <!-- Registration (signup) — inline, same page -->
           <form v-else @submit.prevent="onRegister()">
             <div v-for="f in regFields" :key="f.key" class="rfield">
-              <label class="rlabel">{{ f.label || f.key }} <span v-if="f.required" class="req">*</span></label>
+              <!-- <label class="rlabel">{{ f.label || f.key }} <span v-if="f.required" class="req">*</span></label> -->
 
-              <textarea v-if="f.type === 'textarea'" v-model="regValues[f.key]" :required="f.required" rows="2" />
+              <textarea v-if="f.type === 'textarea'" v-model="regValues[f.key]" :required="f.required" rows="2" :placeholder="f.label || f.key" />
 
               <select v-else-if="f.type === 'select'" v-model="regValues[f.key]" :required="f.required">
                 <option value="" disabled>Select…</option>
@@ -374,12 +383,12 @@ function backToEmail() {
                 </label>
               </div>
 
-              <input v-else :type="inputType(f.type)" v-model="regValues[f.key]" :required="f.required" />
+              <input v-else :type="inputType(f.type)" v-model="regValues[f.key]" :required="f.required" :placeholder="f.label || f.key" />
             </div>
 
             <div class="rfield">
-              <label class="rlabel">Create a password <span class="req">*</span></label>
-              <input type="password" v-model="regPassword" required minlength="8" autocomplete="new-password" />
+              <!-- <label class="rlabel">Create a password <span class="req">*</span></label> -->
+              <input type="password" v-model="regPassword" required minlength="8" autocomplete="new-password"  placeholder="Create a password"/>
             </div>
 
             <p v-if="error" class="error">{{ error }}</p>
@@ -413,13 +422,13 @@ function backToEmail() {
 <style scoped>
 .landing {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background: #e5e5e5;
 }
 
 .panel {
   flex: 0 0 42%;
-  max-width: 560px;
+  max-width: 530px;
   display: flex;
   /* align-items: center; */
   justify-content: center;
@@ -429,7 +438,7 @@ function backToEmail() {
 
 .panel-inner {
   width: 100%;
-  max-width: 330px;
+  max-width: 355px;
   position: relative;
   min-height: 78vh;
   display: flex;
@@ -470,7 +479,7 @@ function backToEmail() {
 
 .event-name {
   color: var(--brand-primary);
-  font-size: 1.3rem;
+  font-size: 20px;
   line-height: 1.2;
   font-weight: 700;
   margin: 16px 0 28px;
@@ -507,25 +516,39 @@ function backToEmail() {
 .field {
   display: flex;
   align-items: center;
-  border-bottom: 2px solid #cfd3d9;
+  border-bottom: 1px solid var(--brand-primary);
+  position: relative;
 }
+.field-pass{
+  margin-top: 10px;
 
+}
 .field:focus-within {
   border-color: var(--brand-primary);
 }
 
 .field .icon {
   color: #9aa0a8;
-  font-size: 1rem;
   padding: 0 8px 0 2px;
+  display: flex;
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.field .icon svg{
+  width: 13px;
+  height: 17px;
 }
 
 .field input {
   border: none;
   background: transparent;
-  padding: 12px 4px;
+  padding: 10px 4px;
   margin: 0;
   border-radius: 0;
+  font-size: 14px;
+  padding-left: 38px;
 }
 
 .field input:focus {
@@ -557,12 +580,14 @@ function backToEmail() {
 .rfield select,
 .rfield textarea {
   width: 100%;
-  padding: 9px 10px;
+  padding: 7px 14px;
   margin: 0;
-  border: 1px solid #cfd3d9;
-  border-radius: 8px;
-  font: inherit;
-  background: #fff;
+  border: none;
+  border-bottom: 1px solid var(--brand-primary);
+  box-shadow: none;
+  border-radius: 0;
+  font-size: 14px;
+  background: transparent;
 }
 
 .rfield input:focus,
@@ -592,6 +617,7 @@ function backToEmail() {
 .forgot {
   text-align: right;
   margin: 10px 0 4px;
+  font-size: 14px;
 }
 
 .forgot a,
@@ -608,9 +634,9 @@ function backToEmail() {
 .agree {
   display: flex;
   gap: 9px;
-  align-items: flex-start;
+  align-items:center;
   margin: 16px 0 6px;
-  font-size: .9rem;
+  font-size: 14px;
   color: #4b5563;
 }
 
@@ -623,16 +649,18 @@ function backToEmail() {
 
 .continue {
   margin-top: 18px;
+  display: flex;
   align-self: flex-start;
   border: none;
   cursor: pointer;
   background: var(--brand-primary);
   color: #fff;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: .4px;
-  padding: 12px 30px;
+  padding: 8px 30px;
   border-radius: 999px;
   font-size: .9rem;
+  margin-left: auto;
 }
 
 .continue:disabled {

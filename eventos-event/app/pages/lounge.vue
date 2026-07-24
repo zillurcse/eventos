@@ -10,6 +10,32 @@ const auth = useAuthStore()
 const tab = ref<LoungeTableKind>('attendee')
 const active = ref<{ config: JoinConfig, title: string, tableId: string } | null>(null)
 
+// Two renderings of the same table data: the existing table-stage cards, and
+// the newer seat-strip layout — a toggle while the redesign is being reviewed.
+const view = ref<'classic' | 'seats'>('classic')
+const seatsSearch = ref('')
+const seatsType = ref<'all' | LoungeTableKind>('all')
+
+const seatsTypeOptions: Array<{ key: 'all' | LoungeTableKind, label: string }> = [
+  { key: 'all', label: 'Type: All' },
+  { key: 'attendee', label: 'Type: Attendees' },
+  { key: 'exhibitor', label: 'Type: Exhibitors' },
+  { key: 'sponsor', label: 'Type: Sponsors' },
+]
+
+const allTables = computed<LoungeTable[]>(() => [
+  ...store.tabs.attendees, ...store.tabs.exhibitors, ...store.tabs.sponsors,
+])
+
+const seatsList = computed<LoungeTable[]>(() => {
+  const q = seatsSearch.value.trim().toLowerCase()
+  return allTables.value.filter((t) => {
+    if (seatsType.value !== 'all' && t.kind !== seatsType.value) return false
+    if (q && !t.name.toLowerCase().includes(q)) return false
+    return true
+  })
+})
+
 // The LiveKit identity minted for me on join — used to spot "my" seat.
 const meId = computed(() => `user_${auth.user?.id ?? ''}`)
 const activeTableId = computed(() => active.value?.tableId ?? '')
@@ -34,8 +60,8 @@ function onLeave() {
 
 // Keep occupancy + the live dot fresh while the page is open.
 let poll: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  store.fetchTables()
+onMounted(async () => {
+  await store.fetchTables()
   poll = setInterval(() => { if (!active.value) store.fetchTables(true) }, 15000)
 })
 onBeforeUnmount(() => { if (poll) clearInterval(poll) })
@@ -45,32 +71,59 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
   <div class="page">
     <div class="head">
       <h1>Lounge</h1>
-      <p class="sub">Join a live video table to network.</p>
     </div>
 
-    <div class="tabs">
-      <button
-        v-for="t in tabs" :key="t.key" type="button" class="tab"
-        :class="{ on: tab === t.key }" @click="tab = t.key"
-      >
-        {{ t.label }}
-        <span v-if="t.list.length" class="pill">{{ t.list.length }}</span>
-      </button>
+    <div class="viewswitch">
+      <button type="button" class="vtab" :class="{ on: view === 'classic' }" @click="view = 'classic'">Classic Lounge</button>
+      <button type="button" class="vtab" :class="{ on: view === 'seats' }" @click="view = 'seats'">Cozy Lounge</button>
     </div>
 
-    <div v-if="store.loading && !store.loaded" class="state">Loading lounge…</div>
-    <div v-else-if="store.error" class="state">Couldn’t load the lounge. Please try again.</div>
-    <div v-else-if="!store.enabled" class="state">The networking lounge isn’t open for this event yet.</div>
-    <div v-else-if="!list.length" class="state">No {{ tab }} tables in the lounge yet.</div>
+    <template v-if="view === 'classic'">
+      <div class="tabs">
+        <button v-for="t in tabs" :key="t.key" type="button" class="tab" :class="{ on: tab === t.key }"
+          @click="tab = t.key">
+          {{ t.label }}
+          <span v-if="t.list.length" class="pill">{{ t.list.length }}</span>
+        </button>
+      </div>
 
-    <div v-else class="grid">
-      <LoungeTableCard
-        v-for="t in list" :key="t.id"
-        :table="t" :joining="store.joining === t.id"
-        :me-id="meId" :active-table-id="activeTableId"
-        @join="onJoin(t)" @leave="onLeave"
-      />
-    </div>
+      <div v-if="store.loading && !store.loaded" class="state">Loading lounge…</div>
+      <div v-else-if="store.error" class="state">Couldn’t load the lounge. Please try again.</div>
+      <div v-else-if="!store.enabled" class="state">The networking lounge isn’t open for this event yet.</div>
+      <div v-else-if="!list.length" class="state">No {{ tab }} tables in the lounge yet.</div>
+
+      <div v-else class="grid">
+        <LoungeTableCard v-for="t in list" :key="t.id" :table="t" :joining="store.joining === t.id" :me-id="meId"
+          :active-table-id="activeTableId" @join="onJoin(t)" @leave="onLeave" />
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="seatstop">
+        <div class="search">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input v-model="seatsSearch" type="text" placeholder="Search tables…">
+        </div>
+        <div class="fselect">
+          <select v-model="seatsType" >
+          <option v-for="o in seatsTypeOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
+        </select>
+        </div>
+      </div>
+
+      <div v-if="store.loading && !store.loaded" class="state">Loading lounge…</div>
+      <div v-else-if="store.error" class="state">Couldn’t load the lounge. Please try again.</div>
+      <div v-else-if="!store.enabled" class="state">The networking lounge isn’t open for this event yet.</div>
+      <div v-else-if="!seatsList.length" class="state">No tables match.</div>
+
+      <div v-else class="seatsgrid">
+        <LoungeSeatCard v-for="t in seatsList" :key="t.id" :table="t" :joining="store.joining === t.id" :me-id="meId"
+          :active-table-id="activeTableId" @join="onJoin(t)" @leave="onLeave" />
+      </div>
+    </template>
 
     <p v-if="store.joinError" class="err">{{ store.joinError }}</p>
 
@@ -80,19 +133,188 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
 </template>
 
 <style scoped>
-.page { max-width: 1000px; }
-.head { margin-bottom: 18px; }
-.head h1 { margin: 0; font-size: 1.4rem; font-weight: 800; color: #1e293b; }
-.sub { margin: 4px 0 0; color: #64748b; font-size: .9rem; }
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+}
 
-.tabs { display: flex; gap: 24px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
-.tab { position: relative; display: inline-flex; align-items: center; gap: 8px; border: none; background: none; padding: 0 2px 12px; font: inherit; font-size: .92rem; font-weight: 700; color: #94a3b8; cursor: pointer; margin-bottom: -1px; border-bottom: 2px solid transparent; }
-.tab:hover { color: var(--brand-primary); }
-.tab.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
-.pill { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #e2e8f0; color: #64748b; font-size: .7rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
-.tab.on .pill { background: color-mix(in srgb, var(--brand-primary) 15%, #fff); color: var(--brand-primary); }
+.head {
+  margin-bottom: 18px;
+}
 
-.state { background: #fff; border-radius: 14px; padding: 48px 20px; text-align: center; color: #64748b; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
-.err { color: #dc2626; font-size: .86rem; margin: 14px 0 0; text-align: center; }
+.head h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.sub {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.viewswitch {
+  display: inline-flex;
+  gap: 4px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.vtab {
+  border: none;
+  background: none;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.vtab.on {
+  background: #fff;
+  color: var(--brand-primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+}
+
+.seatstop {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e2e5eb;
+  border-radius: 10px;
+  padding: 0 14px;
+  height: 44px;
+  background: #fff;
+}
+
+.search svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: .88rem;
+  color: #334155;
+  background: none;
+}
+
+.fselect {
+  min-width: 150px;
+  height: 44px;
+  border: 1px solid #e2e5eb;
+  border-radius: 10px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: .86rem;
+  color: #334155;
+  background: #fff;
+}
+.fselect select{
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background-color: transparent;
+}
+.seatsgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 0 2px 12px;
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 700;
+  color: #94a3b8;
+  cursor: pointer;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  color: var(--brand-primary);
+}
+
+.tab.on {
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
+}
+
+.pill {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: .7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab.on .pill {
+  background: color-mix(in srgb, var(--brand-primary) 15%, #fff);
+  color: var(--brand-primary);
+}
+
+.state {
+  background: #fff;
+  border-radius: 14px;
+  padding: 48px 20px;
+  text-align: center;
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.err {
+  color: #dc2626;
+  font-size: .86rem;
+  margin: 14px 0 0;
+  text-align: center;
+}
 </style>

@@ -43,6 +43,15 @@ export function contestWindow(startsAt?: string | null, endsAt?: string | null):
   return `${contestWhen(startsAt)} – ${endText}`
 }
 
+/** Days/hours/minutes remaining until a deadline, for a boxed countdown. Null once it has passed. */
+export function contestCountdown(iso?: string | null, now = Date.now()): { days: number, hours: number, mins: number } | null {
+  if (!iso) return null
+  const ms = new Date(iso).getTime() - now
+  if (ms <= 0) return null
+  const mins = Math.floor(ms / 60000)
+  return { days: Math.floor(mins / 1440), hours: Math.floor(mins / 60) % 24, mins: mins % 60 }
+}
+
 /** Time left until a deadline: "2d left", "4h left", "12m left", then "Closing". */
 export function timeLeft(iso?: string | null): string {
   if (!iso) return ''

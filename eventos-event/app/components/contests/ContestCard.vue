@@ -4,44 +4,52 @@ import type { Contest } from '~/stores/contests'
 /** One contest in the Contests grid. Links through to the contest page. */
 const props = defineProps<{ contest: Contest }>()
 
-const PHASE_LABEL = { ongoing: 'Live now', upcoming: 'Upcoming', ended: 'Ended' } as const
+// Countdown ticks off a shared clock ref so every card re-renders together,
+// refreshed every 30s — plenty for a days/hours/minutes display.
+const now = ref(Date.now())
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { timer = setInterval(() => { now.value = Date.now() }, 30000) })
+onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
-const when = computed(() => contestWindow(props.contest.starts_at, props.contest.ends_at))
+const countdownTarget = computed(() => props.contest.phase === 'upcoming' ? props.contest.starts_at : props.contest.ends_at)
+const countdown = computed(() => contestCountdown(countdownTarget.value, now.value))
 
-/** The one line that tells the attendee what to do next. */
-const status = computed(() => {
+const statusLabel = computed(() => {
   const c = props.contest
-  if (c.phase === 'upcoming') return `Opens ${contestWhen(c.starts_at)}`
-  if (c.phase === 'ended') return c.my_entry_count ? 'You took part — see the winners' : 'Results are in'
-  if (c.my_entry_count && !c.allow_multiple_entries) return 'You’ve entered'
-  if (c.my_entry_count) return `${c.my_entry_count} ${c.my_entry_count === 1 ? 'entry' : 'entries'} submitted`
-  return c.contest_type === 'entry' ? 'Post your entry' : 'Add your response'
+  if (c.phase === 'ended') return 'Contest ended'
+  if (c.phase === 'upcoming') return 'Contest starts in'
+  return 'Contest ends in'
 })
+
+const hasWinner = computed(() => (props.contest.winners?.length ?? 0) > 0)
 </script>
 
 <template>
   <NuxtLink :to="`/contest/${contest.id}`" class="card">
     <div class="banner">
       <AppImage :src="contest.banner_url" :alt="contest.title" />
-      <span class="phase" :class="contest.phase">{{ PHASE_LABEL[contest.phase] }}</span>
     </div>
 
     <div class="body">
       <h3>{{ contest.title }}</h3>
-      <p v-if="contest.description" class="desc">{{ contest.description }}</p>
+      <p v-if="contest.can_see_others_entries" class="entries">
+        {{ contest.entry_count }} {{ contest.entry_count === 1 ? 'Entry' : 'Entries' }}
+      </p>
 
-      <div class="meta">
-        <span class="pill">{{ contest.contest_type === 'entry' ? 'Entry contest' : 'Response contest' }}</span>
-        <span v-if="contest.points" class="pill pts">+{{ contest.points }} pts</span>
+      <p class="status">{{ statusLabel }}</p>
+
+      <div v-if="contest.phase !== 'ended' && countdown" class="countdown">
+        <div class="cbox"><strong>{{ countdown.days }}</strong><span>days</span></div>
+        <div class="cbox"><strong>{{ countdown.hours }}</strong><span>hours</span></div>
+        <div class="cbox"><strong>{{ countdown.mins }}</strong><span>mins</span></div>
       </div>
 
-      <p v-if="when" class="when">{{ when }}</p>
-
-      <div class="foot">
-        <span v-if="contest.can_see_others_entries" class="count">
-          {{ contest.entry_count }} {{ contest.entry_count === 1 ? 'entry' : 'entries' }}
-        </span>
-        <span class="cta" :class="{ live: contest.phase === 'ongoing' }">{{ status }}</span>
+      <div v-else-if="contest.phase === 'ended'" class="endedpill">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="13" r="8" />
+          <path d="M12 9v4l3 2M10 2h4M12 2v3" />
+        </svg>
+        <span>{{ hasWinner ? 'Winner has been announced' : 'Winner has to be announced' }}</span>
       </div>
     </div>
   </NuxtLink>
@@ -49,35 +57,109 @@ const status = computed(() => {
 
 <style scoped>
 .card {
-  background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.05);
-  display: flex; flex-direction: column; text-decoration: none; color: inherit; transition: box-shadow .15s, transform .15s;
-}
-.card:hover { box-shadow: 0 6px 18px rgba(15,23,42,.09); transform: translateY(-2px); }
-
-.banner { position: relative; aspect-ratio: 1036 / 350; background: #eef0f3; }
-.phase {
-  position: absolute; top: 10px; left: 10px; padding: 4px 10px; border-radius: 999px;
-  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #fff;
-  background: rgba(15,23,42,.7);
-}
-.phase.ongoing { background: #16a34a; }
-.phase.upcoming { background: #2563eb; }
-
-.body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; }
-.body h3 { margin: 0 0 6px; font-size: 1rem; font-weight: 700; color: #1e293b; }
-.desc {
-  margin: 0 0 10px; color: #64748b; font-size: .84rem; line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow .15s, transform .15s;
+  padding: 0;
 }
 
-.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.pill { background: #f1f5f9; color: #475569; border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 700; }
-.pill.pts { background: color-mix(in srgb, var(--brand-primary) 12%, #fff); color: var(--brand-primary); }
+.card:hover {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .09);
+  transform: translateY(-2px);
+}
 
-.when { margin: 0 0 12px; color: #94a3b8; font-size: .78rem; font-weight: 600; }
+.banner {
+  position: relative;
+  min-height: 160px;
+  background: #eef0f3;
+}
+.banner img{
+  min-height: 160px;
+  max-height: 160px;
+}
+.body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
 
-.foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
-.count { color: #94a3b8; font-size: .78rem; font-weight: 600; }
-.cta { margin-left: auto; color: #64748b; font-size: .8rem; font-weight: 700; }
-.cta.live { color: var(--brand-primary); }
+.body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 5px;
+}
+
+.entries {
+  margin: 0;
+  color: #64748b;
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.status {
+  margin: 6px 0 2px;
+  color: #64748b;
+  font-size: .88rem;
+}
+
+.countdown {
+  display: flex;
+  gap: 10px;
+}
+
+.cbox {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 5px 6px;
+}
+
+.cbox strong {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.cbox span {
+  font-size: .78rem;
+  line-height: 1.2;
+  color: #94a3b8;
+}
+
+.endedpill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f4f4fb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #334155;
+  font-size: .88rem;
+  font-weight: 600;
+  max-height: 40px;
+}
+
+.endedpill svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--brand-primary);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 </style>
