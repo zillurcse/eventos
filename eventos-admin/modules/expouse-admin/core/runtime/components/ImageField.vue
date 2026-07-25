@@ -9,6 +9,8 @@ const props = withDefaults(defineProps<{
   outputHeight?: number
   collection?: string
   galleryPath?: string
+  /** Upload endpoint; exhibitor-side callers post to /exhibitor/uploads instead. */
+  uploadPath?: string
   hint?: string
   removable?: boolean
   cardWidth?: string
@@ -153,6 +155,7 @@ function view(url: string) {
       :output-height="outputHeight"
       :collection="collection"
       :gallery-path="galleryPath"
+      :upload-path="uploadPath"
       @selected="onSelected"
       @close="chooserOpen = false"
     />
@@ -164,6 +167,7 @@ function view(url: string) {
       :output-width="outputWidth"
       :output-height="outputHeight"
       :collection="collection"
+      :upload-path="uploadPath"
       @done="onSelected"
       @close="cropSrc = ''"
     />

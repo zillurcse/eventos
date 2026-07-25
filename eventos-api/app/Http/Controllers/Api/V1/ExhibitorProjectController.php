@@ -25,17 +25,7 @@ class ExhibitorProjectController extends Controller
     {
         $exhibitor = Exhibitor::where('uuid', $exhibitorUuid)->firstOrFail();
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:200'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['nullable', 'string', 'max:30'],
-        ]);
-
-        $project = $exhibitor->projects()->create([
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'status' => $data['status'] ?? null,
-        ]);
+        $project = $exhibitor->projects()->create(static::validated($request));
 
         return response()->json(['data' => $this->present($project)], 201);
     }
@@ -49,6 +39,16 @@ class ExhibitorProjectController extends Controller
         return response()->json(['message' => 'Project removed.']);
     }
 
+    public static function validated(Request $request): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:200'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'status' => ['nullable', 'string', 'max:30'],
+            'meta' => ['nullable', 'array'],
+        ]);
+    }
+
     protected function present($p): array
     {
         return [
@@ -56,6 +56,7 @@ class ExhibitorProjectController extends Controller
             'name' => $p->name,
             'description' => $p->description,
             'status' => $p->status,
+            'meta' => $p->meta,
         ];
     }
 }

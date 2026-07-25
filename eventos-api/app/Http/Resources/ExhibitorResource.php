@@ -29,8 +29,10 @@ class ExhibitorResource extends JsonResource
             'package_id' => $this->package_id,
             'logo_url' => $logo ? Storage::disk($logo->disk)->url($logo->path) : null,
             'logo_file_id' => $this->logo_file_id,
-            'entitlements' => $profile['entitlements'] ?? [],
-            'package' => new ExhibitorPackageResource($this->whenLoaded('package')),
+            // Resolved for the Permissions tab: saved overrides → package defaults.
+            // null = never configured (SPA treats as full access).
+            'entitlements' => $this->resolvedEntitlements($profile),
+            'package' => $this->whenLoaded('package', fn () => new ExhibitorPackageResource($this->package)),
             'members' => ExhibitorMemberResource::collection($this->whenLoaded('members')),
             'products' => ExhibitorProductResource::collection($this->whenLoaded('products')),
             'documents' => $this->whenLoaded('documents', fn () => $this->documents->map(fn ($d) => [
@@ -44,8 +46,50 @@ class ExhibitorResource extends JsonResource
                 'name' => $p->name,
                 'description' => $p->description,
                 'status' => $p->status,
+                'meta' => $p->meta,
             ])->values()),
             'members_count' => $this->whenCounted('members'),
         ]);
+    }
+
+    /**
+     * FeatureLine[] for the organizer Permissions UI / exhibitor gate.
+     * Package as base; booth Permissions overlay per key. Keys absent from an
+     * older freeze still come from the package (e.g. Leads & analytics).
+     *
+     * @return list<array{key?: string, enabled?: bool, limit?: int}>|null
+     */
+    protected function resolvedEntitlements(array $profile): ?array
+    {
+        $saved = $profile['entitlements'] ?? null;
+        $package = $this->relationLoaded('package')
+            ? $this->package
+            : $this->package()->first();
+        $fromPackage = $package?->entitlements;
+
+        $hasSaved = is_array($saved) && $saved !== [];
+        $hasPackage = is_array($fromPackage) && $fromPackage !== [];
+
+        if (! $hasSaved && ! $hasPackage) {
+            return null;
+        }
+
+        $byKey = [];
+        if ($hasPackage) {
+            foreach ($fromPackage as $line) {
+                if (is_array($line) && isset($line['key'])) {
+                    $byKey[$line['key']] = $line;
+                }
+            }
+        }
+        if ($hasSaved) {
+            foreach ($saved as $line) {
+                if (is_array($line) && isset($line['key'])) {
+                    $byKey[$line['key']] = $line;
+                }
+            }
+        }
+
+        return array_values($byKey);
     }
 }

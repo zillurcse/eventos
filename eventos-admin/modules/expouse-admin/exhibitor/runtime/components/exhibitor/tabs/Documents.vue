@@ -9,6 +9,7 @@ const { upload } = useUpload()
 
 const FilePond = vueFilePond(FilePondPluginFileValidateType, FilePondPluginFileValidateSize)
 const pond = ref<any>(null)
+const showAdd = ref(false)
 const uploading = ref(false)
 
 // Mirrors the API's `document` collection whitelist (FileUploadController):
@@ -28,8 +29,17 @@ const acceptedTypes = [
   'image/webp',
 ]
 
+function openAdd() {
+  // docForm is shared with the collection (which blanks it after a save);
+  // reset here too so a cancelled draft never leaks into the next open.
+  Object.assign(docForm, DOC_FORM)
+  subError.value = ''
+  showAdd.value = true
+  nextTick(() => pond.value?.removeFiles())
+}
+
 // Custom FilePond server: push the file through the shared /uploads endpoint
-// and drop the returned URL into the form, ready for + ADD DOCUMENT.
+// and drop the returned URL into the form, ready for Add Document.
 const pondServer = {
   process: (
     _field: string,
@@ -46,6 +56,7 @@ const pondServer = {
       .then((d) => {
         if (aborted) return
         docForm.url = d.url
+        docForm.file_id = d.id
         if (!docForm.title) docForm.title = file.name.replace(/\.[^.]+$/, '')
         load(String(d.id))
       })
@@ -54,48 +65,33 @@ const pondServer = {
     return { abort: () => { aborted = true; uploading.value = false; abort() } }
   },
   // Removing the file from the pond before saving clears the pending link.
-  revert: (_id: string, load: () => void) => { docForm.url = ''; load() },
+  revert: (_id: string, load: () => void) => {
+    docForm.url = ''
+    docForm.file_id = null
+    load()
+  },
 }
 
 async function submit() {
+  if (!docForm.title.trim()) return
   await addDocument()
-  if (!subError.value) pond.value?.removeFiles()
+  if (!subError.value) {
+    pond.value?.removeFiles()
+    showAdd.value = false
+  }
 }
 
 const columns = [
-  { key: 'title', label: 'Title' },
+  { key: 'title', label: 'Document' },
   { key: 'url', label: 'Link' },
 ]
 </script>
 
 <template>
   <div>
-    <!-- Add document form -->
-    <div class="border border-line rounded-xl p-4 mb-5 bg-[#f7f8fa]">
-      <p class="font-semibold text-[.92rem] m-0 mb-3 text-ink">Add a document</p>
-      <div class="grid gap-2">
-        <AppInput v-model="docForm.title" label="Title" placeholder="Document title" />
-        <div>
-          <label class="block mb-1.5">Upload file</label>
-          <FilePond
-            ref="pond"
-            name="file"
-            :server="pondServer"
-            :accepted-file-types="acceptedTypes"
-            max-file-size="20MB"
-            :allow-multiple="false"
-            :credits="false"
-            label-idle='Drag & drop a file or <span class="filepond--label-action">Browse</span>'
-          />
-        </div>
-        <AppInput v-model="docForm.url" label="Link" placeholder="https://… (or paste a link instead)" />
-      </div>
-      <div class="flex justify-end mt-3">
-        <button class="btn sm" :disabled="subSaving || uploading || !docForm.title" @click="submit">
-          {{ uploading ? 'UPLOADING…' : subSaving ? 'ADDING…' : '+ ADD DOCUMENT' }}
-        </button>
-      </div>
-      <p v-if="subError" class="error mt-2 mb-0">{{ subError }}</p>
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <p class="font-semibold text-[.92rem] m-0 text-ink">Documents</p>
+      <button class="btn sm" @click="openAdd">+ ADD DOCUMENT</button>
     </div>
 
     <!-- Documents table -->
@@ -108,7 +104,7 @@ const columns = [
     >
       <template #cell-title="{ row }">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-brand-soft text-brand flex items-center justify-center shrink-0">
+          <div class="w-9 h-9 rounded-lg bg-brand-soft text-brand flex items-center justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
           </div>
           <span class="font-semibold text-ink text-[.88rem] truncate">{{ row.title }}</span>
@@ -122,6 +118,44 @@ const columns = [
         <ExhibitorRowDeleteButton title="Remove document" @click="removeDocument(row)" />
       </template>
     </DataTable>
+
+    <!-- Add Document drawer -->
+    <Drawer v-if="showAdd" title="Add Document" back @close="showAdd = false" @back="showAdd = false">
+      <div>
+        <AppInput v-model="docForm.title" label="Document Title" placeholder="Enter Document Title" />
+      </div>
+
+      <div class="mt-4">
+        <label class="block mb-1.5">Upload File</label>
+        <FilePond
+          ref="pond"
+          name="file"
+          :server="pondServer"
+          :accepted-file-types="acceptedTypes"
+          max-file-size="20MB"
+          :allow-multiple="false"
+          :credits="false"
+          label-idle='Drag & drop a file or <span class="filepond--label-action">Browse</span>'
+        />
+      </div>
+
+      <div class="mt-4">
+        <AppInput v-model="docForm.url" label="Link" placeholder="https://… (or paste a link instead)" />
+      </div>
+
+      <p v-if="subError" class="error mt-3 mb-0">{{ subError }}</p>
+
+      <div class="modal-actions border-t border-line pt-4 mt-6">
+        <button
+          class="btn"
+          :disabled="subSaving || uploading || !docForm.title.trim()"
+          @click="submit"
+        >
+          {{ uploading ? 'Uploading…' : subSaving ? 'Adding…' : 'Add Document' }}
+        </button>
+        <button class="btn ghost" @click="showAdd = false">Cancel</button>
+      </div>
+    </Drawer>
   </div>
 </template>
 

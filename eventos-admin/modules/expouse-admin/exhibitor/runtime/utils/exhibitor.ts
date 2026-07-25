@@ -6,7 +6,11 @@
 // drawers all read these fields, so a rename on the server should break the
 // build here rather than render a silently empty cell.
 
-export interface ExhibitorPackage { id: number | string; name: string }
+export interface ExhibitorPackage {
+  id: number | string
+  name: string
+  entitlements?: FeatureLine[] | null
+}
 
 /** One of the event's "Manage Filters" definitions — same shape the Showcase ›
  *  Filters screen writes (event settings JSON), reused by the Details tab. */
@@ -16,7 +20,18 @@ export interface EventFilter { id: string; title: string; headings: FilterHeadin
 export interface ExhibitorMemberContact { name?: string; email?: string; can_login?: boolean }
 export interface ExhibitorMember { id: number; role: string; contact?: ExhibitorMemberContact }
 export interface ExhibitorDocument { id: number; title: string; url: string }
-export interface ExhibitorProject { id: number; name: string; description?: string; status?: string }
+/** Rich project fields kept in ExhibitorProject.meta (jsonb) — same builder
+ *  pattern as products (image, CTA button, attachment). */
+export interface ProjectMeta {
+  image_url?: string
+  image_file_id?: number | null
+  button_label?: string
+  button_url?: string
+  attachment_url?: string
+  attachment_name?: string
+  attachment_file_id?: number | null
+}
+export interface ExhibitorProject { id: number; name: string; description?: string; status?: string; meta?: ProjectMeta }
 /** Rich product fields kept in ExhibitorProduct.meta (jsonb) — no dedicated
  *  columns, matching the "Add Product" builder form. */
 export interface ProductMeta {
@@ -64,6 +79,7 @@ export interface Exhibitor {
   social?: Partial<Social>
   contact?: Partial<Contact>
   entitlements?: FeatureLine[]
+  package?: ExhibitorPackage | null
   members?: ExhibitorMember[]
   documents?: ExhibitorDocument[]
   projects?: ExhibitorProject[]
@@ -101,14 +117,21 @@ export const PHONE_CODES = [
 export const TYPE_OPTIONS  = ['Exhibitor', 'Sponsor']
 export const STALL_OPTIONS = ['A1','A2','A3','B1','B2','B3','C1','C2','C3','D1','D2','D3']
 export const COUNTRIES     = ['Bangladesh','United States','United Kingdom','UAE','India','Saudi Arabia','Qatar','Kuwait','Singapore','Malaysia','Canada','Australia']
-export const EXHIBITOR_TABS = ['Details','Members','Documents','Projects','Products','Permissions']
+export const EXHIBITOR_TABS = ['Details','Teams','Documents','Projects','Products','Permissions']
 export const EXHIBITOR_LIMIT = 50
 
 // Blank "add" forms for the edit-drawer tabs. They double as the reset value
 // after a successful add (see useExhibitorCollection).
 export const MEMBER_FORM = { email: '', first_name: '', last_name: '', role: 'staff', password: '' }
-export const DOC_FORM = { title: '', url: '' }
-export const PROJECT_FORM = { name: '', description: '', status: '' }
+export const DOC_FORM = { title: '', url: '', file_id: null as number | null }
+export const PROJECT_FORM = {
+  name: '', description: '', status: '',
+  image_url: '', image_file_id: null as number | null,
+  button_label: '', button_url: '',
+  attachment_url: '', attachment_name: '', attachment_file_id: null as number | null,
+}
+/** A filled-in "Add Project" form, as the builder hands it back on submit. */
+export type ProjectDraft = typeof PROJECT_FORM
 export const PRODUCT_FORM = {
   name: '', description: '', price: '',
   image_url: '', image_file_id: null as number | null,
@@ -166,6 +189,19 @@ export function featureLabel(key: string) {
   return ALL_FEATURES.find(f => f.key === key)?.label ?? key
 }
 
+/** Collect the builder fields of the project form into its meta payload. */
+export function projectMeta(f: ProjectDraft): ProjectMeta {
+  return {
+    image_url: f.image_url || undefined,
+    image_file_id: f.image_file_id ?? undefined,
+    button_label: f.button_label || undefined,
+    button_url: f.button_url || undefined,
+    attachment_url: f.attachment_url || undefined,
+    attachment_name: f.attachment_name || undefined,
+    attachment_file_id: f.attachment_file_id ?? undefined,
+  }
+}
+
 /** Collect the builder fields of the product form into its meta payload. */
 export function productMeta(f: typeof PRODUCT_FORM): ProductMeta {
   return {
@@ -201,8 +237,9 @@ function plain<T>(value: T): T {
 
 /** API row → editable draft. Every field is defaulted, so a sparse row from the
  *  server can never leave the form bound to `undefined`. */
-export function draftFromExhibitor(e: Exhibitor): Draft {
+export function draftFromExhibitor(e: Exhibitor | null | undefined): Draft {
   const blank = freshDraft()
+  if (!e) return blank
 
   return {
     ...blank,
@@ -237,7 +274,7 @@ export function draftFromExhibitor(e: Exhibitor): Draft {
     spotlight_url: e.spotlight_url || '',
     spotlight_file_id: e.spotlight_file_id ?? null,
     // `open` drives the accordion in the CTA editor; it is UI state, not data.
-    cta: Array.isArray(e.cta) ? e.cta.map(c => ({ ...c, open: false })) : [],
+    cta: Array.isArray(e.cta) ? e.cta.filter(Boolean).map(c => ({ ...c, open: false })) : [],
     social: { ...blank.social, ...(e.social || {}) },
     contact: { ...blank.contact, ...(e.contact || {}) },
   }
@@ -252,7 +289,7 @@ export function draftToPayload(draft: Draft, eventId: string) {
     logo_file_id: draft.logo_file_id,
     package_id: draft.package_id,
     stall_no: draft.stall_no,
-    type: draft.type.toLowerCase(),
+    type: (draft.type || 'Exhibitor').toLowerCase(),
     phone_code: draft.phone_code,
     phone: draft.phone,
     rating: draft.rating,
@@ -281,12 +318,66 @@ export function draftToPayload(draft: Draft, eventId: string) {
   }
 }
 
-export function mergeFeatures(saved: FeatureLine[] | null): FeatureLine[] {
+export function mergeFeatures(saved: FeatureLine[] | null | undefined): FeatureLine[] {
   const map = new Map((saved ?? []).map(f => [f.key, f]))
   return ALL_FEATURES.map((f) => {
     const s = map.get(f.key)
     return s ? { key: f.key, enabled: !!s.enabled, limit: Number(s.limit ?? 1) } : { key: f.key, enabled: false, limit: 1 }
   })
+}
+
+/** Full Showcase access — matches auth.hasFeature(null) = allow everything. */
+export function allEnabledFeatures(): FeatureLine[] {
+  return ALL_FEATURES.map(f => ({
+    key: f.key,
+    enabled: true,
+    limit: featureCountable(f.key) ? 1 : 0,
+  }))
+}
+
+/** True when the exhibitor has its own saved FeatureLine[] (even if all off). */
+export function hasSavedEntitlements(saved: FeatureLine[] | null | undefined): boolean {
+  return Array.isArray(saved) && saved.length > 0
+}
+
+/**
+ * Permissions for this exhibitorId:
+ *  1. Package entitlements as the base (when present)
+ *  2. Booth Permissions overlay per key (including explicit off)
+ *  3. Else full access (never configured → exhibitor can use everything)
+ *
+ * Keys missing from an older booth freeze still come from the package, so
+ * newer catalogue entries (Leads & analytics) are not dropped.
+ */
+export function resolveEntitlements(
+  exhibitor: Pick<Exhibitor, 'entitlements' | 'package_id' | 'package'>,
+  packages: ExhibitorPackage[] = [],
+): FeatureLine[] {
+  const pkg = exhibitor.package
+    ?? packages.find(p => String(p.id) === String(exhibitor.package_id ?? ''))
+
+  const saved = exhibitor.entitlements
+  const fromPackage = pkg?.entitlements
+  const hasSaved = hasSavedEntitlements(saved)
+  const hasPackage = hasSavedEntitlements(fromPackage)
+
+  if (!hasSaved && !hasPackage) {
+    return allEnabledFeatures()
+  }
+
+  const byKey = new Map<string, FeatureLine>()
+  if (hasPackage) {
+    for (const f of fromPackage!) {
+      if (f?.key) byKey.set(f.key, f)
+    }
+  }
+  if (hasSaved) {
+    for (const f of saved!) {
+      if (f?.key) byKey.set(f.key, f)
+    }
+  }
+
+  return mergeFeatures([...byKey.values()])
 }
 
 export function exhibitorMoney(cents: number | null) {

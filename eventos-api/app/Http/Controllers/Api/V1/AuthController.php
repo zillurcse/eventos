@@ -236,7 +236,9 @@ class AuthController extends Controller
         $contactIds = Contact::on('pgsql_admin')->where('user_id', $user->id)->pluck('id');
 
         $exhibitorMemberships = ExhibitorMember::on('pgsql_admin')
-            ->with(['exhibitor.organization', 'exhibitor.event'])
+            // package is needed so UserResource can fall back to package
+            // entitlements when the booth has no Permissions overrides yet.
+            ->with(['exhibitor.organization', 'exhibitor.event', 'exhibitor.package'])
             ->whereIn('contact_id', $contactIds)
             ->get();
 

@@ -1,5 +1,32 @@
 import type { InjectionKey } from 'vue'
 import { toast } from 'vue-sonner'
+import {
+  MEMBER_FORM,
+  DOC_FORM,
+  PROJECT_FORM,
+  PRODUCT_FORM,
+  freshDraft,
+  draftFromExhibitor,
+  draftToPayload,
+  mergeFeatures,
+  resolveEntitlements,
+  hasSavedEntitlements,
+  allEnabledFeatures,
+  featureCountable,
+  projectMeta,
+  productMeta,
+  exhibitorError,
+  isActive,
+  type Draft,
+  type Exhibitor,
+  type ExhibitorMember,
+  type ExhibitorDocument,
+  type ExhibitorProject,
+  type ExhibitorProduct,
+  type ExhibitorPackage,
+  type EventFilter,
+  type FeatureLine,
+} from '../utils/exhibitor'
 
 /**
  * State + data layer for the exhibitor management screen. Created once in
@@ -48,13 +75,18 @@ export function useExhibitorManager(eventId: string) {
       role: f.role,
       contact: { name: [f.first_name, f.last_name].filter(Boolean).join(' ') || undefined, email: f.email },
     }),
-    confirmText: m => `Remove ${m.contact?.email || 'this member'}?`,
-    noun: 'member',
+    confirmText: m => `Remove ${m.contact?.email || 'this team member'}?`,
+    noun: 'team member',
   })
   const documentList = useExhibitorCollection<ExhibitorDocument, typeof DOC_FORM>(editingId, subSaving, subError, {
     path: 'documents',
     blank: DOC_FORM,
     required: 'title',
+    toBody: f => ({
+      title: f.title,
+      url: f.url || undefined,
+      file_id: f.file_id ?? undefined,
+    }),
     toItem: (f, id) => ({ id, title: f.title, url: f.url }),
     confirmText: d => `Remove "${d.title}"?`,
     noun: 'document',
@@ -63,7 +95,20 @@ export function useExhibitorManager(eventId: string) {
     path: 'projects',
     blank: PROJECT_FORM,
     required: 'name',
-    toItem: (f, id) => ({ id, name: f.name, description: f.description, status: f.status }),
+    // Builder fields (image, button, attachment) live in the project's meta jsonb.
+    toBody: f => ({
+      name: f.name,
+      description: f.description || undefined,
+      status: f.status || undefined,
+      meta: projectMeta(f),
+    }),
+    toItem: (f, id) => ({
+      id,
+      name: f.name,
+      description: f.description,
+      status: f.status,
+      meta: projectMeta(f),
+    }),
     confirmText: p => `Remove "${p.name}"?`,
     noun: 'project',
   })
@@ -127,6 +172,7 @@ export function useExhibitorManager(eventId: string) {
   function openAdd() {
     Object.assign(draft, freshDraft())
     editingId.value = null
+    loadedPackageId = ''
     activeTab.value = 'Details'
     error.value = ''
     subError.value = ''
@@ -141,6 +187,39 @@ export function useExhibitorManager(eventId: string) {
   // Deactivate toggle and Reset Password button (which need its status/email).
   const current = ref<Exhibitor | null>(null)
 
+  // Package id from the last successful load/save. Used so Details update can
+  // freeze a new entitlements copy when the organizer switches packages.
+  let loadedPackageId: string | number | '' = ''
+
+  // Selecting a package copies its entitlements into the Permissions tab so
+  // the organizer sees the package defaults (then can override + save).
+  // Skip the hydrate assign in loadForEdit — that path sets entitlements itself.
+  let ignorePackageWatch = false
+  watch(() => draft.package_id, (id, prev) => {
+    if (ignorePackageWatch) return
+    if (id === prev || id === '' || id == null) return
+    applyPackageEntitlements(id)
+  })
+
+  /** Push a package's FeatureLines into the Permissions tab (never wipe to all-off). */
+  function applyPackageEntitlements(packageId: string | number) {
+    const pkg = packages.value.find(p => String(p.id) === String(packageId))
+    entitlements.value = hasSavedEntitlements(pkg?.entitlements)
+      ? mergeFeatures(pkg!.entitlements)
+      : allEnabledFeatures()
+  }
+
+  /** Hydrate Permissions for the open exhibitor (API-resolved or local package). */
+  function applyExhibitorEntitlements(exhibitor: Exhibitor) {
+    entitlements.value = resolveEntitlements(exhibitor, packages.value)
+  }
+
+  // Name + package are required; an admin email is optional but, if given, valid.
+  const canCreate = computed(() =>
+    !!draft.name.trim()
+    && !!draft.package_id
+    && (!draft.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())))
+
   /**
    * Load one exhibitor by uuid into the draft + sub-lists for the full-page
    * editor. Renders on the loaded-but-empty state first (the page is on screen
@@ -152,30 +231,35 @@ export function useExhibitorManager(eventId: string) {
     error.value = ''
     subError.value = ''
     current.value = null
+    loadedPackageId = ''
+    ignorePackageWatch = true
     Object.assign(draft, freshDraft())
     for (const c of collections) { c.set([]); c.reset() }
     entitlements.value = mergeFeatures(null)
     drawerMode.value = 'edit'
 
     try {
+      // Packages may still be in flight from loadMeta(); await them so package
+      // defaults can fill Permissions when the exhibitor has no overrides yet.
+      if (!packages.value.length) await loadMeta()
+
       const full = (await api<{ data: Exhibitor }>(`/exhibitors/${uuid}`)).data
       current.value = full
       Object.assign(draft, draftFromExhibitor(full))
+      loadedPackageId = draft.package_id ?? ''
       memberList.set(full.members ?? [])
       documentList.set(full.documents ?? [])
       projectList.set(full.projects ?? [])
       productList.set(full.products ?? [])
-      entitlements.value = mergeFeatures(full.entitlements ?? null)
+      applyExhibitorEntitlements(full)
     } catch (err) {
       error.value = exhibitorError(err, 'Could not load this exhibitor.')
+    } finally {
+      // Let the package_id assign flush before re-enabling the watch.
+      await nextTick()
+      ignorePackageWatch = false
     }
   }
-
-  // Name + package are required; an admin email is optional but, if given, valid.
-  const canCreate = computed(() =>
-    !!draft.name.trim()
-    && !!draft.package_id
-    && (!draft.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())))
 
   // ── Create / update / delete ─────────────────────────────────────────
   async function create() {
@@ -188,7 +272,14 @@ export function useExhibitorManager(eventId: string) {
       // once we have it.
       const res = await api<{ data: { id: string }, admin_invited?: boolean }>('/exhibitors', {
         method: 'POST',
-        body: { ...draftToPayload(draft, eventId), entitlements: JSON.parse(JSON.stringify(entitlements.value)) },
+        body: {
+          ...draftToPayload(draft, eventId),
+          entitlements: entitlements.value.map(f => ({
+            key: f.key,
+            enabled: !!f.enabled,
+            limit: featureCountable(f.key) ? Number(f.limit ?? 0) : 0,
+          })),
+        },
       })
       const newId = res.data.id
       const flushError = await flushCollections(newId)
@@ -227,9 +318,25 @@ export function useExhibitorManager(eventId: string) {
     error.value = ''
     saving.value = true
     try {
-      const res = await api<{ data: Exhibitor }>(`/exhibitors/${editingId.value}`, { method: 'PUT', body: draftToPayload(draft, eventId) })
+      const body: Record<string, unknown> = { ...draftToPayload(draft, eventId) }
+      // Package change re-seeds the Permissions tab; persist that freeze-copy
+      // (or any tweaks made after switching) so old booth entitlements don't stick.
+      const packageChanged = String(draft.package_id ?? '') !== String(loadedPackageId ?? '')
+      if (packageChanged) {
+        body.entitlements = entitlements.value.map(f => ({
+          key: f.key,
+          enabled: !!f.enabled,
+          limit: featureCountable(f.key) ? Number(f.limit ?? 0) : 0,
+        })) as FeatureLine[]
+      }
+      const res = await api<{ data: Exhibitor }>(`/exhibitors/${editingId.value}`, { method: 'PUT', body })
       // Keep the top-bar record (status/name/email) in step with what was saved.
       if (res?.data) current.value = res.data
+      if (packageChanged) {
+        const frozen = body.entitlements as FeatureLine[]
+        if (current.value) current.value.entitlements = frozen
+        loadedPackageId = draft.package_id ?? ''
+      }
       drawerMode.value = null
       await load()
       toast.success('Exhibitor updated')
@@ -270,10 +377,21 @@ export function useExhibitorManager(eventId: string) {
     subError.value = ''
     subSaving.value = true
     try {
+      // Match package catalogue shape: countable features keep a limit;
+      // on/off-only features always store limit 0.
+      const payload = entitlements.value.map(f => ({
+        key: f.key,
+        enabled: !!f.enabled,
+        limit: featureCountable(f.key) ? Number(f.limit ?? 0) : 0,
+      })) as FeatureLine[]
       await api(`/exhibitors/${editingId.value}`, {
         method: 'PUT',
-        body: { entitlements: JSON.parse(JSON.stringify(entitlements.value)) },
+        body: { entitlements: payload },
       })
+      // Keep the in-memory record in sync so a later package re-select doesn't
+      // treat this exhibitor as "no overrides" and wipe what we just saved.
+      if (current.value) current.value.entitlements = payload
+      entitlements.value = mergeFeatures(payload)
       toast.success('Permissions saved')
     } catch (e) {
       subError.value = exhibitorError(e, 'Could not save permissions.')
@@ -332,7 +450,7 @@ export function useExhibitorManager(eventId: string) {
     // table (search / filters / paging / row menu)
     ...table,
     // edit tabs — the components see the same flat names they always have
-    subSaving, subError, entitlements, savePermissions,
+    subSaving, subError, entitlements, savePermissions, applyExhibitorEntitlements,
     members: memberList.items,
     memberForm: memberList.form,
     addMember: memberList.add,
@@ -389,7 +507,7 @@ export function useExhibitorContext(): ExhibitorManager {
   const ctx = inject(ExhibitorKey)
 
   if (!ctx) {
-    const where = getCurrentInstance()?.type.__name ?? 'an exhibitor component'
+    const where = getCurrentInstance()?.type?.__name ?? 'an exhibitor component'
     throw new Error(
       `<${where}> could not find the exhibitor context — it must be rendered inside <ExhibitorManager>. `
       + '(If this appeared after an edit, the dev server is serving a stale module: hard-reload the page.)',

@@ -54,23 +54,23 @@ class ExhibitorSelfCatalogController extends Controller
     public function projects(Request $request): JsonResponse
     {
         return response()->json(['data' => $this->exhibitor($request)->projects()->latest('id')->get()
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'description' => $p->description, 'status' => $p->status])
+            ->map(fn ($p) => $this->presentProject($p))
             ->values()]);
     }
 
     public function storeProject(Request $request): JsonResponse
     {
-        $project = $this->exhibitor($request)->projects()->create($this->projectData($request));
+        $project = $this->exhibitor($request)->projects()->create(ExhibitorProjectController::validated($request));
 
-        return response()->json(['data' => ['id' => $project->id, 'name' => $project->name, 'description' => $project->description, 'status' => $project->status]], 201);
+        return response()->json(['data' => $this->presentProject($project)], 201);
     }
 
     public function updateProject(Request $request, int $project): JsonResponse
     {
         $p = $this->exhibitor($request)->projects()->whereKey($project)->firstOrFail();
-        $p->update($this->projectData($request));
+        $p->update(ExhibitorProjectController::validated($request));
 
-        return response()->json(['data' => ['id' => $p->id, 'name' => $p->name, 'description' => $p->description, 'status' => $p->status]]);
+        return response()->json(['data' => $this->presentProject($p)]);
     }
 
     public function destroyProject(Request $request, int $project): JsonResponse
@@ -116,12 +116,14 @@ class ExhibitorSelfCatalogController extends Controller
         return Exhibitor::findOrFail($request->attributes->get('exhibitor_id'));
     }
 
-    private function projectData(Request $request): array
+    private function presentProject($p): array
     {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:200'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['nullable', 'string', 'max:30'],
-        ]);
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'description' => $p->description,
+            'status' => $p->status,
+            'meta' => $p->meta,
+        ];
     }
 }

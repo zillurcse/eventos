@@ -8,7 +8,9 @@ export interface ExhibitorLink {
   status: string
   organization?: string
   event?: string
-  entitlements?: string[] // enabled Showcase feature keys (empty = all allowed)
+  // null/undefined = never configured → allow all; [] = configured, nothing on;
+  // string[] = only these Showcase feature keys are allowed.
+  entitlements?: string[] | null
 }
 
 interface User {
@@ -37,13 +39,15 @@ export const useAuthStore = defineStore('auth', {
     primaryExhibitor: (s): ExhibitorLink | null => s.user?.exhibitors?.[0] ?? null,
 
     /**
-     * Whether the active exhibitor may use a Showcase feature. An empty
-     * entitlements list means "never configured" → allow everything, so we
-     * never lock an exhibitor out of a booth that was never set up.
+     * Whether the active exhibitor may use a Showcase feature.
+     * null/undefined = never configured (no Permissions + no package) → allow all.
+     * [] = Permissions/package configured with nothing enabled → deny gated pages.
+     * […] = only listed keys are allowed.
      */
     hasFeature: (s) => (key: string): boolean => {
-      const list = s.user?.exhibitors?.[0]?.entitlements ?? []
-      return list.length === 0 || list.includes(key)
+      const list = s.user?.exhibitors?.[0]?.entitlements
+      if (list == null) return true
+      return list.includes(key)
     },
 
     /** Where this user should land after signing in. */

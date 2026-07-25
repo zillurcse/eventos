@@ -19,7 +19,7 @@ const { activeTab, drawerMode } = useExhibitorContext()
     <!-- The tabs are shared with the edit drawer; sub-resource adds are buffered
          locally until "Add Exhibitor" on the Details tab creates the record. -->
     <ExhibitorTabsDetails v-if="activeTab === 'Details'" />
-    <ExhibitorTabsMembers v-else-if="activeTab === 'Members'" />
+    <ExhibitorTabsMembers v-else-if="activeTab === 'Teams'" />
     <ExhibitorTabsDocuments v-else-if="activeTab === 'Documents'" />
     <ExhibitorTabsProjects v-else-if="activeTab === 'Projects'" />
     <ExhibitorTabsProducts v-else-if="activeTab === 'Products'" />

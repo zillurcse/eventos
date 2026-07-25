@@ -70,7 +70,7 @@ async function onToggleActive() {
 
         <template v-else>
           <ExhibitorTabsBasicDetails v-if="activeTab === 'Details'" />
-          <ExhibitorTabsMembers v-else-if="activeTab === 'Members'" />
+          <ExhibitorTabsMembers v-else-if="activeTab === 'Teams'" />
           <ExhibitorTabsDocuments v-else-if="activeTab === 'Documents'" />
           <ExhibitorTabsProjects v-else-if="activeTab === 'Projects'" />
           <ExhibitorTabsProducts v-else-if="activeTab === 'Products'" />

@@ -32,6 +32,9 @@ class ExhibitorSeeder extends Seeder
 
     public function run(): void
     {
+        // Packages are required for new exhibitors — seed the tier ladder first.
+        $this->call(ExhibitorPackageSeeder::class);
+
         $this->backfillMissingEmails();
         $this->seedDemoExhibitors();
     }
@@ -83,6 +86,8 @@ class ExhibitorSeeder extends Seeder
                 $slug = $this->uniqueSlug($s['name'], $event->id);
                 $email = "{$slug}-{$event->id}@exhibitor.eventos.test";
 
+                $entitlements = is_array($package->entitlements) ? $package->entitlements : [];
+
                 $exhibitor = Exhibitor::on(self::CONN)->create([
                     'organization_id' => $event->organization_id,
                     'event_id' => $event->id,
@@ -93,6 +98,8 @@ class ExhibitorSeeder extends Seeder
                     'package_id' => $package->id,
                     'tier_rank' => 0,
                     'status' => 'active',
+                    // Freeze package entitlements onto the booth (same as create UI).
+                    'profile_data' => $entitlements !== [] ? ['entitlements' => $entitlements] : [],
                 ]);
 
                 $this->provisionLogin($exhibitor, $email);

@@ -6,6 +6,8 @@ const props = withDefaults(defineProps<{
   collection?: string
   /** Listing endpoint for previously uploaded images; the Gallery tab only renders when provided. */
   galleryPath?: string
+  /** Upload endpoint; exhibitor-side callers post to /exhibitor/uploads instead. */
+  uploadPath?: string
   title?: string
 }>(), { title: 'Select Images for Gallery' })
 
@@ -54,7 +56,7 @@ async function confirmUpload() {
   try {
     const blob = await cropperEl.value.crop()
     const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
-    const r = await upload(file, { collection: props.collection })
+    const r = await upload(file, { collection: props.collection, path: props.uploadPath })
     emit('selected', r)
     emit('close')
   } catch (e: any) {

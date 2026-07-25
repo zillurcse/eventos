@@ -8,6 +8,8 @@ const props = withDefaults(defineProps<{
   outputWidth?: number
   outputHeight?: number
   collection?: string
+  /** Upload endpoint; exhibitor-side callers post to /exhibitor/uploads instead. */
+  uploadPath?: string
   title?: string
 }>(), { src: null, file: null, title: 'Crop image' })
 
@@ -51,7 +53,7 @@ async function confirm() {
   try {
     const blob = await cropperEl.value.crop()
     const file = new File([blob], 'image.jpg', { type: 'image/jpeg' })
-    const r = await upload(file, { collection: props.collection })
+    const r = await upload(file, { collection: props.collection, path: props.uploadPath })
     emit('done', r)
     emit('close')
   } catch (e: any) {
