@@ -44,7 +44,7 @@
   a { @apply text-brand no-underline; }
   h1 { @apply text-2xl font-bold mb-1; }
   h2 { @apply font-semibold mb-3; font-size: 1.02rem; }
-  input, textarea { @apply w-full my-1.5 bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5; }
+  input, textarea { @apply w-full my-1.5 bg-white border border-[#d7dae1] rounded-md px-3 py-2.5; }
   input:focus, textarea:focus { @apply outline-none border-brand; box-shadow: 0 0 0 3px var(--brand-soft); }
   label { @apply text-muted text-[.85rem]; }
   table { @apply w-full; border-collapse: collapse; }
@@ -86,7 +86,7 @@
   /* ── Toolbar / search ────────────────────────────────── */
   .toolbar { @apply flex items-center gap-3 mb-[22px]; }
   .search { @apply relative flex-1 max-w-[420px]; }
-  .search > svg { @apply absolute left-3 top-1/2 -translate-y-1/2 text-faint w-[17px] h-[17px]; }
+  .search > svg { @apply absolute left-3 text-faint w-[17px] h-[17px]; top: 50%; transform:translateY(-50%)}
   .search input { @apply pl-[38px] my-0; }
 
   /* ── Filter pills (FilterSelect) ─────────────────────── */
@@ -121,7 +121,7 @@
   .menu .menu-pop { @apply top-[-150px]; }
 
   /* ── Buttons / badges ────────────────────────────────── */
-  .btn { @apply inline-flex items-center gap-[7px] px-4 py-2.5 bg-brand text-white border-0 rounded-[11px] cursor-pointer text-[.92rem]; font-weight: 650; }
+  .btn { @apply inline-flex items-center gap-[7px] px-4 py-2.5 bg-brand text-white border-0 rounded-[8px] cursor-pointer text-[.92rem]; font-weight: 650; max-height: 40px; }
   .btn:hover { @apply bg-brand-dark; }
   .btn:disabled { @apply opacity-55 cursor-not-allowed; }
   .btn.ghost { @apply bg-white text-ink border border-line; }
@@ -138,6 +138,7 @@
   .badge.suspended, .badge.disabled { @apply bg-[#fee2e2] text-[#b91c1c]; }
   .badge.pending { @apply bg-[#fef3c7] text-[#92400e]; }
   .badge.draft { @apply bg-[#f1f3f7] text-[#475569]; }
+  .badge.upgrade { @apply bg-[#ede9fe] text-[#6d28d9]; }
 
   /* ── Stats ───────────────────────────────────────────── */
   .stats { @apply grid gap-3.5 mb-1.5; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
@@ -159,7 +160,7 @@
   .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
 
   /* ── DataTable ───────────────────────────────────────── */
-  .dt-wrap { @apply rounded-xl border border-line  bg-white; }
+  .dt-wrap { @apply rounded-[10px] border border-[#D1D2DE]  bg-white;overflow: hidden; }
   .dt-wrap table { @apply w-full; }
   .dt-wrap thead th { @apply py-3 border-b border-line; background: #f7f8fa; font-size: .7rem; }
   .dt-wrap tbody td { @apply py-3.5; }

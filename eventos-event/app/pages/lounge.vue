@@ -46,7 +46,11 @@ const tabs = computed(() => [
   { key: 'sponsor' as const, label: 'Sponsors', list: store.tabs.sponsors },
 ])
 
-const list = computed<LoungeTable[]>(() => tabs.value.find(t => t.key === tab.value)?.list ?? [])
+const list = computed<LoungeTable[]>(() => {
+  const q = seatsSearch.value.trim().toLowerCase()
+  const base = tabs.value.find(t => t.key === tab.value)?.list ?? []
+  return q ? base.filter(t => t.name.toLowerCase().includes(q)) : base
+})
 
 async function onJoin(table: LoungeTable) {
   const cfg = await store.join(table)
@@ -62,7 +66,10 @@ function onLeave() {
 let poll: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
   await store.fetchTables()
-  poll = setInterval(() => { if (!active.value) store.fetchTables(true) }, 15000)
+  poll = setInterval(async () => {
+    if (active.value) return
+    await store.fetchTables(true)
+  }, 15000)
 })
 onBeforeUnmount(() => { if (poll) clearInterval(poll) })
 </script>
@@ -76,6 +83,21 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
     <div class="viewswitch">
       <button type="button" class="vtab" :class="{ on: view === 'classic' }" @click="view = 'classic'">Classic Lounge</button>
       <button type="button" class="vtab" :class="{ on: view === 'seats' }" @click="view = 'seats'">Cozy Lounge</button>
+    </div>
+
+    <div class="seatstop">
+      <div class="search">
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input v-model="seatsSearch" type="text" placeholder="Search tables…">
+      </div>
+      <div v-if="view === 'seats'" class="fselect">
+        <select v-model="seatsType">
+          <option v-for="o in seatsTypeOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
+        </select>
+      </div>
     </div>
 
     <template v-if="view === 'classic'">
@@ -99,21 +121,6 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
     </template>
 
     <template v-else>
-      <div class="seatstop">
-        <div class="search">
-          <svg viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          <input v-model="seatsSearch" type="text" placeholder="Search tables…">
-        </div>
-        <div class="fselect">
-          <select v-model="seatsType" >
-          <option v-for="o in seatsTypeOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
-        </select>
-        </div>
-      </div>
-
       <div v-if="store.loading && !store.loaded" class="state">Loading lounge…</div>
       <div v-else-if="store.error" class="state">Couldn’t load the lounge. Please try again.</div>
       <div v-else-if="!store.enabled" class="state">The networking lounge isn’t open for this event yet.</div>

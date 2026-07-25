@@ -58,7 +58,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-180">
+  <div>
 
     <!-- Page header -->
     <div class="flex items-center justify-between mb-6">

@@ -242,51 +242,57 @@ onMounted(() => { load(); loadCategories() })
 
 <template>
   <div>
-    <div class="card">
-      <!-- Header -->
-      <div class="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-line">
-        <div>
-          <h2 class="section-title m-0">Speakers</h2>
-          <p class="muted text-[.86rem] mt-0.5 mb-2.5">Events speakers. Use drag and drop to rearrange the position</p>
+    <!-- Header -->
+    <div class="flex items-start justify-between gap-4 mb-5">
+      <div>
+        <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Speakers</h1>
+        <p class="text-muted text-[.88rem]">Manage the speakers that appear in your event.</p>
 
-          <!-- Counter + progress -->
-          <span class="inline-block px-3.5 py-1.5 rounded-lg bg-brand text-white font-semibold text-[.82rem]">
-            {{ speakers.length }} of {{ MAX_SPEAKERS }}
-          </span>
-          <div class="relative w-full max-w-[360px] h-4 rounded-full bg-[#eceef3] mt-2 overflow-hidden">
-            <div class="h-full rounded-full bg-brand transition-all" :style="{ width: progressPct + '%' }" />
-            <span class="absolute inset-0 flex items-center justify-center text-white text-[.62rem] font-semibold">{{ progressPct }}%</span>
+        <!-- Counter + progress -->
+        <div class="flex flex-col gap-1.5 mt-2.5">
+          <div class="inline-flex">
+            <span class="bg-brand text-white text-[.76rem] font-bold px-3 py-1 rounded-full leading-none">
+              {{ speakers.length }} of {{ MAX_SPEAKERS }}
+            </span>
+          </div>
+          <div class="w-52 h-1.75 bg-line rounded-full overflow-hidden">
+            <div class="h-full bg-brand rounded-full transition-all" :style="{ width: progressPct + '%' }" />
           </div>
         </div>
-
-        <div class="flex items-center gap-2.5 shrink-0">
-          <button
-            class="inline-flex items-center px-4 py-2.5 rounded-[11px] bg-[#f2f1fb] text-brand font-[650] text-[.82rem] tracking-wide hover:bg-[#e9e7f8]"
-            @click="openPrevious"
-          >PREVIOUS SPEAKERS</button>
-          <button
-            class="inline-flex items-center px-4 py-2.5 rounded-[11px] bg-[#f2f1fb] text-brand font-[650] text-[.82rem] tracking-wide hover:bg-[#e9e7f8]"
-            @click="openDirectory"
-          >SPEAKERS DIRECTORY</button>
-          <button class="btn" @click="openAdd">
-            + SPEAKERS
-          </button>
-        </div>
       </div>
 
-      <!-- Search -->
-      <div class="mb-4">
-        <AppInput v-model="search" placeholder="Search" class="max-w-[400px]" />
-      </div>
-
-      <SpeakerTable
-        :speakers="filtered"
-        :searching="!!search"
-        @edit="openEdit"
-        @remove="removeSpeaker"
-        @login="openLogin"
-      />
+      <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2 shrink-0" @click="openPrevious">
+        PREVIOUS SPEAKERS
+      </button>
     </div>
+
+    <!-- Toolbar: search + directory/add -->
+    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+      <!-- <AppInput v-model="search" placeholder="Search" class="max-w-[400px] m-0" /> -->
+      <SearchInput v-model="search" placeholder="Search" class="flex-1 min-w-45 max-w-70" />
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-[#F0EEFD] text-brand font-semibold text-[.82rem] border-0 cursor-pointer hover:bg-[#e9e7f8]"
+          @click="openDirectory"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+          Speakers Directory
+        </button>
+        <button class="btn text-[.82rem] tracking-wide px-4 py-2" @click="openAdd">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add Speaker
+        </button>
+      </div>
+    </div>
+
+    <SpeakerTable
+      :speakers="filtered"
+      :searching="!!search"
+      @edit="openEdit"
+      @remove="removeSpeaker"
+      @login="openLogin"
+    />
 
     <!-- Import speakers from the organizer's other events. -->
     <SpeakerPreviousDrawer

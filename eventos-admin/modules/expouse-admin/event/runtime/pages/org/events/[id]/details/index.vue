@@ -160,12 +160,15 @@ onMounted(load)
       </div>
 
       <div class="flex flex-col gap-4">
+        <div class="grid grid-cols-2 gap-3">
+
         <AppInput
           v-model="form.name"
           label="Event Name"
           placeholder="Enter Event Name"
           required
         />
+        </div>
 
         <div class="grid grid-cols-2 gap-3">
           <AppSelect

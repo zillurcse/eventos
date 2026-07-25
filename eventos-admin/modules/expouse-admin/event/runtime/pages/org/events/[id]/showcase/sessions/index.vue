@@ -202,7 +202,9 @@ onMounted(load)
 
     <!-- Toolbar -->
     <div class="flex items-center gap-3 mb-5 flex-wrap">
-      <input v-model="search" placeholder="Search sessions…" class="m-0 max-w-[260px]">
+      <!-- <input v-model="search" placeholder="Search sessions…" class="m-0 max-w-[260px]"> -->
+      <SearchInput v-model="search" placeholder="Search" class="flex-1 min-w-45 max-w-70" />
+
       <div class="flex-1" />
       <button class="btn ghost" @click="goManageDays">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -216,7 +218,7 @@ onMounted(load)
 
     <!-- Day tabs + Show Open Slots -->
     <div v-if="dayOptions.length" class="flex items-center justify-between gap-4 mb-5 flex-wrap">
-      <div class="inline-flex items-center gap-1 bg-white border border-line rounded-xl p-1">
+      <div class="inline-flex items-center gap-1 bg-white border border-line rounded-xl p-1 max-w-4xl overflow-x-auto">
         <button
           v-for="d in dayOptions" :key="d.value"
           class="px-4 py-2 rounded-lg text-[.85rem] font-semibold whitespace-nowrap transition-colors"

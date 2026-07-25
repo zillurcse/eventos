@@ -10,9 +10,12 @@ const props = defineProps<{
 const emit = defineEmits<{ join: [], leave: [] }>()
 
 const seatedHere = computed(() => props.activeTableId === props.table.id)
-// Small tables (<=4) render as a diamond: seats at top/left/right/bottom facing
-// a shared centerpiece. Bigger tables render as two rows with a wide centerpiece bar.
-const isDiamond = computed(() => props.table.capacity <= 4)
+// 2-seat tables render as a simple pair: one seat above the centerpiece, one
+// below. 3-4 seat tables render as a diamond: seats at top/left/right/bottom
+// facing a shared centerpiece. Bigger tables render as two rows with a wide
+// centerpiece bar.
+const isPair = computed(() => props.table.capacity === 2)
+const isDiamond = computed(() => props.table.capacity >= 3 && props.table.capacity <= 4)
 
 interface Seat { i: number, occupant: LoungeOccupant | null, isMe: boolean }
 
@@ -56,7 +59,34 @@ function onSeat(seat: Seat) {
     <span class="pill" :class="{ full: table.full }">{{ table.occupied }}/{{ table.capacity }} seat available</span>
 
     <div class="seating">
-      <template v-if="isDiamond">
+      <template v-if="isPair">
+        <img src="/lounge/seat-plant.svg" class="plant tl" alt="">
+
+        <div class="row">
+          <LoungeSeatUnit :occupant="seatAt(0).occupant" :is-me="seatAt(0).isMe" :full="table.full"
+            @click="onSeat(seatAt(0))" />
+        </div>
+
+        <span class="centerpiece" :class="{ live: table.live, noimg: !table.image_url }">
+          <AppImage :src="table.image_url" :alt="table.name" />
+          <!-- <svg v-else class="micicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="6" x2="8" y2="18" />
+            <line x1="12" y1="9" x2="12" y2="15" />
+            <line x1="16" y1="4" x2="16" y2="20" />
+            <line x1="20" y1="8" x2="20" y2="16" />
+          </svg> -->
+        </span>
+
+        <div class="row">
+          <LoungeSeatUnit :occupant="seatAt(1).occupant" :is-me="seatAt(1).isMe" :full="table.full" :rotate="180"
+            @click="onSeat(seatAt(1))" />
+        </div>
+
+        <img src="/lounge/seat-plant.svg" class="plant br" alt="">
+      </template>
+
+      <template v-else-if="isDiamond">
         <img src="/lounge/seat-plant.svg" class="plant tl" alt="">
 
         <div v-if="diamondSeats.top" class="row">
@@ -68,8 +98,15 @@ function onSeat(seat: Seat) {
           <LoungeSeatUnit v-if="diamondSeats.left" :occupant="diamondSeats.left.occupant"
             :is-me="diamondSeats.left.isMe" :full="table.full" :rotate="-90" @click="onSeat(diamondSeats.left)" />
 
-          <span class="centerpiece" :class="{ live: table.live }">
-            <AppImage :src="table.image_url" :alt="table.name" />
+          <span class="centerpiece" :class="{ live: table.live, noimg: !table.image_url }">
+            <AppImage  :src="table.image_url" :alt="table.name" />
+            <!-- <svg v-else class="micicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="4" y1="10" x2="4" y2="14" />
+              <line x1="8" y1="6" x2="8" y2="18" />
+              <line x1="12" y1="9" x2="12" y2="15" />
+              <line x1="16" y1="4" x2="16" y2="20" />
+              <line x1="20" y1="8" x2="20" y2="16" />
+            </svg> -->
           </span>
 
           <LoungeSeatUnit v-if="diamondSeats.right" :occupant="diamondSeats.right.occupant" 
@@ -90,8 +127,15 @@ function onSeat(seat: Seat) {
             @click="onSeat(s)" />
         </div>
 
-        <span class="centerpiece wide" :class="{ live: table.live }">
+        <span class="centerpiece wide" :class="{ live: table.live, noimg: !table.image_url }">
           <AppImage :src="table.image_url" :alt="table.name" />
+          <!-- <svg v-else class="micicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="6" x2="8" y2="18" />
+            <line x1="12" y1="9" x2="12" y2="15" />
+            <line x1="16" y1="4" x2="16" y2="20" />
+            <line x1="20" y1="8" x2="20" y2="16" />
+          </svg> -->
         </span>
 
         <div class="row">
@@ -210,14 +254,16 @@ function onSeat(seat: Seat) {
   height: 50px;
   border-radius: 8px;
 }
+
+/* .centerpiece.noimg {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+} */
+
 .micicon {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: #fff;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  width: 22px;
+  height: 22px;
+  color: #fff;
 }
 
 .selectbtn {

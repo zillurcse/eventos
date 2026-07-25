@@ -24,6 +24,9 @@ const rowFilter = computed(() =>
 const filtersActive = computed(() => required.value !== 'all' || !!search.value.trim())
 function clearFilters() { required.value = 'all'; search.value = '' }
 
+const selected = ref<(string | number)[]>([])
+const actionsFor = ref<string | null>(null)
+
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 const draft = reactive<Filter>({ id: '', title: '', headings: [] })
@@ -102,72 +105,73 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
+  <div @click="actionsFor = null">
     <!-- Page header -->
-    <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
-      <div>
-        <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Manage Filters</h1>
-        <p class="text-muted text-[.88rem]">Drag rows to reorder how filters appear to attendees.</p>
-      </div>
-      <button class="btn" @click="openAdd">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add filter
-      </button>
+    <div class="mb-5">
+      <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Manage Filter</h1>
+      <p class="text-muted text-[.88rem]">Events Filter. Use drag and drop to rearrange the position.</p>
     </div>
 
-    <div class="card">
-      <!-- Toolbar: search + filter pills -->
-      <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <SearchInput v-model="search" placeholder="Search filters" class="max-w-80" />
-        <div class="flex items-center gap-2">
-          <FilterSelect v-model="required" label="Required" :options="REQUIRED_OPTIONS" />
-          <button
-            v-if="filtersActive"
-            class="inline-flex items-center gap-1.5 text-[.85rem] font-semibold text-brand bg-transparent border-0 cursor-pointer hover:text-brand-dark"
-            @click="clearFilters"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            Clear filters
-          </button>
-        </div>
+    <!-- Toolbar: search + filter pills + add -->
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <SearchInput v-model="search" placeholder="Search" class="max-w-80" />
+      <div class="flex items-center gap-2">
+        <FilterSelect v-model="required" label="Required" :options="REQUIRED_OPTIONS" />
+        <button
+          v-if="filtersActive"
+          class="inline-flex items-center gap-1.5 text-[.85rem] font-semibold text-brand bg-transparent border-0 cursor-pointer hover:text-brand-dark"
+          @click="clearFilters"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          Clear filters
+        </button>
+        <button class="btn" @click="openAdd">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add Filter
+        </button>
       </div>
+    </div>
 
-      <DataTable
-        v-model:items="filters"
-        :columns="columns"
-        :search="search"
-        :search-text="searchText"
-        :filter="rowFilter"
-        reorderable
-        storage-key="showcase-filters"
-        @reorder="persist"
-      >
-        <template #cell-title="{ row }">
-          <span class="text-brand-dark font-semibold">{{ row.title }}</span>
-        </template>
-        <template #cell-label="{ row }">
-          <span class="text-brand-dark">{{ label(row) }}</span>
-        </template>
-        <template #cell-options="{ row }">
-          <span class="text-muted">{{ optionsText(row) }}</span>
-        </template>
-        <template #actions="{ row }">
-          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-brand hover:bg-brand-soft border-0 bg-transparent cursor-pointer" title="Edit" @click="openEdit(row)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <DataTable
+      v-model:items="filters"
+      v-model:selected="selected"
+      :columns="columns"
+      :search="search"
+      :search-text="searchText"
+      :filter="rowFilter"
+      selectable
+      reorderable
+      storage-key="showcase-filters"
+      @reorder="persist"
+    >
+      <template #cell-title="{ row }">
+        <span class="text-ink font-semibold">{{ row.title }}</span>
+      </template>
+      <template #cell-label="{ row }">
+        <span class="text-ink">{{ label(row) }}</span>
+      </template>
+      <template #cell-options="{ row }">
+        <span class="text-ink">{{ optionsText(row) }}</span>
+      </template>
+      <template #actions="{ row }">
+        <div class="relative inline-block" @click.stop>
+          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="actionsFor = actionsFor === row.id ? null : row.id">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
           </button>
-          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-[#dc2626] hover:bg-[#fef2f2] border-0 bg-transparent cursor-pointer" title="Delete" @click="removeFilter(row)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-          </button>
-        </template>
-        <template #empty>
-          <div class="flex flex-col items-center gap-2.5 text-muted">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-faint"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
-            <p class="m-0 text-[.88rem]">No filters yet.</p>
-            <button class="btn sm" @click="openAdd">Add your first filter</button>
+          <div v-if="actionsFor === row.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-36 overflow-hidden">
+            <button class="w-full text-left px-4 py-2.5 text-[.86rem] hover:bg-[#f7f8fa]" @click="actionsFor = null; openEdit(row)">Edit</button>
+            <button class="w-full text-left px-4 py-2.5 text-[.86rem] text-[#dc2626] hover:bg-[#fef2f2]" @click="actionsFor = null; removeFilter(row)">Delete</button>
           </div>
-        </template>
-      </DataTable>
-    </div>
+        </div>
+      </template>
+      <template #empty>
+        <div class="flex flex-col items-center gap-2.5 text-muted">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-faint"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+          <p class="m-0 text-[.88rem]">No filters yet.</p>
+          <button class="btn sm" @click="openAdd">Add your first filter</button>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- Add / Update drawer -->
     <Drawer v-if="drawerOpen" :title="editingId ? 'Update Filter' : 'Add Filter'" @close="drawerOpen = false">

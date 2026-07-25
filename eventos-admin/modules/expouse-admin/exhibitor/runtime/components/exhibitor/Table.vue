@@ -11,6 +11,12 @@ const {
 
 const typeOptions = TYPE_OPTIONS.map((t: string) => ({ value: t.toLowerCase(), label: t }))
 const packageOptions = computed(() => packages.value.map((pkg: any) => ({ value: String(pkg.id), label: pkg.name })))
+const filtersActive = computed(() => !!(search.value.trim() || filterType.value || filterPackage.value))
+
+// TODO: wire to a real org-wide exhibitor directory once it exists.
+function openDirectory() {
+  alert('Coming soon.')
+}
 
 const columns = [
   { key: 'image', label: 'Image', width: '68px' },
@@ -24,13 +30,11 @@ const columns = [
 </script>
 
 <template>
-  <div class="card">
-    <!-- Card header row -->
+  <div>
+    <!-- Header row -->
     <div class="flex items-start justify-between gap-4 mb-5">
       <div>
-        <div class="font-bold text-base">Exhibitors</div>
-        <div class="muted text-[.83rem] mt-0.5">Events exhibitors. Use drag and drop to rearrange the position</div>
-        <div class="mt-2.5 flex flex-col gap-1.5">
+        <div class="flex flex-col gap-1.5">
           <div class="inline-flex">
             <span class="bg-brand text-white text-[.76rem] font-bold px-3 py-1 rounded-full leading-none">
               {{ exhibitors.length }} of {{ EXHIBITOR_LIMIT }}
@@ -44,33 +48,49 @@ const columns = [
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-        <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2" @click="previous.openPicker">
-          PREVIOUS EXHIBITORS
-        </button>
-        <button class="btn ghost text-[.82rem] px-4 py-2">Exhibitors Directory</button>
-        <button class="btn text-[.82rem] tracking-wide px-4 py-2" @click="openAdd">
-          + EXHIBITOR
-        </button>
-      </div>
+      <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2 shrink-0 h-10 capitalize" @click="previous.openPicker">
+        Previous Exhibitors
+      </button>
     </div>
 
-    <!-- Filters row -->
+    <!-- Toolbar: search + filters + directory/add -->
     <div class="flex items-center gap-3 mb-5 flex-wrap">
-      <SearchInput v-model="search" placeholder="Search Exhibitors" class="flex-1 min-w-45 max-w-70" />
-      <AppSelect
-        v-model="filterType"
-        placeholder="Select Type"
-        class="w-[170px]"
-        :options="typeOptions"
-      />
-      <AppSelect
-        v-model="filterPackage"
-        placeholder="Select Package"
-        class="w-[190px]"
-        :options="packageOptions"
-      />
-      <button class="btn ghost text-[.82rem] tracking-wide px-4 py-2" @click="resetFilters">RESET FILTERS</button>
+      <SearchInput v-model="search" placeholder="Search" class="flex-1 min-w-45 max-w-70" />
+      
+
+      <div class="flex items-center gap-2 ml-auto shrink-0">
+        <AppSelect
+          v-model="filterType"
+          placeholder="All Type"
+          class="w-[170px]"
+          :options="typeOptions"
+        />
+        <AppSelect
+          v-model="filterPackage"
+          placeholder="All Packages"
+          class="w-[190px]"
+          :options="packageOptions"
+        />
+        <button
+          v-if="filtersActive"
+          class="inline-flex items-center gap-1.5 text-[.85rem] font-semibold text-brand bg-transparent border-0 cursor-pointer hover:text-brand-dark"
+          @click="resetFilters"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          Clear filters
+        </button>
+        <button
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-[#F0EEFD] text-brand font-[650] text-[.82rem] border-0 cursor-pointer hover:bg-[#e9e7f8] h-10"
+          @click="openDirectory"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+          Exhibitor Directory
+        </button>
+        <button class="btn text-[.82rem] tracking-wide px-4 py-2 h-10" @click="openAdd">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add Exhibitor
+        </button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -111,11 +131,8 @@ const columns = [
       </template>
       <template #actions="{ row }">
         <div class="relative inline-block" @click.stop>
-          <button class="btn flex items-center gap-1.5 text-[.82rem] tracking-wide px-4 py-2" @click="toggleActions(row.id)">
-            ACTIONS
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-3.5 h-3.5 transition-transform" :class="actionsOpenId === row.id ? 'rotate-180' : ''">
-              <path d="M6 9l6 6 6-6"/>
-            </svg>
+          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="toggleActions(row.id)">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
           </button>
           <div v-if="actionsOpenId === row.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-48 overflow-hidden divide-y divide-line">
             <NuxtLink :to="`/org/events/${eventId}/showcase/exhibitors/${row.id}`" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] no-underline hover:bg-[#f7f8fa] text-ink transition-colors" @click="actionsOpenId = null">
@@ -146,3 +163,4 @@ const columns = [
     </DataTable>
   </div>
 </template>
+

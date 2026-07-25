@@ -54,7 +54,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-260">
+  <div class="w-full">
     <SettingsPageHeader
       title="SEO & Meta Data" subtitle="Control how this event appears in search engines and social shares."
       :saving="saving" :saved="saved" @save="save"

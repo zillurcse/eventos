@@ -76,22 +76,11 @@ function featureLabel(key: string) {
   return ALL_FEATURES.find(f => f.key === key)?.label ?? key
 }
 
-function enabledCount(pkg: Package) {
-  return (pkg.entitlements ?? []).filter(f => f.enabled).length
-}
-
-function enabledLabels(pkg: Package) {
-  return (pkg.entitlements ?? [])
-    .filter(f => f.enabled)
-    .map(f => featureLabel(f.key))
-    .join(', ') || '—'
-}
-
 const columns = [
   { key: 'name', label: 'Name' },
-  { key: 'features', label: 'Features' },
 ]
-function searchText(pkg: Package) { return pkg.name + ' ' + enabledLabels(pkg) }
+
+const actionsFor = ref<number | null>(null)
 
 // ── API ───────────────────────────────────────────────────────────────
 async function load() {
@@ -161,55 +150,45 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
-    <div class="mb-4">
-      <h2 class="section-title m-0">Exhibitor Packages</h2>
-      <p class="muted text-[.86rem] mt-0.5 mb-0">Define feature packages available to exhibitors in the Showcase Arena.</p>
-    </div>
-
-    <div class="card">
-      <div class="flex items-center justify-between gap-4 mb-4">
-        <div>
-          <div class="font-bold text-base">Packages</div>
-          <div class="muted text-[.84rem]">Configure what features each exhibitor package includes.</div>
-        </div>
-        <button class="btn" @click="openAdd">
-          + PACKAGE
-        </button>
+  <div @click="actionsFor = null">
+    <div class="flex items-start justify-between gap-4 flex-wrap mb-5">
+      <div>
+        <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Exhibitor Packages</h1>
+        <p class="text-muted text-[.88rem]">Manage the packages available to your exhibitors.</p>
       </div>
-
-      <DataTable
-        :items="packages"
-        :columns="columns"
-        :search-text="searchText"
-        row-key="id"
-        storage-key="showcase-packages"
-      >
-        <template #cell-name="{ row }">
-          <span class="font-semibold text-brand">{{ row.name }}</span>
-        </template>
-        <template #cell-features="{ row }">
-          <span class="muted text-[.84rem]">
-            <span class="font-semibold text-ink">{{ enabledCount(row) }}</span>
-            / {{ ALL_FEATURES.length }} —
-            <span class="text-[.82rem]">{{ enabledLabels(row) }}</span>
-          </span>
-        </template>
-        <template #actions="{ row }">
-          <button
-            class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-brand"
-            title="Edit" @click="openEdit(row)"
-          >✎</button>
-          <button
-            class="bg-transparent border-0 cursor-pointer text-base px-2 py-1 text-[#dc2626]"
-            title="Delete" @click="removePackage(row)"
-          >🗑</button>
-        </template>
-        <template #empty>
-          <span class="muted">No packages yet. Click <strong>+ PACKAGE</strong> to add one.</span>
-        </template>
-      </DataTable>
+      <button class="btn" @click="openAdd">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add Package
+      </button>
     </div>
+
+    <DataTable
+      :items="packages"
+      :columns="columns"
+      row-key="id"
+      storage-key="showcase-packages"
+    >
+      <template #cell-name="{ row }">
+        <span class="font-semibold text-ink">{{ row.name }}</span>
+      </template>
+      <template #actions="{ row }">
+        <div class="relative inline-block" @click.stop>
+          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="actionsFor = actionsFor === row.id ? null : row.id">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          </button>
+          <div v-if="actionsFor === row.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-36 overflow-hidden">
+            <button class="w-full text-left px-4 py-2.5 text-[.86rem] hover:bg-[#f7f8fa]" @click="actionsFor = null; openEdit(row)">Edit</button>
+            <button class="w-full text-left px-4 py-2.5 text-[.86rem] text-[#dc2626] hover:bg-[#fef2f2]" @click="actionsFor = null; removePackage(row)">Delete</button>
+          </div>
+        </div>
+      </template>
+      <template #empty>
+        <div class="flex flex-col items-center gap-2.5 text-muted">
+          <p class="m-0 text-[.88rem]">No packages yet.</p>
+          <button class="btn sm" @click="openAdd">Add your first package</button>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- Add / Edit Drawer -->
     <Drawer v-if="drawerOpen" title="Exhibitor Packages" @close="drawerOpen = false">

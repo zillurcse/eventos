@@ -177,7 +177,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-180">
+  <div class="w-full">
     <div class="mb-6">
       <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Login Setup</h1>
       <p class="text-muted text-[.88rem]">Login setup will appear at the event login page.</p>
@@ -199,63 +199,57 @@ onMounted(() => {
       <div class="p-6 border-b border-line">
         <p class="font-semibold text-[1rem] text-ink mb-1">Access authentication</p>
         <p class="text-[.85rem] text-muted mb-4">
-          Choose how users can sign in (e.g. OTP, Signup, social). Unchecking a channel hides it on the event login page.
+          Choose how users can sign in (e.g. OTP, Signup, social). Unchecking a channel hides it on the event login
+          page.
         </p>
 
         <div class="flex items-center gap-6 flex-wrap">
-          <label
-            v-for="c in CHANNELS" :key="c.key"
-            class="inline-flex items-center gap-2 cursor-pointer select-none"
-            :class="{ 'text-brand': methods[c.key] }"
-          >
-            <input v-model="methods[c.key]" type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand">
-            <span class="text-[.9rem]">{{ c.label }}</span>
+          <label v-for="c in CHANNELS" :key="c.key" class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+            <input v-model="methods[c.key]" type="checkbox" class="sr-only">
+            <span class="checkbox-box" />
+            <span class="text-[.9rem] text-ink" :class="{ 'font-semibold': methods[c.key] }">{{ c.label }}</span>
           </label>
         </div>
 
         <!-- A social provider with no OAuth app on this installation would put a
              dead button on the login page — say so rather than let it happen. -->
-        <p
-          v-if="CHANNELS.some(c => c.social && methods[c.key] && available[c.key] === false)"
-          class="text-[.82rem] mt-3 mb-0 px-3 py-2 rounded-lg bg-[#fef3c7] text-[#b45309]"
-        >
-          {{ CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).map(c => c.label).join(', ') }}
-          {{ CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).length > 1 ? 'have' : 'has' }}
+        <p v-if="CHANNELS.some(c => c.social && methods[c.key] && available[c.key] === false)"
+          class="text-[.82rem] mt-3 mb-0 px-3 py-2 rounded-lg bg-[#fef3c7] text-[#b45309]">
+          {{CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).map(c => c.label).join(', ')
+          }}
+          {{CHANNELS.filter(c => c.social && methods[c.key] && available[c.key] === false).length > 1 ? 'have' : 'has'
+          }}
           no OAuth app configured yet — plug in your own app below, or ask a platform administrator to add one.
         </p>
 
         <!-- Per-channel OAuth app: an organizer's own credentials, used instead of
              the platform's when present. -->
-        <div
-          v-for="c in CHANNELS.filter(c => c.social && methods[c.key])" :key="c.key"
-          class="mt-4 border border-line rounded-xl p-4"
-        >
+        <div v-for="c in CHANNELS.filter(c => c.social && methods[c.key])" :key="c.key"
+          class="mt-4 border border-line rounded-xl p-4">
           <p class="font-semibold text-[.88rem] text-ink mb-3">{{ c.label }} app credentials</p>
           <div class="grid sm:grid-cols-2 gap-3">
             <AppInput v-model="socialCreds[c.key].client_id" label="Client ID" placeholder="App client ID" />
-            <AppInput
-              v-model="socialCreds[c.key].client_secret"
-              type="password"
-              label="Client Secret"
+            <AppInput v-model="socialCreds[c.key].client_secret" type="password" label="Client Secret"
               :placeholder="hasSecret[c.key] ? '•••••• (leave blank to keep)' : 'App client secret'"
-              :hint="hasSecret[c.key] ? 'A secret is already saved. Leave blank to keep it.' : undefined"
-            />
+              :hint="hasSecret[c.key] ? 'A secret is already saved. Leave blank to keep it.' : undefined" />
           </div>
           <p class="text-[.8rem] text-muted mt-3 mb-0">
             Leave both blank to use the platform's own {{ c.label }} app, if one is configured. To use your own,
             register an app with {{ c.label }} and whitelist this redirect URI:
-            <code class="bg-faint px-1.5 py-0.5 rounded font-mono text-[.78rem] break-all">{{ redirectUri(c.key) }}</code>
-            <button type="button" class="text-[#6352e7] font-medium hover:underline ml-1" @click="copy(redirectUri(c.key))">Copy</button>
+            <code
+              class="bg-faint px-1.5 py-0.5 rounded font-mono text-[.78rem] break-all">{{ redirectUri(c.key) }}</code>
+            <button type="button" class="text-[#6352e7] font-medium hover:underline ml-1"
+              @click="copy(redirectUri(c.key))">Copy</button>
           </p>
         </div>
       </div>
 
       <!-- Event admins -->
       <div class="p-6 border-b border-line">
-        <div class="flex items-center justify-between gap-4 bg-faint rounded-xl p-4 mb-4">
+        <div class="flex items-start justify-between gap-6 mb-4">
           <div>
-            <p class="font-semibold text-[.95rem] text-ink mb-0.5">Add event admin</p>
-            <p class="text-[.83rem] text-muted m-0">Users added to the web app are provided web app access.</p>
+            <p class="font-semibold text-[1rem] text-ink mb-1">Add event admin</p>
+            <p class="text-[.85rem] text-muted m-0">Users added to the web app are provided web app access.</p>
           </div>
           <button class="btn shrink-0" @click="addOpen = true">+ Add User</button>
         </div>
@@ -263,11 +257,9 @@ onMounted(() => {
         <p v-if="!admins.length" class="text-[.85rem] text-muted m-0">No event admins added yet.</p>
 
         <div v-else class="flex flex-col gap-2">
-          <div
-            v-for="a in admins" :key="a.id"
-            class="flex items-center gap-3 border border-line rounded-xl px-4 py-3"
-          >
-            <div class="w-9 h-9 rounded-full bg-brand-soft text-brand grid place-items-center font-bold text-[.78rem] shrink-0 uppercase">
+          <div v-for="a in admins" :key="a.id" class="flex items-center gap-3 border border-line rounded-xl px-4 py-3">
+            <div
+              class="w-9 h-9 rounded-full bg-brand-soft text-brand grid place-items-center font-bold text-[.78rem] shrink-0 uppercase">
               {{ (a.name || a.email || '?').slice(0, 2) }}
             </div>
             <div class="min-w-0 flex-1">
@@ -325,13 +317,70 @@ onMounted(() => {
 <style scoped>
 /* Standalone on/off toggle (no label), for the Require-login and Onboarding rows. */
 .toggle {
-  position: relative; width: 44px; height: 24px; flex: 0 0 auto; border: 0; border-radius: 999px;
-  background: #cdd2dc; cursor: pointer; transition: background .15s;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: #cdd2dc;
+  cursor: pointer;
+  transition: background .15s;
 }
-.toggle.on { background: var(--brand); }
+
+.toggle.on {
+  background: var(--brand);
+}
+
 .toggle i {
-  position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+  transition: transform .15s;
 }
-.toggle.on i { transform: translateX(20px); }
+
+.toggle.on i {
+  transform: translateX(20px);
+}
+
+/* Rounded-square checkbox for the Access authentication channels. */
+.checkbox-box {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  border: 1.5px solid #cdd2dc;
+  background: #fff;
+  transition: border-color .15s, border-width .15s;
+}
+
+.checkbox-box::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+input:checked+.checkbox-box {
+  border-color: var(--brand);
+  border-width: 2px;
+}
+
+input:checked+.checkbox-box::after {
+  opacity: 1;
+}
+
+input:focus-visible+.checkbox-box {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 </style>

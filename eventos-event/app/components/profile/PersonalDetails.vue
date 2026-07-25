@@ -93,26 +93,28 @@ function cancel() { fillFromProfile() }
 <template>
   <div class="tab">
     <div class="avatar-row">
-      <span class="av"><UserAvatar :src="profile.data?.avatar_url" :name="auth.user?.name" /></span>
+      <span class="av">
+        <UserAvatar :src="profile.data?.avatar_url" :name="auth.user?.name" />
+      </span>
       <div class="av-actions">
         <button type="button" class="btn ghost" :disabled="uploading" @click="pickAvatar">
-          <svg viewBox="0 0 24 24"><path d="M4 8l1-3h4l1 3h5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" /><circle cx="12" cy="14" r="3.5" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M4 8l1-3h4l1 3h5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" />
+            <circle cx="12" cy="14" r="3.5" />
+          </svg>
           {{ uploading ? 'Uploading…' : 'Change' }}
         </button>
         <button v-if="profile.data?.avatar_url" type="button" class="btn ghost danger" @click="deleteAvatar">
-          <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M7 7l1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M7 7l1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13" />
+          </svg>
           Delete
         </button>
         <input ref="fileInput" type="file" accept="image/*" hidden @change="onAvatarChange">
       </div>
     </div>
 
-    <ProfileAvatarCropModal
-      v-if="cropFile"
-      :file="cropFile"
-      @save="onCropSave"
-      @cancel="cropFile = null"
-    />
+    <ProfileAvatarCropModal v-if="cropFile" :file="cropFile" @save="onCropSave" @cancel="cropFile = null" />
 
     <div class="grid">
       <label class="field">
@@ -193,37 +195,152 @@ function cancel() { fillFromProfile() }
     </label>
 
     <div class="foot">
-      <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
+      <button type="button" class="btn primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save'
+        }}</button>
       <button type="button" class="btn text" :disabled="saving" @click="cancel">Cancel</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.tab { display: flex; flex-direction: column; gap: 20px; max-width: 720px; }
-
-.avatar-row { display: flex; align-items: center; gap: 20px; }
-.av { width: 84px; height: 84px; border-radius: 12px; overflow: hidden; flex: 0 0 auto; background: #e2e8f0; }
-.av-actions { display: flex; gap: 10px; }
-
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field > span { font-size: .84rem; font-weight: 600; color: #334155; }
-.field em { color: #ef4444; font-style: normal; }
-.field input, .field select, .field textarea {
-  border: 1px solid #d7dae1; border-radius: 10px; padding: 11px 13px; font: inherit; font-size: .9rem; color: #1e293b; outline: none; background: #fff;
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 720px;
 }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--brand-primary); }
 
-.foot { display: flex; align-items: center; gap: 16px; padding-top: 8px; border-top: 1px solid #f1f2f6; margin-top: 4px; }
-.btn { border: none; border-radius: 10px; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; padding: 11px 22px; }
-.btn.primary { background: var(--brand-primary); color: #fff; }
-.btn.primary:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
-.btn.text { background: none; color: var(--brand-primary); padding: 11px 4px; }
-.btn.ghost { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); color: var(--brand-primary); display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: .82rem; }
-.btn.ghost svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.btn.ghost.danger { color: #ef4444; background: #fef2f2; }
-.btn:disabled { opacity: .6; cursor: default; }
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.av {
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: #e2e8f0;
+}
+
+.av-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 620px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field>span {
+  font-size: .84rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.field em {
+  color: #ef4444;
+  font-style: normal;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid #d7dae1;
+  border-radius: 8px;
+  padding: 11px 13px;
+  font: inherit;
+  font-size: .9rem;
+  color: #1e293b;
+  outline: none;
+  background: #fff;
+  max-height: 48px;
+  margin: 0;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--brand-primary);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f2f6;
+  margin-top: 4px;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 11px 22px;
+}
+
+.btn.primary {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: color-mix(in srgb, var(--brand-primary) 88%, #000);
+}
+
+.btn.text {
+  background: none;
+  color: var(--brand-primary);
+  padding: 11px 4px;
+}
+
+.btn.ghost {
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: .82rem;
+}
+
+.btn.ghost svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.btn.ghost.danger {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.btn:disabled {
+  opacity: .6;
+  cursor: default;
+}
 </style>
