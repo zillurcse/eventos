@@ -286,7 +286,7 @@ function save() {
         <div v-if="draft.tags.length" class="flex flex-wrap gap-1.5 mb-2">
           <span
             v-for="(tag, i) in draft.tags" :key="i"
-            class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
+            class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F0EEFD] text-brand text-[.8rem] font-medium"
           >
             {{ tag }}
             <button

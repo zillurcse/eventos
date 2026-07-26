@@ -37,7 +37,7 @@ const boxClass = computed(() => {
   if (props.error) {
     return 'border-[#dc2626] bg-white group-hover:border-[#b91c1c]'
   }
-  return 'border-[#d7dae1] bg-white group-hover:border-brand/55 group-hover:bg-brand-soft/40'
+  return 'border-[#d7dae1] bg-white group-hover:border-brand/55 group-hover:bg-[#F0EEFD]/40'
 })
 
 const ringClass = computed(() => props.error

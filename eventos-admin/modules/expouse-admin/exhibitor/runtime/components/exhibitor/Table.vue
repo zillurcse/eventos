@@ -6,7 +6,7 @@ import { TYPE_OPTIONS } from '../../utils/exhibitor'
 const {
   eventId, exhibitors, packages, openAdd,
   search, filterType, filterPackage, resetFilters, filtered,
-  packageName, toggleActions, actionsOpenId, remove,
+  packageName, toggleActions, actionsOpenId, actionsAnchor, closeActions, remove,
   openResetPassword, toggleStatus, previous,
 } = useExhibitorContext()
 
@@ -103,10 +103,12 @@ const columns = [
       empty-text="No exhibitors found."
     >
       <template #cell-image="{ row }">
-        <div class="w-10 h-10 rounded-lg overflow-hidden shrink-0">
-          <img v-if="row.logo_url" :src="row.logo_url" class="w-full h-full object-cover" :alt="row.name">
-          <div v-else class="w-full h-full bg-brand-soft flex items-center justify-center text-brand font-bold text-[.78rem] uppercase">
-            {{ exhibitorInitials(row.name) }}
+        <div class="min-h-[47px] flex items-center">
+          <div class="w-14 h-10 rounded-lg overflow-hidden shrink-0">
+              <img v-if="row.logo_url" :src="row.logo_url" class="w-full h-full object-cover" :alt="row.name">
+              <div v-else class="w-full h-full bg-[#F0EEFD] flex items-center justify-center text-brand font-bold text-[.78rem] uppercase">
+                {{ exhibitorInitials(row.name) }}
+              </div>
           </div>
         </div>
       </template>
@@ -132,33 +134,55 @@ const columns = [
       </template>
       <template #actions="{ row }">
         <div class="relative inline-block" @click.stop>
-          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="toggleActions(row.id)">
+          <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="toggleActions(row.id, $event)">
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
           </button>
-          <div v-if="actionsOpenId === row.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-48 overflow-hidden divide-y divide-line">
-            <NuxtLink :to="`/org/events/${eventId}/showcase/exhibitors/${row.id}`" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] no-underline hover:bg-[#f7f8fa] text-ink transition-colors" @click="actionsOpenId = null">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              Edit
-            </NuxtLink>
-            <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="toggleStatus(row)">
-              <template v-if="isActive(row)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#dc2626]"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
-                Deactivate
-              </template>
-              <template v-else>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-green-600"><path d="M20 6L9 17l-5-5"/></svg>
-                Activate
-              </template>
-            </button>
-            <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#f7f8fa] text-ink transition-colors" @click="openResetPassword(row)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-              Reset Password
-            </button>
-            <button class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.88rem] hover:bg-[#fef2f2] text-[#dc2626] transition-colors" @click="remove(row); actionsOpenId = null">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-              Delete
-            </button>
-          </div>
+          <Teleport to="body">
+            <div
+              v-if="actionsOpenId === row.id && actionsAnchor"
+              class="fixed bg-white rounded-xl border border-[#E8E8EE] shadow-xl z-30 min-w-40 overflow-hidden p-2"
+              :style="{ top: `${actionsAnchor.top}px`, right: `${actionsAnchor.right}px` }"
+              @click.stop
+            >
+              <NuxtLink
+                :to="`/org/events/${eventId}/showcase/exhibitors/${row.id}`"
+                class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg max-h-10 text-[.92rem] font-medium text-brand hover:bg-[#F7F7FB] no-underline transition-colors"
+                @click="closeActions"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                    <path d="M2.25 12.0043H5.43C5.5287 12.0049 5.62655 11.986 5.71793 11.9487C5.80931 11.9114 5.89242 11.8564 5.9625 11.7868L11.1525 6.58935L13.2825 4.50435C13.3528 4.43463 13.4086 4.35168 13.4467 4.26028C13.4847 4.16889 13.5043 4.07086 13.5043 3.97185C13.5043 3.87284 13.4847 3.77481 13.4467 3.68342C13.4086 3.59202 13.3528 3.50907 13.2825 3.43935L10.1025 0.221849C10.0328 0.151552 9.94983 0.0957567 9.85843 0.0576802C9.76704 0.0196037 9.66901 0 9.57 0C9.47099 0 9.37296 0.0196037 9.28157 0.0576802C9.19017 0.0957567 9.10722 0.151552 9.0375 0.221849L6.9225 2.34435L1.7175 7.54185C1.64799 7.61193 1.593 7.69504 1.55567 7.78642C1.51835 7.8778 1.49943 7.97564 1.5 8.07435V11.2543C1.5 11.4533 1.57902 11.644 1.71967 11.7847C1.86032 11.9253 2.05109 12.0043 2.25 12.0043ZM9.57 1.81185L11.6925 3.93435L10.6275 4.99935L8.505 2.87685L9.57 1.81185ZM3 8.38185L7.4475 3.93435L9.57 6.05685L5.1225 10.5043H3V8.38185ZM14.25 13.5043H0.75C0.551088 13.5043 0.360322 13.5834 0.21967 13.724C0.0790176 13.8647 0 14.0554 0 14.2543C0 14.4533 0.0790176 14.644 0.21967 14.7847C0.360322 14.9253 0.551088 15.0043 0.75 15.0043H14.25C14.4489 15.0043 14.6397 14.9253 14.7803 14.7847C14.921 14.644 15 14.4533 15 14.2543C15 14.0554 14.921 13.8647 14.7803 13.724C14.6397 13.5834 14.4489 13.5043 14.25 13.5043Z" fill="#6452E7"/>
+                  </svg>
+                Edit
+              </NuxtLink>
+              <button
+                class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg max-h-10 text-[.92rem] font-medium text-ink hover:bg-[#f7f8fa] cursor-pointer bg-transparent border-0 text-left transition-colors"
+                @click="toggleStatus(row)"
+              >
+                <template v-if="isActive(row)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-[#dc2626]"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+                  Deactivate
+                </template>
+                <template v-else>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M20 6L9 17l-5-5"/></svg>
+                  Activate
+                </template>
+              </button>
+              <button
+                class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg max-h-10 text-[.92rem] font-medium text-ink hover:bg-[#f7f8fa] cursor-pointer bg-transparent border-0 text-left transition-colors"
+                @click="openResetPassword(row)"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                Reset Password
+              </button>
+              <button
+                class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg max-h-10 text-[.92rem] font-medium text-ink hover:bg-[#f7f8fa] cursor-pointer bg-transparent border-0 text-left transition-colors"
+                @click="closeActions(); remove(row)"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                Delete
+              </button>
+            </div>
+          </Teleport>
         </div>
       </template>
     </DataTable>

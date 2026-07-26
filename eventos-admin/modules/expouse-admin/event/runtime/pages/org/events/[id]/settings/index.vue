@@ -251,7 +251,7 @@ onMounted(() => {
             <p class="font-semibold text-[1rem] text-ink mb-1">Add event admin</p>
             <p class="text-[.85rem] text-muted m-0">Users added to the web app are provided web app access.</p>
           </div>
-          <button class="btn shrink-0" @click="addOpen = true">+ Add User</button>
+          <button class="btn shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer" @click="addOpen = true">+ Add User</button>
         </div>
 
         <p v-if="!admins.length" class="text-[.85rem] text-muted m-0">No event admins added yet.</p>
@@ -259,7 +259,7 @@ onMounted(() => {
         <div v-else class="flex flex-col gap-2">
           <div v-for="a in admins" :key="a.id" class="flex items-center gap-3 border border-line rounded-xl px-4 py-3">
             <div
-              class="w-9 h-9 rounded-full bg-brand-soft text-brand grid place-items-center font-bold text-[.78rem] shrink-0 uppercase">
+              class="w-9 h-9 rounded-full bg-[#F0EEFD] text-brand grid place-items-center font-bold text-[.78rem] shrink-0 uppercase">
               {{ (a.name || a.email || '?').slice(0, 2) }}
             </div>
             <div class="min-w-0 flex-1">

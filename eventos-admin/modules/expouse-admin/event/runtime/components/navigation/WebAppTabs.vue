@@ -24,39 +24,18 @@ const open = ref(false)
 
 <template>
   <!-- Section row -->
-  <div class="px-5 py-5">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-brand-soft grid place-items-center shrink-0">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-        </svg>
+  <div class="px-6 py-6">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-[1.05rem] font-bold text-ink mb-1">Web App Tabs</h2>
+        <p class="text-[.85rem] text-muted">Personalized &amp; customized various sections that will be displayed in your web app.</p>
       </div>
-      <div class="flex-1 min-w-0">
-        <p class="font-semibold text-[.95rem] text-ink mb-0.5">Web App Tabs</p>
-        <p class="text-[.82rem] text-muted">Personalise the sections and order shown in your web app.</p>
-      </div>
-      <button class="btn ghost shrink-0" @click="open = true">
+      <button
+        class="shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer"
+        @click="open = true"
+      >
         Manage
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
       </button>
-    </div>
-
-    <!-- Inline preview pills — enabled tabs only -->
-    <div class="flex gap-1.5 flex-wrap mt-3 pt-3 border-t border-line">
-      <template v-if="tabs.items.filter(i => i.enabled).length">
-        <span
-          v-for="item in tabs.items.filter(i => i.enabled).slice(0, 8)" :key="item.key"
-          class="inline-flex items-center px-2.5 py-1 rounded-lg text-[.78rem] font-medium bg-brand-soft text-brand"
-        >
-          {{ item.label }}
-        </span>
-        <span v-if="tabs.items.filter(i => i.enabled).length > 8" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[.78rem] text-muted bg-faint">
-          +{{ tabs.items.filter(i => i.enabled).length - 8 }} more
-        </span>
-      </template>
-      <span v-else class="text-[.82rem] text-muted">No tabs enabled</span>
     </div>
   </div>
 
@@ -109,7 +88,7 @@ const open = ref(false)
           type="button"
           class="w-9 h-9 rounded-lg border border-line bg-white grid place-items-center cursor-pointer transition-all duration-150"
           :class="tabs.alignment === a.v
-            ? 'bg-brand-soft border-brand text-brand'
+            ? 'bg-[#F0EEFD] border-brand text-brand'
             : 'text-muted hover:text-brand hover:border-[#c7c2f5]'"
           :title="a.v"
           @click="tabs.alignment = a.v"

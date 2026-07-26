@@ -164,7 +164,7 @@ onMounted(load)
       <div class="mt-3 flex flex-wrap gap-1.5">
         <span
           v-for="t in feedTabs.filter((t: any) => t.enabled)" :key="t.key"
-          class="bg-brand-soft text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full"
+          class="bg-[#F0EEFD] text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full"
         >{{ t.label }}</span>
       </div>
     </div>

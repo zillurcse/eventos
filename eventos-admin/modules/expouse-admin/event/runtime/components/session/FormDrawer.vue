@@ -371,7 +371,7 @@ async function save() {
         <div
           v-for="sp in selectedSpeakers"
           :key="sp.id"
-          class="relative w-16 h-16 rounded-xl overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
+          class="relative w-16 h-16 rounded-xl overflow-hidden bg-[#F0EEFD] text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
           :title="sp.name"
         >
           <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
@@ -426,7 +426,7 @@ async function save() {
       <div v-if="draft.tags.length" class="flex flex-wrap gap-1.5 mb-2">
         <span
           v-for="(tag, i) in draft.tags" :key="i"
-          class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
+          class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F0EEFD] text-brand text-[.8rem] font-medium"
         >
           {{ tag }}
           <button

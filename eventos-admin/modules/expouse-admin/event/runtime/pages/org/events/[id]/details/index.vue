@@ -218,7 +218,7 @@ onMounted(load)
           v-for="d in DELIVERY" :key="d.value" type="button"
           class="relative flex items-center gap-2.5 px-4 py-3.5 rounded-xl border-[1.5px] cursor-pointer transition-all duration-150"
           :class="form.format === d.value
-            ? 'border-brand bg-brand-soft text-brand'
+            ? 'border-brand bg-[#F0EEFD] text-brand'
             : 'border-line bg-white text-muted hover:border-[#c7c2f5] hover:text-brand'"
           @click="form.format = d.value"
         >

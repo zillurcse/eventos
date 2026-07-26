@@ -88,7 +88,7 @@ async function save() {
     <div class="mt-4">
       <label class="block mb-1.5">Custom Tags</label>
       <div class="border border-line rounded-[11px] px-3 pt-2 pb-1.5 bg-white flex flex-wrap gap-1.5 min-h-11">
-        <span v-for="tag in draft.tags" :key="tag" class="inline-flex items-center gap-1 bg-brand-soft text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full">
+        <span v-for="tag in draft.tags" :key="tag" class="inline-flex items-center gap-1 bg-[#F0EEFD] text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full">
           {{ tag }}
           <button type="button" class="border-0 bg-transparent cursor-pointer text-brand-dark font-bold leading-none p-0" @click="removeTag(tag)">×</button>
         </span>

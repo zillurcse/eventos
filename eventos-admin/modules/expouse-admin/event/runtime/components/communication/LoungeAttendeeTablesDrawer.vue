@@ -79,7 +79,7 @@ function onDragEnd() { dragIndex.value = null }
               <button
                 v-for="d in TABLE_DESIGNS" :key="d.key" type="button"
                 class="px-2.5 py-1 text-[.76rem] font-semibold cursor-pointer transition-colors"
-                :class="t.design === d.key ? 'bg-brand text-white' : 'bg-white text-muted hover:bg-brand-soft'"
+                :class="t.design === d.key ? 'bg-brand text-white' : 'bg-white text-muted hover:bg-[#F0EEFD]'"
                 @click="t.design = d.key"
               >{{ d.label }}</button>
             </div>

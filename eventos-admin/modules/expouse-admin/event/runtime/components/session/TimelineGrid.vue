@@ -131,7 +131,7 @@ function remove(s: Session) {
               <div
                 v-for="sp in s.speakers.slice(0, 4)"
                 :key="sp.id"
-                class="w-6 h-6 rounded-full overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.6rem] font-bold shrink-0 border-2 border-white -ml-1 first:ml-0"
+                class="w-6 h-6 rounded-full overflow-hidden bg-[#F0EEFD] text-brand flex items-center justify-center text-[.6rem] font-bold shrink-0 border-2 border-white -ml-1 first:ml-0"
                 :title="sp.name"
               >
                 <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
@@ -154,7 +154,7 @@ function remove(s: Session) {
 
         <!-- Add-to-slot button -->
         <button
-          class="w-11 h-11 shrink-0 rounded-xl bg-brand-soft text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
+          class="w-11 h-11 shrink-0 rounded-xl bg-[#F0EEFD] text-brand flex items-center justify-center hover:bg-brand hover:text-white transition-colors"
           title="Add session at this time"
           @click="emit('add', row.key)"
         >

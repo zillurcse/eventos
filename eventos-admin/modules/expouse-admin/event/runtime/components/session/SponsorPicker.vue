@@ -51,7 +51,7 @@ function isSelected(s: Sponsor) {
             :key="sp.id"
             type="button"
             class="border-2 rounded-xl p-2 flex flex-col items-center gap-2 transition-colors"
-            :class="isSelected(sp) ? 'border-brand bg-brand-soft' : 'border-line hover:bg-[#fafbfc]'"
+            :class="isSelected(sp) ? 'border-brand bg-[#F0EEFD]' : 'border-line hover:bg-[#fafbfc]'"
             @click="emit('toggle', sp)"
           >
             <div class="w-full aspect-square rounded-lg overflow-hidden bg-[#f1f1f5] text-muted flex items-center justify-center text-[.95rem] font-bold p-2 text-center">

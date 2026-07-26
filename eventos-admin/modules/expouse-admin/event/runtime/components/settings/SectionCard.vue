@@ -5,7 +5,7 @@ defineProps<{ title: string, subtitle?: string }>()
 <template>
   <div class="card">
     <div class="flex items-center gap-3 mb-4">
-      <div class="w-9 h-9 rounded-xl bg-brand-soft grid place-items-center shrink-0 text-brand">
+      <div class="w-9 h-9 rounded-xl bg-[#F0EEFD] grid place-items-center shrink-0 text-brand">
         <slot name="icon" />
       </div>
       <div>

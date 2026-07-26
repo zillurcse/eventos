@@ -10,26 +10,10 @@ const props = defineProps<{ eventId: string, login: LoginConfig }>()
 const emit  = defineEmits<{ (e: 'update', v: Partial<LoginConfig>): void }>()
 
 const TYPES = [
-  {
-    value: 'banner',
-    label: 'Banner image',
-    icon: 'M2 7h20v14a1 1 0 01-1 1H3a1 1 0 01-1-1V7z M2 7l10 8 10-8',
-  },
-  {
-    value: 'video',
-    label: 'YouTube video',
-    icon: 'M15 12l-5 3.5V8.5L15 12z M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z',
-  },
-  {
-    value: 'website',
-    label: 'Website URL',
-    icon: 'M12 2a10 10 0 100 20A10 10 0 0012 2z M2 12h20 M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20',
-  },
+  { value: 'banner',  label: 'Banner'  },
+  { value: 'video',   label: 'Video'   },
+  { value: 'website', label: 'Website' },
 ]
-
-function pathsFor(icon: string) {
-  return icon.split(' M').map((s, i) => (i ? 'M' + s : s))
-}
 
 const drawerOpen = ref(false)
 const draft = reactive<LoginConfig>({ type: 'banner', banner_url: null, video_url: '', website_url: '' })
@@ -58,36 +42,37 @@ const drawerTitle = computed(() =>
 </script>
 
 <template>
-  <div class="card">
+  <div>
     <!-- Section header -->
-    <div class="flex items-start justify-between gap-4 mb-1.5">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-          </svg>
-        </div>
-        <div>
-          <h2 class="mb-0!">Login Page Design</h2>
-          <p class="text-[.8rem] text-muted mt-0.5">Brand-wise customisation of the sign-in page for your event.</p>
-        </div>
+    <div class="flex items-start justify-between gap-4 mb-1">
+      <div>
+        <h2 class="text-[1.05rem] font-bold text-ink mb-1">Login Page Design</h2>
+        <p class="text-[.85rem] text-muted">Brand-wise customization of sign-in page design for your virtual event.</p>
       </div>
-      <button class="btn sm ghost shrink-0" @click="openDrawer">Customise</button>
+      <button
+        class="shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer"
+        @click="openDrawer"
+      >
+       Manage
+      </button>
     </div>
 
     <!-- Design type pills (selected on the page; the sidebar edits the matching field) -->
-    <div class="flex gap-2 mt-4 mb-4">
+    <div class="flex gap-4 mt-4 mb-4">
       <button
         v-for="t in TYPES" :key="t.value" type="button"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl border-[1.5px] cursor-pointer font-semibold text-[.85rem] transition-all duration-150"
+        class="flex items-center gap-2.5 px-5 py-2.5 rounded-lg border min-h-12 cursor-pointer font-medium text-[.9rem] transition-all duration-150"
         :class="login.type === t.value
-          ? 'border-brand bg-brand-soft text-brand'
-          : 'border-line bg-white text-muted hover:border-[#c7c2f5] hover:text-brand'"
+          ? 'border-brand text-ink'
+          : 'border-line bg-white text-ink hover:border-[#c7c2f5]'"
         @click="emit('update', { type: t.value })"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path v-for="(p, i) in pathsFor(t.icon)" :key="i" :d="p" />
-        </svg>
+        <span
+          class="w-4.5 h-4.5 rounded-full border-2 shrink-0 grid place-items-center"
+          :class="login.type === t.value ? 'border-brand' : 'border-[#d7dae1]'"
+        >
+          <span v-if="login.type === t.value" class="w-2 h-2 rounded-full bg-brand" />
+        </span>
         {{ t.label }}
       </button>
     </div>

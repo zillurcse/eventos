@@ -198,7 +198,7 @@ onMounted(load)
       <label class="text-[.82rem] font-semibold text-brand block mb-1">Default meetings count</label>
       <div class="flex items-center gap-2 mb-3">
         <input v-model.number="exhibitorDefaultMeetings" type="number" min="0" class="m-0 w-24">
-        <button class="w-8 h-8 rounded-full border border-line bg-white grid place-items-center text-brand hover:bg-brand-soft cursor-pointer" title="Apply" @click="persist()">
+        <button class="w-8 h-8 rounded-full border border-line bg-white grid place-items-center text-brand hover:bg-[#F0EEFD] cursor-pointer" title="Apply" @click="persist()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
         </button>
       </div>
@@ -214,7 +214,7 @@ onMounted(load)
       <label class="text-[.82rem] font-semibold text-brand block mb-1">Default meetings count</label>
       <div class="flex items-center gap-2 mb-3">
         <input v-model.number="sponsorDefaultMeetings" type="number" min="0" class="m-0 w-24">
-        <button class="w-8 h-8 rounded-full border border-line bg-white grid place-items-center text-brand hover:bg-brand-soft cursor-pointer" title="Apply" @click="persist()">
+        <button class="w-8 h-8 rounded-full border border-line bg-white grid place-items-center text-brand hover:bg-[#F0EEFD] cursor-pointer" title="Apply" @click="persist()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
         </button>
       </div>

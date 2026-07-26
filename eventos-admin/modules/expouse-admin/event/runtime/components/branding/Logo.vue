@@ -14,19 +14,10 @@ function onLogoChange(v: string | string[] | null) {
 </script>
 
 <template>
-  <div class="card">
+  <div>
     <!-- Section header -->
-    <div class="flex items-center gap-2.5 mb-5">
-      <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/>
-        </svg>
-      </div>
-      <div>
-        <h2 class="mb-0!">Logo</h2>
-        <p class="text-[.8rem] text-muted mt-0.5">Event logo that appears across your event.</p>
-      </div>
-    </div>
+    <h2 class="text-[1.05rem] font-bold text-ink mb-1">Logo</h2>
+    <p class="text-[.85rem] text-muted mb-4">Event logo that appears across your event.</p>
 
     <ImageField
       :model-value="logoUrl"

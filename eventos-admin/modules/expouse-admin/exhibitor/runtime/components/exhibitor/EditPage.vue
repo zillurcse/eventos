@@ -57,7 +57,7 @@ async function onToggleActive() {
         <button
           v-for="tab in EXHIBITOR_TABS" :key="tab"
           class="w-full text-left px-3.5 py-2.5 rounded-lg text-[.88rem] font-medium mb-0.5 transition-colors"
-          :class="activeTab === tab ? 'bg-brand-soft text-brand font-semibold' : 'text-ink hover:bg-[#f7f8fa]'"
+          :class="activeTab === tab ? 'bg-[#F0EEFD] text-brand font-semibold' : 'text-ink hover:bg-[#f7f8fa]'"
           @click="activeTab = tab"
         >{{ tabLabel(tab) }}</button>
       </aside>

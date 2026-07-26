@@ -104,7 +104,7 @@ const columns = [
     >
       <template #cell-title="{ row }">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg bg-brand-soft text-brand flex items-center justify-center shrink-0">
+          <div class="w-9 h-9 rounded-lg bg-[#F0EEFD] text-brand flex items-center justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
           </div>
           <span class="font-semibold text-ink text-[.88rem] truncate">{{ row.title }}</span>

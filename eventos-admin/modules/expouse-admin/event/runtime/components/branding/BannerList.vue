@@ -45,6 +45,19 @@ function onImageChange(v: string | string[] | null) {
   form.image = Array.isArray(v) ? v[0] ?? '' : v ?? ''
 }
 
+// Per-card ImageField (single mode): null means Remove was clicked, otherwise
+// it's a replaced/cropped image URL to swap in place.
+function onCardImageChange(i: number, v: string | string[] | null) {
+  if (v === null) {
+    removeBanner(i)
+    return
+  }
+  const url = Array.isArray(v) ? v[0] ?? '' : v
+  const next = [...props.banners]
+  next[i] = { ...next[i]!, image: url }
+  emit('update', next)
+}
+
 function save() {
   if (!form.image) {
     formError.value = 'A banner image is required.'
@@ -75,29 +88,24 @@ function toggleActive(i: number) {
 </script>
 
 <template>
-  <div class="card">
+  <div>
     <!-- Section header -->
-    <div class="flex items-start justify-between gap-4 mb-1.5">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>
-          </svg>
-        </div>
-        <div>
-          <h2 class="mb-0!">{{ title }}</h2>
-          <p class="text-[.8rem] text-muted mt-0.5">{{ subtitle }}</p>
-        </div>
+    <div class="flex items-start justify-between gap-4 mb-1">
+      <div>
+        <h2 class="text-[1.05rem] font-bold text-ink mb-1">{{ title }}</h2>
+        <p class="text-[.85rem] text-muted">{{ subtitle }}</p>
       </div>
-      <button class="btn sm ghost shrink-0" @click="openAdd">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add banner
+      <button
+        class="shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer"
+        @click="openAdd"
+      >
+        + Add banner
       </button>
     </div>
 
     <!-- Empty state -->
-    <div v-if="!banners.length" class="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-line bg-[#fafbfc] mt-4">
-      <div class="w-10 h-10 rounded-xl bg-brand-soft grid place-items-center mb-3">
+    <div v-if="!banners.length" class="flex flex-col items-center justify-center py-10 rounded-lg border border-dashed border-line bg-[#fafbfc] mt-4">
+      <div class="w-10 h-10 rounded-lg bg-[#F0EEFD] grid place-items-center mb-3">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
           <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>
         </svg>
@@ -108,26 +116,34 @@ function toggleActive(i: number) {
     </div>
 
     <!-- Banner grid -->
-    <div v-else class="flex gap-4 flex-wrap mt-4">
-      <div v-for="(b, i) in banners" :key="b.image + i" class="w-75">
-        <div class="img-card" :class="{ 'opacity-50': b.active === false }" :style="{ aspectRatio: '1036 / 350' }">
-          <img :src="b.image" :alt="b.title || title">
-          <span v-if="b.active === false" class="badge draft absolute top-1.5 left-1.5">Hidden</span>
-          <div class="img-card-actions">
-            <button class="img-action" title="Edit banner" @click="openEdit(i)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
-            </button>
-            <button class="img-action" :title="b.active === false ? 'Show banner' : 'Hide banner'" @click="toggleActive(i)">
-              <svg v-if="b.active === false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>
-              <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button class="img-action danger" title="Remove banner" @click="removeBanner(i)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <div v-else class="grid grid-cols-2 gap-5 mt-4">
+      <div v-for="(b, i) in banners" :key="b.image + i" :class="{ 'opacity-50': b.active === false }">
+        <ImageField
+          :model-value="b.image"
+          :aspect="1036 / 350"
+          :output-width="1036"
+          :output-height="350"
+          collection="banner"
+          card-width="100%"
+          :gallery-path="`/events/${eventId}/gallery`"
+          @update:model-value="onCardImageChange(i, $event)"
+        />
+        <!-- <div class="flex items-center justify-between gap-3 mt-2">
+          <div class="min-w-0">
+            <p v-if="b.title" class="text-[.82rem] text-ink font-medium mb-0 truncate">{{ b.title }}</p>
+            <p v-if="b.url" class="text-[.75rem] text-faint mt-0.5 mb-0 truncate">{{ b.url }}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button class="text-[.78rem] font-semibold text-brand cursor-pointer" @click="openEdit(i)">Edit details</button>
+            <button
+              class="text-[.78rem] font-semibold cursor-pointer"
+              :class="b.active === false ? 'text-muted' : 'text-[#dc2626]'"
+              @click="toggleActive(i)"
+            >
+              {{ b.active === false ? 'Show' : 'Hide' }}
             </button>
           </div>
-        </div>
-        <p v-if="b.title" class="text-[.82rem] text-ink font-medium mt-1.5 mb-0 truncate">{{ b.title }}</p>
-        <p v-if="b.url" class="text-[.75rem] text-faint mt-0.5 mb-0 truncate">{{ b.url }}</p>
+        </div> -->
       </div>
     </div>
 

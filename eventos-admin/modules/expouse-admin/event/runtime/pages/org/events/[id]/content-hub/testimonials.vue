@@ -124,7 +124,7 @@ onMounted(load)
           <p class="text-[.9rem] text-ink leading-relaxed m-0 line-clamp-4">"{{ t.quote }}"</p>
 
           <div class="flex items-center gap-3 mt-auto pt-2">
-            <div class="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-brand-soft flex items-center justify-center text-brand font-semibold text-[.8rem]">
+            <div class="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-[#F0EEFD] flex items-center justify-center text-brand font-semibold text-[.8rem]">
               <img v-if="t.avatar_url" :src="t.avatar_url" :alt="t.name" class="w-full h-full object-cover">
               <span v-else>{{ initials(t.name) }}</span>
             </div>

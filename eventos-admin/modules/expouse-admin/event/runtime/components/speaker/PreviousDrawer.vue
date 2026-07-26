@@ -150,7 +150,7 @@ onMounted(load)
         class="flex items-center gap-3 border border-line rounded-xl p-3 transition-colors"
         :class="c.already_added
           ? 'opacity-55 cursor-default bg-[#f7f8fa]'
-          : selected.includes(c.id) ? 'border-brand bg-brand-soft cursor-pointer' : 'cursor-pointer hover:border-brand'"
+          : selected.includes(c.id) ? 'border-brand bg-[#F0EEFD] cursor-pointer' : 'cursor-pointer hover:border-brand'"
       >
         <input
           type="checkbox" class="w-4.5 h-4.5 m-0 accent-brand shrink-0"
@@ -161,7 +161,7 @@ onMounted(load)
 
         <div class="w-10 h-10 rounded-full overflow-hidden shrink-0">
           <img v-if="c.image_url" :src="c.image_url" class="w-full h-full object-cover" :alt="c.name">
-          <div v-else class="w-full h-full bg-brand-soft flex items-center justify-center text-brand font-bold text-[.75rem] uppercase">
+          <div v-else class="w-full h-full bg-[#F0EEFD] flex items-center justify-center text-brand font-bold text-[.75rem] uppercase">
             {{ initials(c.name) }}
           </div>
         </div>

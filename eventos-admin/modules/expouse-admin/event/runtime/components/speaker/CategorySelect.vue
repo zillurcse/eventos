@@ -81,7 +81,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- Panel (in-flow so it is never clipped by the drawer's scroll area) -->
     <div v-if="open" class="mt-2 bg-white border border-[#d7dae1] rounded-[11px] p-3">
       <!-- Add row -->
-      <div class="flex items-center gap-2 border border-[#e3e3ee] rounded-[10px] px-2.5 py-2 mb-1">
+      <div class="flex items-center gap-2 border border-[#e3e3ee] rounded-lg px-2.5 py-2 mb-1">
         <input
           v-model="newName"
           placeholder="Enter Category Name"
@@ -90,7 +90,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         >
         <button
           type="button"
-          class="px-3.5 py-1.5 rounded-[8px] bg-brand-soft text-brand font-semibold text-[.78rem] tracking-wide disabled:opacity-50"
+          class="px-3.5 py-1.5 rounded-[8px] bg-[#F0EEFD] text-brand font-semibold text-[.78rem] tracking-wide disabled:opacity-50"
           :disabled="!newName.trim() || busy"
           @click="submitNew"
         >ADD</button>

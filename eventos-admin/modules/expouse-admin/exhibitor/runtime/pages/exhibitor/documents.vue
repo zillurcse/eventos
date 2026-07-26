@@ -49,7 +49,7 @@ onMounted(load)
         <div class="flex gap-2.5 flex-wrap items-center">
           <input v-model="form.title" placeholder="Title" class="flex-[1_1_200px]">
           <input v-model="form.url" placeholder="File URL (https://…)" class="flex-[1_1_240px]">
-          <select v-model="form.visibility" class="py-[9px] px-3 rounded-[10px] border border-[#cbd5e1]">
+          <select v-model="form.visibility" class="py-[9px] px-3 rounded-lg border border-[#cbd5e1]">
             <option value="all">Everyone</option>
             <option value="members">Members only</option>
             <option value="private">Private</option>

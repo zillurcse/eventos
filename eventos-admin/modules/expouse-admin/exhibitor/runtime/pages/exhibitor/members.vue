@@ -197,7 +197,7 @@ onMounted(load)
               <tr>
                 <td>
                   <div class="flex items-center gap-3">
-                    <span class="w-9 h-9 rounded-full bg-brand-soft text-brand grid place-items-center font-bold text-[.78rem] shrink-0">{{ initials(m.contact?.name, m.contact?.email) }}</span>
+                    <span class="w-9 h-9 rounded-full bg-[#F0EEFD] text-brand grid place-items-center font-bold text-[.78rem] shrink-0">{{ initials(m.contact?.name, m.contact?.email) }}</span>
                     <div class="min-w-0">
                       <div class="font-semibold text-ink truncate">{{ m.contact?.name || m.contact?.email }} <span v-if="isSelf(m)" class="badge">you</span></div>
                       <div class="muted text-[.82rem] truncate">{{ m.contact?.email }}</div>

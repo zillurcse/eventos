@@ -95,7 +95,7 @@ function toggleAll() {
           <div
             v-for="f in boothFeatures" :key="f.key"
             class="flex items-center gap-3 px-4 py-2.5 border border-line rounded-xl bg-[#fafbfc]"
-            :class="{ 'bg-brand-soft border-brand/20': f.enabled }"
+            :class="{ 'bg-[#F0EEFD] border-brand/20': f.enabled }"
           >
             <AppCheckbox
               :model-value="f.enabled"
@@ -134,7 +134,7 @@ function toggleAll() {
           <div
             v-for="f in leadFeatures" :key="f.key"
             class="flex items-center gap-3 px-4 py-2.5 border border-line rounded-xl bg-[#fafbfc]"
-            :class="{ 'bg-brand-soft border-brand/20': f.enabled }"
+            :class="{ 'bg-[#F0EEFD] border-brand/20': f.enabled }"
           >
             <AppCheckbox
               :model-value="f.enabled"

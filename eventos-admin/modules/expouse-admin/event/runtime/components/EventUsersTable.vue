@@ -172,7 +172,7 @@ onMounted(load)
       >
         <template #cell-name="{ row: u }">
           <div class="flex items-center gap-2.5" :class="u.blocked ? 'opacity-60' : ''">
-            <div class="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-brand-soft text-brand flex items-center justify-center text-[.74rem] font-bold">
+            <div class="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[#F0EEFD] text-brand flex items-center justify-center text-[.74rem] font-bold">
               <img v-if="u.avatar_url" :src="u.avatar_url" class="w-full h-full object-cover" :alt="u.name ?? ''">
               <span v-else>{{ initials(u.name) }}</span>
             </div>

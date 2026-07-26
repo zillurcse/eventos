@@ -226,7 +226,7 @@ function alignClass(col: DataTableColumn) {
           class="align-middle"
           :class="[
             canReorder ? 'cursor-grab' : '',
-            dragIndex === i ? 'opacity-50 bg-brand-soft/50' : '',
+            dragIndex === i ? 'opacity-50 bg-[#F0EEFD]/50' : '',
           ]"
           :draggable="canReorder"
           @dragstart="onDragStart(i)"

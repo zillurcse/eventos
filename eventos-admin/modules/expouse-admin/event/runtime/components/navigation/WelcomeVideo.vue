@@ -68,74 +68,18 @@ const hasValidPreview = computed(() => !!embedUrl.value || !!thumbnailUrl.value)
 
 <template>
   <!-- Section row -->
-  <div class="px-5 py-5">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-brand-soft grid place-items-center shrink-0">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-          <path d="M15 12l-5 3.5V8.5L15 12z M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"/>
-        </svg>
+  <div class="px-6 py-6">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-[1.05rem] font-bold text-ink mb-1">Welcoming Video</h2>
+        <p class="text-[.85rem] text-muted">Greet your attendee with a welcome video</p>
       </div>
-      <div class="flex-1 min-w-0">
-        <p class="font-semibold text-[.95rem] text-ink mb-0.5">Welcome Video</p>
-        <p class="text-[.82rem] text-muted">Greet attendees with a welcome video after login or on the home screen.</p>
-      </div>
-      <button class="btn ghost shrink-0" @click="open = true">
+      <button
+        class="shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer"
+        @click="open = true"
+      >
         Manage
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
       </button>
-    </div>
-
-    <!-- Card preview -->
-    <div class="mt-3 pt-3 border-t border-line">
-      <!-- YouTube thumbnail preview -->
-      <div v-if="thumbnailUrl" class="relative rounded-xl overflow-hidden bg-black" style="max-width:420px;aspect-ratio:16/9">
-        <img :src="thumbnailUrl" alt="Video thumbnail" class="w-full h-full object-cover opacity-90">
-        <!-- Play button overlay -->
-        <div class="absolute inset-0 flex items-center justify-center">
-          <div class="w-12 h-12 rounded-full bg-black/60 grid place-items-center backdrop-blur-sm shadow-lg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </div>
-        </div>
-        <!-- Type badge -->
-        <span class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[.75rem] font-semibold backdrop-blur-sm capitalize">
-          {{ video.type }}
-        </span>
-      </div>
-
-      <!-- Vimeo / uploaded: compact embed iframe -->
-      <div v-else-if="embedUrl && video.type !== 'youtube'" class="rounded-xl overflow-hidden border border-line" style="max-width:420px;aspect-ratio:16/9">
-        <iframe
-          v-if="video.type === 'vimeo'"
-          :src="embedUrl"
-          class="w-full h-full"
-          frameborder="0"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowfullscreen
-        />
-        <video
-          v-else
-          :src="embedUrl"
-          class="w-full h-full object-cover"
-          controls
-          preload="metadata"
-        />
-      </div>
-
-      <!-- Not configured -->
-      <div v-else class="flex items-center gap-2">
-        <span class="badge">Not configured</span>
-        <span class="text-[.82rem] text-muted">Add a URL to preview the video here.</span>
-      </div>
-
-      <!-- Status row when active -->
-      <div v-if="video.url" class="flex items-center gap-2 mt-2">
-        <span class="badge active">Active</span>
-        <span class="text-[.8rem] text-muted truncate max-w-[320px]">{{ video.url }}</span>
-      </div>
     </div>
   </div>
 
@@ -150,7 +94,7 @@ const hasValidPreview = computed(() => !!embedUrl.value || !!thumbnailUrl.value)
           v-for="t in VIDEO_TYPES" :key="t.value" type="button"
           class="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-[1.5px] cursor-pointer transition-all duration-150 text-[.82rem] font-semibold"
           :class="video.type === t.value
-            ? 'border-brand bg-brand-soft text-brand'
+            ? 'border-brand bg-[#F0EEFD] text-brand'
             : 'border-line bg-white text-muted hover:border-[#c7c2f5] hover:text-brand'"
           @click="video.type = t.value"
         >

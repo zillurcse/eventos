@@ -810,7 +810,7 @@ onMounted(load)
             <div
               v-for="sp in session?.speakers ?? []"
               :key="sp.id"
-              class="relative w-16 h-16 rounded-xl overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
+              class="relative w-16 h-16 rounded-xl overflow-hidden bg-[#F0EEFD] text-brand flex items-center justify-center text-[.85rem] font-bold border border-line"
               :title="sp.name"
             >
               <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
@@ -864,7 +864,7 @@ onMounted(load)
             <div class="flex flex-wrap gap-1.5 mb-2">
               <span
                 v-for="(tag, i) in basic.tags" :key="i"
-                class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-soft text-brand text-[.8rem] font-medium"
+                class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F0EEFD] text-brand text-[.8rem] font-medium"
               >
                 {{ tag }}
                 <button class="bg-transparent border-0 p-0 cursor-pointer text-brand leading-none text-[.9rem]" @click="removeTag(i)">×</button>
@@ -1156,7 +1156,7 @@ onMounted(load)
             </div>
 
             <div v-for="o in p.options" :key="o.id" class="relative border border-line rounded-lg px-3 py-2 mb-1.5 overflow-hidden">
-              <span class="absolute left-0 top-0 bottom-0 bg-brand-soft transition-[width]" :style="{ width: pct(o, p) + '%' }" />
+              <span class="absolute left-0 top-0 bottom-0 bg-[#F0EEFD] transition-[width]" :style="{ width: pct(o, p) + '%' }" />
               <span class="relative flex items-center justify-between text-[.85rem] text-ink">
                 <span>{{ o.text }}</span>
                 <span class="font-bold text-brand">{{ pct(o, p) }}% · {{ o.votes }}</span>
@@ -1227,7 +1227,7 @@ onMounted(load)
                   <span v-if="m.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
                   <span v-if="m.status === 'rejected'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Rejected</span>
                   <span v-if="m.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>
-                  <span v-if="m.is_pinned" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-brand-soft text-brand">Pinned</span>
+                  <span v-if="m.is_pinned" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#F0EEFD] text-brand">Pinned</span>
                   <span v-if="m.is_answered" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#dcfce7] text-[#15803d]">Answered</span>
                 </div>
               </div>
@@ -1273,7 +1273,7 @@ onMounted(load)
                     <span
                       v-if="r.author_role !== 'attendee'"
                       class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded"
-                      :class="r.author_role === 'speaker' ? 'bg-brand-soft text-brand' : 'bg-[#dcfce7] text-[#15803d]'"
+                      :class="r.author_role === 'speaker' ? 'bg-[#F0EEFD] text-brand' : 'bg-[#dcfce7] text-[#15803d]'"
                     >{{ r.author_role === 'speaker' ? 'Speaker' : 'Organizer' }}</span>
                     <span v-if="r.status === 'pending'" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#fef3c7] text-[#b45309]">Awaiting approval</span>
                     <span v-if="r.is_hidden" class="text-[.62rem] font-bold uppercase px-1.5 py-0.5 rounded bg-[#e2e8f0] text-[#475569]">Hidden</span>

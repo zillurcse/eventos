@@ -34,7 +34,7 @@ onMounted(() => {
       <p class="text-muted text-[.92rem]">Welcome {{ ov.name }}, Let's Power Your Event.</p>
     </div>
 
-    <div class="grid grid-cols-[1fr_380px] gap-5 items-start">
+    <div class="grid grid-cols-2 gap-5 items-start">
       <SetupChecklist
         :checklist="ov.checklist"
         :completed="ov.completed"

@@ -81,7 +81,7 @@ onMounted(loadOrgs)
   <div>
     <div class="card">
       <label>Organization:
-        <select v-model="orgId" class="py-[9px] px-3 rounded-[10px] border border-[#cbd5e1] ml-2">
+        <select v-model="orgId" class="py-[9px] px-3 rounded-lg border border-[#cbd5e1] ml-2">
           <option value="">— select —</option>
           <option v-for="o in orgs" :key="o.id" :value="o.id">{{ o.name }}</option>
         </select>
@@ -95,7 +95,7 @@ onMounted(loadOrgs)
           <input v-model="form.email" type="email" placeholder="Email" class="flex-[1_1_200px]" />
           <input v-model="form.name" placeholder="Name (optional)" class="flex-[1_1_150px]" />
           <input v-model="form.password" type="password" placeholder="Password (optional)" class="flex-[1_1_160px]" />
-          <select v-model="form.role" class="py-[9px] px-3 rounded-[10px] border border-[#cbd5e1]">
+          <select v-model="form.role" class="py-[9px] px-3 rounded-lg border border-[#cbd5e1]">
             <option v-for="r in roles" :key="r.id" :value="String(r.id)">{{ r.name }}</option>
           </select>
           <button class="btn" :disabled="adding || !form.email" @click="add">{{ adding ? 'Adding…' : 'Add' }}</button>

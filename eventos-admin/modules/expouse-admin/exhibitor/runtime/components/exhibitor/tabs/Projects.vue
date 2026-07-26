@@ -68,7 +68,7 @@ const columns = [
     >
       <template #cell-name="{ row }">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-brand-soft flex items-center justify-center">
+          <div class="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-[#F0EEFD] flex items-center justify-center">
             <img v-if="row.meta?.image_url" :src="row.meta.image_url" class="w-full h-full object-cover" :alt="row.name">
             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-4 h-4 text-brand"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
           </div>

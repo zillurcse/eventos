@@ -70,7 +70,7 @@ const columns = [
     >
       <template #cell-name="{ row }">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-brand-soft flex items-center justify-center">
+          <div class="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-[#F0EEFD] flex items-center justify-center">
             <img v-if="row.meta?.image_url" :src="row.meta.image_url" class="w-full h-full object-cover" :alt="row.name">
             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-4 h-4 text-brand"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
           </div>

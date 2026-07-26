@@ -61,22 +61,7 @@ onMounted(load)
   <div>
 
     <!-- Page header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-[1.35rem] font-bold text-ink mb-0.5">Navigation &amp; Menu</h1>
-        <p class="text-muted text-[.88rem]">Manage tabs, modules, and the welcome experience for your event app.</p>
-      </div>
-      <button class="btn" :disabled="saving" @click="save">
-        <svg v-if="saving" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
-          <path class="opacity-75" d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        <svg v-else-if="saved" width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        {{ saving ? 'Saving…' : saved ? 'Saved' : 'Save changes' }}
-      </button>
-    </div>
+    <h1 class="text-[1.35rem] font-bold text-ink mb-6">Navigation &amp; Menu</h1>
 
     <!-- Sections -->
     <div class="card p-0! divide-y divide-line">

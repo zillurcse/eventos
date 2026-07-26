@@ -31,7 +31,7 @@ function applyPreset(p: typeof PRESETS[number]) {
   <div class="card">
     <!-- Section header -->
     <div class="flex items-center gap-2.5 mb-5">
-      <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-[#F0EEFD] grid place-items-center shrink-0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
           <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
         </svg>
@@ -52,7 +52,7 @@ function applyPreset(p: typeof PRESETS[number]) {
         type="button"
         class="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150"
         :class="primary === p.primary
-          ? 'border-brand bg-brand-soft text-brand'
+          ? 'border-brand bg-[#F0EEFD] text-brand'
           : 'border-line bg-white text-muted hover:border-brand hover:text-brand'"
         @click="applyPreset(p)"
       >

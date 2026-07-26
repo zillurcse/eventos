@@ -13,36 +13,27 @@ const OPTIONS = [
 </script>
 
 <template>
-  <div class="card">
+  <div>
     <!-- Section header -->
-    <div class="flex items-center gap-2.5 mb-5">
-      <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
-        </svg>
-      </div>
-      <div>
-        <h2 class="mb-0!">Appearance</h2>
-        <p class="text-[.8rem] text-muted mt-0.5">Customise the look, feel and color of your event on mobile and web apps.</p>
-      </div>
-    </div>
+    <h2 class="text-[1.05rem] font-bold text-ink mb-1">Appearance</h2>
+    <p class="text-[.85rem] text-muted mb-4">Customise the look, feel and color of your event on mobile and web apps.</p>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-3 gap-5 max-w-2xl">
       <button
         v-for="o in OPTIONS" :key="o.value" type="button"
-        class="rounded-2xl border-[1.5px] p-3 text-left transition-all duration-150 cursor-pointer"
-        :class="modelValue === o.value ? 'border-brand ring-2 ring-brand-soft' : 'border-line hover:border-[#c7c2f5]'"
+        class="rounded-2xl border-[1.5px] p-2.5 text-left transition-all duration-150 cursor-pointer"
+        :class="modelValue === o.value ? 'border-brand' : 'border-line hover:border-[#c7c2f5]'"
         @click="emit('update:modelValue', o.value)"
       >
-        <div class="rounded-lg border border-line bg-[#fafbfc] p-2 mb-2.5">
-          <div class="h-2.5 rounded bg-line mb-2" style="width:55%" />
-          <div class="flex gap-1.5">
-            <div v-if="o.value !== 'minimal'" class="h-9 rounded bg-line" :style="{ width: o.value === 'advanced' ? '28%' : '35%' }" />
-            <div class="h-9 rounded bg-line flex-1" />
-            <div v-if="o.value === 'advanced'" class="h-9 rounded bg-line" style="width:18%" />
+        <div class="rounded-lg bg-[#F0EEFD]/60 p-2.5">
+          <div class="h-2.5 rounded-full bg-white mb-2.5" style="width:55%" />
+          <div class="h-16 rounded-lg bg-white mb-2.5" />
+          <div class="flex gap-2">
+            <div class="h-9 rounded-lg bg-white flex-1" />
+            <div class="h-9 rounded-lg bg-white flex-1" />
           </div>
         </div>
-        <p class="text-[.85rem] font-semibold mb-0 text-center" :class="modelValue === o.value ? 'text-brand' : 'text-ink'">{{ o.label }}</p>
+        <p class="text-[.9rem] mb-0 mt-3 text-center" :class="modelValue === o.value ? 'text-brand font-semibold' : 'text-ink font-medium'">{{ o.label }}</p>
       </button>
     </div>
   </div>

@@ -246,7 +246,7 @@ onMounted(() => { loadConversations(); loadRequests(); loadMembers() })
             </div>
 
             <div v-if="r.status === 'requested'" class="flex items-center gap-2 shrink-0">
-              <select v-model="assignPick[r.id]" class="py-[9px] px-3 rounded-[10px] border border-[#cbd5e1] text-[.85rem]">
+              <select v-model="assignPick[r.id]" class="py-[9px] px-3 rounded-lg border border-[#cbd5e1] text-[.85rem]">
                 <option value="">Assign member…</option>
                 <option v-for="m in members" :key="m.id" :value="m.id">{{ m.contact?.name || m.contact?.email }}</option>
               </select>

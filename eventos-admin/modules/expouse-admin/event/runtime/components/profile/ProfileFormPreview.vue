@@ -146,7 +146,7 @@ const darkStage = computed(() => {
             </div>
 
             <!-- reCAPTCHA -->
-            <div v-else-if="f.type === 'recaptcha'" class="col-span-2 flex items-center justify-between gap-3 border border-line rounded-[10px] px-4 py-3.5 bg-[#f8fafc]">
+            <div v-else-if="f.type === 'recaptcha'" class="col-span-2 flex items-center justify-between gap-3 border border-line rounded-lg px-4 py-3.5 bg-[#f8fafc]">
               <label class="flex items-center gap-2.5 text-[.9rem] font-medium text-ink">
                 <input type="checkbox" disabled class="w-4 h-4 m-0"> I'm not a robot
               </label>
@@ -180,13 +180,13 @@ const darkStage = computed(() => {
                 <input type="checkbox" disabled class="w-4 h-4 m-0"> {{ f.help_text || 'Yes' }}
               </label>
 
-              <select v-else-if="f.type === 'select'" disabled class="w-full m-0 border border-[#d7dae1] rounded-[10px] px-3 py-2.5 text-[.9rem] bg-white text-[#94a3b8]">
+              <select v-else-if="f.type === 'select'" disabled class="w-full m-0 border border-[#d7dae1] rounded-lg px-3 py-2.5 text-[.9rem] bg-white text-[#94a3b8]">
                 <option>{{ f.meta.placeholder || 'Select…' }}</option>
               </select>
 
               <textarea
                 v-else-if="f.type === 'textarea'" disabled rows="3"
-                class="w-full m-0 border border-[#d7dae1] rounded-[10px] px-3 py-2.5 text-[.9rem] bg-white"
+                class="w-full m-0 border border-[#d7dae1] rounded-lg px-3 py-2.5 text-[.9rem] bg-white"
                 :placeholder="f.meta.placeholder || ''"
               />
 
@@ -197,7 +197,7 @@ const darkStage = computed(() => {
 
               <input
                 v-else disabled :type="inputType(f.type)"
-                class="w-full m-0 border border-[#d7dae1] rounded-[10px] px-3 py-2.5 text-[.9rem] bg-white"
+                class="w-full m-0 border border-[#d7dae1] rounded-lg px-3 py-2.5 text-[.9rem] bg-white"
                 :placeholder="placeholderFor(f)"
               >
 

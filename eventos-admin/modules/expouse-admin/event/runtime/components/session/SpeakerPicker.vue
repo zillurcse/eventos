@@ -55,10 +55,10 @@ function initials(name: string | null | undefined): string {
             :key="sp.id"
             type="button"
             class="border-2 rounded-xl p-2 flex flex-col items-center gap-2 transition-colors"
-            :class="selectedIds.includes(sp.id) ? 'border-brand bg-brand-soft' : 'border-line hover:bg-[#fafbfc]'"
+            :class="selectedIds.includes(sp.id) ? 'border-brand bg-[#F0EEFD]' : 'border-line hover:bg-[#fafbfc]'"
             @click="emit('toggle', sp.id)"
           >
-            <div class="w-full aspect-square rounded-lg overflow-hidden bg-brand-soft text-brand flex items-center justify-center text-[1.4rem] font-bold">
+            <div class="w-full aspect-square rounded-lg overflow-hidden bg-[#F0EEFD] text-brand flex items-center justify-center text-[1.4rem] font-bold">
               <img v-if="sp.image_url" :src="sp.image_url" :alt="sp.name" class="w-full h-full object-cover">
               <span v-else>{{ initials(sp.name) }}</span>
             </div>

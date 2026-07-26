@@ -13,7 +13,7 @@ const FONTS = ['Inter', 'Roboto', 'Poppins', 'Nunito', 'Open Sans', 'Lato', 'Mon
 <template>
   <div class="card">
     <div class="flex items-center gap-2.5 mb-5">
-      <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-[#F0EEFD] grid place-items-center shrink-0">
         <span class="text-brand font-bold text-[.8rem] leading-none">Aa</span>
       </div>
       <div>

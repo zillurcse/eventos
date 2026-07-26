@@ -59,7 +59,7 @@ function slotsAtHour(hour: string): { slot: string, index: number }[] {
       <button
         v-for="d in eventDates" :key="d"
         class="px-4 py-2.5 rounded-lg border text-[.84rem] font-bold whitespace-nowrap transition-colors"
-        :class="selectedDate === d ? 'border-brand text-brand bg-brand-soft' : 'border-line text-muted bg-white hover:border-brand'"
+        :class="selectedDate === d ? 'border-brand text-brand bg-[#F0EEFD]' : 'border-line text-muted bg-white hover:border-brand'"
         @click="emit('update:selectedDate', d)"
       >{{ fmtDateTab(d) }}</button>
     </div>
@@ -78,7 +78,7 @@ function slotsAtHour(hour: string): { slot: string, index: number }[] {
         <div v-for="h in HOURS" :key="h" class="min-h-14 py-1 flex flex-wrap gap-1.5 content-start">
           <span
             v-for="s in slotsAtHour(h)" :key="s.index"
-            class="inline-flex items-center gap-1 bg-brand-soft text-brand-dark text-[.82rem] font-semibold px-2.5 py-1 rounded-md"
+            class="inline-flex items-center gap-1 bg-[#F0EEFD] text-brand-dark text-[.82rem] font-semibold px-2.5 py-1 rounded-md"
           >
             {{ s.slot }}
             <button class="text-brand-dark font-bold leading-none cursor-pointer bg-transparent border-0 p-0" @click="removeSlot(s.index)">×</button>

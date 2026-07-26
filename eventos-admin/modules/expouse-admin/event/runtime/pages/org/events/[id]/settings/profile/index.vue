@@ -23,6 +23,9 @@ interface ServiceRow {
 const rows = ref<ServiceRow[]>([])
 const loading = ref(true)
 const openMenu = ref<string | null>(null)
+// Actions dropdown is teleported to <body> (the DataTable wrapper clips overflow),
+// so we track the trigger button's viewport position to anchor it there.
+const menuAnchor = ref<{ top: number; right: number } | null>(null)
 
 // Publish & Share modal
 const shareRow = ref<ServiceRow | null>(null)
@@ -45,10 +48,16 @@ async function load() {
   finally { loading.value = false }
 }
 
-function toggleMenu(audience: string) {
-  openMenu.value = openMenu.value === audience ? null : audience
+function toggleMenu(audience: string, ev: MouseEvent) {
+  if (openMenu.value === audience) {
+    closeMenu()
+    return
+  }
+  openMenu.value = audience
+  const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect()
+  menuAnchor.value = { top: rect.bottom + 4, right: window.innerWidth - rect.right }
 }
-function closeMenu() { openMenu.value = null }
+function closeMenu() { openMenu.value = null; menuAnchor.value = null }
 
 function openShare(r: ServiceRow) {
   closeMenu()
@@ -86,8 +95,17 @@ async function confirmReset() {
 }
 
 const onWindowClick = () => closeMenu()
-onMounted(() => { load(); window.addEventListener('click', onWindowClick) })
-onBeforeUnmount(() => window.removeEventListener('click', onWindowClick))
+// Fixed-position teleported menu doesn't scroll with the table, so drop it on scroll.
+const onWindowScroll = () => closeMenu()
+onMounted(() => {
+  load()
+  window.addEventListener('click', onWindowClick)
+  window.addEventListener('scroll', onWindowScroll, true)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('click', onWindowClick)
+  window.removeEventListener('scroll', onWindowScroll, true)
+})
 </script>
 
 <template>
@@ -97,90 +115,89 @@ onBeforeUnmount(() => window.removeEventListener('click', onWindowClick))
       <p class="muted text-[.88rem] mt-1 mb-0">Configure user profile fields for different user types at your event.</p>
     </div>
 
-    <div class="card p-0 overflow-visible">
-      <table class="w-full">
-        <thead>
-          <tr class="text-left">
-            <th class="px-5 py-3.5">Services</th>
-            <th class="px-5 py-3.5">Fields</th>
-            <th class="px-5 py-3.5">Submissions</th>
-            <th class="px-5 py-3.5">Status</th>
-            <th class="px-5 py-3.5 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="5" class="px-5 py-10 text-center muted">Loading profile forms…</td>
-          </tr>
-          <tr v-for="r in rows" v-else :key="r.audience" class="border-t border-[#f0f0f5]">
-            <td class="px-5 py-4">
-              <NuxtLink :to="`/org/events/${id}/settings/profile/${r.audience}`" class="font-semibold text-ink no-underline hover:text-[#6352e7]">
-                {{ r.name }}
-              </NuxtLink>
-            </td>
-            <td class="px-5 py-4">{{ r.fields_count }}</td>
-            <td class="px-5 py-4">
+    <DataTable
+      :items="rows"
+      :columns="[
+        { key: 'name', label: 'Services' },
+        { key: 'fields_count', label: 'Fields' },
+        { key: 'submissions_count', label: 'Submissions' },
+        { key: 'status', label: 'Status' },
+      ]"
+      row-key="audience"
+      storage-key="profile-forms"
+      :empty-text="loading ? 'Loading profile forms…' : 'No profile forms found.'"
+    >
+      <template #cell-name="{ row }">
+        <NuxtLink :to="`/org/events/${id}/settings/profile/${row.audience}`" class="font-semibold text-ink no-underline hover:text-brand">
+          {{ row.name }}
+        </NuxtLink>
+      </template>
+
+      <template #cell-submissions_count="{ row }">
+        <NuxtLink
+          :to="`/org/events/${id}/settings/profile/${row.audience}/submissions`"
+          class="text-brand font-semibold underline underline-offset-2"
+        >{{ row.submissions_count }}</NuxtLink>
+        <span v-if="row.pending_count" class="ml-2 text-[.72rem] font-bold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">{{ row.pending_count }} pending</span>
+      </template>
+
+      <template #cell-status="{ row }">
+        <span
+          class="badge"
+          :class="row.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'"
+        >{{ row.status === 'published' ? `Published · v${row.version}` : 'Draft' }}</span>
+      </template>
+
+      <template #actions="{ row }">
+        <div class="relative inline-block" @click.stop>
+          <button
+            class="w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center hover:bg-brand-soft"
+            aria-label="Actions"
+            @click="toggleMenu(row.audience, $event)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="text-muted"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="openMenu === row.audience && menuAnchor"
+              class="fixed bg-white border border-line rounded-xl shadow-lg z-30 min-w-47.5 overflow-hidden py-1"
+              :style="{ top: `${menuAnchor.top}px`, right: `${menuAnchor.right}px` }"
+              @click.stop
+            >
               <NuxtLink
-                :to="`/org/events/${id}/settings/profile/${r.audience}/submissions`"
-                class="text-[#6352e7] font-semibold underline underline-offset-2"
-              >{{ r.submissions_count }}</NuxtLink>
-              <span v-if="r.pending_count" class="ml-2 text-[.72rem] font-bold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">{{ r.pending_count }} pending</span>
-            </td>
-            <td class="px-5 py-4">
-              <span
-                class="badge"
-                :class="r.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'"
-              >{{ r.status === 'published' ? `Published · v${r.version}` : 'Draft' }}</span>
-            </td>
-            <td class="px-5 py-4">
-              <div class="flex justify-end" @click.stop>
-                <div class="relative">
-                  <button
-                    class="w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center hover:bg-[#f3f0ff]"
-                    aria-label="Actions"
-                    @click="toggleMenu(r.audience)"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" class="text-muted"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
-                  </button>
-                  <div
-                    v-if="openMenu === r.audience"
-                    class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-30 min-w-[190px] overflow-hidden py-1"
-                  >
-                    <NuxtLink
-                      :to="`/org/events/${id}/settings/profile/${r.audience}`"
-                      class="flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink no-underline hover:bg-[#f7f8fa]"
-                    >
-                      <AppIcon name="pencil" class="w-4 h-4 text-muted" /> Manage Fields
-                    </NuxtLink>
-                    <NuxtLink
-                      :to="`/org/events/${id}/settings/profile/${r.audience}/submissions`"
-                      class="flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink no-underline hover:bg-[#f7f8fa]"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-                      View Submissions
-                    </NuxtLink>
-                    <button
-                      class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink bg-transparent border-none cursor-pointer text-left hover:bg-[#f7f8fa]"
-                      @click="openShare(r)"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-                      Publish &amp; Share
-                    </button>
-                    <button
-                      class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-[#dc2626] bg-transparent border-none cursor-pointer text-left hover:bg-[#fef2f2]"
-                      @click="closeMenu(); resetRow = r"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                      Delete &amp; Reset
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+                :to="`/org/events/${id}/settings/profile/${row.audience}`"
+                class="flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink no-underline hover:bg-[#f7f8fa]"
+                @click="closeMenu"
+              >
+                <AppIcon name="pencil" class="w-4 h-4 text-muted" /> Manage Fields
+              </NuxtLink>
+              <NuxtLink
+                :to="`/org/events/${id}/settings/profile/${row.audience}/submissions`"
+                class="flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink no-underline hover:bg-[#f7f8fa]"
+                @click="closeMenu"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                View Submissions
+              </NuxtLink>
+              <button
+                class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-ink bg-transparent border-none cursor-pointer text-left hover:bg-[#f7f8fa]"
+                @click="openShare(row)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+                Publish &amp; Share
+              </button>
+              <button
+                class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[.85rem] text-[#dc2626] bg-transparent border-none cursor-pointer text-left hover:bg-[#fef2f2]"
+                @click="closeMenu(); resetRow = row"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                Delete &amp; Reset
+              </button>
+            </div>
+          </Teleport>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- ── Publish & Share ─────────────────────────────────────── -->
     <Modal v-if="shareRow" :title="`Share ${shareRow.name} Form`" @close="shareRow = null">

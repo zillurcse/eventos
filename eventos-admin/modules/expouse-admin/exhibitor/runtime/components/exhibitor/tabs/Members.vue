@@ -40,7 +40,7 @@ const columns = [
     >
       <template #cell-member="{ row }">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-full bg-brand-soft text-brand flex items-center justify-center font-bold text-[.72rem] shrink-0 uppercase">
+          <div class="w-9 h-9 rounded-full bg-[#F0EEFD] text-brand flex items-center justify-center font-bold text-[.72rem] shrink-0 uppercase">
             {{ exhibitorInitials(row.contact?.name || row.contact?.email || '') }}
           </div>
           <div class="min-w-0">

@@ -27,31 +27,26 @@ function save() {
 </script>
 
 <template>
-  <div class="card">
+  <div>
     <!-- Section header -->
-    <div class="flex items-start justify-between gap-4 mb-1.5">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-brand-soft grid place-items-center shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-            <path d="M17 20.5H7c-3 0-5-1.5-5-5v-7c0-3.5 2-5 5-5h10c3 0 5 1.5 5 5v7c0 3.5-2 5-5 5z"/>
-            <path d="m17 9-3.13 2.5c-1.03.82-2.72.82-3.75 0L7 9"/>
-          </svg>
-        </div>
-        <div>
-          <h2 class="mb-0!">Email Header</h2>
-          <p class="text-[.8rem] text-muted mt-0.5">Header image shown at the top of all event emails.</p>
-        </div>
+    <div class="flex items-start justify-between gap-4 mb-1">
+      <div>
+        <h2 class="text-[1.05rem] font-bold text-ink mb-1">Email Header</h2>
+        <p class="text-[.85rem] text-muted">Header image shown at the top of all event emails.</p>
       </div>
-      <button class="btn sm ghost shrink-0" @click="openDrawer">
-        {{ emailHeaderUrl ? 'Edit header' : 'Add header' }}
+      <button
+        class="shrink-0 inline-flex items-center px-5 py-2.5 rounded-lg text-[.85rem] font-semibold bg-[#F0EEFD] text-brand-dark transition-colors hover:bg-brand hover:text-white cursor-pointer"
+        @click="openDrawer"
+      >
+       + {{ emailHeaderUrl ? 'Edit header' : 'Add header' }}
       </button>
     </div>
 
     <!-- Preview -->
-    <div v-if="emailHeaderUrl" class="mt-4 rounded-xl overflow-hidden border border-line max-w-110" :style="{ aspectRatio: '4' }">
+    <div v-if="emailHeaderUrl" class="mt-4 rounded-lg overflow-hidden border border-line max-w-110" :style="{ aspectRatio: '4' }">
       <img :src="emailHeaderUrl" alt="Email header" class="w-full h-full object-cover">
     </div>
-    <div v-else class="flex items-center justify-center py-8 rounded-xl border border-dashed border-line bg-[#fafbfc] mt-4 text-[.85rem] text-muted">
+    <div v-else class="flex items-center justify-center py-8 rounded-lg border border-dashed border-line bg-[#fafbfc] mt-4 text-[.85rem] text-muted">
       No email header yet.
     </div>
 

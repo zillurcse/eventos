@@ -61,7 +61,7 @@ function filterChips(fid: string) {
         >
           <span class="flex items-center gap-2 min-w-0">
             <span class="font-semibold text-[.9rem] text-ink truncate">{{ f.title }}</span>
-            <span v-if="filterCount(f.id)" class="bg-brand-soft text-brand-dark text-[.72rem] font-semibold px-2 py-0.5 rounded-full shrink-0">{{ filterCount(f.id) }}</span>
+            <span v-if="filterCount(f.id)" class="bg-[#F0EEFD] text-brand-dark text-[.72rem] font-semibold px-2 py-0.5 rounded-full shrink-0">{{ filterCount(f.id) }}</span>
           </span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 text-muted transition-transform shrink-0" :class="openFilter === f.id ? 'rotate-180' : ''"><path d="M6 9l6 6 6-6"/></svg>
         </button>
@@ -71,7 +71,7 @@ function filterChips(fid: string) {
           <span
             v-for="chip in filterChips(f.id)"
             :key="chip.heading + '::' + chip.opt"
-            class="inline-flex items-center gap-1 bg-brand-soft text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full"
+            class="inline-flex items-center gap-1 bg-[#F0EEFD] text-brand-dark text-[.8rem] font-semibold px-2.5 py-0.5 rounded-full"
           >
             {{ chip.opt }}
             <button type="button" class="border-0 bg-transparent cursor-pointer text-brand-dark font-bold leading-none p-0" @click="toggleOption(f.id, chip.heading, chip.opt)">×</button>

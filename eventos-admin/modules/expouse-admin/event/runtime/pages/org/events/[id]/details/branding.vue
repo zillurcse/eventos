@@ -105,7 +105,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-180">
+  <div class="w-full">
 
     <!-- Page header -->
     <div class="flex items-center justify-between mb-6">
@@ -125,57 +125,64 @@ onMounted(load)
       </button>
     </div>
 
-    <BrandingLogo
-      class="mb-4"
-      :event-id="id"
-      :logo-url="logoUrl"
-      @logo-uploaded="onLogoUploaded"
-    />
+    <div class="card">
+      <BrandingLogo
+        :event-id="id"
+        :logo-url="logoUrl"
+        @logo-uploaded="onLogoUploaded"
+      />
 
-    <BrandingAppearance
-      class="mb-4"
-      v-model="appearance"
-    />
+      <hr class="border-line my-6">
 
-    <BrandingColors
-      class="mb-4"
-      :colors="colors"
-      @update="onColorsUpdate"
-    />
+      <BrandingAppearance
+        v-model="appearance"
+      />
 
-    <BrandingBannerList
-      class="mb-4"
-      :event-id="id"
-      :banners="banners"
-      title="Community Banner"
-      subtitle="Banners displayed on the event landing page."
-      @update="onBannersUpdate"
-    />
+      <hr class="border-line my-6">
 
-    <BrandingBannerList
-      class="mb-4"
-      :event-id="id"
-      :banners="eventBanners"
-      title="Event Page Banner"
-      subtitle="Banners displayed inside the event app after sign-in."
-      @update="onEventBannersUpdate"
-    />
+      <BrandingColors
+        :colors="colors"
+        @update="onColorsUpdate"
+      />
 
-    <BrandingLoginPageDesign
-      class="mb-4"
-      :event-id="id"
-      :login="login"
-      @update="onLoginUpdate"
-    />
+      <hr class="border-line my-6">
 
-    <BrandingEmailHeader
-      class="mb-6"
-      :event-id="id"
-      :email-header-url="emailHeaderUrl"
-      @uploaded="onEmailHeaderUploaded"
-    />
+      <BrandingBannerList
+        :event-id="id"
+        :banners="banners"
+        title="Community Banner"
+        subtitle="Banners displayed on the event landing page."
+        @update="onBannersUpdate"
+      />
 
-    <p v-if="error" class="error mb-4">{{ error }}</p>
+      <hr class="border-line my-6">
+
+      <BrandingBannerList
+        :event-id="id"
+        :banners="eventBanners"
+        title="Event Page Banner"
+        subtitle="Banners displayed inside the event app after sign-in."
+        @update="onEventBannersUpdate"
+      />
+
+      <hr class="border-line my-6">
+
+      <BrandingLoginPageDesign
+        :event-id="id"
+        :login="login"
+        @update="onLoginUpdate"
+      />
+
+      <hr class="border-line my-6">
+
+      <BrandingEmailHeader
+        :event-id="id"
+        :email-header-url="emailHeaderUrl"
+        @uploaded="onEmailHeaderUploaded"
+      />
+    </div>
+
+    <p v-if="error" class="error mt-4 mb-0">{{ error }}</p>
 
   </div>
 </template>
