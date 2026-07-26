@@ -46,14 +46,18 @@ class SocialAuthController extends Controller
         private readonly TenantContext $tenant,
     ) {}
 
-    /** GET /auth/social/{provider}/redirect?subdomain=… — send them to the provider. */
+    /** GET /auth/social/{provider}/redirect?subdomain=…&host=… — send them to the provider. */
     public function redirect(Request $request, string $provider): RedirectResponse
     {
         $driver = EventAccess::SOCIAL_DRIVERS[$provider] ?? null;
         abort_if($driver === null, 404, 'Unknown sign-in provider.');
 
         $subdomain = (string) $request->query('subdomain', '');
-        $resolved = $this->access->resolve($subdomain);
+        $host = (string) $request->query('host', '');
+        $resolved = $this->access->resolveIdentity(
+            $subdomain !== '' ? $subdomain : null,
+            $host !== '' ? $host : null,
+        );
         abort_if($resolved === null, 404, 'Event not found.');
 
         [, $setting] = $resolved;
@@ -66,8 +70,13 @@ class SocialAuthController extends Controller
             'That sign-in method is not available for this event.',
         );
 
+        // Prefer the platform subdomain for state (stable), but remember the
+        // custom host so we can send them back to the right site.
+        $platformSub = data_get($setting->domain, 'subdomain') ?: $subdomain;
+
         $state = Crypt::encryptString(json_encode([
-            'subdomain' => $subdomain,
+            'subdomain' => $platformSub,
+            'host' => $host !== '' ? strtolower($host) : null,
             'provider' => $provider,
             'issued_at' => now()->timestamp,
         ]));
@@ -87,7 +96,10 @@ class SocialAuthController extends Controller
         abort_if($driver === null, 404, 'Unknown sign-in provider.');
 
         $state = $this->readState($request, $provider);
-        $resolved = $this->access->resolve($state['subdomain']);
+        $resolved = $this->access->resolveIdentity(
+            $state['subdomain'] ?? null,
+            $state['host'] ?? null,
+        );
         abort_if($resolved === null, 404, 'Event not found.');
 
         [$event, $setting] = $resolved;
@@ -105,7 +117,7 @@ class SocialAuthController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
-            return $this->back($state['subdomain'], ['error' => 'social_failed']);
+            return $this->back($state, ['error' => 'social_failed']);
         }
 
         $email = Str::lower(trim((string) $social->getEmail()));
@@ -115,12 +127,12 @@ class SocialAuthController extends Controller
         // so send them back to sign in the ordinary way rather than inventing an
         // account that can never be matched to their registration.
         if ($email === '') {
-            return $this->back($state['subdomain'], ['error' => 'social_no_email']);
+            return $this->back($state, ['error' => 'social_no_email']);
         }
 
         // An unknown person may only be created if the organizer left Signup on.
         if (! $this->access->channels($setting)['signup'] && ! $this->knownUser($email)) {
-            return $this->back($state['subdomain'], ['error' => 'signup_closed']);
+            return $this->back($state, ['error' => 'signup_closed']);
         }
 
         $this->tenant->set($event->organization_id);
@@ -129,10 +141,10 @@ class SocialAuthController extends Controller
         [$user] = $this->access->enrol($event, $email, $social->getName());
 
         if ($user->status === 'disabled') {
-            return $this->back($state['subdomain'], ['error' => 'account_disabled']);
+            return $this->back($state, ['error' => 'account_disabled']);
         }
 
-        return $this->back($state['subdomain'], [], $this->access->token($user));
+        return $this->back($state, [], $this->access->token($user));
     }
 
     /**
@@ -163,7 +175,8 @@ class SocialAuthController extends Controller
         }
 
         abort_unless(
-            is_array($state) && ($state['provider'] ?? null) === $provider && ! empty($state['subdomain']),
+            is_array($state) && ($state['provider'] ?? null) === $provider
+                && (! empty($state['subdomain']) || ! empty($state['host'])),
             400,
             'Invalid sign-in state.',
         );
@@ -184,18 +197,28 @@ class SocialAuthController extends Controller
      * Back to the event site. The token rides in the fragment so it never reaches
      * a server log; errors ride in the query string because they are not secret
      * and the SPA may need them after a reload.
+     *
+     * @param  array{subdomain?:?string, host?:?string}  $state
      */
-    private function back(string $subdomain, array $query = [], ?string $token = null): RedirectResponse
+    private function back(array $state, array $query = [], ?string $token = null): RedirectResponse
     {
-        $base = rtrim((string) config('app.event_site_url', env('EVENT_SITE_URL', 'http://localhost:3001')), '/');
-        $host = parse_url($base, PHP_URL_HOST) ?: 'localhost';
+        $subdomain = (string) ($state['subdomain'] ?? '');
+        $customHost = (string) ($state['host'] ?? '');
 
-        // Dev runs every event on one host, so the subdomain travels as a query
-        // param (matching the SPA's own useEventSubdomain fallback); production
-        // gives each event a real subdomain.
-        $url = str_contains($host, 'localhost') || filter_var($host, FILTER_VALIDATE_IP)
-            ? $base.'/?subdomain='.urlencode($subdomain)
-            : preg_replace('#^(https?://)#', '$1'.$subdomain.'.', $base).'/';
+        // Verified custom domain wins — send them back where they started.
+        if ($customHost !== '') {
+            $url = 'https://'.$customHost.'/';
+        } else {
+            $base = rtrim((string) config('app.event_site_url', env('EVENT_SITE_URL', 'http://localhost:3001')), '/');
+            $host = parse_url($base, PHP_URL_HOST) ?: 'localhost';
+
+            // Dev runs every event on one host, so the subdomain travels as a query
+            // param (matching the SPA's own useEventSubdomain fallback); production
+            // gives each event a real subdomain.
+            $url = str_contains($host, 'localhost') || filter_var($host, FILTER_VALIDATE_IP)
+                ? $base.'/?subdomain='.urlencode($subdomain)
+                : preg_replace('#^(https?://)#', '$1'.$subdomain.'.', $base).'/';
+        }
 
         foreach ($query as $key => $value) {
             $url .= (str_contains($url, '?') ? '&' : '?').$key.'='.urlencode((string) $value);

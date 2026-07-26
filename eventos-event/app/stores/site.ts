@@ -129,10 +129,10 @@ export const useSiteStore = defineStore('site', {
 
   actions: {
     async fetchSite() {
-      const sub = useEventSubdomain()
-      this.subdomain = sub
+      const identity = useEventIdentity()
+      this.subdomain = identity.subdomain || identity.host
 
-      if (!sub) {
+      if (!identity.subdomain && !identity.host) {
         this.notFound = true
         return
       }
@@ -142,7 +142,7 @@ export const useSiteStore = defineStore('site', {
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: SitePayload }>(`${apiBase}/public/site`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.site = res.data
         this.applyBranding()

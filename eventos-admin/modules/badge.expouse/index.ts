@@ -1,4 +1,4 @@
-import { defineNuxtModule, createResolver, addComponent, addComponentsDir, addLayout, addPlugin, extendPages } from '@nuxt/kit'
+import { defineNuxtModule, createResolver, addComponent, addComponentsDir, addLayout, extendPages } from '@nuxt/kit'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
@@ -21,8 +21,8 @@ import { dirname, join } from 'node:path'
  *  - Badge uses @nuxt/icon's <NuxtIcon> (its <Icon> was rewritten) because the
  *    admin has its own hand-rolled <Icon> component that only knows a fixed set
  *    of SVG paths and can't render iconify `name="mdi:..."` icons.
- *  - The pdf plugin (provides $jsPDF / $html2canvas, used by the preview/export)
- *    is registered as a client plugin.
+ *  - PDF export (jsPDF / html2canvas) is loaded on demand in preview-badge —
+ *    not via a global client plugin, so those ~600 kB never hit every admin page.
  */
 export default defineNuxtModule({
   meta: { name: 'badge-expouse' },
@@ -46,8 +46,6 @@ export default defineNuxtModule({
     addComponent({ name: 'NuxtIcon', filePath: iconComponent, export: 'default' })
 
     addLayout(resolve('app/layouts/default.vue'), 'badge')
-
-    addPlugin({ src: resolve('app/plugins/pdf.client.ts'), mode: 'client' })
 
     extendPages((pages) => {
       pages.push(

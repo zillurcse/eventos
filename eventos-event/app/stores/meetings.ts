@@ -100,13 +100,14 @@ export const useMeetingsStore = defineStore('meetings', {
     /** The organizer's "main ads" strip targeted at the Meetings page. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'meetings' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {

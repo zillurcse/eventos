@@ -16,6 +16,12 @@ const selected = ref<(string | number)[]>([])
 const openMenuId = ref<string | null>(null)
 const saving = ref(false)
 
+const testModal = ref<{ row: MailEmail } | null>(null)
+const testEmail = ref('')
+const testSending = ref(false)
+const testError = ref('')
+const testOk = ref('')
+
 const DEFAULTS: MailEmail[] = [
   {
     id: 'e-reg',
@@ -182,6 +188,47 @@ function editRoute(id: string) {
   return `/org/events/${eventId}/mail/emails/${id}`
 }
 
+function reportRoute(id: string, hash = '') {
+  return `/org/events/${eventId}/mail/emails/report/${id}${hash}`
+}
+
+function openTestModal(row: MailEmail) {
+  openMenuId.value = null
+  if (!row.template_id) {
+    alert('Link a template to this email first (Edit Email → Template step), then send a test.')
+    return
+  }
+  testModal.value = { row }
+  testEmail.value = ''
+  testError.value = ''
+  testOk.value = ''
+}
+
+function closeTestModal() {
+  if (testSending.value) return
+  testModal.value = null
+}
+
+async function sendTestEmail() {
+  const row = testModal.value?.row
+  if (!row?.template_id || !testEmail.value.trim()) return
+  testSending.value = true
+  testError.value = ''
+  testOk.value = ''
+  try {
+    await api(`/email-templates/${row.template_id}/send-test`, {
+      method: 'POST',
+      body: { to: testEmail.value.trim() },
+    })
+    testOk.value = `Test email sent to ${testEmail.value.trim()}.`
+    setTimeout(() => { testModal.value = null }, 1200)
+  } catch (e: any) {
+    testError.value = e?.data?.message || 'Could not send test email.'
+  } finally {
+    testSending.value = false
+  }
+}
+
 async function toggleActive(row: MailEmail) {
   row.active = !row.active
   if (row.active) row.status = 'active'
@@ -318,7 +365,7 @@ onBeforeUnmount(() => {
           <template v-if="tab === 'automated'">
             <NuxtLink
               v-if="row.active"
-              :to="editRoute(row.id)"
+              :to="reportRoute(row.id)"
               class="inline-flex items-center gap-1.5 text-[.82rem] font-semibold text-brand no-underline hover:text-brand-dark"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -366,13 +413,55 @@ onBeforeUnmount(() => {
                 class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
                 @click="openMenuId = null"
               >Edit Email</NuxtLink>
-              <button class="block w-full text-left px-4 py-2.5 text-[.88rem] text-ink hover:bg-[#f7f8fa] bg-transparent border-0 cursor-pointer" @click="openMenuId = null">Send Test Email</button>
-              <button class="block w-full text-left px-4 py-2.5 text-[.88rem] text-ink hover:bg-[#f7f8fa] bg-transparent border-0 cursor-pointer" @click="openMenuId = null">Analytics</button>
+              <button
+                type="button"
+                class="block w-full text-left px-4 py-2.5 text-[.88rem] text-ink hover:bg-[#f7f8fa] bg-transparent border-0 cursor-pointer"
+                @click="openTestModal(row)"
+              >Send Test Email</button>
+              <NuxtLink
+                :to="reportRoute(row.id, '#analytics')"
+                class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
+                @click="openMenuId = null"
+              >Analytics</NuxtLink>
               <button class="block w-full text-left px-4 py-2.5 text-[.88rem] text-[#dc2626] hover:bg-[#fef2f2] bg-transparent border-0 cursor-pointer" @click="removeEmail(row)">Delete</button>
             </div>
           </div>
         </div>
       </template>
     </DataTable>
+
+    <!-- Send test email modal -->
+    <div
+      v-if="testModal"
+      class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+      @click.self="closeTestModal"
+    >
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+        <h3 class="m-0 mb-1 text-[1.05rem] font-bold text-ink">Send test email</h3>
+        <p class="muted text-[.84rem] mt-0 mb-4">
+          Sends <span class="text-ink font-medium">{{ testModal.row.name }}</span> using its linked template.
+        </p>
+        <label class="block text-[.85rem] font-semibold text-ink mb-1.5">Recipient</label>
+        <input
+          v-model="testEmail"
+          type="email"
+          class="m-0"
+          placeholder="you@example.com"
+          :disabled="testSending"
+          @keyup.enter="sendTestEmail"
+        >
+        <p v-if="testError" class="error text-[.82rem] mt-2 mb-0">{{ testError }}</p>
+        <p v-else-if="testOk" class="text-[.82rem] text-[#15803d] mt-2 mb-0">{{ testOk }}</p>
+        <div class="flex items-center gap-2 mt-5 justify-end">
+          <button type="button" class="btn ghost" :disabled="testSending" @click="closeTestModal">Cancel</button>
+          <button
+            type="button"
+            class="btn"
+            :disabled="testSending || !testEmail.trim()"
+            @click="sendTestEmail"
+          >{{ testSending ? 'Sending…' : 'Send test' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

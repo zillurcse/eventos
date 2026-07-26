@@ -33,18 +33,19 @@ const allReady = computed(() => total.value > 0 && completed.value >= total.valu
 
 async function load() {
   try {
-    const [ev, ov, settings] = await Promise.all([
+    const [ev, ov, domain] = await Promise.all([
       api<{ data: EventInfo }>(`/events/${id}`),
       api<any>(`/events/${id}/overview`),
-      api<any>(`/events/${id}/settings`),
+      api<any>(`/events/${id}/domain`),
     ])
     event.value = ev.data
     checklist.value = ov.data.checklist || []
     completed.value = ov.data.completed || 0
     total.value = ov.data.total || 0
-    const sub = settings.data.domain?.subdomain
-    const custom = settings.data.domain?.custom_domain
-    websiteUrl.value = custom ? `https://${custom}` : `https://${sub || 'your-event'}.eventos.app`
+    websiteUrl.value = domain.data.primary_url
+      || domain.data.custom_domain_url
+      || domain.data.subdomain_url
+      || ''
   } catch { /* */ }
 }
 

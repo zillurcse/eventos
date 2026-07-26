@@ -5,8 +5,6 @@ import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useCanvasRendering } from "@floorplan/composables/useCanvasRendering";
 import { useIconRenderer } from "@floorplan/composables/useIconRenderer";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 
 const emit = defineEmits<{
   close: [];
@@ -186,6 +184,8 @@ const generatePreviewImage = async (): Promise<string> => {
 
     exportProgress.value = "Rendering elements...";
 
+    const { default: html2canvas } = await import("html2canvas");
+
     // Capture the preview container exactly as rendered
     const canvas = await html2canvas(previewContainer.value, {
       backgroundColor: "#ffffff",
@@ -241,6 +241,8 @@ const downloadAsPDF = async () => {
       pdfHeight = 297; // A4 portrait height in mm
       pdfWidth = pdfHeight * imgRatio;
     }
+
+    const { jsPDF } = await import("jspdf");
 
     const pdf = new jsPDF({
       orientation: imgRatio > 1 ? "landscape" : "portrait",

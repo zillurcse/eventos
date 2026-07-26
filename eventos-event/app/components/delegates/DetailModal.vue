@@ -1,85 +1,42 @@
 <script setup lang="ts">
-import type { Speaker } from '~/stores/speakers'
-import type { AgendaSession } from '~/stores/sessions'
+import type { Delegate } from '~/stores/delegates'
 
-const props = defineProps<{ speaker: Speaker }>()
+const props = defineProps<{ delegate: Delegate }>()
 
-const store = useSpeakersStore()
-const delegates = useDelegatesStore()
-const sessionsStore = useSessionsStore()
+const store = useDelegatesStore()
 const bookmarks = useBookmarksStore()
 const auth = useAuthStore()
 
 const bioExpanded = ref(false)
 
-onMounted(() => {
-  // The schedule reuses the public agenda payload; fetch it once on demand.
-  if (!sessionsStore.loaded && !sessionsStore.loading) sessionsStore.fetchSessions()
-  window.addEventListener('keydown', onKey)
-})
+onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') store.close()
 }
 
-const subtitle = computed(() => {
-  const s = props.speaker
-  return [s.designation, s.company].filter(Boolean).join(' · ')
-})
+const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
 
-const bookmarked = computed(() => bookmarks.isOn('speaker', props.speaker.id))
-
-function openConnect() {
-  delegates.openConnect({
-    id: props.speaker.id,
-    name: props.speaker.name,
-    company: props.speaker.company,
-    job_title: props.speaker.designation,
-    avatar_url: props.speaker.image_url,
-    online: false,
-  }, 'connect')
-}
-
-const socialIcons: Record<string, string> = {
-  linkedin: 'M4 4h4v16H4zM6 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4M10 8h4v2a4 4 0 0 1 6 3v7h-4v-6a2 2 0 0 0-4 0v6h-4z',
-  twitter: 'M22 5a8 8 0 0 1-2.3.6A4 4 0 0 0 21.4 3a8 8 0 0 1-2.5 1A4 4 0 0 0 12 7.5a11 11 0 0 1-8-4 4 4 0 0 0 1.2 5.3A4 4 0 0 1 3 8.3a4 4 0 0 0 3.2 4 4 4 0 0 1-1.8.1 4 4 0 0 0 3.7 2.8A8 8 0 0 1 2 18a11 11 0 0 0 18-8.5A6 6 0 0 0 22 5z',
-  facebook: 'M14 9h3V5h-3a4 4 0 0 0-4 4v2H7v4h3v6h4v-6h3l1-4h-4V9a1 1 0 0 1 1-1z',
-  instagram: 'M4 8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M17 6.5h.01',
-  whatsapp: 'M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.4l.7 1.7c0 .2 0 .3-.1.5l-.4.5c-.1.1-.2.3-.1.5.4.7 1 1.4 1.7 1.8.2.1.3.1.5-.1l.5-.5c.1-.1.3-.2.5-.1l1.6.8c.2.1.3.2.3.4v.6c0 .5-.6 1-1.1 1.1-1 .2-2.3 0-4-1.4-1.4-1.1-2.3-2.5-2.6-3.4-.2-.6-.2-1.2 0-1.6z',
-  website: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
-}
-const socials = computed(() => Object.entries(props.speaker.social || {}).filter(([, v]) => v))
-
-const bio = computed(() => (props.speaker.bio || '').replace(/<[^>]+>/g, '').trim())
+const bio = computed(() => (props.delegate.bio || '').replace(/<[^>]+>/g, '').trim())
 const bioIsLong = computed(() => bio.value.length > 180)
 const bioShown = computed(() =>
   bioExpanded.value || !bioIsLong.value ? bio.value : `${bio.value.slice(0, 180).trimEnd()}…`,
 )
 
-/** Agenda sessions this speaker is assigned to, soonest first (TBA last). */
-const schedule = computed<AgendaSession[]>(() =>
-  sessionsStore.sessions
-    .filter(s => s.speakers.some(sp => sp.id === props.speaker.id))
-    .sort((a, b) => {
-      if (!a.starts_at) return 1
-      if (!b.starts_at) return -1
-      return a.starts_at.localeCompare(b.starts_at)
-    }),
-)
+const socialIcons: Record<string, string> = {
+  linkedin: 'M4 4h4v16H4zM6 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4M10 8h4v2a4 4 0 0 1 6 3v7h-4v-6a2 2 0 0 0-4 0v6h-4z',
+  twitter: 'M22 5a8 8 0 0 1-2.3.6A4 4 0 0 0 21.4 3a8 8 0 0 1-2.5 1A4 4 0 0 0 12 7.5a11 11 0 0 1-8-4 4 4 0 0 0 1.2 5.3A4 4 0 0 1 3 8.3a4 4 0 0 0 3.2 4 4 4 0 0 1-1.8.1 4 4 0 0 0 3.7 2.8A8 8 0 0 1 2 18a11 11 0 0 0 18-8.5A6 6 0 0 0 22 5z',
+  x: 'M22 5a8 8 0 0 1-2.3.6A4 4 0 0 0 21.4 3a8 8 0 0 1-2.5 1A4 4 0 0 0 12 7.5a11 11 0 0 1-8-4 4 4 0 0 0 1.2 5.3A4 4 0 0 1 3 8.3a4 4 0 0 0 3.2 4 4 4 0 0 1-1.8.1 4 4 0 0 0 3.7 2.8A8 8 0 0 1 2 18a11 11 0 0 0 18-8.5A6 6 0 0 0 22 5z',
+  facebook: 'M14 9h3V5h-3a4 4 0 0 0-4 4v2H7v4h3v6h4v-6h3l1-4h-4V9a1 1 0 0 1 1-1z',
+  instagram: 'M4 8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M17 6.5h.01',
+  whatsapp: 'M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.4l.7 1.7c0 .2 0 .3-.1.5l-.4.5c-.1.1-.2.3-.1.5.4.7 1 1.4 1.7 1.8.2.1.3.1.5-.1l.5-.5c.1-.1.3-.2.5-.1l1.6.8c.2.1.3.2.3.4v.6c0 .5-.6 1-1.1 1.1-1 .2-2.3 0-4-1.4-1.4-1.1-2.3-2.5-2.6-3.4-.2-.6-.2-1.2 0-1.6z',
+  website: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+}
+const socials = computed(() => Object.entries(props.delegate.social || {}).filter(([, v]) => v))
 
-/** "NOV 18 | TUE | 11:00 AM - 01:00 PM" in the viewer's own timezone. */
-function whenLabel(s: AgendaSession) {
-  if (!s.starts_at) return 'Time TBA'
-  const tz = deviceTimezone()
-  const d = new Date(s.starts_at)
-  const part = (opts: Intl.DateTimeFormatOptions, date: Date) =>
-    new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(date)
-  const month = part({ month: 'short', day: 'numeric' }, d).toUpperCase()
-  const day = part({ weekday: 'short' }, d).toUpperCase()
-  const time = (date: Date) => part({ hour: '2-digit', minute: '2-digit', hour12: true }, date)
-  const range = s.ends_at ? `${time(d)} - ${time(new Date(s.ends_at))}` : time(d)
-  return `${month} | ${day} | ${range}`
+function openConnect() {
+  store.openConnect(props.delegate, 'connect')
 }
 </script>
 
@@ -92,16 +49,17 @@ function whenLabel(s: AgendaSession) {
         </svg>
       </button>
 
-      <div class="modal" role="dialog" aria-modal="true" :aria-label="speaker.name || 'Speaker profile'">
+      <div class="modal" role="dialog" aria-modal="true" :aria-label="delegate.name || 'Delegate profile'">
         <header class="head">
           <div class="photo">
-            <UserAvatar :src="speaker.image_url" :name="speaker.name" />
+            <UserAvatar :src="delegate.avatar_url" :name="delegate.name" />
           </div>
 
           <div class="ident">
-            <h2>{{ speaker.name }}</h2>
-            <p v-if="subtitle" class="role">{{ subtitle }}</p>
-            <span v-if="speaker.is_featured" class="featured">
+            <h2>{{ delegate.name }}</h2>
+            <p v-if="delegate.job_title" class="role">{{ delegate.job_title }}</p>
+            <p v-if="delegate.company" class="co">{{ delegate.company }}</p>
+            <span v-if="delegate.is_featured" class="featured">
               <svg viewBox="0 0 24 24">
                 <path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.4 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z" />
               </svg>
@@ -112,12 +70,12 @@ function whenLabel(s: AgendaSession) {
 
         <div class="hacts">
           <button class="hact bm" :class="{ on: bookmarked }" type="button" :title="bookmarked ? 'Saved' : 'Save'"
-            @click="bookmarks.toggle('speaker', speaker.id)">
+            @click="bookmarks.toggle('delegate', delegate.id)">
             <svg viewBox="0 0 24 24">
               <path d="M6 3h12v18l-6-4-6 4z" />
             </svg>
           </button>
-          <EventNotePopover v-if="auth.isAuthed" type="speaker" :id="speaker.id" block class="hact-note" />
+          <EventNotePopover v-if="auth.isAuthed" type="delegate" :id="delegate.id" block class="hact-note" />
           <button v-if="auth.isAuthed" class="hact chat" type="button" @click="openConnect">
             <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
             Chat
@@ -125,7 +83,9 @@ function whenLabel(s: AgendaSession) {
         </div>
 
         <div class="scroll">
-          <template v-if="bio">
+          <div v-if="store.detailLoading && !bio && !socials.length" class="sload">Loading profile…</div>
+
+          <template v-else-if="bio">
             <h3 class="sech">About</h3>
             <div class="bio">
               <p>{{ bioShown }}</p>
@@ -143,34 +103,9 @@ function whenLabel(s: AgendaSession) {
             </a>
           </div>
 
-          <div v-if="sessionsStore.loading && !sessionsStore.loaded" class="sload">Loading schedule…</div>
-
-          <template v-else-if="schedule.length">
-            <h3 class="sech">Sessions</h3>
-            <section class="sched">
-              <article v-for="s in schedule" :key="s.id" class="slot">
-                <p class="when">{{ whenLabel(s) }}</p>
-                <p class="stitle">{{ s.title }}</p>
-                <p v-if="s.session_place" class="splace">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" />
-                    <circle cx="12" cy="9.5" r="2.3" />
-                  </svg>
-                  {{ s.session_place }}
-                </p>
-
-                <div v-if="s.speakers.length" class="sspeakers">
-                  <p class="scount">Speakers ({{ s.speakers.length }})</p>
-                  <div class="savatars">
-                    <span v-for="sp in s.speakers.slice(0, 4)" :key="sp.id" class="savatar">
-                      <UserAvatar :src="sp.profile?.image_url" :name="sp.name" />
-                    </span>
-                    <span v-if="s.speakers.length > 4" class="smore">+{{ s.speakers.length - 4 }} More</span>
-                  </div>
-                </div>
-              </article>
-            </section>
-          </template>
+          <p v-if="!store.detailLoading && !bio && !socials.length" class="empty">
+            No additional profile details yet.
+          </p>
         </div>
       </div>
     </div>
@@ -225,10 +160,7 @@ function whenLabel(s: AgendaSession) {
   box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-primary) 45%, transparent);
 }
 
-.x:hover {
-  background: color-mix(in srgb, var(--brand-primary) 88%, #000);
-}
-
+.x:hover { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 .x svg {
   width: 16px;
   height: 16px;
@@ -254,9 +186,7 @@ function whenLabel(s: AgendaSession) {
   background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
 }
 
-.photo :deep(.ua) {
-  border-radius: 8px;
-}
+.photo :deep(.ua) { border-radius: 8px; }
 
 .ident {
   min-width: 0;
@@ -273,6 +203,13 @@ function whenLabel(s: AgendaSession) {
 
 .role {
   margin: 4px 0 0;
+  font-size: .92rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.co {
+  margin: 2px 0 0;
   font-size: .92rem;
   color: #64748b;
   line-height: 1.4;
@@ -302,12 +239,14 @@ function whenLabel(s: AgendaSession) {
   display: flex;
   gap: 12px;
   padding: 24px 26px;
+  border-bottom: 1px solid #eef0f3;
+  margin-bottom: 4px;
 }
 
 .hact {
   flex: none;
   width: 52px;
-  height: 40px;
+  height: 48px;
   border-radius: 10px;
   border: 1.5px solid var(--brand-primary);
   background: #fff;
@@ -333,9 +272,7 @@ function whenLabel(s: AgendaSession) {
   color: #fff;
 }
 
-.hact.on svg {
-  fill: currentColor;
-}
+.hact.on svg { fill: currentColor; }
 
 .hact.chat {
   flex: 1;
@@ -355,7 +292,7 @@ function whenLabel(s: AgendaSession) {
 }
 
 .scroll {
-  padding: 0 26px 26px;
+  padding: 18px 26px 26px;
   overflow-y: auto;
 }
 
@@ -397,9 +334,6 @@ function whenLabel(s: AgendaSession) {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 22px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid #eef0f3;
 }
 
 .soc {
@@ -413,9 +347,7 @@ function whenLabel(s: AgendaSession) {
   justify-content: center;
 }
 
-.soc:hover {
-  background: #eceef2;
-}
+.soc:hover { background: #eceef2; }
 
 .soc svg {
   width: 19px;
@@ -427,106 +359,18 @@ function whenLabel(s: AgendaSession) {
   stroke-linejoin: round;
 }
 
-.sload {
+.sload,
+.empty {
   color: #94a3b8;
   font-size: .88rem;
   padding: 8px 0;
-}
-
-.sched {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.slot {
-  border: 1.5px solid color-mix(in srgb, var(--brand-primary) 30%, #fff);
-  border-radius: 14px;
-  padding: 16px 18px;
-}
-
-.when {
   margin: 0;
-  color: var(--brand-primary);
-  font-weight: 800;
-  font-size: .92rem;
-  letter-spacing: .2px;
-}
-
-.stitle {
-  margin: 8px 0 0;
-  color: #1e293b;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.splace {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 8px 0 0;
-  color: #94a3b8;
-  font-size: .84rem;
-}
-
-.splace svg {
-  flex: none;
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sspeakers {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid #eef0f3;
-}
-
-.scount {
-  margin: 0 0 10px;
-  color: #64748b;
-  font-size: .84rem;
-}
-
-.savatars {
-  display: flex;
-  align-items: center;
-}
-
-.savatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #eef0f3;
-  margin-right: -10px;
-  flex: none;
-}
-
-.smore {
-  margin-left: 18px;
-  color: var(--brand-primary);
-  font-size: .84rem;
-  font-weight: 700;
 }
 
 @media (max-width: 560px) {
-  .head {
-    flex-direction: column;
-  }
-
-  .photo {
-    width: 108px;
-  }
-
-  .hacts {
-    flex-wrap: wrap;
-  }
+  .head { flex-direction: column; }
+  .photo { width: 108px; }
+  .hacts { flex-wrap: wrap; }
+  .x { top: 10px; right: 10px; }
 }
 </style>

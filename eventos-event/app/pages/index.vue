@@ -95,9 +95,11 @@ function socialError(code: string): string {
 /** Send the browser off to the provider; it returns to this page with a token. */
 function signInWith(provider: string) {
   const { public: { apiBase } } = useRuntimeConfig()
-  const sub = useEventSubdomain()
-  const url = `${apiBase}/auth/social/${provider}/redirect?subdomain=${encodeURIComponent(sub || '')}`
-  window.location.href = url
+  const { subdomain, host } = useEventIdentity()
+  const params = new URLSearchParams()
+  if (subdomain) params.set('subdomain', subdomain)
+  if (host) params.set('host', host)
+  window.location.href = `${apiBase}/auth/social/${provider}/redirect?${params.toString()}`
 }
 
 const initials = computed(() =>

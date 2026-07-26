@@ -13,6 +13,22 @@ const emit = defineEmits<{ (e: 'send', body: string): void }>()
 const draft = ref('')
 const scroller = ref<HTMLElement | null>(null)
 
+const isExhibitorThread = computed(() =>
+  props.conversation?.kind === 'exhibitor' && !!props.conversation.exhibitor_id,
+)
+
+function scheduleMeet() {
+  const c = props.conversation
+  if (!c?.exhibitor_id) return
+  useExhibitorContactStore().openFor({ id: c.exhibitor_id, name: c.with.name }, 'meet')
+}
+
+function visitExhibitor() {
+  const id = props.conversation?.exhibitor_id
+  if (!id) return
+  navigateTo(`/exhibitor/${id}`)
+}
+
 function submit() {
   const body = draft.value.trim()
   if (!body || props.sending) return
@@ -87,6 +103,17 @@ const lastSeenIndex = computed(() => {
         </div>
       </header>
 
+      <div v-if="isExhibitorThread" class="ex-actions">
+        <button type="button" class="ex-btn" @click="scheduleMeet">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+          Schedule Meet
+        </button>
+        <button type="button" class="ex-btn ghost" @click="visitExhibitor">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" /></svg>
+          Visit Exhibitor profile
+        </button>
+      </div>
+
       <div ref="scroller" class="scroll">
         <div v-if="loading" class="note">Loading messages…</div>
         <div v-else-if="!messages.length" class="note">No messages yet.</div>
@@ -133,6 +160,24 @@ const lastSeenIndex = computed(() => {
 .who strong { color: #1e293b; font-size: .92rem; }
 .who small { color: #94a3b8; font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .who .role { text-transform: capitalize; color: var(--brand-primary); font-weight: 700; }
+
+.ex-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 10px 18px; background: #fff; border-bottom: 1px solid #eef0f3;
+}
+.ex-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: none; border-radius: 999px; padding: 7px 12px;
+  background: var(--brand-primary); color: #fff;
+  font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer;
+}
+.ex-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ex-btn.ghost {
+  background: #fff; color: var(--brand-primary);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, #e2e8f0);
+}
+.ex-btn.ghost:hover { background: color-mix(in srgb, var(--brand-primary) 8%, #fff); }
+.ex-btn:hover:not(.ghost) { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 
 .scroll { flex: 1; overflow-y: auto; min-height: 0; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
 .note { color: #94a3b8; font-size: .84rem; text-align: center; padding: 30px 0; }

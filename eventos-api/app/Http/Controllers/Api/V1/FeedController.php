@@ -65,9 +65,10 @@ class FeedController extends Controller
             });
         }
 
-        return FeedPostResource::collection(
-            $query->orderByDesc('is_pinned')->latest('id')->paginate(20)->withQueryString()
-        );
+        $posts = $query->orderByDesc('is_pinned')->latest('id')->paginate(20)->withQueryString();
+        FeedPost::warmAuthorCache($posts->getCollection());
+
+        return FeedPostResource::collection($posts);
     }
 
     /**
@@ -261,10 +262,13 @@ class FeedController extends Controller
         $comments = FeedComment::where('post_id', $feedPost->id)
             ->where('status', 'published')
             ->orderBy('id')
-            ->get()
-            ->map(fn (FeedComment $c) => $this->commentPayload($c));
+            ->get();
 
-        return response()->json(['data' => $comments]);
+        FeedPost::warmAuthorCache($comments);
+
+        return response()->json([
+            'data' => $comments->map(fn (FeedComment $c) => $this->commentPayload($c))->values(),
+        ]);
     }
 
     public function comment(string $event, string $post, Request $request): JsonResponse

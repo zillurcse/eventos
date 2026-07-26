@@ -13,10 +13,10 @@ export function useApi() {
     onRequest({ options }) {
       const headers = new Headers(options.headers as HeadersInit)
 
-      // Scope every call to the event this subdomain resolves to ("API call
-      // under the subdomain") — the API reads this for public/event context.
-      const sub = useEventSubdomain()
-      if (sub) headers.set('X-Event-Subdomain', sub)
+      // Scope every call to the event this host/subdomain resolves to.
+      for (const [k, v] of Object.entries(eventIdentityHeaders())) {
+        headers.set(k, v)
+      }
 
       if (auth.token) headers.set('Authorization', `Bearer ${auth.token}`)
 

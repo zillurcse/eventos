@@ -103,21 +103,22 @@ export const useSessionsStore = defineStore('sessions', {
     /** Safe to call unconditionally — no-ops once `data` is fresh for the
      *  current subdomain, refetches when it isn't. */
     async fetchSessions() {
-      const sub = useEventSubdomain()
-      if (!sub) { this.error = true; return }
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) { this.error = true; return }
       if (this.loading) return
-      if (this.loaded && this.loadedSubdomain === sub) return
+      if (this.loaded && this.loadedSubdomain === id) return
 
       this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: SessionsPayload }>(`${apiBase}/public/sessions`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.data = res.data
         this.loaded = true
-        this.loadedSubdomain = sub
+        this.loadedSubdomain = id
       } catch {
         this.error = true
       } finally {
@@ -129,13 +130,14 @@ export const useSessionsStore = defineStore('sessions', {
      *  Sessions page) — shown as a banner above the day tabs. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: SessionsAd[], sidebar: SessionsAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'sessions' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {

@@ -167,6 +167,47 @@ class DelegateController extends Controller
         ]);
     }
 
+    /**
+     * Single-delegate profile for the detail modal — bio + social that the
+     * directory list deliberately omits to keep the paged payload light.
+     * GET /events/{event}/delegates/{uuid}
+     */
+    public function show(Request $request, string $uuid): JsonResponse
+    {
+        $eventId = $request->attributes->get('event_id');
+        $me = $request->attributes->get('participation_id');
+
+        $row = $this->directoryQuery($eventId, $me)
+            ->where('participations.uuid', $uuid)
+            ->firstOrFail();
+
+        $online = $this->onlineMap($eventId, collect([$row->id]));
+        $avatarFiles = $this->avatarFileUrls(collect([$row]));
+        $profile = $row->profile_data ?? [];
+
+        $social = is_array($profile['social'] ?? null) ? $profile['social'] : [];
+        // Drop empty entries so the client can render icons without filtering.
+        $social = array_filter(
+            $social,
+            fn ($v) => is_string($v) && trim($v) !== '',
+        );
+
+        return response()->json([
+            'data' => array_merge(
+                $this->format(
+                    $row,
+                    $online[$row->id] ?? false,
+                    $avatarFiles[$row->contact?->photo_file_id] ?? null,
+                ),
+                [
+                    'bio' => (string) ($profile['bio'] ?? ''),
+                    'social' => (object) $social,
+                    'is_featured' => (bool) ($profile['is_featured'] ?? false),
+                ],
+            ),
+        ]);
+    }
+
     /** Why this person surfaced — shown under the name in the strip. */
     private function matchLabel(int $score, string $jobTitle, string $company): string
     {

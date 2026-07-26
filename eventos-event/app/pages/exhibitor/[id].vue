@@ -29,13 +29,31 @@ watch(id, v => v && store.fetchDetail(v))
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', id.value))
 
 function openChat() {
-  if (ex.value) contact.openFor({ id: ex.value.id, name: ex.value.name }, 'chat')
+  if (ex.value) {
+    contact.openFor({
+      id: ex.value.id,
+      name: ex.value.name,
+      logo_url: ex.value.logo_url,
+      booth: ex.value.booth,
+      type: ex.value.type,
+      category: ex.value.category,
+    }, 'chat')
+  }
 }
 function openMeet() {
-  if (ex.value) contact.openFor({ id: ex.value.id, name: ex.value.name }, 'meet')
+  if (ex.value) {
+    contact.openFor({
+      id: ex.value.id,
+      name: ex.value.name,
+      logo_url: ex.value.logo_url,
+      booth: ex.value.booth,
+      type: ex.value.type,
+      category: ex.value.category,
+    }, 'meet')
+  }
 }
 function openShareDetails() {
-  if (ex.value) contact.openFor({ id: ex.value.id, name: ex.value.name }, 'chat')
+  openChat()
 }
 
 const copied = ref(false)

@@ -120,15 +120,16 @@ export const useExhibitorsStore = defineStore('exhibitors', {
 
   actions: {
     async fetchExhibitors() {
-      const sub = useEventSubdomain()
-      if (!sub) { this.error = true; return }
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) { this.error = true; return }
 
       this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: ExhibitorsPayload }>(`${apiBase}/public/exhibitors`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.exhibitors = res.data.exhibitors
         this.sponsors = res.data.sponsors
@@ -148,8 +149,8 @@ export const useExhibitorsStore = defineStore('exhibitors', {
 
     /** Load one booth's full profile for the details page. */
     async fetchDetail(id: string) {
-      const sub = useEventSubdomain()
-      if (!sub) { this.detailError = true; return }
+      const identity = useEventIdentity()
+      if (!(identity.subdomain || identity.host)) { this.detailError = true; return }
 
       this.detailLoading = true
       this.detailError = false
@@ -157,7 +158,7 @@ export const useExhibitorsStore = defineStore('exhibitors', {
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: ExhibitorDetail }>(`${apiBase}/public/exhibitors/${id}`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.detail = res.data
       } catch {
@@ -169,13 +170,14 @@ export const useExhibitorsStore = defineStore('exhibitors', {
 
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'exhibitors' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {

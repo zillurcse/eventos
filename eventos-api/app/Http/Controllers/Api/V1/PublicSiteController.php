@@ -15,9 +15,11 @@ use App\Models\Participation;
 use App\Models\Session;
 use App\Models\User;
 use App\Services\Auth\EventAccess;
+use App\Support\PublicEventCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -34,16 +36,26 @@ use Illuminate\Support\Facades\Storage;
  */
 class PublicSiteController extends Controller
 {
-    /** GET /api/v1/public/site — resolve subdomain → published event public config. */
+    /** GET /api/v1/public/site — resolve subdomain/custom host → published event public config. */
     public function show(Request $request): JsonResponse
     {
+        $cacheId = $this->cacheIdentity($request);
+        if ($cacheId === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        $cached = Cache::get(PublicEventCache::siteKey($cacheId));
+        if (is_array($cached)) {
+            return response()->json(['data' => $cached]);
+        }
+
         $resolved = $this->resolvePublishedEvent($request);
 
         if ($resolved === null) {
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
-        [$event, $setting, $sub] = $resolved;
+        [$event, $setting, $sub, $cacheId] = $resolved;
 
         $branding = $setting->branding ?? [];
         $theme = $setting->theme ?? [];
@@ -69,71 +81,74 @@ class PublicSiteController extends Controller
             ->latest('id')
             ->first();
 
-        return response()->json([
-            'data' => [
-                'event' => [
-                    'uuid' => $event->uuid,
-                    'name' => $event->name,
-                    'slug' => $event->slug,
-                    'description' => $event->description,
-                    'format' => $event->format,
-                    'starts_at' => $event->starts_at?->toIso8601String(),
-                    'ends_at' => $event->ends_at?->toIso8601String(),
-                    'timezone' => $event->timezone,
-                    'location' => $event->meta['location'] ?? null,
-                    'cover_url' => $cover ? Storage::disk($cover->disk)->url($cover->path) : null,
-                ],
-                'branding' => [
-                    'logo_url' => $branding['logo_url'] ?? null,
-                    'primary' => $theme['primary'] ?? '#6352e7',
-                    'accent' => $theme['accent'] ?? '#22d3ee',
-                    'banners' => $this->publicBanners($branding),
-                    'login' => [
-                        'type' => $branding['login']['type'] ?? 'banner',
-                        'banner_url' => $branding['login']['banner_url'] ?? null,
-                        'video_url' => $branding['login']['video_url'] ?? null,
-                        'website_url' => $branding['login']['website_url'] ?? null,
-                    ],
-                ],
-                'login' => [
-                    // Which doors are open (Settings › Access authentication).
-                    // A social channel the platform has no OAuth app for is
-                    // reported false however the organizer ticked it — the login
-                    // page must never show a button that dead-ends.
-                    'channels' => app(EventAccess::class)->channels($setting),
-                    'require_login' => (bool) ($login['require_login'] ?? false),
-                    'onboarding' => (bool) ($login['onboarding'] ?? false),
-                    // Kept for older clients that read `methods` directly.
-                    'methods' => $login['methods'] ?? [],
-                ],
-                'seo' => [
-                    'meta_title' => $seo['meta_title'] ?? null,
-                    'meta_description' => $seo['meta_description'] ?? null,
-                    'favicon_url' => $seo['favicon_url'] ?? null,
-                ],
-                // The tab bar the organizer configured in Navigation & Menu ›
-                // Web App Tabs: which sections appear, in what order, and how.
-                'navigation' => $this->navigation($setting->navigation ?? []),
-                'subdomain' => $sub,
-                'registration_form_uuid' => $regForm?->uuid,
-                'profile_form' => $profileForm ? [
-                    'uuid' => $profileForm->uuid,
-                    'fields' => $profileForm->fields
-                        ->reject(fn ($f) => in_array($f->type, ['section_break', 'recaptcha'], true))
-                        ->filter(fn ($f) => ($f->meta['visible'] ?? true) !== false)
-                        ->map(fn ($f) => [
-                            'key' => $f->key,
-                            'label' => $f->label,
-                            'help_text' => $f->help_text,
-                            'type' => $f->type,
-                            'required' => (bool) $f->is_required,
-                            'meta' => $f->meta,
-                            'options' => $f->options->map(fn ($o) => ['label' => $o->label, 'value' => $o->value])->values(),
-                        ])->values(),
-                ] : null,
-                'powered_by' => 'EXPOUSE',
+        $data = [
+            'event' => [
+                'uuid' => $event->uuid,
+                'name' => $event->name,
+                'slug' => $event->slug,
+                'description' => $event->description,
+                'format' => $event->format,
+                'starts_at' => $event->starts_at?->toIso8601String(),
+                'ends_at' => $event->ends_at?->toIso8601String(),
+                'timezone' => $event->timezone,
+                'location' => $event->meta['location'] ?? null,
+                'cover_url' => $cover ? Storage::disk($cover->disk)->url($cover->path) : null,
             ],
-        ]);
+            'branding' => [
+                'logo_url' => $branding['logo_url'] ?? null,
+                'primary' => $theme['primary'] ?? '#6352e7',
+                'accent' => $theme['accent'] ?? '#22d3ee',
+                'banners' => $this->publicBanners($branding),
+                'login' => [
+                    'type' => $branding['login']['type'] ?? 'banner',
+                    'banner_url' => $branding['login']['banner_url'] ?? null,
+                    'video_url' => $branding['login']['video_url'] ?? null,
+                    'website_url' => $branding['login']['website_url'] ?? null,
+                ],
+            ],
+            'login' => [
+                // Which doors are open (Settings › Access authentication).
+                // A social channel the platform has no OAuth app for is
+                // reported false however the organizer ticked it — the login
+                // page must never show a button that dead-ends.
+                'channels' => app(EventAccess::class)->channels($setting),
+                'require_login' => (bool) ($login['require_login'] ?? false),
+                'onboarding' => (bool) ($login['onboarding'] ?? false),
+                // Kept for older clients that read `methods` directly.
+                'methods' => $login['methods'] ?? [],
+            ],
+            'seo' => [
+                'meta_title' => $seo['meta_title'] ?? null,
+                'meta_description' => $seo['meta_description'] ?? null,
+                'favicon_url' => $seo['favicon_url'] ?? null,
+            ],
+            // The tab bar the organizer configured in Navigation & Menu ›
+            // Web App Tabs: which sections appear, in what order, and how.
+            'navigation' => $this->navigation($setting->navigation ?? []),
+            'subdomain' => $sub,
+            'custom_domain' => data_get($setting->domain, 'custom_domain'),
+            'registration_form_uuid' => $regForm?->uuid,
+            'profile_form' => $profileForm ? [
+                'uuid' => $profileForm->uuid,
+                'fields' => $profileForm->fields
+                    ->reject(fn ($f) => in_array($f->type, ['section_break', 'recaptcha'], true))
+                    ->filter(fn ($f) => ($f->meta['visible'] ?? true) !== false)
+                    ->map(fn ($f) => [
+                        'key' => $f->key,
+                        'label' => $f->label,
+                        'help_text' => $f->help_text,
+                        'type' => $f->type,
+                        'required' => (bool) $f->is_required,
+                        'meta' => $f->meta,
+                        'options' => $f->options->map(fn ($o) => ['label' => $o->label, 'value' => $o->value])->values(),
+                    ])->values(),
+            ] : null,
+            'powered_by' => 'EXPOUSE',
+        ];
+
+        Cache::put(PublicEventCache::siteKey($cacheId), $data, PublicEventCache::SITE_TTL);
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -283,13 +298,23 @@ class PublicSiteController extends Controller
      */
     public function reception(Request $request): JsonResponse
     {
+        $cacheId = $this->cacheIdentity($request);
+        if ($cacheId === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        $cached = Cache::get(PublicEventCache::receptionKey($cacheId));
+        if (is_array($cached)) {
+            return response()->json(['data' => $cached]);
+        }
+
         $resolved = $this->resolvePublishedEvent($request);
 
         if ($resolved === null) {
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
-        [$event, $setting] = $resolved;
+        [$event, $setting, $sub, $cacheId] = $resolved;
 
         $branding = $setting->branding ?? [];
         $cover = $event->coverFile;
@@ -360,38 +385,40 @@ class PublicSiteController extends Controller
             'images' => $ad->images ?? [],
         ];
 
-        return response()->json([
-            'data' => [
-                'about' => [
-                    'name' => $event->name,
-                    'description' => $event->description,
-                    'format' => $event->format,
-                    'starts_at' => $event->starts_at?->toIso8601String(),
-                    'ends_at' => $event->ends_at?->toIso8601String(),
-                    'timezone' => $event->timezone,
-                    'location' => $event->meta['location'] ?? null,
-                    'logo_url' => $branding['logo_url'] ?? null,
-                    'cover_url' => $cover ? Storage::disk($cover->disk)->url($cover->path) : null,
-                    'social' => $setting->social ?? (object) [],
-                ],
-                'event' => [
-                    'uuid' => $event->uuid,
-                    'name' => $event->name,
-                    'slug' => $event->slug,
-                ],
-                // Event Page Banners take priority in-app; fall back to the
-                // Community Banners if the organizer hasn't set any up yet.
-                'banners' => $this->publicBanners($branding, 'event_banners') ?: $this->publicBanners($branding),
-                'ads' => [
-                    'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
-                    'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
-                ],
-                'sessions' => SessionResource::collection($sessions),
-                'speakers' => $speakers,
-                'exhibitors' => $exhibitors,
-                'sponsors' => $sponsors,
+        $data = [
+            'about' => [
+                'name' => $event->name,
+                'description' => $event->description,
+                'format' => $event->format,
+                'starts_at' => $event->starts_at?->toIso8601String(),
+                'ends_at' => $event->ends_at?->toIso8601String(),
+                'timezone' => $event->timezone,
+                'location' => $event->meta['location'] ?? null,
+                'logo_url' => $branding['logo_url'] ?? null,
+                'cover_url' => $cover ? Storage::disk($cover->disk)->url($cover->path) : null,
+                'social' => $setting->social ?? (object) [],
             ],
-        ]);
+            'event' => [
+                'uuid' => $event->uuid,
+                'name' => $event->name,
+                'slug' => $event->slug,
+            ],
+            // Event Page Banners take priority in-app; fall back to the
+            // Community Banners if the organizer hasn't set any up yet.
+            'banners' => $this->publicBanners($branding, 'event_banners') ?: $this->publicBanners($branding),
+            'ads' => [
+                'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
+                'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
+            ],
+            'sessions' => SessionResource::collection($sessions)->resolve(),
+            'speakers' => $speakers,
+            'exhibitors' => $exhibitors,
+            'sponsors' => $sponsors,
+        ];
+
+        Cache::put(PublicEventCache::receptionKey($cacheId), $data, PublicEventCache::RECEPTION_TTL);
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -958,39 +985,55 @@ class PublicSiteController extends Controller
     }
 
     /**
-     * Resolve the request's subdomain to its PUBLISHED event, or null.
-     * Shared by show() and reception(); returns [Event, EventSetting, string $sub].
+     * Resolve the request to its PUBLISHED event, or null.
+     * Shared by show() and reception(); returns [Event, EventSetting, string $sub, string $cacheId].
      *
-     * @return array{0: Event, 1: EventSetting, 2: string}|null
+     * @return array{0: Event, 1: EventSetting, 2: string, 3: string}|null
      */
     protected function resolvePublishedEvent(Request $request): ?array
     {
+        $host = $this->customHost($request);
         $sub = $this->subdomain($request);
 
-        if ($sub === null) {
+        $resolved = app(\App\Services\DomainService::class)->resolvePublished($sub, $host);
+
+        if ($resolved === null) {
             return null;
         }
 
-        $setting = EventSetting::on('pgsql_admin')
-            ->where('domain->subdomain', $sub)
-            ->first();
+        [$event, $setting] = $resolved;
+        $platformSub = data_get($setting->domain, 'subdomain') ?: ($sub ?: 'event');
+        $cacheId = $host
+            ? PublicEventCache::hostIdentity($host)
+            : $platformSub;
 
-        if (! $setting) {
-            return null;
+        return [$event, $setting, $platformSub, $cacheId];
+    }
+
+    /** Cache identity for this request (subdomain label or host:…). */
+    protected function cacheIdentity(Request $request): ?string
+    {
+        $host = $this->customHost($request);
+        if ($host !== null) {
+            return PublicEventCache::hostIdentity($host);
         }
 
-        /** @var Event|null $event */
-        $event = Event::on('pgsql_admin')
-            ->with('coverFile')
-            ->where('id', $setting->event_id)
-            ->first();
+        return $this->subdomain($request);
+    }
 
-        // Never leak an unpublished (draft) event through the public site.
-        if (! $event || $event->status !== 'published') {
-            return null;
+    /** Verified custom hostname from the SPA header, or ?host= for local dev. */
+    protected function customHost(Request $request): ?string
+    {
+        $host = $request->header('X-Event-Host') ?: $request->query('host');
+        $host = is_string($host) ? strtolower(trim($host)) : null;
+        // Strip accidental scheme/path if a full URL was pasted.
+        if ($host) {
+            $host = preg_replace('#^https?://#', '', $host);
+            $host = explode('/', $host)[0];
+            $host = rtrim($host, '.');
         }
 
-        return [$event, $setting, $sub];
+        return $host !== '' && $host !== null ? $host : null;
     }
 
     /** Subdomain from the SPA header, falling back to ?subdomain= for local dev. */

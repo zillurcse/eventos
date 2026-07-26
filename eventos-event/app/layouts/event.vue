@@ -13,6 +13,10 @@ const contact = useExhibitorContactStore()
     <!-- App-wide so it can open from the chat drawer / chat page too. -->
     <ExhibitorsContactModal v-if="contact.open" />
 
+    <!-- Chat / Meet connect modal — opened from delegate cards, speaker
+         profiles, similar-people strip, etc. -->
+    <DelegatesConnectModal />
+
     <!-- Profile-completion onboarding (first-time attendees, if the organizer
          turned it on): a renderless gate that sends them to the /onboarding
          page before they settle into Reception. -->

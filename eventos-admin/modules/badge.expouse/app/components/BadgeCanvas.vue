@@ -34,7 +34,6 @@
 import { ref, computed } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import DraggableElement from "./DraggableElement.vue";
-import html2canvas from "html2canvas";
 
 const canvas = ref(null);
 const elements = ref([]);
@@ -80,6 +79,7 @@ const toggleEdit = (index) => {
 };
 
 const exportDesign = async () => {
+  const { default: html2canvas } = await import("html2canvas");
   const canvasElement = canvas.value;
   const canvasImage = await html2canvas(canvasElement, { scale: 2 });
   const link = document.createElement("a");

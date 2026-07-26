@@ -160,16 +160,18 @@ async function downloadPDF() {
   capturing.value = true;
 
   try {
-    const { $html2canvas, $jsPDF } = useNuxtApp();
-    if (!$html2canvas || !$jsPDF) {
-      throw new Error("PDF utilities not available.");
-    }
+    // Loaded on demand (~600 kB): only when the organizer downloads a PDF,
+    // not on every admin page via a global plugin.
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
 
     await nextTick();
 
     const mm = { width: page.value.widthMm, height: page.value.heightMm };
     const shoot = (el) =>
-      $html2canvas(el, {
+      html2canvas(el, {
         scale: 3,
         backgroundColor: null,
         useCORS: true,
@@ -182,7 +184,7 @@ async function downloadPDF() {
         ? await shoot(captureBack.value)
         : null;
 
-    const pdf = new $jsPDF({
+    const pdf = new jsPDF({
       orientation: mm.width > mm.height ? "landscape" : "portrait",
       unit: "mm",
       format: [mm.width, mm.height],

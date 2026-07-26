@@ -3,13 +3,14 @@ definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
 const api = useApi()
-const { $echo } = useNuxtApp()
+const { $ensureEcho } = useNuxtApp()
 const id = route.params.id as string
 
 const agenda = ref<any[]>([])
 const posts = ref<any[]>([])
 const newBody = ref('')
 const live = ref(false)
+let echo: any = null
 
 async function loadFeed() {
   try { posts.value = (await api<any>(`/events/${id}/feed`)).data } catch { /* not a participant */ }
@@ -27,7 +28,8 @@ async function post() {
 onMounted(async () => {
   await Promise.all([loadFeed(), loadAgenda()])
   try {
-    ;($echo as any).channel(`event.${id}.feed`).listen('.feed.post.created', (e: any) => {
+    echo = await ($ensureEcho as () => Promise<any>)()
+    echo.channel(`event.${id}.feed`).listen('.feed.post.created', (e: any) => {
       posts.value.unshift({ id: e.id, body: e.body, author: 'Live', comment_count: 0, reaction_count: 0, _live: true })
     })
     live.value = true
@@ -35,7 +37,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  try { ($echo as any).leave(`event.${id}.feed`) } catch {}
+  try { echo?.leave(`event.${id}.feed`) } catch {}
 })
 </script>
 

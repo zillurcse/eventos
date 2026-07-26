@@ -69,8 +69,10 @@ async function joinCurrentMeeting() {
 }
 
 onMounted(async () => {
-  if (!reception.loaded) await reception.fetchReception()
-  if (!meetingsStore.loaded) await meetingsStore.fetchMeetings()
+  await Promise.all([
+    reception.loaded ? Promise.resolve() : reception.fetchReception(),
+    meetingsStore.loaded ? Promise.resolve() : meetingsStore.fetchMeetings(),
+  ])
 })
 </script>
 

@@ -40,15 +40,16 @@ export const useRoomsStore = defineStore('rooms', {
 
   actions: {
     async fetchRooms() {
-      const sub = useEventSubdomain()
-      if (!sub) { this.error = true; return }
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) { this.error = true; return }
 
       this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: BreakoutRoom[] }>(`${apiBase}/public/rooms`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.rooms = res.data
         this.loaded = true

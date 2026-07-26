@@ -13,7 +13,11 @@ const saved = ref(false)
 const error = ref('')
 
 async function load() {
-  const [e, s] = await Promise.all([api<any>(`/events/${id}`), api<any>(`/events/${id}/settings`)])
+  const [e, s, domain] = await Promise.all([
+    api<any>(`/events/${id}`),
+    api<any>(`/events/${id}/settings`),
+    api<any>(`/events/${id}/domain`),
+  ])
   eventName.value = e.data.name
   const v = s.data.seo || {}
   seo.title = v.title || ''
@@ -21,8 +25,14 @@ async function load() {
   seo.keywords = v.keywords || ''
   seo.og_image_url = v.og_image_url || null
   seo.favicon_url = v.favicon_url || null
-  const d = s.data.domain || {}
-  previewHost.value = d.custom_domain || (d.subdomain ? `${d.subdomain}.eventos.app` : 'your-event.eventos.app')
+  const d = domain.data || {}
+  if (d.status === 'active' && d.custom_domain) {
+    previewHost.value = d.custom_domain
+  } else if (d.subdomain) {
+    previewHost.value = `${d.subdomain}.${d.apex || 'eventos.app'}`
+  } else {
+    previewHost.value = `your-event.${d.apex || 'eventos.app'}`
+  }
 }
 
 async function save() {

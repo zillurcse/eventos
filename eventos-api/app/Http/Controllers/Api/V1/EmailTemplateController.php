@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EmailTemplateResource;
+use App\Models\EmailSend;
 use App\Models\EmailTemplate;
 use App\Models\EmailTemplateVersion;
 use App\Models\Event;
@@ -17,6 +18,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -189,6 +191,161 @@ class EmailTemplateController extends Controller
             'subject' => $send->subject,
             'status' => $send->status,
         ], 202);
+    }
+
+    /**
+     * Delivery / open analytics for one template (architecture §6.13).
+     * Built from email_sends at read time — volumes stay small for event mail.
+     */
+    public function analytics(string $uuid, Request $request): JsonResponse
+    {
+        $template = $this->find($uuid);
+        $params = $request->validate([
+            'days' => ['nullable', 'integer', 'in:7,30,90'],
+        ]);
+        $days = (int) ($params['days'] ?? 30);
+        $since = now()->subDays($days - 1)->startOfDay();
+
+        $all = EmailSend::query()
+            ->where('template_id', $template->id)
+            ->orderByDesc('id')
+            ->get();
+
+        $range = $all->filter(function (EmailSend $s) use ($since) {
+            $at = $s->sent_at ?? $s->created_at;
+
+            return $at && $at->gte($since);
+        });
+
+        $statusCounts = $all->countBy(fn (EmailSend $s) => $s->status ?: 'queued');
+        $sentStatuses = ['sent', 'delivered', 'opened'];
+        $sent = $all->whereIn('status', $sentStatuses)->count();
+        // Prefer the richer of status=opened vs opened_at so early rows still count.
+        $openedUnique = $all->filter(fn (EmailSend $s) => $s->status === 'opened' || $s->opened_at)->count();
+
+        $statusLabels = [
+            'queued' => 'Queued',
+            'sent' => 'Sent',
+            'delivered' => 'Delivered',
+            'opened' => 'Opened',
+            'bounced' => 'Bounced',
+            'failed' => 'Failed',
+        ];
+
+        $byStatus = collect($statusLabels)->map(function (string $label, string $key) use ($statusCounts, $all) {
+            $count = (int) ($statusCounts[$key] ?? 0);
+
+            return [
+                'key' => $key,
+                'label' => $label,
+                'count' => $count,
+                'share' => $all->count() ? (int) round(($count / $all->count()) * 100) : 0,
+            ];
+        })->values()->all();
+
+        $triggerLabels = [
+            'test' => 'Test send',
+            'automated' => 'Automated',
+            'manual' => 'Manual',
+        ];
+        $byTrigger = $all->groupBy(fn (EmailSend $s) => $s->trigger ?: 'unknown')
+            ->map(function (Collection $group, string $key) use ($all, $triggerLabels) {
+                $count = $group->count();
+
+                return [
+                    'key' => $key,
+                    'label' => $triggerLabels[$key] ?? Str::headline($key),
+                    'count' => $count,
+                    'share' => $all->count() ? (int) round(($count / $all->count()) * 100) : 0,
+                ];
+            })
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => [
+                'template' => [
+                    'id' => $template->uuid,
+                    'name' => $template->name,
+                    'subject' => $template->subject,
+                    'status' => $template->status,
+                ],
+                'range' => [
+                    'days' => $days,
+                    'from' => $since->toDateString(),
+                    'to' => now()->toDateString(),
+                ],
+                'totals' => [
+                    'total' => $all->count(),
+                    'in_range' => $range->count(),
+                    'sent' => $sent,
+                    'delivered' => (int) ($statusCounts['delivered'] ?? 0),
+                    'opened' => $openedUnique,
+                    'bounced' => (int) ($statusCounts['bounced'] ?? 0),
+                    'failed' => (int) ($statusCounts['failed'] ?? 0),
+                    'queued' => (int) ($statusCounts['queued'] ?? 0),
+                    'unique_recipients' => $all->pluck('to_email')->filter()->unique()->count(),
+                    'today' => $all->filter(function (EmailSend $s) {
+                        $at = $s->sent_at ?? $s->created_at;
+
+                        return $at && $at->isToday();
+                    })->count(),
+                    'open_rate' => $sent ? (int) round(($openedUnique / $sent) * 100) : 0,
+                    'delivery_rate' => $all->count()
+                        ? (int) round(($sent / $all->count()) * 100)
+                        : 0,
+                ],
+                'timeline' => $this->emailTimeline($range, $days),
+                'by_status' => $byStatus,
+                'by_trigger' => $byTrigger,
+                'recent' => $all->take(40)->map(fn (EmailSend $s) => [
+                    'id' => $s->uuid,
+                    'to_email' => $s->to_email,
+                    'subject' => $s->subject,
+                    'status' => $s->status,
+                    'trigger' => $s->trigger,
+                    'sent_at' => optional($s->sent_at ?? $s->created_at)->toIso8601String(),
+                    'opened_at' => optional($s->opened_at)->toIso8601String(),
+                ])->values()->all(),
+            ],
+        ]);
+    }
+
+    /** Daily send / open counts across the selected window, oldest first. */
+    private function emailTimeline(Collection $range, int $days): array
+    {
+        $byDay = $range->groupBy(function (EmailSend $s) {
+            return ($s->sent_at ?? $s->created_at)->toDateString();
+        });
+
+        $step = $days > 30 ? 7 : 1;
+        $buckets = [];
+        $cursor = now()->subDays($days - 1)->startOfDay();
+        $end = now()->startOfDay();
+
+        while ($cursor->lte($end)) {
+            $bucketEnd = $cursor->copy()->addDays($step - 1);
+            $sent = 0;
+            $opened = 0;
+            for ($d = $cursor->copy(); $d->lte($bucketEnd) && $d->lte($end); $d->addDay()) {
+                $day = $byDay->get($d->toDateString(), collect());
+                $sent += $day->count();
+                $opened += $day->filter(fn (EmailSend $s) => $s->status === 'opened' || $s->opened_at)->count();
+            }
+
+            $buckets[] = [
+                'date' => $cursor->toDateString(),
+                'label' => $step > 1
+                    ? $cursor->format('M j').'–'.$bucketEnd->format('j')
+                    : $cursor->format('M j'),
+                'sent' => $sent,
+                'opened' => $opened,
+            ];
+            $cursor->addDays($step);
+        }
+
+        return $buckets;
     }
 
     // ── version history ─────────────────────────────────────────────────────

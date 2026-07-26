@@ -142,7 +142,7 @@ class OtpAuthController extends Controller
 
     private function event(Request $request): array
     {
-        $resolved = $this->access->resolve($request->header('X-Event-Subdomain'));
+        $resolved = $this->access->resolveFromRequest($request);
 
         abort_if($resolved === null, 404, 'Event not found.');
 

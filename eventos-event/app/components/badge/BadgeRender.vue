@@ -34,6 +34,9 @@ const punch = computed(() => badgePunch(props.badgeJson))
 const scale = computed(() =>
   Math.min(props.maxWidth / page.value.width, props.maxHeight / page.value.height),
 )
+
+// Badge faces may use any editor font; load the picker set only when needed.
+onMounted(() => ensureBadgeFonts())
 </script>
 
 <template>

@@ -2,29 +2,22 @@
 import type { Delegate } from '~/stores/delegates'
 
 const props = defineProps<{ delegate: Delegate }>()
-const chat = useChatStore()
+const store = useDelegatesStore()
 const bookmarks = useBookmarksStore()
 
 const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
 
-// Touch devices have no hover — tapping the card pins the reveal row instead.
-const pinned = ref(false)
+function openDetail() {
+  store.open(props.delegate)
+}
 
-const contacting = ref(false)
-async function contact() {
-  if (contacting.value) return
-  contacting.value = true
-  try {
-    if (!chat.drawerOpen) chat.toggleDrawer()
-    await chat.openWith(props.delegate.id)
-  } finally {
-    contacting.value = false
-  }
+function contact() {
+  store.openConnect(props.delegate, 'connect')
 }
 </script>
 
 <template>
-  <article class="card" :class="{ pinned }" @click="pinned = !pinned">
+  <article class="card" @click="openDetail">
     <div class="photo">
       <UserAvatar :src="delegate.avatar_url" :name="delegate.name" />
       <button class="bm" :class="{ on: bookmarked }" type="button" :title="bookmarked ? 'Saved' : 'Save'"
@@ -45,12 +38,12 @@ async function contact() {
     <div class="reveal" @click.stop>
       <div class="reveal-inner">
         <EventNotePopover type="delegate" :id="delegate.id" block />
-        <button type="button" class="act chat" :disabled="contacting" @click="contact">
+        <button type="button" class="act chat" @click="contact">
           <svg viewBox="0 0 24 24">
             <path
               d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
           </svg>
-          {{ contacting ? 'Opening…' : 'Chat' }}
+          Chat
         </button>
       </div>
     </div>
@@ -65,22 +58,19 @@ async function contact() {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid transparent;
-  /* box-shadow: 0 1px 2px rgba(15, 23, 42, .05); */
   cursor: pointer;
   transition: border-color .15s, box-shadow .15s;
   margin: 0;
 }
 
 .card:hover,
-.card:focus-within,
-.card.pinned {
+.card:focus-within {
   border-color: var(--brand-primary);
   box-shadow: 0 8px 20px rgba(15, 23, 42, .1);
 }
 
 .photo {
   position: relative;
-  /* aspect-ratio: 11 / 10; */
   max-height: 180px;
   background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
 }
@@ -174,8 +164,7 @@ async function contact() {
 }
 
 .card:hover .reveal,
-.card:focus-within .reveal,
-.card.pinned .reveal {
+.card:focus-within .reveal {
   height: var(--reveal-h);
   opacity: 1;
 }
@@ -187,8 +176,6 @@ async function contact() {
   padding: 0 16px 16px;
 }
 
-/* The note popover's own `block` styling already matches this look — just
-   make it share the row equally with the Chat button. */
 .reveal-inner :deep(.act) {
   flex: 1;
   min-width: 0;
@@ -218,10 +205,6 @@ async function contact() {
 
 .act.chat:hover {
   background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
-}
-
-.act.chat:disabled {
-  cursor: default;
 }
 
 .act.chat svg {

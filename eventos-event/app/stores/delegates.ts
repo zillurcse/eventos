@@ -8,6 +8,9 @@ export interface Delegate {
   job_title: string
   avatar_url: string | null
   online: boolean
+  bio?: string
+  social?: Record<string, string>
+  is_featured?: boolean
 }
 
 /** A delegate who shares my designation and/or company; `match` says which. */
@@ -42,6 +45,10 @@ export const useDelegatesStore = defineStore('delegates', {
     similar: [] as SimilarDelegate[],
     similarLoading: false,
     similarLoaded: false,
+
+    // Profile detail modal (opened by clicking a directory card).
+    selected: null as Delegate | null,
+    detailLoading: false,
 
     // Connect modal (opened from a delegate card's Connect action).
     connectTarget: null as Delegate | null,
@@ -160,15 +167,43 @@ export const useDelegatesStore = defineStore('delegates', {
     },
     closeConnect() { this.connectTarget = null },
 
+    // ── Detail modal ─────────────────────────────────────────────────────
+    open(delegate: Delegate) {
+      this.selected = { ...delegate }
+      void this.fetchDetail(delegate.id)
+    },
+    close() { this.selected = null },
+
+    /** Hydrate bio / social for the open profile card. */
+    async fetchDetail(id: string) {
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid || !id) return
+      this.detailLoading = true
+      try {
+        const api = useApi()
+        const res = await api<{ data: Delegate }>(`/events/${uuid}/delegates/${id}`)
+        if (this.selected?.id === id) {
+          this.selected = { ...this.selected, ...res.data }
+        }
+      }
+      catch {
+        // Detail enrichment is best-effort — the card data already shows identity.
+      }
+      finally {
+        this.detailLoading = false
+      }
+    },
+
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'delegates' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {

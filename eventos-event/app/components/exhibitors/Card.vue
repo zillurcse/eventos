@@ -12,10 +12,24 @@ function toggleBookmark() {
 }
 
 function openChat() {
-  contact.openFor({ id: props.exhibitor.id, name: props.exhibitor.name }, 'chat')
+  contact.openFor({
+    id: props.exhibitor.id,
+    name: props.exhibitor.name,
+    logo_url: props.exhibitor.logo_url,
+    booth: props.exhibitor.booth,
+    type: props.exhibitor.type,
+    category: props.exhibitor.category,
+  }, 'chat')
 }
 function openMeet() {
-  contact.openFor({ id: props.exhibitor.id, name: props.exhibitor.name }, 'meet')
+  contact.openFor({
+    id: props.exhibitor.id,
+    name: props.exhibitor.name,
+    logo_url: props.exhibitor.logo_url,
+    booth: props.exhibitor.booth,
+    type: props.exhibitor.type,
+    category: props.exhibitor.category,
+  }, 'meet')
 }
 
 const meta = computed(() => {

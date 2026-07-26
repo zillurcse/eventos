@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use App\Support\PublicEventCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +12,19 @@ class EventSetting extends Model
     use BelongsToOrganization;
 
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        static::saved(function (EventSetting $setting) {
+            PublicEventCache::forgetSubdomain(data_get($setting->domain, 'subdomain'));
+            PublicEventCache::forgetHost(data_get($setting->domain, 'custom_domain'));
+        });
+
+        static::deleted(function (EventSetting $setting) {
+            PublicEventCache::forgetSubdomain(data_get($setting->domain, 'subdomain'));
+            PublicEventCache::forgetHost(data_get($setting->domain, 'custom_domain'));
+        });
+    }
 
     protected $casts = [
         'branding' => 'array',

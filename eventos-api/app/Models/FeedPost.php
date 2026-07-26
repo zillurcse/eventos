@@ -31,6 +31,50 @@ class FeedPost extends Model
     }
 
     /**
+     * Request-scoped author map keyed by "participation:{id}". When warmed via
+     * warmAuthorCache(), authorInfo() is O(1) and a feed page avoids N+1 finds.
+     *
+     * @var array<string, array{name: string, avatar: string|null, role: string}>|null
+     */
+    protected static ?array $authorCache = null;
+
+    /**
+     * Batch-load participation authors for a collection of posts/comments so
+     * FeedPostResource / commentPayload don't hit the DB once per row.
+     *
+     * @param  iterable<int, object|array{author_type?: string|null, author_id?: int|null}>  $items
+     */
+    public static function warmAuthorCache(iterable $items): void
+    {
+        $ids = [];
+        foreach ($items as $item) {
+            $type = is_array($item) ? ($item['author_type'] ?? null) : ($item->author_type ?? null);
+            $id = is_array($item) ? ($item['author_id'] ?? null) : ($item->author_id ?? null);
+            if ($type === 'participation' && $id) {
+                $ids[(int) $id] = true;
+            }
+        }
+
+        $ids = array_keys($ids);
+        static::$authorCache = [];
+
+        if ($ids === []) {
+            return;
+        }
+
+        $parts = Participation::with('contact')->whereIn('id', $ids)->get()->keyBy('id');
+
+        foreach ($ids as $id) {
+            static::$authorCache['participation:'.$id] = static::formatAuthor($parts->get($id));
+        }
+    }
+
+    public static function clearAuthorCache(): void
+    {
+        static::$authorCache = null;
+    }
+
+    /**
      * Display projection for a feed author (post or comment). Authors are
      * polymorphic: a participation (attendee) or a user (organizer). Attendee
      * avatars come from participation.profile_data.image_url.
@@ -40,21 +84,34 @@ class FeedPost extends Model
     public static function authorInfo(?string $type, ?int $id): array
     {
         if ($type === 'participation' && $id) {
-            $p = Participation::with('contact')->find($id);
-            if ($p) {
-                $name = trim(($p->contact->first_name ?? '').' '.($p->contact->last_name ?? ''));
+            $key = 'participation:'.$id;
 
-                return [
-                    'name' => $name ?: 'Attendee',
-                    'avatar' => $p->profile_data['image_url'] ?? null,
-                    'role' => 'attendee',
-                ];
+            if (static::$authorCache !== null) {
+                return static::$authorCache[$key] ?? ['name' => 'Attendee', 'avatar' => null, 'role' => 'attendee'];
             }
 
-            return ['name' => 'Attendee', 'avatar' => null, 'role' => 'attendee'];
+            return static::formatAuthor(Participation::with('contact')->find($id));
         }
 
         return ['name' => 'Organizer', 'avatar' => null, 'role' => 'organizer'];
+    }
+
+    /**
+     * @return array{name: string, avatar: string|null, role: string}
+     */
+    protected static function formatAuthor(?Participation $p): array
+    {
+        if (! $p) {
+            return ['name' => 'Attendee', 'avatar' => null, 'role' => 'attendee'];
+        }
+
+        $name = trim(($p->contact->first_name ?? '').' '.($p->contact->last_name ?? ''));
+
+        return [
+            'name' => $name ?: 'Attendee',
+            'avatar' => $p->profile_data['image_url'] ?? null,
+            'role' => 'attendee',
+        ];
     }
 
     protected $casts = [

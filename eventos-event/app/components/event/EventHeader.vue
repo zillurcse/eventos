@@ -110,19 +110,34 @@ function closeOnOutside(e: MouseEvent) {
   if (!t?.closest?.('.bell-wrap')) bellOpen.value = false
 }
 
-onMounted(() => {
-  document.addEventListener('click', closeOnOutside)
-  if (auth.user) {
-    // Presence isn't a module — it's what makes the green dots work everywhere.
-    presence.start()
-    if (mod('notifications')) notifications.start()
-    if (mod('chat') && !chat.loaded) chat.fetchInbox()
-    if (mod('briefcase')) briefcase.fetch()
+/**
+ * Shell data only needs the bearer token (set by auth middleware / login), not
+ * the /auth/me payload. Waiting on `auth.user` meant a page refresh left the
+ * header avatar on initials until the user opened Profile (which calls
+ * profile.fetch() itself). Presence/notifications.start are idempotent.
+ */
+function bootShell() {
+  if (!auth.isAuthed) return
+  // Presence isn't a module — it's what makes the green dots work everywhere.
+  presence.start()
+  if (mod('notifications')) notifications.start()
+  // Kick shell data in parallel — don't serialize 3–4 RTTs after login.
+  void Promise.all([
+    mod('chat') && !chat.loaded ? chat.fetchInbox() : Promise.resolve(),
+    mod('briefcase') ? briefcase.fetch() : Promise.resolve(),
     // So the header avatar shows the same photo the Edit Profile page saves —
     // both read this one store, so a save there updates the header live.
-    profile.fetch()
-  }
+    profile.fetch(),
+  ])
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeOnOutside)
+  bootShell()
 })
+// Cover the case where the layout mounts before the token is adopted (e.g.
+// social callback), or the user signs in without a full remount.
+watch(() => auth.isAuthed, (ok) => { if (ok) bootShell() })
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeOnOutside)
   notifications.stop()

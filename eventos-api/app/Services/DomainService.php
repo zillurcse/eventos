@@ -64,6 +64,59 @@ class DomainService
             ->exists();
     }
 
+    /** Globally unique custom hostname across every tenant. */
+    public function isCustomDomainTaken(string $domain, int $exceptEventId): bool
+    {
+        return EventSetting::on('pgsql_admin')
+            ->where('domain->custom_domain', $domain)
+            ->where('event_id', '!=', $exceptEventId)
+            ->exists();
+    }
+
+    /**
+     * Resolve a published event by platform subdomain or verified custom host.
+     *
+     * @return array{0: \App\Models\Event, 1: EventSetting}|null
+     */
+    public function resolvePublished(?string $subdomain = null, ?string $customHost = null): ?array
+    {
+        $setting = null;
+
+        if ($customHost) {
+            $host = $this->normalizeCustomDomain($customHost);
+            if ($host) {
+                $setting = EventSetting::on('pgsql_admin')
+                    ->where('domain->custom_domain', $host)
+                    ->where('domain->status', self::STATUS_ACTIVE)
+                    ->first();
+            }
+        }
+
+        if (! $setting && $subdomain) {
+            $sub = $this->normalizeSubdomain($subdomain);
+            if ($sub) {
+                $setting = EventSetting::on('pgsql_admin')
+                    ->where('domain->subdomain', $sub)
+                    ->first();
+            }
+        }
+
+        if (! $setting) {
+            return null;
+        }
+
+        $event = \App\Models\Event::on('pgsql_admin')
+            ->with('coverFile')
+            ->where('id', $setting->event_id)
+            ->first();
+
+        if (! $event || $event->status !== 'published') {
+            return null;
+        }
+
+        return [$event, $setting];
+    }
+
     /** lowercase FQDN, strip scheme/path/trailing dot. Return null if empty. */
     public function normalizeCustomDomain(?string $value): ?string
     {

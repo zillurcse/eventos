@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ParticipantResource;
 use App\Models\Event;
+use App\Models\File;
 use App\Models\Participation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Organizer-side directory of an event's people (the "Users" section). A user is
@@ -47,7 +50,36 @@ class ParticipantController extends Controller
             });
         }
 
-        return ParticipantResource::collection($query->latest('id')->get());
+        $rows = $query->latest('id')->get();
+        ParticipantResource::$photoUrls = $this->avatarFileUrls($rows);
+
+        return ParticipantResource::collection($rows);
+    }
+
+    /**
+     * Resolve contact photo soft references in one query for the whole list.
+     *
+     * @return array<int, string>
+     */
+    private function avatarFileUrls(Collection $rows): array
+    {
+        $ids = $rows
+            ->map(fn (Participation $p) => $p->contact?->photo_file_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return File::on('pgsql_admin')
+            ->whereIn('id', $ids)
+            ->get(['id', 'disk', 'path'])
+            ->mapWithKeys(fn (File $file) => [
+                $file->id => Storage::disk($file->disk)->url($file->path),
+            ])
+            ->all();
     }
 
     /** Block or unblock a participant (stored in meta.blocked). */
@@ -64,7 +96,10 @@ class ParticipantController extends Controller
             'meta' => array_merge($participation->meta ?? [], ['blocked' => $data['blocked']]),
         ]);
 
-        return response()->json(['data' => new ParticipantResource($participation->fresh('contact'))]);
+        $fresh = $participation->fresh('contact');
+        ParticipantResource::$photoUrls = $this->avatarFileUrls(collect([$fresh]));
+
+        return response()->json(['data' => new ParticipantResource($fresh)]);
     }
 
     public function destroy(string $uuid, string $participationUuid): JsonResponse

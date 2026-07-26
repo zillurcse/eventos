@@ -78,15 +78,16 @@ export const useReceptionStore = defineStore('reception', {
 
   actions: {
     async fetchReception() {
-      const sub = useEventSubdomain()
-      if (!sub) { this.error = true; return }
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) { this.error = true; return }
 
       this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: ReceptionPayload }>(`${apiBase}/public/reception`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.data = res.data
         this.loaded = true

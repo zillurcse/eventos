@@ -82,10 +82,9 @@ export const useAuthStore = defineStore('auth', {
       await this.fetchMe()
     },
 
-    /** Attach the resolved event subdomain so auth calls carry event context. */
+    /** Attach the resolved event identity so auth calls carry event context. */
     subHeaders(): Record<string, string> {
-      const sub = useEventSubdomain()
-      return sub ? { 'X-Event-Subdomain': sub } : {}
+      return eventIdentityHeaders()
     },
 
     /** Profile › Account Settings › Change Password. */

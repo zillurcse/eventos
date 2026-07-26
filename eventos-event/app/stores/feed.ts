@@ -152,13 +152,14 @@ export const useFeedStore = defineStore('feed', {
      *  Feed page) — shown in place of a banner slider at the top of the feed. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: FeedAd[], sidebar: FeedAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'feed' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {
@@ -215,7 +216,6 @@ export const useFeedStore = defineStore('feed', {
       const uuid = this.eventUuid()
       const { public: { apiBase } } = useRuntimeConfig()
       const auth = useAuthStore()
-      const sub = useEventSubdomain()
       const xhr = new XMLHttpRequest()
 
       const promise = new Promise<UploadedMedia>((resolve, reject) => {
@@ -227,7 +227,9 @@ export const useFeedStore = defineStore('feed', {
         xhr.open('POST', `${apiBase}/events/${uuid}/uploads`)
         xhr.setRequestHeader('Accept', 'application/json')
         if (auth.token) xhr.setRequestHeader('Authorization', `Bearer ${auth.token}`)
-        if (sub) xhr.setRequestHeader('X-Event-Subdomain', sub)
+        for (const [k, v] of Object.entries(eventIdentityHeaders())) {
+          xhr.setRequestHeader(k, v)
+        }
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))

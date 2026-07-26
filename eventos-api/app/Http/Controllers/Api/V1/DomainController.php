@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventSetting;
 use App\Services\DomainService;
+use App\Support\PublicEventCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -27,12 +28,95 @@ class DomainController extends Controller
         return response()->json(['data' => $this->payload($s)]);
     }
 
+    /**
+     * Live availability check before save.
+     * GET /events/{uuid}/domain/check?subdomain=… | ?custom_domain=…
+     */
+    public function check(string $uuid, Request $request): JsonResponse
+    {
+        $event = Event::where('uuid', $uuid)->firstOrFail();
+
+        $request->validate([
+            'subdomain' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'custom_domain' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        if ($request->filled('subdomain')) {
+            $sub = $this->domains->normalizeSubdomain($request->input('subdomain'));
+            if ($sub === null) {
+                return response()->json(['data' => ['available' => false, 'reason' => 'Enter a subdomain.']]);
+            }
+            if (! $this->domains->isValidSubdomain($sub)) {
+                return response()->json(['data' => [
+                    'available' => false,
+                    'reason' => 'Use 3–63 letters, numbers or hyphens (no leading/trailing hyphen).',
+                    'normalized' => $sub,
+                ]]);
+            }
+            if (in_array($sub, $this->domains->reserved(), true)) {
+                return response()->json(['data' => [
+                    'available' => false,
+                    'reason' => 'That subdomain is reserved.',
+                    'normalized' => $sub,
+                ]]);
+            }
+            if ($this->domains->isSubdomainTaken($sub, $event->id)) {
+                return response()->json(['data' => [
+                    'available' => false,
+                    'reason' => 'That subdomain is already taken.',
+                    'normalized' => $sub,
+                ]]);
+            }
+
+            return response()->json(['data' => [
+                'available' => true,
+                'reason' => null,
+                'normalized' => $sub,
+                'url' => "https://{$sub}.{$this->domains->apex()}",
+            ]]);
+        }
+
+        if ($request->filled('custom_domain')) {
+            $custom = $this->domains->normalizeCustomDomain($request->input('custom_domain'));
+            if ($custom === null) {
+                return response()->json(['data' => ['available' => false, 'reason' => 'Enter a domain.']]);
+            }
+            if (! $this->domains->isValidCustomDomain($custom)) {
+                return response()->json(['data' => [
+                    'available' => false,
+                    'reason' => 'Enter a valid domain like events.yourcompany.com (not a '.$this->domains->apex().' address).',
+                    'normalized' => $custom,
+                ]]);
+            }
+            if ($this->domains->isCustomDomainTaken($custom, $event->id)) {
+                return response()->json(['data' => [
+                    'available' => false,
+                    'reason' => 'That domain is already connected to another event.',
+                    'normalized' => $custom,
+                ]]);
+            }
+
+            return response()->json(['data' => [
+                'available' => true,
+                'reason' => null,
+                'normalized' => $custom,
+                'url' => "https://{$custom}",
+            ]]);
+        }
+
+        throw ValidationException::withMessages([
+            'subdomain' => 'Provide subdomain or custom_domain to check.',
+        ]);
+    }
+
     /** Save subdomain and/or custom domain. Changing the custom domain re-arms verification. */
     public function update(string $uuid, Request $request): JsonResponse
     {
         $event = Event::where('uuid', $uuid)->firstOrFail();
         $s = EventSetting::firstOrCreate(['event_id' => $event->id]);
         $domain = $s->domain ?? [];
+        $previousSub = $domain['subdomain'] ?? null;
+        $previousCustom = $domain['custom_domain'] ?? null;
 
         $request->validate([
             'subdomain' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -71,7 +155,7 @@ class DomainController extends Controller
                 if (! $this->domains->isValidCustomDomain($custom)) {
                     throw ValidationException::withMessages(['custom_domain' => 'Enter a valid domain like events.yourcompany.com (not a '.$this->domains->apex().' address).']);
                 }
-                if ($this->isCustomDomainTaken($custom, $event->id)) {
+                if ($this->domains->isCustomDomainTaken($custom, $event->id)) {
                     throw ValidationException::withMessages(['custom_domain' => 'That domain is already connected to another event.']);
                 }
                 // New/changed → fresh challenge, back to pending.
@@ -84,6 +168,12 @@ class DomainController extends Controller
         }
 
         $s->update(['domain' => $domain]);
+
+        // Bust public cache for both old and new identities.
+        PublicEventCache::forgetSubdomain($previousSub);
+        PublicEventCache::forgetSubdomain($domain['subdomain'] ?? null);
+        PublicEventCache::forgetHost($previousCustom);
+        PublicEventCache::forgetHost($domain['custom_domain'] ?? null);
 
         return response()->json(['data' => $this->payload($s->fresh())]);
     }
@@ -109,15 +199,10 @@ class DomainController extends Controller
         $domain['error'] = $result['error'];
         $s->update(['domain' => $domain]);
 
-        return response()->json(['data' => $this->payload($s->fresh()), 'result' => $result]);
-    }
+        PublicEventCache::forgetHost($custom);
+        PublicEventCache::forgetSubdomain($domain['subdomain'] ?? null);
 
-    private function isCustomDomainTaken(string $domain, int $exceptEventId): bool
-    {
-        return EventSetting::on('pgsql_admin')
-            ->where('domain->custom_domain', $domain)
-            ->where('event_id', '!=', $exceptEventId)
-            ->exists();
+        return response()->json(['data' => $this->payload($s->fresh()), 'result' => $result]);
     }
 
     /** Everything the Domain settings UI renders. */
@@ -127,9 +212,12 @@ class DomainController extends Controller
         $sub = $d['subdomain'] ?? null;
         $custom = $d['custom_domain'] ?? null;
         $status = $d['status'] ?? DomainService::STATUS_UNCONFIGURED;
+        $token = $d['verification_token'] ?? null;
 
         return [
             'apex' => $this->domains->apex(),
+            'cname_target' => (string) config('eventos.domain.cname_target'),
+            'ingress_ip' => (string) config('eventos.domain.ip'),
             'subdomain' => $sub,
             'subdomain_url' => $sub ? "https://{$sub}.{$this->domains->apex()}" : null,
             'custom_domain' => $custom,
@@ -138,9 +226,12 @@ class DomainController extends Controller
             'verified_at' => $d['verified_at'] ?? null,
             'checked_at' => $d['checked_at'] ?? null,
             'error' => $d['error'] ?? null,
-            'dns_records' => ($custom && ($token = $d['verification_token'] ?? null))
+            'dns_records' => ($custom && $token)
                 ? $this->domains->dnsRecords($custom, $token)
                 : [],
+            'primary_url' => ($custom && $status === DomainService::STATUS_ACTIVE)
+                ? "https://{$custom}"
+                : ($sub ? "https://{$sub}.{$this->domains->apex()}" : null),
         ];
     }
 }

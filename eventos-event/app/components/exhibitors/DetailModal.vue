@@ -6,7 +6,14 @@ const store = useExhibitorsStore()
 const contact = useExhibitorContactStore()
 
 function openContact() {
-  contact.openFor({ id: props.exhibitor.id, name: props.exhibitor.name })
+  contact.openFor({
+    id: props.exhibitor.id,
+    name: props.exhibitor.name,
+    logo_url: props.exhibitor.logo_url,
+    booth: props.exhibitor.booth,
+    type: props.exhibitor.type,
+    category: props.exhibitor.category,
+  })
 }
 
 const bookmarks = useBookmarksStore()

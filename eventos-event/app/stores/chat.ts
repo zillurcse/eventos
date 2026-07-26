@@ -20,8 +20,8 @@ export interface ChatConversationItem {
   with: ChatPerson
   unread: number
   last_message: ChatPreview | null
-  // 'person' = participant chat thread; 'exhibitor' = a booth "Contact" thread
-  // (opens the exhibitor Contact modal instead of the in-drawer thread).
+  // 'person' = participant chat; 'exhibitor' = booth Contact thread (same
+  // drawer UI; Schedule Meet / Visit profile available in the thread).
   kind?: 'person' | 'exhibitor'
   exhibitor_id?: string
 }
@@ -94,6 +94,7 @@ export const useChatStore = defineStore('chat', {
     messagesLoading: false,
     sending: false,
     subscribed: false,
+    exhibitorChannel: null as string | null,
   }),
 
   getters: {
@@ -135,8 +136,7 @@ export const useChatStore = defineStore('chat', {
 
     /**
      * Merge the attendee's exhibitor "Contact" threads into the conversation
-     * list so they appear alongside participant chats. They open the Contact
-     * modal rather than the in-drawer thread.
+     * list so they appear alongside participant chats.
      */
     async syncExhibitorConversations() {
       const uuid = this.eventUuid()
@@ -161,16 +161,12 @@ export const useChatStore = defineStore('chat', {
           const tb = b.last_message?.created_at ? Date.parse(b.last_message.created_at) : 0
           return tb - ta
         })
+        this.subscribeExhibitorContact()
       } catch { /* exhibitor threads are optional */ }
     },
 
-    /** Route a list row: participant threads open in-drawer; booths open the modal. */
+    /** Open a list row in the drawer / chat page thread view. */
     openConversation(c: ChatConversationItem) {
-      if (c.kind === 'exhibitor' && c.exhibitor_id) {
-        this.closeDrawer()
-        useExhibitorContactStore().openFor({ id: c.exhibitor_id, name: c.with.name })
-        return
-      }
       this.select(c.id)
     },
 
@@ -182,12 +178,30 @@ export const useChatStore = defineStore('chat', {
       this.messages = []
       this.messagesLoading = true
       try {
+        const c = this.conversations.find(x => x.id === conversationId)
         const api = useApi()
+
+        if (c?.kind === 'exhibitor' && c.exhibitor_id) {
+          const res = await api<{ data: { messages: Array<{ id: string, body: string, mine: boolean, read_at: string | null, created_at: string | null }> } }>(
+            `/events/${uuid}/exhibitors/${c.exhibitor_id}/thread`,
+          )
+          if (this.activeId !== conversationId) return
+          this.messages = res.data.messages.map(m => ({
+            id: m.id,
+            body: m.body,
+            attachments: [],
+            mine: m.mine,
+            read_at: m.read_at,
+            created_at: m.created_at,
+          }))
+          c.unread = 0
+          return
+        }
+
         const res = await api<{ data: ChatMessageItem[] }>(`/events/${uuid}/chat/${conversationId}/messages`)
         // Ignore a stale response if the user already clicked another thread.
         if (this.activeId !== conversationId) return
         this.messages = res.data
-        const c = this.conversations.find(x => x.id === conversationId)
         if (c) c.unread = 0
       } finally {
         this.messagesLoading = false
@@ -204,7 +218,7 @@ export const useChatStore = defineStore('chat', {
         body: { participant: participantId },
       })
       if (!this.conversations.some(c => c.id === res.data.id)) {
-        this.conversations.unshift(res.data)
+        this.conversations.unshift({ ...res.data, kind: res.data.kind ?? 'person' })
       }
       await this.select(res.data.id)
     },
@@ -212,10 +226,33 @@ export const useChatStore = defineStore('chat', {
     async send(body: string, attachments: ChatAttachment[] = []) {
       const uuid = this.eventUuid()
       const id = this.activeId
+      const active = this.active
       if (!uuid || !id || (!body.trim() && !attachments.length) || this.sending) return
       this.sending = true
       try {
         const api = useApi()
+
+        // Booth Contact threads use a separate endpoint (text only).
+        if (active?.kind === 'exhibitor' && active.exhibitor_id) {
+          const text = body.trim()
+          if (!text) return
+          const res = await api<{ data: { message: { id: string, body: string, mine: boolean, read_at: string | null, created_at: string | null } } }>(
+            `/events/${uuid}/exhibitors/${active.exhibitor_id}/messages`,
+            { method: 'POST', body: { body: text } },
+          )
+          const m = res.data.message
+          this.messages.push({
+            id: m.id,
+            body: m.body,
+            attachments: [],
+            mine: m.mine,
+            read_at: m.read_at,
+            created_at: m.created_at,
+          })
+          this.touchPreview(id, { body: m.body, mine: true, created_at: m.created_at })
+          return
+        }
+
         const res = await api<{ data: ChatMessageItem }>(`/events/${uuid}/chat/${id}/messages`, {
           method: 'POST',
           body: { body: body.trim(), attachments },
@@ -247,15 +284,68 @@ export const useChatStore = defineStore('chat', {
     },
 
     /** Live delivery: one personal channel covers every thread I'm in. */
-    subscribe() {
+    async subscribe() {
       const uuid = this.eventUuid()
       if (this.subscribed || !uuid || !this.me) return
-      const { $echo } = useNuxtApp() as any
-      if (!$echo) return
+      const { $ensureEcho } = useNuxtApp() as any
+      if (!$ensureEcho) return
 
-      $echo.channel(`event.${uuid}.chat.${this.me}`)
+      const echo = await $ensureEcho()
+      echo.channel(`event.${uuid}.chat.${this.me}`)
         .listen('.chat.message.created', (payload: LiveChatPayload) => this.onLiveMessage(payload))
       this.subscribed = true
+    },
+
+    /** Live exhibitor booth replies (separate channel from participant chat). */
+    async subscribeExhibitorContact() {
+      const uuid = this.eventUuid()
+      if (!uuid || !this.me) return
+      const name = `event.${uuid}.exhibitor-contact.${this.me}`
+      if (this.exhibitorChannel === name) return
+      const { $ensureEcho } = useNuxtApp() as any
+      if (!$ensureEcho) return
+
+      const echo = await $ensureEcho()
+      echo.channel(name).listen('.exhibitor.contact.message', (payload: {
+        conversation_id: string
+        exhibitor_id: string
+        message: { id: string, body: string, created_at: string | null }
+      }) => this.onLiveExhibitorMessage(payload))
+      this.exhibitorChannel = name
+    },
+
+    onLiveExhibitorMessage(payload: {
+      conversation_id: string
+      exhibitor_id: string
+      message: { id: string, body: string, created_at: string | null }
+    }) {
+      let convo = this.conversations.find(c => c.id === payload.conversation_id)
+      if (!convo) {
+        // Unknown booth thread — refresh the merged inbox.
+        this.syncExhibitorConversations()
+        return
+      }
+
+      this.touchPreview(convo.id, {
+        body: payload.message.body,
+        mine: false,
+        created_at: payload.message.created_at,
+      })
+
+      if (this.activeId === payload.conversation_id) {
+        if (!this.messages.some(m => m.id === payload.message.id)) {
+          this.messages.push({
+            id: payload.message.id,
+            body: payload.message.body,
+            attachments: [],
+            mine: false,
+            read_at: null,
+            created_at: payload.message.created_at,
+          })
+        }
+      } else {
+        convo.unread += 1
+      }
     },
 
     async onLiveMessage(payload: LiveChatPayload) {

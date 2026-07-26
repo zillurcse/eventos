@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\HasUuid;
+use App\Support\PublicEventCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,6 +24,17 @@ class Event extends Model
     protected $guarded = [];
 
     public array $translatable = ['name', 'description'];
+
+    protected static function booted(): void
+    {
+        static::saved(function (Event $event) {
+            PublicEventCache::forgetEvent((int) $event->id);
+        });
+
+        static::deleted(function (Event $event) {
+            PublicEventCache::forgetEvent((int) $event->id);
+        });
+    }
 
     protected $casts = [
         'starts_at' => 'datetime',

@@ -43,15 +43,16 @@ export const useSpeakersStore = defineStore('speakers', {
 
   actions: {
     async fetchSpeakers() {
-      const sub = useEventSubdomain()
-      if (!sub) { this.error = true; return }
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) { this.error = true; return }
 
       this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: SpeakersPayload }>(`${apiBase}/public/speakers`, {
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.speakers = res.data.speakers
         this.categories = res.data.categories
@@ -70,13 +71,14 @@ export const useSpeakersStore = defineStore('speakers', {
      *  Speakers page) — shown as a banner above the search/sort toolbar. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const sub = useEventSubdomain()
-      if (!sub) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
           query: { page: 'speakers' },
-          headers: { 'X-Event-Subdomain': sub },
+          headers: eventIdentityHeaders(),
         })
         this.ads = res.data.strip
       } catch {

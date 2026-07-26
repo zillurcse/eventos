@@ -66,6 +66,12 @@ async function pick(person: ChatPerson) {
 
 function submit() {
   const body = draft.value.trim()
+  if (isExhibitorThread.value) {
+    if (!body || chat.sending) return
+    chat.send(body, [])
+    draft.value = ''
+    return
+  }
   if ((!body && !pending.value.length) || chat.sending || uploading.value) return
   chat.send(body, pending.value)
   draft.value = ''
@@ -105,6 +111,23 @@ function sender(mine: boolean): Sender {
     return { name: chat.profile?.name || 'You', avatar_url: chat.profile?.avatar_url ?? null }
   }
   return { name: chat.active?.with.name || 'Attendee', avatar_url: chat.active?.with.avatar_url ?? null }
+}
+
+const isExhibitorThread = computed(() =>
+  chat.active?.kind === 'exhibitor' && !!chat.active.exhibitor_id,
+)
+
+function scheduleMeet() {
+  const c = chat.active
+  if (!c?.exhibitor_id) return
+  useExhibitorContactStore().openFor({ id: c.exhibitor_id, name: c.with.name }, 'meet')
+}
+
+function visitExhibitor() {
+  const id = chat.active?.exhibitor_id
+  if (!id) return
+  chat.closeDrawer()
+  navigateTo(`/exhibitor/${id}`)
 }
 </script>
 
@@ -169,6 +192,17 @@ function sender(mine: boolean): Sender {
             </button>
           </header>
 
+          <div v-if="isExhibitorThread" class="ex-actions">
+            <button type="button" class="ex-btn" @click="scheduleMeet">
+              <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+              Schedule Meet
+            </button>
+            <button type="button" class="ex-btn ghost" @click="visitExhibitor">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" /></svg>
+              Visit Exhibitor profile
+            </button>
+          </div>
+
           <div ref="scroller" class="msgs">
             <div v-if="chat.messagesLoading" class="note">Loading messages…</div>
             <div v-else-if="!chat.messages.length" class="note">No messages yet.</div>
@@ -186,8 +220,8 @@ function sender(mine: boolean): Sender {
             </div>
           </div>
 
-          <!-- Pending attachments (before send) -->
-          <div v-if="pending.length || uploading" class="pending">
+          <!-- Pending attachments (before send) — participant chat only -->
+          <div v-if="!isExhibitorThread && (pending.length || uploading)" class="pending">
             <span v-for="(a, i) in pending" :key="a.url" class="chip">
               <img v-if="a.kind === 'image'" :src="a.url" alt="">
               <svg v-else viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM15 3v4h4" /></svg>
@@ -198,7 +232,15 @@ function sender(mine: boolean): Sender {
           </div>
 
           <footer class="composer">
-            <button class="plus" type="button" title="Attach a file" aria-label="Attach a file" :disabled="uploading || pending.length >= 5" @click="fileInput?.click()">
+            <button
+              v-if="!isExhibitorThread"
+              class="plus"
+              type="button"
+              title="Attach a file"
+              aria-label="Attach a file"
+              :disabled="uploading || pending.length >= 5"
+              @click="fileInput?.click()"
+            >
               <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
             </button>
             <input
@@ -207,7 +249,14 @@ function sender(mine: boolean): Sender {
               placeholder="Type a message"
               @keydown="onKeydown"
             >
-            <button class="send" type="button" title="Send" aria-label="Send" :disabled="(!draft.trim() && !pending.length) || chat.sending || uploading" @click="submit">
+            <button
+              class="send"
+              type="button"
+              title="Send"
+              aria-label="Send"
+              :disabled="(!draft.trim() && (isExhibitorThread || !pending.length)) || chat.sending || uploading"
+              @click="submit"
+            >
               <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
             </button>
             <input ref="fileInput" type="file" multiple :accept="ACCEPT" class="hiddeninput" @change="onFiles">
@@ -242,6 +291,24 @@ function sender(mine: boolean): Sender {
 .tname { flex: 1; color: #334155; font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .x { border: none; background: #e02d2d; color: #fff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+.ex-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 10px 16px; border-bottom: 1px solid #eef0f3; background: #fafbfc;
+}
+.ex-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: none; border-radius: 999px; padding: 7px 12px;
+  background: var(--brand-primary); color: #fff;
+  font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer;
+}
+.ex-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.ex-btn.ghost {
+  background: #fff; color: var(--brand-primary);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, #e2e8f0);
+}
+.ex-btn.ghost:hover { background: color-mix(in srgb, var(--brand-primary) 8%, #fff); }
+.ex-btn:hover:not(.ghost) { background: color-mix(in srgb, var(--brand-primary) 88%, #000); }
 
 .searchrow { padding: 10px 16px; border-bottom: 1px solid #eef0f3; }
 .searchrow input { width: 100%; border: 1px solid #e2e8f0; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: .86rem; outline: none; color: #334155; }

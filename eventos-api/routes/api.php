@@ -328,6 +328,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/delegates', [DelegateController::class, 'index']);
             // "People like you" strip above the directory (same designation/company).
             Route::get('/delegates/similar', [DelegateController::class, 'similar']);
+            Route::get('/delegates/{uuid}', [DelegateController::class, 'show']);
             // Live-session engagement panel (attendee watch page): group chat,
             // Q&A, polls and the attendees list, all scoped to one session.
             Route::get('/sessions/{sessionUuid}/chat', [SessionEngagementController::class, 'chatIndex']);
@@ -437,6 +438,7 @@ Route::prefix('v1')->group(function () {
 
             // ── Domain settings (subdomain + custom domain DNS verification) ──
             Route::get('/events/{uuid}/domain', [DomainController::class, 'show'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/domain/check', [DomainController::class, 'check'])->middleware('perm:events.view');
             Route::match(['put', 'patch'], '/events/{uuid}/domain', [DomainController::class, 'update'])->middleware('perm:events.manage');
             Route::post('/events/{uuid}/domain/verify', [DomainController::class, 'verify'])->middleware('perm:events.manage');
             // ── Event admins (Settings › Add event admin) — web-app access +
@@ -752,6 +754,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/email-templates/{uuid}/duplicate', [EmailTemplateController::class, 'duplicate']);
                 Route::post('/email-templates/{uuid}/preview', [EmailTemplateController::class, 'preview']);
                 Route::post('/email-templates/{uuid}/send-test', [EmailTemplateController::class, 'sendTest']);
+                Route::get('/email-templates/{uuid}/analytics', [EmailTemplateController::class, 'analytics']);
                 // Cached compiled HTML for the gallery's lazy card previews.
                 Route::get('/email-templates/{uuid}/html', [EmailTemplateController::class, 'html']);
                 Route::post('/email-templates/{uuid}/compile', [EmailTemplateController::class, 'compile']);

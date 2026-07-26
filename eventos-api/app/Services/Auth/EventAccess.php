@@ -38,26 +38,39 @@ class EventAccess
     /** Resolve a published event from its subdomain, with its settings. */
     public function resolve(?string $subdomain): ?array
     {
-        if (! $subdomain) {
-            return null;
-        }
+        return $this->resolveIdentity($subdomain, null);
+    }
 
-        $setting = EventSetting::on('pgsql_admin')
-            ->where('domain->subdomain', $subdomain)
-            ->first();
+    /** Resolve a published event from a verified custom hostname. */
+    public function resolveByHost(?string $host): ?array
+    {
+        return $this->resolveIdentity(null, $host);
+    }
 
-        if (! $setting) {
-            return null;
-        }
+    /**
+     * Resolve from SPA headers: X-Event-Host (custom) or X-Event-Subdomain.
+     *
+     * @return array{0: Event, 1: EventSetting}|null
+     */
+    public function resolveFromRequest(\Illuminate\Http\Request $request): ?array
+    {
+        $host = $request->header('X-Event-Host') ?: $request->query('host');
+        $host = is_string($host) ? strtolower(trim($host)) : null;
+        $host = $host !== '' ? $host : null;
 
-        $event = Event::on('pgsql_admin')->find($setting->event_id);
+        $sub = $request->header('X-Event-Subdomain') ?: $request->query('subdomain');
+        $sub = is_string($sub) ? strtolower(trim($sub)) : null;
+        $sub = $sub !== '' ? $sub : null;
 
-        // Draft events are private: they cannot be signed in to either.
-        if (! $event || $event->status !== 'published') {
-            return null;
-        }
+        return $this->resolveIdentity($sub, $host);
+    }
 
-        return [$event, $setting];
+    /**
+     * @return array{0: Event, 1: EventSetting}|null
+     */
+    public function resolveIdentity(?string $subdomain, ?string $customHost): ?array
+    {
+        return app(\App\Services\DomainService::class)->resolvePublished($subdomain, $customHost);
     }
 
     /**

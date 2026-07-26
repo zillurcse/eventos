@@ -52,6 +52,7 @@ class FeedModerationController extends Controller
         }
 
         $posts = $query->latest('id')->paginate(24)->withQueryString();
+        FeedPost::warmAuthorCache($posts->getCollection());
 
         return response()->json([
             'moderate' => (bool) data_get($event->meta, 'feed_moderation', false),

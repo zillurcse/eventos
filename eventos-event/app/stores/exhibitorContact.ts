@@ -34,7 +34,14 @@ export interface LoungeInfo {
   locations: string[]           // places the organizer allows, e.g. ["Hall 4"]
 }
 
-interface ContactTarget { id: string, name: string }
+interface ContactTarget {
+  id: string
+  name: string
+  logo_url?: string | null
+  booth?: string | null
+  type?: 'exhibitor' | 'sponsor'
+  category?: string
+}
 
 /**
  * Attendee → exhibitor "Contact" modal (Chat + Meet). REST via useApi() against
@@ -70,7 +77,14 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
     },
 
     openFor(exhibitor: ContactTarget, tab: 'chat' | 'meet' = 'chat') {
-      this.target = { id: exhibitor.id, name: exhibitor.name }
+      this.target = {
+        id: exhibitor.id,
+        name: exhibitor.name,
+        logo_url: exhibitor.logo_url ?? null,
+        booth: exhibitor.booth ?? null,
+        type: exhibitor.type,
+        category: exhibitor.category,
+      }
       this.tab = tab
       this.open = true
       this.error = ''
@@ -105,17 +119,18 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
     },
 
     /** Live delivery of exhibitor replies on my personal channel. */
-    subscribe() {
+    async subscribe() {
       const uuid = this.eventUuid()
       if (!uuid || !this.me) return
-      const { $echo } = useNuxtApp() as any
-      if (!$echo) return
+      const { $ensureEcho } = useNuxtApp() as any
+      if (!$ensureEcho) return
 
       const name = `event.${uuid}.exhibitor-contact.${this.me}`
       if (this.channel === name) return
       this.unsubscribe()
 
-      $echo.channel(name).listen('.exhibitor.contact.message', (payload: any) => {
+      const echo = await $ensureEcho()
+      echo.channel(name).listen('.exhibitor.contact.message', (payload: any) => {
         // Only append to the thread that's currently open.
         if (!this.open || payload?.exhibitor_id !== this.target?.id) return
         if (this.messages.some(m => m.id === payload.message.id)) return
@@ -132,11 +147,12 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
     },
 
     unsubscribe() {
-      const uuid = this.eventUuid()
-      if (!this.channel || !uuid) { this.channel = null; return }
-      const { $echo } = useNuxtApp() as any
-      $echo?.leaveChannel?.(this.channel)
+      const name = this.channel
       this.channel = null
+      if (!name) return
+      const { $getEcho } = useNuxtApp() as any
+      // Don't bootstrap Echo just to leave; only leave if already connected.
+      $getEcho?.()?.leaveChannel?.(name)
     },
 
     async sendMessage(body: string): Promise<boolean> {

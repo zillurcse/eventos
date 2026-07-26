@@ -3,7 +3,6 @@ import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useCanvasRendering } from "@floorplan/composables/useCanvasRendering";
 import type { CanvasObject, Point } from "@floorplan/types/canvas";
-import jsPDF from "jspdf";
 import { loadIcon } from "@iconify/vue";
 
 export function useCanvasExport() {
@@ -668,6 +667,7 @@ export function useCanvasExport() {
     // Create PDF
     try {
       const imgData = canvas.toDataURL("image/png");
+      const { default: jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: exportWidth > exportHeight ? "landscape" : "portrait",
         unit: "px",
