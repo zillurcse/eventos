@@ -215,6 +215,24 @@ class BadgeTemplateFactory
                     'radius' => 14,
                     'showRing' => false,
                     'showBorder' => false,
+                    // Same object the editor's computeContainerStyle writes, so
+                    // a seeded logo is rounded even before anyone opens Properties.
+                    'containerStyle' => [
+                        'width' => '100%',
+                        'height' => '100%',
+                        'overflow' => 'hidden',
+                        'display' => 'flex',
+                        'alignItems' => 'center',
+                        'justifyContent' => 'center',
+                        'backgroundColor' => '#f3f4f6',
+                        'borderRadius' => '14px',
+                    ],
+                    'imageStyle' => [
+                        'width' => '100%',
+                        'height' => '100%',
+                        'display' => 'block',
+                        'objectFit' => 'cover',
+                    ],
                 ],
                 'fontSize' => 'Auto',
                 'rotation' => 0,

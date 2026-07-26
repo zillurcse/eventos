@@ -3,6 +3,7 @@ import type { FeedAttachment, FeedPost, FeedType, NewPostPayload } from '~/store
 
 const feed = useFeedStore()
 const auth = useAuthStore()
+const profile = useProfileStore()
 
 type Mode = 'compose' | 'poll' | 'looking_for' | 'offering'
 const mode = ref<Mode>('compose')
@@ -222,7 +223,7 @@ async function submit() {
     @dragleave="onDragLeave" @drop.prevent="onDrop">
     <div class="row">
       <span class="me">
-        <UserAvatar :name="auth.user?.name" />
+        <UserAvatar :src="profile.data?.avatar_url" :name="auth.user?.name" />
       </span>
       <textarea v-model="body" rows="2" :placeholder="placeholder" />
     </div>

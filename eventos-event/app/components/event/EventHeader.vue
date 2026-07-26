@@ -12,9 +12,9 @@ interface Tab { key: string, label: string, to?: string, detail?: string, icon: 
  * it actually ships. The two meet on `key`, which is stable — renaming a tab in
  * admin changes its label, never its key.
  *
- * A key we have no page for (ExpoLens, My Badges…) still renders, greyed out as
- * "Coming soon": the organizer switched it on and expects to see it, and quietly
- * dropping it would look like the setting didn't save.
+ * A key we have no page for still renders, greyed out as "Coming soon": the
+ * organizer switched it on and expects to see it, and quietly dropping it would
+ * look like the setting didn't save.
  */
 const TAB_META: Record<string, { to?: string, detail?: string, icon: string }> = {
   reception: { to: '/reception', icon: 'M4 20v-8l8-6 8 6v8h-6v-6h-4v6z' },
@@ -31,7 +31,7 @@ const TAB_META: Record<string, { to?: string, detail?: string, icon: string }> =
   rooms: { to: '/rooms', icon: 'M4 20V6l8-3 8 3v14M4 20h16M9 20v-5h6v5' },
   sponsors: { icon: 'M12 3l2.6 5.3 5.9.8-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z' },
   contests: { to: '/contests', detail: '/contest/', icon: 'M7 4h10v3a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M9 15h6l-1 5h-4z' },
-  expolens: { icon: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3' },
+  expolens: { to: '/expolens', icon: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3' },
   // Admin slugs the label, so "My Badges" arrives as `my_badges`; `badges` is
   // the app's own shorter name for it. Both point at the same page, the way
   // event_feed/feed do.
@@ -52,9 +52,9 @@ const DEFAULT_TABS: { key: string, label: string }[] = [
   { key: 'exhibitors', label: 'Exhibitors' },
   { key: 'meetings', label: 'Meetings' },
   { key: 'lounge', label: 'Lounge' },
-  { key: 'sponsors', label: 'Sponsors' },
   { key: 'rooms', label: 'Rooms' },
   { key: 'contests', label: 'Contests' },
+  { key: 'expolens', label: 'ExpoLens' },
   { key: 'my_badges', label: 'My Badges' },
 ]
 

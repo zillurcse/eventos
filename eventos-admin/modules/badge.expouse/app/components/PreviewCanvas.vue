@@ -42,15 +42,12 @@
           ></div>
         </div>
       </div>
-      <!-- Draggable Elements -->
+      <!-- Elements — styling must stay in lockstep with badgeDesign.ts /
+           BadgePreview so organizer preview, print, and attendee badges match. -->
       <template v-for="(box, index) in props.modelValue" :key="box.id">
         <div
           v-if="box.visible"
-          class="absolute border group border-blue-500"
-          :class="{
-            'border-2 border-blue-500': box.isSelected,
-            'border border-transparent': !box.isSelected,
-          }"
+          class="absolute overflow-hidden"
           :style="{
             top: box.position.top + 'px',
             left: box.position.left + 'px',
@@ -68,11 +65,10 @@
             zIndex: box.zIndex || 0,
           }"
         >
-          <!-- Content -->
           <component
             v-if="checkElementTypes.includes(box.type)"
             :is="box.type"
-            class="leading-tight w-full h-full flex"
+            class="leading-tight w-full h-full flex m-0"
             :class="[
               box.type === 'p'
                 ? [
@@ -88,47 +84,44 @@
           >
             {{ box.text }}
           </component>
-          <!-- Images and Background -->
           <img
             v-if="box.type === 'img'"
-            :src="box.properties.src.url"
-            class="w-full h-full cursor-pointer select-none"
+            :src="box.properties.src?.url"
+            class="w-full h-full select-none"
             :class="[objectPositionClass(box), objectFitPositionClass(box)]"
           />
 
           <img
             v-if="box.type === 'background'"
-            :src="box.properties.src.url"
-            class="w-full h-full transition-all duration-300 cursor-pointer select-none"
+            :src="box.properties.src?.url"
+            class="w-full h-full select-none"
             :class="[objectPositionClass(box), objectFitPositionClass(box)]"
           />
-          <!-- Redesigned Avatar -->
-          <!-- {{ box.text }} -->
           <div
             v-if="box.type === 'avatar'"
-            class="w-full h-full overflow-hidden shadow-sm transition-transform hover:scale-[1.02] flex items-center justify-center bg-gray-100"
+            class="w-full h-full overflow-hidden flex items-center justify-center bg-gray-100"
             :class="[
-              box.properties.avatar.showBorder ? 'border border-gray-300' : '',
-              box.properties.avatar.showRing
+              box.properties.avatar?.showBorder ? 'border border-gray-300' : '',
+              box.properties.avatar?.showRing
                 ? 'ring-2 ring-offset-2 ring-gray-400'
                 : '',
             ]"
-            :style="box.properties.avatar.containerStyle"
+            :style="avatarContainerStyle(box)"
           >
             <img
-              :src="box.text"
+              v-if="avatarSrc(box)"
+              :src="avatarSrc(box)"
               class="w-full h-full object-cover"
-              :style="box.properties.avatar.imageStyle"
+              :style="box.properties.avatar?.imageStyle"
             />
           </div>
-          <!-- QR Code -->
           <Qrcode
             v-if="box.type === 'qrcode'"
-            :value="box.properties.qrcode.value"
-            :variant="box.properties.qrcode.variant"
-            :radius="box.properties.qrcode.radius"
-            :blackColor="box.properties.qrcode.blackColor"
-            :whiteColor="box.properties.qrcode.whiteColor"
+            :value="box.properties.qrcode?.value"
+            :variant="box.properties.qrcode?.variant"
+            :radius="box.properties.qrcode?.radius"
+            :blackColor="box.properties.qrcode?.blackColor"
+            :whiteColor="box.properties.qrcode?.whiteColor"
             class="w-full h-full"
           />
         </div>
@@ -149,6 +142,27 @@ const props = defineProps({
 const canvas = ref(null);
 const checkElementTypes = ["h1", "h2", "h3", "h4", "h6", "p", "a", "span"];
 const textElements = ref({});
+
+/** Photo / logo URL: merge value in `text`, else avatar_src, else uploaded src. */
+function avatarSrc(box) {
+  if (typeof box.text === "string" && box.text.startsWith("http")) return box.text;
+  if (box.properties?.avatar?.avatar_src) return box.properties.avatar.avatar_src;
+  return box.properties?.src?.url || "";
+}
+
+/** Prefer persisted containerStyle; else derive from shape/radius like badgeDesign. */
+function avatarContainerStyle(box) {
+  const avatar = box.properties?.avatar || {};
+  const persisted = avatar.containerStyle;
+  if (persisted && typeof persisted === "object" && !Array.isArray(persisted) && Object.keys(persisted).length) {
+    return persisted;
+  }
+  const shape = avatar.shape || "rounded";
+  const radius = Number(avatar.radius) || 14;
+  if (shape === "circle") return { borderRadius: "9999px" };
+  if (shape === "rounded") return { borderRadius: `${radius}px` };
+  return { borderRadius: `${radius}px` };
+}
 
 onMounted(() => {
   const resizeObserver = new ResizeObserver(() => {

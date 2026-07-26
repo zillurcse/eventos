@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Contact;
+use App\Models\Participation;
 use App\Models\User;
+use App\Services\ExpoLens\ExpoLensRetention;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +44,12 @@ class PurgeContact extends Command
 
         DB::connection('pgsql_admin')->transaction(function () use ($contact) {
             $userId = $contact->user_id;
+            $retention = app(ExpoLensRetention::class);
+
+            Participation::on('pgsql_admin')
+                ->where('contact_id', $contact->id)
+                ->pluck('id')
+                ->each(fn ($id) => $retention->purgeParticipation((int) $id));
 
             // Cascades remove participations + their children via FK constraints.
             $contact->forceDelete();

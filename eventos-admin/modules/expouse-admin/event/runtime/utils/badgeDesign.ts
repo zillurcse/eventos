@@ -169,6 +169,15 @@ const VERTICAL_FLEX: Record<string, string> = { top: 'flex-start', middle: 'cent
 const HORIZONTAL_FLEX: Record<string, string> = { left: 'flex-start', center: 'center', right: 'flex-end' }
 const HORIZONTAL_TEXT: Record<string, string> = { left: 'left', center: 'center', right: 'right', justify: 'justify' }
 
+/** CSS font-family with a guaranteed generic fallback. */
+function badgeFontFamily(font: unknown): string {
+  const raw = typeof font === 'string' ? font.trim() : ''
+  if (!raw) return 'Poppins, sans-serif'
+  if (/serif|monospace|cursive|fantasy|system-ui/i.test(raw)) return raw
+  if (raw.includes(',')) return raw
+  return `${raw}, sans-serif`
+}
+
 /**
  * Text styling, including the alignment model — which differs by type in the
  * editor and must here too: a `p` is a *column* aligned vertically by
@@ -192,7 +201,9 @@ export function badgeTextStyle(box: any): Record<string, any> {
     lineHeight: 1.25, // Tailwind's leading-tight
     margin: 0,
     fontSize: (p.fontSize === 'Auto' || !p.fontSize) ? `${calculated}px` : `${p.fontSize}px`,
-    fontFamily: p.font || 'poppins, sans-serif',
+    // Designs often store a bare family ("Roboto"). Without a fallback, missing
+    // webfonts make <h1> fall back to Times on Windows.
+    fontFamily: badgeFontFamily(p.font),
     fontWeight: p.fontWeight || 'normal',
     fontStyle: p.fontStyle || 'normal',
     textDecoration: p.textDecoration || 'none',
@@ -241,12 +252,17 @@ export function badgeImageStyle(box: any): Record<string, any> {
 }
 
 /**
- * Avatar boxes are a framed container around a cover-fitted image, and the
- * editor persists both halves as raw style objects (`avatar.containerStyle` /
- * `avatar.imageStyle`) — so they are spread verbatim rather than re-derived.
+ * Avatar boxes are a framed container around a cover-fitted image. The editor
+ * usually persists raw style objects (`avatar.containerStyle` / `imageStyle`);
+ * seeded templates only store `shape` + `radius`, so we derive the frame when
+ * those style objects are absent — otherwise every starter logo renders as a
+ * sharp rectangle instead of the rounded tile the template promised.
  */
 export function badgeAvatarStyle(box: any) {
   const avatar = obj(box?.properties?.avatar)
+  const persisted = obj(avatar.containerStyle)
+  const derived = Object.keys(persisted).length ? {} : avatarFrameStyle(avatar)
+
   return {
     container: {
       width: '100%',
@@ -258,7 +274,8 @@ export function badgeAvatarStyle(box: any) {
       backgroundColor: '#f3f4f6',
       ...(avatar.showBorder ? { border: '1px solid #d1d5db' } : {}),
       ...(avatar.showRing ? { boxShadow: '0 0 0 2px #fff, 0 0 0 4px #9ca3af' } : {}),
-      ...obj(avatar.containerStyle),
+      ...derived,
+      ...persisted,
     },
     image: {
       width: '100%',
@@ -266,5 +283,38 @@ export function badgeAvatarStyle(box: any) {
       objectFit: 'cover',
       ...obj(avatar.imageStyle),
     },
+  }
+}
+
+/** Mirror of useCanvasStore.computeContainerStyle for shape + radius. */
+function avatarFrameStyle(avatar: Record<string, any>): Record<string, any> {
+  const shape = avatar.shape || 'rounded'
+  const radius = Number(avatar.radius) || 14
+  const custom = avatar.customClipPath
+
+  switch (shape) {
+    case 'circle':
+      return { borderRadius: '9999px' }
+    case 'rounded':
+      return { borderRadius: `${radius}px` }
+    case 'squircle':
+      return {
+        borderRadius: `${Math.min(radius, 100)}% / ${Math.min(radius + 10, 100)}%`,
+      }
+    case 'diamond':
+      return { clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' }
+    case 'hex':
+      return { clipPath: 'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%)' }
+    case 'triangle':
+      return { clipPath: 'polygon(50% 0, 0 100%, 100% 100%)' }
+    case 'blob':
+      return {
+        clipPath:
+          'path("M74.7 12.9c11.8 7.3 20.2 20 23 34.2 2.7 14.2-.3 29.9-8.6 39.8-8.3 9.9-21.8 14-35.6 12.2-13.8-1.7-27.8-10.3-35.1-22.8-7.3-12.5-7.8-28.8-2.5-41.4 5.3-12.6 16.4-21.5 28.4-25C56.2 6.6 68.9 5.7 74.7 12.9z")',
+      }
+    case 'custom':
+      return custom ? { clipPath: custom } : { borderRadius: `${radius}px` }
+    default:
+      return { borderRadius: `${radius}px` }
   }
 }

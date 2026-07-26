@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Event;
 use App\Models\Organization;
+use App\Observers\EventObserver;
 use App\Services\Billing\FeatureGate;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::observe(EventObserver::class);
+
         // H-3: refuse to run in production with debug on. Combined with the
         // api/* JSON error rendering (bootstrap/app.php), APP_DEBUG=true would
         // leak stack traces + env in 500s. Fail loudly at boot — including during

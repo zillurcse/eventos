@@ -34,12 +34,14 @@ class FileUploadController extends Controller
         // Contest entries carry the same attendee-shot photo/video as feed posts.
         $isFeed = in_array($collectionInput, ['feed', 'contest_entry'], true);
         $isChat = $collectionInput === 'chat';
+        $isExpoLens = $collectionInput === 'expolens';
 
         $data = $request->validate([
             'file' => match (true) {
                 $isFeed => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf'],
                 $isChat => ['required', 'file', 'max:81920', 'mimes:png,jpg,jpeg,webp,gif,mp4,webm,mov,pdf,doc,docx,xls,xlsx,csv,ppt,pptx,txt'],
                 $isDocument => ['required', 'file', 'max:20480', 'mimes:pdf,ppt,pptx,doc,docx,xls,xlsx,csv,txt,key,png,jpg,jpeg,webp'],
+                $isExpoLens => ['required', 'file', 'max:25600', 'mimes:png,jpg,jpeg,webp'],
                 // Explicit raster list — NOT the `image` rule, which admits SVG
                 // (inline-script XSS) and is served public under tenant-trusted
                 // origins. Mirrors the other branches' allow-lists.
@@ -49,7 +51,8 @@ class FileUploadController extends Controller
                 'cover', 'logo', 'avatar', 'document', 'banner', 'banners', 'email_header', 'feed', 'email',
                 'ad_image', 'lounge', 'breakout_room_poster', 'session_doc', 'session_icon', 'session_logo',
                 'exhibitor_logo', 'exhibitor_spotlight', 'ctas', 'chat', 'contest_banner', 'contest_entry',
-                'survey_response', 'form_background',
+                'survey_response', 'form_background', 'help_screen',
+                'app_icon', 'app_splash', 'app_banner', 'expolens',
             ])],
         ]);
 

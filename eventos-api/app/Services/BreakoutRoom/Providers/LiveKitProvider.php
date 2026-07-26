@@ -55,6 +55,16 @@ class LiveKitProvider implements MeetingProvider
             'roomAdmin' => $isAdmin,
         ];
 
+        // Keep seat:0 — array_filter would drop it as falsy and every seated
+        // participant would then pack into chair 0 for other viewers.
+        $metadata = array_filter([
+            'role' => $role,
+            'avatar_url' => $participant['avatar_url'] ?? null,
+        ], fn ($v) => $v !== null && $v !== '');
+        if (array_key_exists('seat', $participant) && $participant['seat'] !== null) {
+            $metadata['seat'] = (int) $participant['seat'];
+        }
+
         return [
             'provider' => 'webrtc',
             'url' => (string) config('services.livekit.url'),
@@ -63,10 +73,7 @@ class LiveKitProvider implements MeetingProvider
                 identity: $participant['identity'],
                 name: $participant['name'] ?? $participant['identity'],
                 grant: $grant,
-                metadata: json_encode(array_filter([
-                    'role' => $role,
-                    'avatar_url' => $participant['avatar_url'] ?? null,
-                ])),
+                metadata: json_encode($metadata),
             ),
         ];
     }
@@ -101,9 +108,9 @@ class LiveKitProvider implements MeetingProvider
     }
 
     /**
-     * Live occupants of one room as [{ identity, name, avatar_url }] — the seat
-     * roster for the lounge table card. avatar_url is pulled from the join-time
-     * participant metadata. Returns [] when the room is empty or unreachable.
+     * Live occupants of one room as [{ identity, name, avatar_url, seat }] — the
+     * seat roster for the lounge table card. avatar_url + seat come from
+     * join-time participant metadata. Returns [] when empty or unreachable.
      */
     public function participants(string $roomName): array
     {
@@ -111,11 +118,14 @@ class LiveKitProvider implements MeetingProvider
             return collect($this->rpc('ListParticipants', ['room' => $roomName])['participants'] ?? [])
                 ->map(function ($p) {
                     $meta = json_decode($p['metadata'] ?? '', true);
+                    $meta = is_array($meta) ? $meta : [];
+                    $seat = array_key_exists('seat', $meta) ? (int) $meta['seat'] : null;
 
                     return [
                         'identity' => $p['identity'] ?? '',
                         'name' => $p['name'] ?? ($p['identity'] ?? 'Guest'),
-                        'avatar_url' => is_array($meta) ? ($meta['avatar_url'] ?? null) : null,
+                        'avatar_url' => $meta['avatar_url'] ?? null,
+                        'seat' => $seat,
                     ];
                 })
                 ->values()

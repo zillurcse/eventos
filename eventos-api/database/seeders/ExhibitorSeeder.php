@@ -65,7 +65,7 @@ class ExhibitorSeeder extends Seeder
         $samples = [
             ['type' => 'exhibitor', 'name' => 'Altus Group'],
             ['type' => 'exhibitor', 'name' => 'DarGlobal'],
-            ['type' => 'sponsor',   'name' => 'MoHUP'],
+            ['type' => 'exhibitor', 'name' => 'MoHUP'],
         ];
 
         $created = 0;

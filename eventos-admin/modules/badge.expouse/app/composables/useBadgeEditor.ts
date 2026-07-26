@@ -1,3 +1,4 @@
+import { toast } from "vue-sonner";
 import { useCanvasStore } from "@badge/stores/useCanvasStore";
 import { usePageStore } from "@badge/stores/usePageStore";
 
@@ -65,9 +66,6 @@ export function useBadgeEditor() {
   const presetHeight = pageStore.presetHeight;
 
   const applyGradient = store.applyGradient;
-
-  // Toast Massage
-  const toast = useToast();
 
   // Router and Route
   const router = useRouter();
@@ -323,11 +321,7 @@ export function useBadgeEditor() {
       response.value = res;
       errorData.value = null;
       badgeData.value = res;
-      toast.success({
-        title: "Success!",
-        message: "Badge design saved.",
-        position: "topRight",
-      });
+      toast.success("Badge design saved");
       return res;
     } catch (err: any) {
       error.value = err.message || "Failed to send data";

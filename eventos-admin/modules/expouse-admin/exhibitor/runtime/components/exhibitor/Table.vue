@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { toast } from 'vue-sonner'
 import { TYPE_OPTIONS } from '../../utils/exhibitor'
 
 const {
@@ -15,7 +16,7 @@ const filtersActive = computed(() => !!(search.value.trim() || filterType.value 
 
 // TODO: wire to a real org-wide exhibitor directory once it exists.
 function openDirectory() {
-  alert('Coming soon.')
+  toast.info('Coming soon.')
 }
 
 const columns = [

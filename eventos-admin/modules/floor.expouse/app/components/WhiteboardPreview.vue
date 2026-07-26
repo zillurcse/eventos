@@ -1,6 +1,7 @@
 <!-- WhiteboardPreview.vue - FIXED VERSION FOR EXACT SCREEN CAPTURE -->
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from "vue";
+import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useCanvasRendering } from "@floorplan/composables/useCanvasRendering";
 import { useIconRenderer } from "@floorplan/composables/useIconRenderer";
@@ -267,7 +268,7 @@ const downloadAsPDF = async () => {
     }, 2000);
   } catch (error) {
     console.error("Failed to generate PDF:", error);
-    alert("Failed to generate PDF. Please try again.");
+    toast.error("Failed to generate PDF. Please try again.");
     exportProgress.value = "";
   }
 };
@@ -290,7 +291,7 @@ const downloadAsPNG = async () => {
     }, 2000);
   } catch (error) {
     console.error("Failed to generate PNG:", error);
-    alert("Failed to generate PNG preview");
+    toast.error("Failed to generate PNG preview");
     exportProgress.value = "";
   }
 };
@@ -356,7 +357,7 @@ const exportAsJSON = () => {
     URL.revokeObjectURL(link.href);
   } catch (error) {
     console.error("Failed to export JSON:", error);
-    alert("Failed to export JSON");
+    toast.error("Failed to export JSON");
   }
 };
 
@@ -402,10 +403,10 @@ const importFromJSON = (event: Event) => {
         renderPreview();
       });
 
-      alert("Floor plan imported successfully!");
+      toast.success("Floor plan imported successfully");
     } catch (error) {
       console.error("Failed to import JSON:", error);
-      alert("Failed to import JSON file");
+      toast.error("Failed to import JSON file");
     }
   };
 
@@ -432,10 +433,10 @@ const copyJSONToClipboard = async () => {
 
     const jsonString = JSON.stringify(previewData, null, 2);
     await navigator.clipboard.writeText(jsonString);
-    alert("JSON copied to clipboard!");
+    toast.success("JSON copied to clipboard");
   } catch (error) {
     console.error("Failed to copy to clipboard:", error);
-    alert("Failed to copy to clipboard");
+    toast.error("Failed to copy to clipboard");
   }
 };
 

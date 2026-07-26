@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'exhibitor', feature: 'teams', title: 'Team Members', subtitle: 'Manage your team and their access' })
 
 const auth = useAuthStore()
@@ -19,9 +21,9 @@ const page = ref(1)
 const perPage = ref(10)
 const actionsFor = ref<number | null>(null)
 
-// Invite form (toggled)
-const inviteOpen = ref(false)
-const form = reactive({ email: '', first_name: '', last_name: '', role: 'staff', password: '' })
+// Invite drawer
+const showAdd = ref(false)
+const form = reactive({ ...MEMBER_FORM })
 const adding = ref(false)
 const error = ref('')
 
@@ -67,16 +69,25 @@ const rangeLabel = computed(() => {
 watch([search, perPage], () => { page.value = 1 })
 
 // ── Invite / remove / password ──
+function openAdd() {
+  Object.assign(form, MEMBER_FORM)
+  error.value = ''
+  showAdd.value = true
+}
+
 async function add() {
+  if (!form.email.trim()) return
   error.value = ''
   adding.value = true
   try {
     await api('/exhibitor/members', { method: 'POST', body: { ...form } })
-    Object.assign(form, { email: '', first_name: '', last_name: '', role: 'staff', password: '' })
-    inviteOpen.value = false
+    Object.assign(form, MEMBER_FORM)
+    showAdd.value = false
+    toast.success('Team member invited')
     await load()
   } catch (e: any) {
     error.value = e?.data?.message || 'Could not add the member.'
+    toast.error(error.value)
   } finally {
     adding.value = false
   }
@@ -84,15 +95,25 @@ async function add() {
 async function remove(m: any) {
   actionsFor.value = null
   if (!confirm(`Remove ${m.contact?.email}?`)) return
-  await api(`/exhibitor/members/${m.id}`, { method: 'DELETE' })
-  await load()
+  try {
+    await api(`/exhibitor/members/${m.id}`, { method: 'DELETE' })
+    toast.success('Team member removed')
+    await load()
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not remove the member.')
+  }
 }
 function openReset(m: any) { actionsFor.value = null; pwFor.value = m.id; pwValue.value = '' }
 async function savePassword(m: any) {
   if (pwValue.value.length < 8) return
-  await api(`/exhibitor/members/${m.id}/password`, { method: 'POST', body: { password: pwValue.value } })
-  pwFor.value = null; pwValue.value = ''
-  await load()
+  try {
+    await api(`/exhibitor/members/${m.id}/password`, { method: 'POST', body: { password: pwValue.value } })
+    pwFor.value = null; pwValue.value = ''
+    toast.success('Password updated')
+    await load()
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update the password.')
+  }
 }
 
 // ── Staff permissions panel ──
@@ -125,6 +146,9 @@ async function savePerms() {
     })
     const i = members.value.findIndex(m => m.id === selected.value!.id)
     if (i >= 0) members.value[i] = res.data
+    toast.success('Permissions saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save permissions.')
   } finally {
     savingPerms.value = false
   }
@@ -161,23 +185,7 @@ onMounted(load)
       <div class="card">
         <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <SearchInput v-model="search" placeholder="Search" class="max-w-72 flex-1" />
-          <button class="btn" @click.stop="inviteOpen = !inviteOpen">+ Invite member</button>
-        </div>
-
-        <!-- Invite form -->
-        <div v-if="inviteOpen" class="border border-line rounded-xl p-3 mb-4 bg-[#f7f8fa]">
-          <div class="flex gap-2.5 flex-wrap items-center">
-            <input v-model="form.email" type="email" placeholder="Email" class="flex-[1_1_180px]">
-            <input v-model="form.first_name" placeholder="First name" class="flex-[0_1_120px]">
-            <input v-model="form.last_name" placeholder="Last name" class="flex-[0_1_120px]">
-            <select v-model="form.role" class="py-[9px] px-3 rounded-[10px] border border-[#cbd5e1]">
-              <option value="staff">Staff</option>
-              <option value="admin">Admin</option>
-            </select>
-            <input v-model="form.password" type="password" placeholder="Password (enables login)" class="flex-[1_1_170px]">
-            <button class="btn sm" :disabled="adding || !form.email" @click="add">{{ adding ? 'Adding…' : 'Invite' }}</button>
-          </div>
-          <p v-if="error" class="error mt-2">{{ error }}</p>
+          <button class="btn sm" @click.stop="openAdd">+ ADD TEAM</button>
         </div>
 
         <table>
@@ -283,5 +291,45 @@ onMounted(load)
         </div>
       </div>
     </div>
+
+    <!-- Add Team drawer — same pattern as Add Project -->
+    <Drawer v-if="showAdd" title="Add Team" back @close="showAdd = false" @back="showAdd = false">
+      <div>
+        <AppInput v-model="form.email" type="email" label="Email" placeholder="name@company.com" />
+      </div>
+
+      <div class="mt-4">
+        <AppInput v-model="form.first_name" label="First Name" placeholder="Enter First Name" />
+      </div>
+
+      <div class="mt-4">
+        <AppInput v-model="form.last_name" label="Last Name" placeholder="Enter Last Name" />
+      </div>
+
+      <div class="mt-4">
+        <AppSelect
+          v-model="form.role"
+          label="Role"
+          :options="[{ value: 'staff', label: 'Staff' }, { value: 'admin', label: 'Admin' }]"
+        />
+      </div>
+
+      <div class="mt-4">
+        <AppInput v-model="form.password" type="password" label="Password" placeholder="Enables login (optional)" />
+      </div>
+
+      <p v-if="error" class="error mt-3 mb-0">{{ error }}</p>
+
+      <div class="modal-actions border-t border-line pt-4 mt-6">
+        <button
+          class="btn"
+          :disabled="adding || !form.email.trim()"
+          @click="add"
+        >
+          {{ adding ? 'Adding…' : 'Add Team' }}
+        </button>
+        <button class="btn ghost" @click="showAdd = false">Cancel</button>
+      </div>
+    </Drawer>
   </div>
 </template>

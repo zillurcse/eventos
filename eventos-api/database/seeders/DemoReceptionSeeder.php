@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Local dev only. Creates one published event reachable at the `demo` subdomain
  * (http://localhost:3001/?subdomain=demo) with brand theme, hero banners, ads,
- * featured sessions + speakers, exhibitors, sponsors, breakout rooms, and five
+ * featured sessions + speakers, exhibitors, breakout rooms, and five
  * logins (4 attendees + 1 host, all password="password").
  *
  * Run: php artisan db:seed --class=DemoReceptionSeeder

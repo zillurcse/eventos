@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\File;
 use App\Models\Participation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Attendee-facing delegate directory ("Delegates" tab). Acts as the resolved
@@ -66,10 +68,15 @@ class DelegateController extends Controller
         $rows = $rows->take($perPage);
 
         $online = $this->onlineMap($eventId, $rows->pluck('id'));
+        $avatarFiles = $this->avatarFileUrls($rows);
 
         return response()->json([
             'data' => $rows
-                ->map(fn (Participation $p) => $this->format($p, $online[$p->id] ?? false))
+                ->map(fn (Participation $p) => $this->format(
+                    $p,
+                    $online[$p->id] ?? false,
+                    $avatarFiles[$p->contact?->photo_file_id] ?? null,
+                ))
                 ->values(),
             'meta' => ['page' => $page, 'per_page' => $perPage, 'has_more' => $hasMore],
         ]);
@@ -145,10 +152,15 @@ class DelegateController extends Controller
             ->get();
 
         $online = $this->onlineMap($eventId, $rows->pluck('id'));
+        $avatarFiles = $this->avatarFileUrls($rows);
 
         return response()->json([
             'data' => $rows->map(fn (Participation $p) => array_merge(
-                $this->format($p, $online[$p->id] ?? false),
+                $this->format(
+                    $p,
+                    $online[$p->id] ?? false,
+                    $avatarFiles[$p->contact?->photo_file_id] ?? null,
+                ),
                 ['match' => $this->matchLabel((int) $p->match_score, $jobTitle, $company)],
             ))->values(),
             'meta' => ['job_title' => $jobTitle, 'company' => $company],
@@ -185,18 +197,52 @@ class DelegateController extends Controller
             ->all();
     }
 
-    private function format(Participation $p, bool $online): array
+    /**
+     * Resolve contact photo soft references in one query for the whole page.
+     *
+     * @return array<int, string>
+     */
+    private function avatarFileUrls(Collection $rows): array
+    {
+        $ids = $rows
+            ->map(fn (Participation $p) => $p->contact?->photo_file_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return File::on('pgsql_admin')
+            ->whereIn('id', $ids)
+            ->get(['id', 'disk', 'path'])
+            ->mapWithKeys(fn (File $file) => [
+                $file->id => Storage::disk($file->disk)->url($file->path),
+            ])
+            ->all();
+    }
+
+    private function format(Participation $p, bool $online, ?string $contactPhotoUrl = null): array
     {
         $c = $p->contact;
         $meta = $p->meta ?? [];
         $profile = $p->profile_data ?? [];
+        $contactProfile = $c?->profile_data ?? [];
 
         return [
             'id' => $p->uuid,
             'name' => $c ? (trim(($c->first_name ?? '').' '.($c->last_name ?? '')) ?: null) : null,
             'company' => $c?->company ?? ($profile['company'] ?? ''),
             'job_title' => $c?->job_title ?? ($profile['designation'] ?? ''),
-            'avatar_url' => $meta['avatar_url'] ?? ($profile['avatar_url'] ?? ($profile['image_url'] ?? null)),
+            // Edit Profile saves into profile_data, so it must take precedence
+            // over the legacy/meta avatar or the directory can show a stale image.
+            'avatar_url' => $profile['avatar_url']
+                ?? ($profile['image_url']
+                ?? ($meta['avatar_url']
+                ?? ($contactPhotoUrl
+                ?? ($contactProfile['avatar_url']
+                ?? ($contactProfile['image_url'] ?? null))))),
             'online' => $online,
         ];
     }

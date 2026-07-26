@@ -43,7 +43,7 @@ trait SeedsEventContent
     /**
      * Seed the standard test dataset onto an existing event: 5 logins (4
      * attendees + 1 host, all password="password"), speakers, featured sessions,
-     * exhibitors, sponsors, reception ads, breakout rooms and two meetings.
+     * exhibitors, reception ads, breakout rooms and two meetings.
      *
      * @return string[] login summary lines for the console
      */
@@ -102,14 +102,10 @@ trait SeedsEventContent
             $session->speakers()->syncWithoutDetaching($pivot);
         }
 
-        // --- Exhibitors & sponsors -------------------------------------------
+        // --- Exhibitors (sponsors are managed as exhibitors) -----------------
         $exhibitors = ['Okum', 'Altus Group', 'BrightCloud', 'Nova Robotics', 'Vertex Systems', 'PixelForge'];
         foreach ($exhibitors as $i => $name) {
             $this->partner($org, $event, $name, 'exhibitor', 10000 + $i * 137, $this->pic($picPrefix.'-exh'.$i, 240, 120), $i);
-        }
-        $sponsors = ['Muscat Steel', 'Oman Opportunities', 'DarGlobal', 'Expouse DSA'];
-        foreach ($sponsors as $i => $name) {
-            $this->partner($org, $event, $name, 'sponsor', 15000 + $i * 211, $this->pic($picPrefix.'-spo'.$i, 240, 120), $i);
         }
 
         // --- Networking Lounge (LOUNGE tab: tables + bookable meeting slots) ---
@@ -164,9 +160,9 @@ trait SeedsEventContent
 
     /**
      * Configure the networking lounge (Communication → Lounge): a few named
-     * attendee tables, exhibitor + sponsor branded tables (the partners seeded
-     * above), and bookable meeting slots across every event day — so both the
-     * LOUNGE tab (live video tables) and the Meetings slot picker have real data.
+     * attendee tables, exhibitor branded tables (the partners seeded above),
+     * and bookable meeting slots across every event day — so both the LOUNGE
+     * tab (live video tables) and the Meetings slot picker have real data.
      */
     private function seedLounge(Event $event, string $tz, string $picPrefix): void
     {
@@ -202,8 +198,8 @@ trait SeedsEventContent
                     'attendee_tables' => $attendeeTables,
                     'exhibitor_tables_enabled' => true,
                     'exhibitor_default_meetings' => 3,
-                    'sponsor_tables_enabled' => true,
-                    'sponsor_default_meetings' => 10,
+                    'sponsor_tables_enabled' => false,
+                    'sponsor_default_meetings' => 0,
                 ]),
             ],
         );

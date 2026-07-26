@@ -3,3 +3,4 @@
 CREATE EXTENSION IF NOT EXISTS citext;     -- case-insensitive emails
 CREATE EXTENSION IF NOT EXISTS pg_trgm;    -- trigram search / fuzzy lookup
 CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid(), digests
+CREATE EXTENSION IF NOT EXISTS vector;    -- ExpoLens face embeddings (pgvector)

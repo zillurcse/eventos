@@ -1,4 +1,5 @@
 // app/composables/api/useFloorsApi.ts
+import { toast } from "vue-sonner";
 import type { Floor } from "@floorplan/types/canvas";
 
 /**
@@ -16,7 +17,6 @@ export const useFloorsApi = () => {
   const api = useApi();
   const auth = useAuthStore();
   const route = useRoute();
-  const toast = useToast();
 
   // Event uuid from the route (mounted at /org/events/:id/floor).
   const eventId = computed(
@@ -39,18 +39,10 @@ export const useFloorsApi = () => {
       try {
         const res = await api(`/events/${eventId.value}/floors`);
         const floors = pickList(res);
-        toast.success({
-          title: "Floors Loaded",
-          message: `Found ${floors.length} floor(s)`,
-          position: "topRight",
-        });
+        toast.success(`Found ${floors.length} floor(s)`);
         return floors;
       } catch (error: any) {
-        toast.error({
-          title: "Failed to Load Floors",
-          message: error.data?.message || error.message || "Please try again later.",
-          position: "topRight",
-        });
+        toast.error(error.data?.message || error.message || "Could not load floors.");
         return [];
       }
     },
@@ -61,18 +53,10 @@ export const useFloorsApi = () => {
       try {
         const res = await api(`/floors/${id}`);
         const floor = pickOne(res);
-        toast.success({
-          title: "Floor Loaded",
-          message: `Opened: ${(floor as any)?.name || "Untitled"}`,
-          position: "topRight",
-        });
+        toast.success(`Opened: ${(floor as any)?.name || "Untitled"}`);
         return floor;
       } catch (error: any) {
-        toast.error({
-          title: "Floor Not Found",
-          message: `ID: ${id} — ${error.data?.message || error.message}`,
-          position: "topRight",
-        });
+        toast.error(error.data?.message || error.message || "Floor not found.");
         return null;
       }
     },
@@ -81,18 +65,10 @@ export const useFloorsApi = () => {
     createFloor: async (floor: Partial<Floor>): Promise<Floor | null> => {
       try {
         const res = await api(`/events/${eventId.value}/floors`, { method: "POST", body: floor });
-        toast.success({
-          title: "Floor Created!",
-          message: `${floor.name || "New Floor"} is ready to design`,
-          position: "topRight",
-        });
+        toast.success(`${floor.name || "New Floor"} is ready to design`);
         return pickOne(res);
       } catch (error: any) {
-        toast.error({
-          title: "Create Failed",
-          message: error.data?.message || error.message || "Could not create floor.",
-          position: "topRight",
-        });
+        toast.error(error.data?.message || error.message || "Could not create floor.");
         return null;
       }
     },
@@ -101,18 +77,10 @@ export const useFloorsApi = () => {
     updateFloor: async (id: string, floor: Partial<Floor>): Promise<Floor | null> => {
       try {
         const res = await api(`/floors/${id}`, { method: "PUT", body: floor });
-        toast.success({
-          title: "Floor Saved",
-          message: `${floor.name || "Floor"} updated successfully`,
-          position: "topRight",
-        });
+        toast.success(`${floor.name || "Floor"} updated successfully`);
         return pickOne(res);
       } catch (error: any) {
-        toast.error({
-          title: "Save Failed",
-          message: error.data?.message || error.message || "Changes were not saved.",
-          position: "topRight",
-        });
+        toast.error(error.data?.message || error.message || "Changes were not saved.");
         return null;
       }
     },
@@ -121,19 +89,10 @@ export const useFloorsApi = () => {
     deleteFloor: async (id: string): Promise<boolean> => {
       try {
         await api(`/floors/${id}`, { method: "DELETE" });
-        toast.success({
-          title: "Floor Deleted",
-          message: "All booths & walls removed permanently.",
-          position: "topRight",
-          timeout: 3000,
-        });
+        toast.success("Floor deleted");
         return true;
       } catch (error: any) {
-        toast.error({
-          title: "Delete Failed",
-          message: error.data?.message || "Try again or check your connection.",
-          position: "topRight",
-        });
+        toast.error(error.data?.message || "Could not delete floor.");
         return false;
       }
     },

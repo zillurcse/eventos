@@ -1,4 +1,5 @@
 // composables/useCanvasExport.ts
+import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useCanvasRendering } from "@floorplan/composables/useCanvasRendering";
 import type { CanvasObject, Point } from "@floorplan/types/canvas";
@@ -614,7 +615,7 @@ export function useCanvasExport() {
       canvas.toBlob((blob) => {
         if (!blob) {
           console.error("❌ Failed to create PNG blob");
-          alert("Failed to generate PNG image.");
+          toast.error("Failed to generate PNG image.");
           reject(new Error("Blob creation failed"));
           return;
         }
@@ -684,7 +685,7 @@ export function useCanvasExport() {
       console.log(`✅ PDF export initiated: ${filename}`);
     } catch (e) {
       console.error("❌ Failed to generate PDF data. Likely CORS issue.", e);
-       alert("Export failed. If you used external images, they might be blocking secure export.");
+      toast.error("Export failed. If you used external images, they might be blocking secure export.");
     }
   };
 

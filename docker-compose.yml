@@ -26,7 +26,7 @@ x-api-base: &api-base
 services:
   # ── PostgreSQL 16 ──────────────────────────────────────────────
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eventos}
@@ -66,6 +66,15 @@ services:
     environment:
       INSTALL_DEPS: "true"      # this service owns composer install + migrate
       RUN_MIGRATIONS: "true"
+      FACE_SERVICE_URL: "http://face-service:8000"
+      FACE_SERVICE_TOKEN: "${FACE_SERVICE_TOKEN:-expolens_dev_token}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      face-service:
+        condition: service_healthy
 
   # ── Nginx (HTTP front for the API) ─────────────────────────────
   nginx:
@@ -91,6 +100,8 @@ services:
     command: ["php", "artisan", "horizon"]
     environment:
       INSTALL_DEPS: "false"
+      FACE_SERVICE_URL: "http://face-service:8000"
+      FACE_SERVICE_TOKEN: "${FACE_SERVICE_TOKEN:-expolens_dev_token}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,6 +109,29 @@ services:
         condition: service_healthy
       api:
         condition: service_started
+      face-service:
+        condition: service_healthy
+
+  # ── ExpoLens face detection / embeddings ─────────────────────
+  face-service:
+    build:
+      context: ./face-service
+      dockerfile: Dockerfile
+    image: eventos-face-service:dev
+    restart: unless-stopped
+    environment:
+      FACE_MODEL_NAME: "${FACE_MODEL_NAME:-buffalo_l}"
+      FACE_DETECTION_SIZE: "${FACE_DETECTION_SIZE:-640}"
+      FACE_MAX_UPLOAD_BYTES: "${FACE_MAX_UPLOAD_BYTES:-26214400}"
+      FACE_SERVICE_TOKEN: "${FACE_SERVICE_TOKEN:-expolens_dev_token}"
+    volumes:
+      - face_models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
 
   # ── Reverb (WebSockets) ────────────────────────────────────────
   reverb:
@@ -256,3 +290,4 @@ volumes:
   api_vendor:
   admin_node_modules:
   event_node_modules:
+  face_models:

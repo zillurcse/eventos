@@ -1,22 +1,30 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ layout: false })
 const auth = useAuthStore()
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const error = ref('')
-const notice = ref('')
 const loading = ref(false)
 
 async function submit() {
   if (loading.value) return
+  if (!email.value.trim() || !password.value) {
+    toast.error('Enter your email and password.')
+    return
+  }
+
   loading.value = true
   error.value = ''
   try {
     await auth.login(email.value, password.value)
+    toast.success('Signed in')
     navigateTo(auth.home)
   } catch (e: any) {
     error.value = e?.data?.message || 'Those credentials do not match our records.'
+    toast.error(error.value)
   } finally {
     loading.value = false
   }
@@ -86,11 +94,8 @@ async function submit() {
           </button>
         </label>
 
-        <p v-if="error" class="err-msg">{{ error }}</p>
-        <p v-else-if="notice" class="notice-msg">{{ notice }}</p>
-
         <div class="forgot">
-          <button type="button" class="forgot-link" @click="notice = 'Please contact your platform administrator to reset your password.'">
+          <button type="button" class="forgot-link" @click="toast.info('Please contact your platform administrator to reset your password.')">
             Forget password?
           </button>
         </div>
@@ -208,17 +213,6 @@ async function submit() {
 }
 .reveal:hover { background: rgba(99, 102, 241, .1); }
 .reveal svg { width: 20px; height: 20px; }
-
-.err-msg {
-  margin: -8px 0 14px;
-  color: #dc2626;
-  font-size: .86rem;
-}
-.notice-msg {
-  margin: -8px 0 14px;
-  color: var(--brand-dark);
-  font-size: .86rem;
-}
 
 .forgot {
   display: flex;

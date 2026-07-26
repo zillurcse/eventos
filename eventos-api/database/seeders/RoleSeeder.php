@@ -24,7 +24,8 @@ class RoleSeeder extends Seeder
             ['name' => 'super_admin', 'scope' => 'platform', 'perms' => PermissionSeeder::PLATFORM],
             ['name' => 'owner',       'scope' => 'tenant',   'perms' => $tenant->all()],
             ['name' => 'manager',     'scope' => 'tenant',   'perms' => $tenant->reject(
-                fn ($p) => in_array($p, ['settings.manage', 'members.manage', 'email.manage'], true)
+                // Managers run events (incl. email) but can't change org settings or members.
+                fn ($p) => in_array($p, ['settings.manage', 'members.manage'], true)
             )->values()->all()],
             ['name' => 'staff',       'scope' => 'tenant',   'perms' => ['events.view', 'attendees.manage', 'checkin.manage', 'analytics.view']],
         ];

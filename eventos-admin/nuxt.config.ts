@@ -18,7 +18,6 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxtjs/google-fonts',
     'nuxt-color-picker',
-    'nuxt-toast',
     'pinia-plugin-persistedstate/nuxt',
     // Module required by the badge.expouse feature (modules/badge.expouse) — its
     // canvas uses the <Qrcode> component to render QR elements.

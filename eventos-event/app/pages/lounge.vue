@@ -52,8 +52,8 @@ const list = computed<LoungeTable[]>(() => {
   return q ? base.filter(t => t.name.toLowerCase().includes(q)) : base
 })
 
-async function onJoin(table: LoungeTable) {
-  const cfg = await store.join(table)
+async function onJoin(table: LoungeTable, seat?: number) {
+  const cfg = await store.join(table, seat)
   if (cfg) active.value = { config: cfg, title: cfg.title, tableId: table.id }
 }
 
@@ -116,7 +116,7 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
 
       <div v-else class="grid">
         <LoungeTableCard v-for="t in list" :key="t.id" :table="t" :joining="store.joining === t.id" :me-id="meId"
-          :active-table-id="activeTableId" @join="onJoin(t)" @leave="onLeave" />
+          :active-table-id="activeTableId" @join="onJoin(t, $event)" @leave="onLeave" />
       </div>
     </template>
 
@@ -128,7 +128,7 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
 
       <div v-else class="seatsgrid">
         <LoungeSeatCard v-for="t in seatsList" :key="t.id" :table="t" :joining="store.joining === t.id" :me-id="meId"
-          :active-table-id="activeTableId" @join="onJoin(t)" @leave="onLeave" />
+          :active-table-id="activeTableId" @join="onJoin(t, $event)" @leave="onLeave" />
       </div>
     </template>
 

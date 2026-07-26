@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\EmailTemplateController;
 use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\EventAdminController;
 use App\Http\Controllers\Api\V1\EventController;
+use App\Http\Controllers\Api\V1\ExpoLensAdminController;
 use App\Http\Controllers\Api\V1\ExhibitorContactController;
 use App\Http\Controllers\Api\V1\ExhibitorController;
 use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
@@ -72,6 +73,7 @@ use App\Http\Controllers\Api\V1\OtpAuthController;
 use App\Http\Controllers\Api\V1\ParticipantBadgeController;
 use App\Http\Controllers\Api\V1\ParticipantController;
 use App\Http\Controllers\Api\V1\ParticipantContestController;
+use App\Http\Controllers\Api\V1\ParticipantExpoLensController;
 use App\Http\Controllers\Api\V1\ParticipantProfileController;
 use App\Http\Controllers\Api\V1\ProfileFormController;
 use App\Http\Controllers\Api\V1\ParticipantSurveyController;
@@ -318,6 +320,11 @@ Route::prefix('v1')->group(function () {
             // Attendee media uploads (feed images/video/PDF) → MinIO, under the
             // event's org GUC set by the participant middleware.
             Route::post('/uploads', [FileUploadController::class, 'store']);
+            Route::get('/expolens/photos', [ParticipantExpoLensController::class, 'index']);
+            Route::get('/expolens/my-photos', [ParticipantExpoLensController::class, 'myPhotos']);
+            Route::get('/expolens/enrollment', [ParticipantExpoLensController::class, 'enrollment']);
+            Route::post('/expolens/enroll', [ParticipantExpoLensController::class, 'enroll']);
+            Route::delete('/expolens/enroll', [ParticipantExpoLensController::class, 'withdraw']);
             Route::get('/delegates', [DelegateController::class, 'index']);
             // "People like you" strip above the directory (same designation/company).
             Route::get('/delegates/similar', [DelegateController::class, 'similar']);
@@ -633,6 +640,22 @@ Route::prefix('v1')->group(function () {
             Route::post('/events/{uuid}/gallery/reorder', [GalleryImageController::class, 'reorder'])->middleware('perm:events.manage');
             Route::match(['put', 'patch'], '/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'update'])->middleware('perm:events.manage');
             Route::delete('/events/{uuid}/gallery/{image}', [GalleryImageController::class, 'destroy'])->middleware('perm:events.manage');
+            Route::get('/events/{uuid}/expolens/photos', [ExpoLensAdminController::class, 'index'])
+                ->middleware('perm:events.view')->name('expolens.admin.index');
+            Route::post('/events/{uuid}/expolens/photos', [ExpoLensAdminController::class, 'store'])
+                ->middleware('perm:events.manage')->name('expolens.admin.store');
+            Route::patch('/events/{uuid}/expolens/photos/{photo}', [ExpoLensAdminController::class, 'update'])
+                ->middleware('perm:events.manage')->name('expolens.admin.update');
+            Route::delete('/events/{uuid}/expolens/photos/{photo}', [ExpoLensAdminController::class, 'destroy'])
+                ->middleware('perm:events.manage')->name('expolens.admin.destroy');
+            Route::get('/events/{uuid}/expolens/photos/{photo}/matches', [ExpoLensAdminController::class, 'matches'])
+                ->middleware('perm:events.view')->name('expolens.admin.matches');
+            Route::get('/events/{uuid}/expolens/attendees', [ExpoLensAdminController::class, 'attendees'])
+                ->middleware('perm:events.view')->name('expolens.admin.attendees');
+            Route::get('/events/{uuid}/expolens/attendees/{participation}', [ExpoLensAdminController::class, 'attendeeMatches'])
+                ->middleware('perm:events.view')->name('expolens.admin.attendee-matches');
+            Route::post('/events/{uuid}/expolens/reprocess', [ExpoLensAdminController::class, 'reprocess'])
+                ->middleware('perm:events.manage')->name('expolens.admin.reprocess');
 
             // ── Event services catalogue ──
             Route::get('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'index'])->middleware('perm:events.view');

@@ -228,6 +228,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
+import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useUiStore } from "@floorplan/stores/uiStore";
 import { useCanvasExport } from "@floorplan/composables/useCanvasExport";
@@ -376,7 +377,7 @@ const handleDownload = async () => {
       `❌ ${selectedFormat.value.toUpperCase()} export failed:`,
       error
     );
-    alert(
+    toast.error(
       `Failed to export ${selectedFormat.value.toUpperCase()}. Please try again.`
     );
   } finally {

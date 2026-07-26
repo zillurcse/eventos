@@ -420,6 +420,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { toast } from "vue-sonner";
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useUiStore } from "@floorplan/stores/uiStore";
 
@@ -544,7 +545,7 @@ const handleShare = async () => {
 
   } catch (err) {
     console.error("Share Error:", err);
-    alert("Failed to generate share link. Please try again.");
+    toast.error("Failed to generate share link. Please try again.");
   } finally {
     shareLoading.value = false;
   }

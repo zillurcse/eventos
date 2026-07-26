@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ExpoLens\EnrollParticipationFaceJob;
 use App\Models\EventSetting;
 use App\Models\Form;
 use App\Models\FormFieldValue;
@@ -52,6 +53,7 @@ class ParticipantProfileController extends Controller
             'company' => ['nullable', 'string', 'max:150'],
             'bio' => ['nullable', 'string', 'max:2000'],
             'avatar_url' => ['nullable', 'string', 'max:2000'],
+            'avatar_file_id' => ['nullable', 'integer', 'exists:files,id'],
             'phone' => ['nullable', 'string', 'max:40'],
             'gender' => ['nullable', 'string', 'max:40'],
             'country' => ['nullable', 'string', 'max:100'],
@@ -94,11 +96,15 @@ class ParticipantProfileController extends Controller
         $profile = array_merge(
             $participation->profile_data ?? [],
             collect($data)
-                ->except(['complete_onboarding', 'first_name', 'last_name', 'custom'])
+                ->except(['complete_onboarding', 'first_name', 'last_name', 'custom', 'avatar_file_id'])
                 ->filter(fn ($v) => $v !== null)
                 ->all(),
             $custom,
         );
+
+        if (array_key_exists('avatar_file_id', $data)) {
+            $profile['avatar_file_id'] = $data['avatar_file_id'];
+        }
 
         $meta = $participation->meta ?? [];
         if ($request->boolean('complete_onboarding')) {
@@ -106,6 +112,18 @@ class ParticipantProfileController extends Controller
         }
 
         $participation->update(['profile_data' => $profile, 'meta' => $meta]);
+
+        if (
+            ! empty($data['avatar_file_id'])
+            && ! empty($profile['expolens_consent_at'])
+        ) {
+            EnrollParticipationFaceJob::dispatch(
+                $participation->organization_id,
+                $participation->event_id,
+                $participation->id,
+                (int) $data['avatar_file_id'],
+            );
+        }
 
         $fresh = $participation->fresh(['contact']);
 
@@ -252,6 +270,7 @@ class ParticipantProfileController extends Controller
             'company' => $profile['company'] ?? '',
             'bio' => $profile['bio'] ?? '',
             'avatar_url' => $profile['avatar_url'] ?? ($profile['image_url'] ?? null),
+            'avatar_file_id' => $profile['avatar_file_id'] ?? null,
             'phone' => $profile['phone'] ?? '',
             'gender' => $profile['gender'] ?? '',
             'country' => $profile['country'] ?? '',

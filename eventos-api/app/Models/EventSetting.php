@@ -36,7 +36,12 @@ class EventSetting extends Model
         'communication' => 'array',
         'video' => 'array',
         'mobile_access_panel' => 'array',
+        'help_screens' => 'array',
+        'manage_tabs' => 'array',
+        'branded_app' => 'array',
+        'app_banner' => 'array',
         'sender' => 'array',
+        'mail_emails' => 'array',
         'registration_open' => 'datetime',
         'registration_close' => 'datetime',
     ];

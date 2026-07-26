@@ -7,7 +7,7 @@ const props = defineProps<{
   meId: string
   activeTableId: string
 }>()
-const emit = defineEmits<{ join: [], leave: [] }>()
+const emit = defineEmits<{ join: [seat?: number], leave: [] }>()
 
 const seatedHere = computed(() => props.activeTableId === props.table.id)
 // 2-seat tables render as a simple pair: one seat above the centerpiece, one
@@ -19,8 +19,28 @@ const isDiamond = computed(() => props.table.capacity >= 3 && props.table.capaci
 
 interface Seat { i: number, occupant: LoungeOccupant | null, isMe: boolean }
 
+/** Map occupants onto chairs by their persisted seat index (not join order). */
+const occupantBySeat = computed<(LoungeOccupant | null)[]>(() => {
+  const n = props.table.capacity
+  const seats: (LoungeOccupant | null)[] = Array.from({ length: n }, () => null)
+  const unseated: LoungeOccupant[] = []
+  for (const o of props.table.occupants) {
+    if (typeof o.seat === 'number' && o.seat >= 0 && o.seat < n && seats[o.seat] == null) {
+      seats[o.seat] = o
+    } else {
+      unseated.push(o)
+    }
+  }
+  for (const o of unseated) {
+    const i = seats.findIndex(s => s == null)
+    if (i < 0) break
+    seats[i] = o
+  }
+  return seats
+})
+
 function seatAt(i: number): Seat {
-  const occupant = props.table.occupants[i] ?? null
+  const occupant = occupantBySeat.value[i] ?? null
   return { i, occupant, isMe: !!occupant && occupant.identity === props.meId }
 }
 
@@ -48,7 +68,17 @@ function onSeat(seat: Seat) {
     if (seat.isMe) emit('leave')
     return
   }
-  if (!props.table.full) emit('join')
+  if (!props.table.full) emit('join', seat.i)
+}
+
+function onSelectBtn() {
+  if (seatedHere.value) {
+    emit('leave')
+    return
+  }
+  // Pick the first empty chair when joining from the button.
+  const empty = occupantBySeat.value.findIndex(o => o == null)
+  emit('join', empty >= 0 ? empty : undefined)
 }
 </script>
 
@@ -146,7 +176,7 @@ function onSeat(seat: Seat) {
     </div>
 
     <button type="button" class="selectbtn" :disabled="joining || (table.full && !seatedHere)"
-      @click="seatedHere ? emit('leave') : emit('join')">
+      @click="onSelectBtn">
       {{ seatedHere ? 'Leave table' : joining ? 'Joining…' : table.full ? 'Table full' : 'Select a seat' }}
     </button>
   </article>

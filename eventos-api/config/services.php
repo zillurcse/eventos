@@ -48,6 +48,13 @@ return [
         'token_ttl' => (int) env('LIVEKIT_TOKEN_TTL', 3600),
     ],
 
+    'expolens' => [
+        'face_service_url' => env('FACE_SERVICE_URL', 'http://127.0.0.1:8000'),
+        'face_service_token' => env('FACE_SERVICE_TOKEN'),
+        'match_threshold' => (float) env('EXPOLENS_MATCH_THRESHOLD', 0.45),
+        'minimum_quality' => (float) env('EXPOLENS_MIN_QUALITY', 0.18),
+    ],
+
     /*
     | Zoom Meeting SDK — lets a "zoom"-hosted session embed inside the event
     | page via the Web SDK (Zoom pages refuse to be iframed). Create a "Meeting

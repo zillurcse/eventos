@@ -92,9 +92,41 @@ class LoungeController extends Controller
         $found = collect($this->buildTables($eventModel, $lounge))->firstWhere('id', $table);
         abort_unless($found, 404, 'That lounge table no longer exists.');
 
+        $occupants = $this->livekit->participants($found['room']);
+        $capacity = (int) $found['capacity'];
+
         // Capacity guard against the live room (accurate single-room read).
-        $seated = $this->livekit->participantCount($found['room']);
-        if ($seated >= $found['capacity']) {
+        if (count($occupants) >= $capacity) {
+            throw ValidationException::withMessages(['table' => 'This table is full. Try another one.']);
+        }
+
+        // Prefer the chair the attendee tapped; otherwise claim the first empty one
+        // so "Select a seat" still works. Persist seat in LiveKit metadata so other
+        // browsers render that person on the same chair.
+        $requested = $request->input('seat');
+        $seat = is_numeric($requested) ? (int) $requested : null;
+        $taken = collect($occupants)
+            ->pluck('seat')
+            ->filter(fn ($s) => $s !== null)
+            ->map(fn ($s) => (int) $s)
+            ->all();
+
+        if ($seat !== null) {
+            if ($seat < 0 || $seat >= $capacity) {
+                throw ValidationException::withMessages(['seat' => 'That seat is not available.']);
+            }
+            if (in_array($seat, $taken, true)) {
+                throw ValidationException::withMessages(['seat' => 'That seat was just taken. Pick another.']);
+            }
+        } else {
+            for ($i = 0; $i < $capacity; $i++) {
+                if (! in_array($i, $taken, true)) {
+                    $seat = $i;
+                    break;
+                }
+            }
+        }
+        if ($seat === null) {
             throw ValidationException::withMessages(['table' => 'This table is full. Try another one.']);
         }
 
@@ -107,9 +139,10 @@ class LoungeController extends Controller
             'role' => 'attendee',
             'canPublish' => true,          // lounge tables are participatory (mic + camera)
             'avatar_url' => $request->input('avatar_url'),
+            'seat' => $seat,
         ]);
 
-        return response()->json(['data' => $config + ['title' => $found['name']]]);
+        return response()->json(['data' => $config + ['title' => $found['name'], 'seat' => $seat]]);
     }
 
     // ── internals ───────────────────────────────────────────────────────────

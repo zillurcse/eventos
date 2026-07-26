@@ -6,6 +6,8 @@
  * for why the download captures a hidden 1:1 node and never leaks artwork
  * through a third-party proxy.
  */
+import { toast } from 'vue-sonner'
+
 interface Badge {
   participation_id: string
   role_label: string
@@ -83,8 +85,7 @@ async function download(b: Badge) {
     const name = (b.data.full_name || 'badge').toLowerCase().replace(/\s+/g, '_')
     pdf.save(`${name}-badge.pdf`)
   } catch {
-    // eslint-disable-next-line no-alert
-    alert('Your badge could not be downloaded. Please try again.')
+    toast.error('Your badge could not be downloaded. Please try again.')
   } finally {
     downloading.value = null
     capturing.value = null
@@ -207,7 +208,8 @@ onMounted(load)
 
 .btn {
   padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line, #e5e7eb);
-  background: #fff; font-size: .9rem; font-weight: 600; cursor: pointer;
+  background: #fff; color: var(--ink, #1e293b); font-size: .9rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
 }
 .btn:disabled { opacity: .6; cursor: default; }
 .btn.primary { background: var(--brand-primary, #6352e7); border-color: var(--brand-primary, #6352e7); color: #fff; }

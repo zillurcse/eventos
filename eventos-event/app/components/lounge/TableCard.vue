@@ -7,7 +7,7 @@ const props = defineProps<{
   meId: string          // 'user_<uuid>' of the current viewer
   activeTableId: string // the table this viewer is currently seated at ('' = none)
 }>()
-const emit = defineEmits<{ join: [], leave: [] }>()
+const emit = defineEmits<{ join: [seat?: number], leave: [] }>()
 
 const MAX_SEATS = 10
 
@@ -51,10 +51,30 @@ const positions = computed<{ x: number, y: number }[]>(() => {
   })
 })
 
+/** Map occupants onto chairs by their persisted seat index (not join order). */
+const occupantBySeat = computed<(LoungeOccupant | null)[]>(() => {
+  const n = shown.value
+  const seats: (LoungeOccupant | null)[] = Array.from({ length: n }, () => null)
+  const unseated: LoungeOccupant[] = []
+  for (const o of props.table.occupants) {
+    if (typeof o.seat === 'number' && o.seat >= 0 && o.seat < n && seats[o.seat] == null) {
+      seats[o.seat] = o
+    } else {
+      unseated.push(o)
+    }
+  }
+  for (const o of unseated) {
+    const i = seats.findIndex(s => s == null)
+    if (i < 0) break
+    seats[i] = o
+  }
+  return seats
+})
+
 interface Chair { i: number, occupant: LoungeOccupant | null, isMe: boolean, x: number, y: number, low: boolean }
 
 const chairs = computed<Chair[]>(() => positions.value.map((p, i) => {
-  const occupant = props.table.occupants[i] ?? null
+  const occupant = occupantBySeat.value[i] ?? null
   return { i, occupant, isMe: !!occupant && occupant.identity === props.meId, x: p.x, y: p.y, low: p.y < 42 }
 }))
 
@@ -63,7 +83,7 @@ function onChair(c: Chair) {
     if (c.isMe) emit('leave')
     return
   }
-  if (!props.table.full) emit('join')
+  if (!props.table.full) emit('join', c.i)
 }
 </script>
 

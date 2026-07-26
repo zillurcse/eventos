@@ -12,6 +12,8 @@
  * to white — scanning a small QR off a dimmed phone at a busy gate is the one
  * thing this page has to get right.
  */
+import { toast } from 'vue-sonner'
+
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 interface Badge {
@@ -118,8 +120,7 @@ async function download(b: Badge) {
     const name = (b.data.full_name || 'badge').toLowerCase().replace(/\s+/g, '_')
     pdf.save(`${name}-badge.pdf`)
   } catch {
-    // eslint-disable-next-line no-alert
-    alert('Your badge could not be downloaded. Please try again.')
+    toast.error('Your badge could not be downloaded. Please try again.')
   } finally {
     downloading.value = null
     capturing.value = null
@@ -264,16 +265,26 @@ onMounted(load)
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
+/* Global `.btn` sets color:#fff + brand fill — override fully so secondary
+   actions stay readable (the empty pill next to Show QR was white-on-white). */
 .btn {
   padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid var(--line, #e5e7eb);
   background: #fff;
+  color: var(--ink, #1e293b);
   font-size: .86rem;
   font-weight: 600;
   cursor: pointer;
+  font-family: inherit;
 }
-.btn.primary { background: var(--brand-primary, #6352e7); border-color: var(--brand-primary, #6352e7); color: #fff; }
+.btn.primary {
+  background: var(--brand-primary, #6352e7);
+  border-color: var(--brand-primary, #6352e7);
+  color: #fff;
+}
+.btn:hover { filter: brightness(.97); }
+.btn.primary:hover { filter: brightness(1.05); }
 
 .scan {
   position: fixed;

@@ -109,7 +109,7 @@ onMounted(load)
   <div>
     <div class="flex items-start justify-between gap-4 mb-4">
       <div>
-        <h2 class="section-title m-0">Email Builder</h2>
+        <h2 class="section-title m-0">Email Templates</h2>
         <p class="muted text-[.86rem] mt-0.5 mb-0">Design professional, responsive emails with dynamic variables and reuse them across your event.</p>
       </div>
     </div>

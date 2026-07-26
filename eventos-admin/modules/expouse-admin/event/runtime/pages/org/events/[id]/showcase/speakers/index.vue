@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
@@ -232,7 +233,7 @@ function openPrevious() {
 }
 
 function openDirectory() {
-  alert('Coming soon.')
+  toast.info('Coming soon.')
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────

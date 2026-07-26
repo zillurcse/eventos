@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Enriches the EXISTING published "aiexpo" event (AI Expo 2026) with the standard
- * microsite test dataset — speakers, featured sessions, sponsors, reception ads,
+ * microsite test dataset — speakers, featured sessions, exhibitors, reception ads,
  * breakout rooms and five logins (4 attendees + 1 host, all password="password").
  *
  * Unlike DemoReceptionSeeder this does NOT create the event; it resolves it by its

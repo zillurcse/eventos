@@ -7,6 +7,8 @@ export interface LoungeOccupant {
   identity: string
   name: string
   avatar_url: string | null
+  /** Chair index the person sat in (0-based). Null for legacy joins. */
+  seat: number | null
 }
 
 export type LoungeTableDesign = 'round' | 'boardroom' | 'lounge'
@@ -71,7 +73,7 @@ export const useLoungeTablesStore = defineStore('loungeTables', {
     },
 
     /** Take a seat at a table. Returns the video join config (+ title) or null. */
-    async join(table: LoungeTable): Promise<(JoinConfig & { title: string }) | null> {
+    async join(table: LoungeTable, seat?: number): Promise<(JoinConfig & { title: string }) | null> {
       const uuid = useSiteStore().event?.uuid
       if (!uuid) return null
 
@@ -80,13 +82,18 @@ export const useLoungeTablesStore = defineStore('loungeTables', {
       try {
         const api = useApi()
         const avatar = (useAuthStore().user as any)?.avatar_url ?? null
+        const body: Record<string, unknown> = { avatar_url: avatar }
+        if (typeof seat === 'number') body.seat = seat
         const res = await api<{ data: JoinConfig & { title: string } }>(
           `/events/${uuid}/lounge/tables/${encodeURIComponent(table.id)}/join`,
-          { method: 'POST', body: { avatar_url: avatar } },
+          { method: 'POST', body },
         )
         return res.data
       } catch (e: any) {
-        this.joinError = e?.data?.errors?.table?.[0] || e?.data?.message || 'Could not join this table.'
+        this.joinError = e?.data?.errors?.seat?.[0]
+          || e?.data?.errors?.table?.[0]
+          || e?.data?.message
+          || 'Could not join this table.'
         return null
       } finally {
         this.joining = ''

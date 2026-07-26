@@ -153,6 +153,7 @@ import {
   type BoothStatus,
   type BoothDisplayOption,
 } from "@floorplan/constants/boothConstants";
+import { toast } from "vue-sonner";
 
 import { useCanvasStore } from "@floorplan/stores/canvasStore";
 import { useBoothColors } from "@floorplan/composables/useBoothColors";
@@ -340,7 +341,7 @@ const handleBoothSave = (boothData: any) => {
     );
 
     if (existingBooth) {
-      alert(
+      toast.error(
         `Booth number ${boothNumber} already exists. Please choose a different number.`
       );
       return;

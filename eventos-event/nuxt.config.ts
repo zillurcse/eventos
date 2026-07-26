@@ -15,7 +15,12 @@ export default defineNuxtConfig({
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap' },
+        // Cairo for the event shell; the rest match the badge editor's font
+        // picker so My Badges / printed PDFs use the same faces as the design.
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Cairo:wght@400;500;600;700;800&family=Fira+Sans:wght@400;600;700&family=Inconsolata:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;600;700&family=Mukta:wght@400;600;700&family=Noto+Sans:wght@400;600;700&family=Nunito:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Oswald:wght@400;600;700&family=PT+Sans:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;600;700&family=Quicksand:wght@400;600;700&family=Raleway:wght@400;600;700&family=Roboto:wght@400;500;700&family=Roboto+Condensed:wght@400;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap',
+        },
       ],
     },
   },

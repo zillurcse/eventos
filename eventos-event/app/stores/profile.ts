@@ -9,6 +9,7 @@ export interface ProfileData {
   company: string
   bio: string
   avatar_url: string | null
+  avatar_file_id?: number | null
   phone: string
   gender: string
   country: string
@@ -86,16 +87,16 @@ export const useProfileStore = defineStore('profile', {
       const form = new FormData()
       form.append('file', file)
       form.append('collection', 'avatar')
-      const res = await api<{ data: { url: string } }>(`/events/${uuid}/uploads`, {
+      const res = await api<{ data: { id: number, url: string } }>(`/events/${uuid}/uploads`, {
         method: 'POST',
         body: form,
       })
-      await this.save({ avatar_url: res.data.url })
+      await this.save({ avatar_url: res.data.url, avatar_file_id: res.data.id })
       return res.data.url
     },
 
     async deleteAvatar() {
-      await this.save({ avatar_url: '' })
+      await this.save({ avatar_url: '', avatar_file_id: null })
     },
   },
 })

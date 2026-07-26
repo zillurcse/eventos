@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ layout: false })
 
 interface Field {
@@ -18,8 +20,6 @@ const step = ref<'email' | 'password' | 'register' | 'otp'>('email')
 const email = ref('')
 const password = ref('')
 const agreed = ref(false)
-const forgot = ref(false)
-const error = ref('')
 const loading = ref(false)
 
 // OTP sign-in state.
@@ -77,7 +77,7 @@ onMounted(async () => {
 
     // A social sign-in that failed sends back an ?error= we can explain.
     const err = new URLSearchParams(window.location.search).get('error')
-    if (err) error.value = socialError(err)
+    if (err) toast.error(socialError(err))
   }
 
   if (auth.isAuthed) navigateTo('/reception')
@@ -104,9 +104,8 @@ const initials = computed(() =>
   (site.name || 'EV').trim().slice(0, 4).toUpperCase())
 
 async function onContinue() {
-  error.value = ''
-  if (!agreed.value) { error.value = 'Please agree to the Terms of Service and Privacy Policy.'; return }
-  if (!email.value.includes('@')) { error.value = 'Enter a valid email address.'; return }
+  if (!agreed.value) { toast.error('Please agree to the Terms of Service and Privacy Policy.'); return }
+  if (!email.value.includes('@')) { toast.error('Enter a valid email address.'); return }
 
   loading.value = true
   try {
@@ -125,16 +124,16 @@ async function onContinue() {
       await startRegister()            // unknown email → show the signup form inline
     } else if (exists && has_password) {
       // Signup is closed and there's no OTP to fall back on.
-      error.value = 'Password sign-in is currently disabled for this event. Contact the organizer.'
+      toast.error('Password sign-in is currently disabled for this event. Contact the organizer.')
     } else if (!exists) {
       // Invite-only event and we don't know this address.
-      error.value = 'This event is invite-only — ask the organizer for access.'
+      toast.error('This event is invite-only — ask the organizer for access.')
     } else {
       // Known passwordless account but OTP is off — nothing we can offer.
-      error.value = 'This account can only sign in with a method that’s currently disabled. Contact the organizer.'
+      toast.error('This account can only sign in with a method that’s currently disabled. Contact the organizer.')
     }
   } catch (e: any) {
-    error.value = e?.data?.message || 'Something went wrong. Please try again.'
+    toast.error(e?.data?.message || 'Something went wrong. Please try again.')
   } finally {
     loading.value = false
   }
@@ -142,32 +141,32 @@ async function onContinue() {
 
 // ── OTP ─────────────────────────────────────────────────────────────────────
 async function sendOtp() {
-  error.value = ''
-  if (!agreed.value) { error.value = 'Please agree to the Terms of Service and Privacy Policy.'; return }
-  if (!email.value.includes('@')) { error.value = 'Enter a valid email address.'; return }
+  if (!agreed.value) { toast.error('Please agree to the Terms of Service and Privacy Policy.'); return }
+  if (!email.value.includes('@')) { toast.error('Enter a valid email address.'); return }
 
   loading.value = true
   try {
     await auth.requestOtp(email.value)
     otpInfo.value = `We’ve emailed a 6-digit code to ${email.value}. It expires in 10 minutes.`
     step.value = 'otp'
+    toast.success('Sign-in code sent')
   } catch (e: any) {
-    error.value = e?.data?.message || 'Could not send a code. Please try again.'
+    toast.error(e?.data?.message || 'Could not send a code. Please try again.')
   } finally {
     loading.value = false
   }
 }
 
 async function onVerifyOtp() {
-  error.value = ''
-  if (otpCode.value.trim().length < 6) { error.value = 'Enter the 6-digit code from your email.'; return }
+  if (otpCode.value.trim().length < 6) { toast.error('Enter the 6-digit code from your email.'); return }
 
   loading.value = true
   try {
     await auth.verifyOtp(email.value, otpCode.value.trim())
+    toast.success('Signed in')
     navigateTo('/reception')
   } catch (e: any) {
-    error.value = e?.data?.message || 'That code is not right.'
+    toast.error(e?.data?.message || 'That code is not right.')
   } finally {
     loading.value = false
   }
@@ -203,20 +202,20 @@ async function startRegister() {
 }
 
 async function onSignIn() {
-  error.value = ''
+  if (!password.value) { toast.error('Enter your password.'); return }
   loading.value = true
   try {
     await auth.login(email.value, password.value)
+    toast.success('Signed in')
     navigateTo('/reception')
   } catch (e: any) {
-    error.value = e?.data?.message || 'Those credentials do not match our records.'
+    toast.error(e?.data?.message || 'Those credentials do not match our records.')
   } finally {
     loading.value = false
   }
 }
 
 async function onRegister() {
-  error.value = ''
   loading.value = true
   try {
     await api(`/events/${site.event!.uuid}/register`, {
@@ -227,9 +226,10 @@ async function onRegister() {
     const ef = regFields.value.find(f => f.type === 'email' || f.key === 'email')
     const em = ef ? regValues[ef.key] : email.value
     await auth.login(em, regPassword.value)
+    toast.success('Account created')
     navigateTo('/reception')
   } catch (e: any) {
-    error.value = e?.data?.message || 'We could not complete your registration. Please check the form and try again.'
+    toast.error(e?.data?.message || 'We could not complete your registration. Please check the form and try again.')
   } finally {
     loading.value = false
   }
@@ -241,7 +241,6 @@ function backToEmail() {
   regPassword.value = ''
   otpCode.value = ''
   otpInfo.value = ''
-  error.value = ''
 }
 </script>
 
@@ -291,8 +290,6 @@ function backToEmail() {
                 placeholder="Enter 6-digit code" />
             </label>
 
-            <p v-if="error" class="error">{{ error }}</p>
-
             <button class="continue" type="submit" :disabled="loading">
               {{ loading ? 'PLEASE WAIT…' : 'VERIFY & SIGN IN' }}
             </button>
@@ -331,18 +328,14 @@ function backToEmail() {
               </label>
 
               <div class="forgot">
-                <a href="#" @click.prevent="forgot = !forgot">Forget password</a>
+                <a href="#" @click.prevent="toast.info('Password resets are handled by the event organizer — please reach out to them.')">Forget password</a>
               </div>
-              <p v-if="forgot" class="muted small">Password resets are handled by the event organizer — please reach out
-                to them.</p>
 
               <label v-if="step === 'email'" class="agree">
                 <input type="checkbox" v-model="agreed" />
                 <span>I agree to expouse <a href="#" @click.prevent>Terms of Service</a> and <a href="#"
                     @click.prevent>Privacy Policy</a></span>
               </label>
-
-              <p v-if="error" class="error">{{ error }}</p>
 
               <button class="continue" type="submit" :disabled="loading">
                 {{ loading ? 'PLEASE WAIT…' : (step === 'email' ? 'CONTINUE' : 'SIGN IN') }}
@@ -390,8 +383,6 @@ function backToEmail() {
               <!-- <label class="rlabel">Create a password <span class="req">*</span></label> -->
               <input type="password" v-model="regPassword" required minlength="8" autocomplete="new-password"  placeholder="Create a password"/>
             </div>
-
-            <p v-if="error" class="error">{{ error }}</p>
 
             <button class="continue" type="submit" :disabled="loading">
               {{ loading ? 'PLEASE WAIT…' : 'REGISTER' }}
@@ -724,12 +715,6 @@ function backToEmail() {
 
 .social-btn.linkedin {
   color: #0a66c2;
-}
-
-.error {
-  color: #b91c1c;
-  font-size: .88rem;
-  margin-top: 12px;
 }
 
 .powered {

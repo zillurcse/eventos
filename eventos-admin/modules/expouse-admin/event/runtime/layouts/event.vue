@@ -68,7 +68,7 @@ const sections = computed<any[]>(() => [
   { key: 'communication', label: 'Communication', svg: I.comm, children: kids([['Communication', 'communication/functionality'], ['Profiles', 'communication/profiles'], ['Lounge', 'communication/lounge'], ['Meetings', 'communication/meetings'], ['Chats', 'communication/chats'], ['CTA', 'communication/cta'], ['Gamification', 'communication/gamification'], ['Notification', 'communication/notification']]) },
   { key: 'onsite', label: 'OnSite', svg: I.onsite, children: kids([['Badge templates', 'onsite/badge-templates'], ['Lead generation', 'onsite/lead-generation'], ['Gates Scanning', 'onsite/gates-scanning'], ['Exhibitors Scanning', 'onsite/exhibitors-scanning']]) },
   { key: 'services', label: 'Services', svg: I.services, children: kids([['Services', 'services/all'], ['Requested Services', 'services/requested']]) },
-  { key: 'mail', label: 'Mail & Notification', svg: I.mail, children: kids([['Email Builder', 'mail/email-builder'], ['Sender Details', 'mail/sender-details'], ['Invite Mailer', 'mail/invite-mailer']]) },
+  { key: 'mail', label: 'Mail & Notification', svg: I.mail, children: kids([['Emails', 'mail/emails'], ['Email Templates', 'mail/email-builder'], ['Sender Details', 'mail/sender-details'], ['Invite Mailer', 'mail/invite-mailer']]) },
   { key: 'ads', label: 'AD Managements', svg: I.ads, children: kids([['Manage ADs', 'ads/manage'], ['Insights', 'ads/insights']]) },
   { key: 'users', label: 'Users', svg: I.users, children: kids([['All Users', 'users/all'], ['WebApp users', 'users/webapp'], ['Blocked users', 'users/blocked']]) },
   { key: 'expolens', label: 'ExpoLens', svg: I.expolens, children: kids([['Photo Gallery', 'expolens/gallery'], ['Find Attendee Photos', 'expolens/find'], ['Moderate Uploads', 'expolens/moderate']]) },
@@ -77,7 +77,7 @@ const sections = computed<any[]>(() => [
   { key: 'mobile', label: 'Mobile App', svg: I.mobile, children: kids([['Help Screens', 'mobile/help-screens'], ['Manage Tabs', 'mobile/manage-tabs'], ['Branded Mobile App', 'mobile/branded-app'], ['Add App Banner', 'mobile/app-banner']]) },
 ])
 
-function childActive(to: string) { return route.path === to }
+function childActive(to: string) { return route.path === to || route.path.startsWith(`${to}/`) }
 function groupActive(item: any) { return item.children?.some((c: any) => childActive(c.to)) }
 
 function toggle(item: any) {

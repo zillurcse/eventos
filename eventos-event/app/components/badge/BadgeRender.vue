@@ -37,8 +37,11 @@ const scale = computed(() =>
 </script>
 
 <template>
+  <!-- Root class must NOT be `badge` — the event app's global CSS uses `.badge`
+       for status pills (green chip, border-radius 999px), which would turn this
+       rectangular design into a clipped oval. -->
   <div
-    class="badge"
+    class="badge-face"
     :style="{ width: `${page.width * scale}px`, height: `${page.height * scale}px` }"
   >
     <div
@@ -107,7 +110,7 @@ const scale = computed(() =>
 </template>
 
 <style scoped>
-.badge { position: relative; overflow: hidden; background: #fff; }
+.badge-face { position: relative; overflow: hidden; background: #fff; display: block; padding: 0; border-radius: 0; font-size: initial; color: inherit; }
 .canvas { position: absolute; top: 0; left: 0; transform-origin: top left; user-select: none; }
 .qr { width: 100%; height: 100%; }
 

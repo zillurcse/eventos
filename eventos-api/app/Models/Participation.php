@@ -9,6 +9,7 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -53,6 +54,11 @@ class Participation extends Model
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(ParticipationGroup::class, 'participation_group_member', 'participation_id', 'group_id');
+    }
+
+    public function expoLensMatches(): HasMany
+    {
+        return $this->hasMany(ExpoLensPhotoMatch::class);
     }
 
     public function scopeAttendees($q)
