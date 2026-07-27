@@ -15,6 +15,7 @@ use App\Models\Participation;
 use App\Models\Session;
 use App\Models\User;
 use App\Services\Auth\EventAccess;
+use App\Services\BreakoutRoom\Providers\LiveKitProvider;
 use App\Support\PublicEventCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -372,11 +373,7 @@ class PublicSiteController extends Controller
             ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', $now))
             ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', $now))
             ->get()
-            ->filter(function (EventAd $ad) {
-                $pages = $ad->targeted_pages;
-
-                return empty($pages) || in_array('reception', $pages, true);
-            });
+            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, 'reception', $ad->placement));
 
         $formatAd = fn (EventAd $ad) => [
             'id' => $ad->uuid ?? $ad->id,
@@ -444,11 +441,7 @@ class PublicSiteController extends Controller
             ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', $now))
             ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', $now))
             ->get()
-            ->filter(function (EventAd $ad) use ($page) {
-                $pages = $ad->targeted_pages;
-
-                return empty($pages) || in_array($page, $pages, true);
-            });
+            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, $page, $ad->placement));
 
         $formatAd = fn (EventAd $ad) => [
             'id' => $ad->uuid ?? $ad->id,
@@ -463,6 +456,41 @@ class PublicSiteController extends Controller
                 'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
             ],
         ]);
+    }
+
+    /**
+     * Attendee pages that host the main/featured ad strip. Kept here so a
+     * "Select All" save from before a page existed (e.g. Contests) still
+     * matches that new page without forcing organizers to re-save.
+     */
+    private const AD_STRIP_PAGES = [
+        'reception', 'feed', 'delegates', 'speakers', 'exhibitors',
+        'sponsors', 'sessions', 'meetings', 'lounge', 'rooms', 'contests',
+    ];
+
+    /** Empty targeted_pages = all pages; otherwise the page must be listed. */
+    private function adTargetsPage(mixed $pages, string $page, ?string $placement = null): bool
+    {
+        // Event Main Ad is defined as site-wide — show on every strip page
+        // even when an older "Select All" omitted a page added later.
+        if ($placement === 'main') {
+            return true;
+        }
+
+        if (! is_array($pages) || $pages === []) {
+            return true;
+        }
+
+        if (in_array($page, $pages, true)) {
+            return true;
+        }
+
+        // Backward compat: an ad that already targets every strip page except
+        // `$page` was almost certainly a "Select All" from before `$page` was
+        // added to the catalog — include it on the new surface too.
+        $legacy = array_values(array_diff(self::AD_STRIP_PAGES, [$page]));
+
+        return $legacy !== [] && array_diff($legacy, $pages) === [];
     }
 
     /**
@@ -659,10 +687,12 @@ class PublicSiteController extends Controller
      * GET /api/v1/public/rooms — the attendee-facing breakout room list for the
      * event this subdomain resolves to. Public read (published events only);
      * exposes only PUBLISHED, non-HIDDEN rooms and never leaks the access code
-     * (only whether one is set). Joining/minting a media token is a separate,
-     * authenticated call (POST /events/{event}/breakout-rooms/{room}/token).
+     * (only whether one is set). Live webrtc rooms also include a short
+     * occupant preview (avatars for the card stack). Joining/minting a media
+     * token is a separate authenticated call
+     * (POST /events/{event}/breakout-rooms/{room}/token).
      */
-    public function rooms(Request $request): JsonResponse
+    public function rooms(Request $request, LiveKitProvider $livekit): JsonResponse
     {
         $resolved = $this->resolvePublishedEvent($request);
 
@@ -672,28 +702,47 @@ class PublicSiteController extends Controller
 
         [$event] = $resolved;
 
-        $rooms = BreakoutRoom::on('pgsql_admin')
+        $models = BreakoutRoom::on('pgsql_admin')
             ->where('event_id', $event->id)
             ->where('status', 'published')
             ->where('access_type', '!=', 'hidden')
             ->orderByDesc('id')
-            ->get()
-            ->map(fn (BreakoutRoom $r) => [
-                'id' => $r->id,
-                'uuid' => $r->uuid,
-                'name' => $r->name,
-                'description' => $r->description,
-                'purpose' => $r->purpose,
-                'type' => $r->type,
-                'access_type' => $r->access_type,
-                'has_access_code' => filled($r->access_code),
-                'capacity' => $r->capacity,
-                'poster_url' => $r->poster_url,
-                'provider' => $r->provider,
-                'meeting_url' => $r->provider === 'webrtc' ? null : $r->meeting_url,
-                'starts_at' => $r->starts_at?->toIso8601String(),
-                'ends_at' => $r->ends_at?->toIso8601String(),
-            ])
+            ->get();
+
+        // One ListRooms call, then ListParticipants only for rooms that are live
+        // (same budget pattern as the lounge tables endpoint).
+        $occupancy = $livekit->roomOccupancy();
+        $rosterBudget = 40;
+
+        $rooms = $models
+            ->map(function (BreakoutRoom $r) use ($livekit, $occupancy, &$rosterBudget) {
+                $lkRoom = 'room_'.$r->uuid;
+                $count = $r->provider === 'webrtc' ? ($occupancy[$lkRoom] ?? 0) : 0;
+                $occupants = [];
+                if ($count > 0 && $rosterBudget > 0) {
+                    $rosterBudget--;
+                    $occupants = array_slice($livekit->participants($lkRoom), 0, 8);
+                }
+
+                return [
+                    'id' => $r->id,
+                    'uuid' => $r->uuid,
+                    'name' => $r->name,
+                    'description' => $r->description,
+                    'purpose' => $r->purpose,
+                    'type' => $r->type,
+                    'access_type' => $r->access_type,
+                    'has_access_code' => filled($r->access_code),
+                    'capacity' => $r->capacity,
+                    'poster_url' => $r->poster_url,
+                    'provider' => $r->provider,
+                    'meeting_url' => $r->provider === 'webrtc' ? null : $r->meeting_url,
+                    'starts_at' => $r->starts_at?->toIso8601String(),
+                    'ends_at' => $r->ends_at?->toIso8601String(),
+                    'occupied' => $count,
+                    'occupants' => $occupants,
+                ];
+            })
             ->values();
 
         return response()->json(['data' => $rooms]);

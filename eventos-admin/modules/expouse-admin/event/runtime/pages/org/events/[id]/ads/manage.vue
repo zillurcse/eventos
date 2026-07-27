@@ -25,6 +25,7 @@ const PAGES: [string, string][] = [
   ['reception', 'Reception Page'], ['feed', 'Event Feed'], ['delegates', 'Delegates Page'],
   ['speakers', 'Speakers Page'], ['exhibitors', 'Exhibitors Page'], ['sponsors', 'Sponsors Page'],
   ['sessions', 'Sessions Page'], ['meetings', 'Meetings'], ['lounge', 'Lounge'], ['rooms', 'Rooms'],
+  ['contests', 'Contests'],
 ]
 const REDIRECT_TYPES: [string, string][] = [
   ['none', 'No redirect'], ['url', 'External URL'],
@@ -151,7 +152,9 @@ async function save() {
     is_active: form.is_active,
     images: form.images.filter(i => i.image_url).map(({ _open, ...rest }) => rest),
     targeted_groups: form.targeted_groups,
-    targeted_pages: form.targeted_pages,
+    // Full page list ≡ "all pages" — store empty so newly added surfaces
+    // (e.g. Contests) inherit the ad without a re-save.
+    targeted_pages: allSelected(PAGES, form.targeted_pages) ? [] : form.targeted_pages,
   }
   try {
     if (drawer.mode === 'create') await api(`/events/${id}/ads`, { method: 'POST', body })

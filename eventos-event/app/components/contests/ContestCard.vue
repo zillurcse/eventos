@@ -45,7 +45,7 @@ const hasWinner = computed(() => (props.contest.winners?.length ?? 0) > 0)
       </div>
 
       <div v-else-if="contest.phase === 'ended'" class="endedpill">
-        <svg viewBox="0 0 24 24">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="13" r="8" />
           <path d="M12 9v4l3 2M10 2h4M12 2v3" />
         </svg>
@@ -58,61 +58,69 @@ const hasWinner = computed(() => (props.contest.winners?.length ?? 0) > 0)
 <style scoped>
 .card {
   background: #fff;
+  border: 1px solid #e8ecf1;
   border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   text-decoration: none;
   color: inherit;
-  transition: box-shadow .15s, transform .15s;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+  transition: box-shadow .15s, transform .15s, border-color .15s;
   padding: 0;
 }
 
 .card:hover {
-  box-shadow: 0 6px 18px rgba(15, 23, 42, .09);
+  border-color: #dde3ea;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
   transform: translateY(-2px);
 }
 
 .banner {
   position: relative;
-  min-height: 160px;
+  min-height: 168px;
   background: #eef0f3;
 }
-.banner img{
-  min-height: 160px;
-  max-height: 160px;
+
+.banner :deep(img) {
+  display: block;
+  width: 100%;
+  min-height: 168px;
+  max-height: 168px;
+  object-fit: cover;
 }
+
 .body {
-  padding: 16px;
+  padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .body h3 {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 1.05rem;
-  line-height: 1.2;
+  line-height: 1.3;
   font-weight: 800;
   color: #1e293b;
-  margin-bottom: 5px;
 }
 
 .entries {
   margin: 0;
-  color: #64748b;
+  color: #94a3b8;
   font-size: .88rem;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 .status {
-  margin: 6px 0 2px;
-  color: #64748b;
+  margin: 14px 0 8px;
+  color: #94a3b8;
   font-size: .88rem;
 }
 
 .countdown {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .cbox {
@@ -123,13 +131,13 @@ const hasWinner = computed(() => (props.contest.winners?.length ?? 0) > 0)
   gap: 2px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 5px 6px;
+  padding: 8px 6px;
 }
 
 .cbox strong {
   font-size: 1.05rem;
   line-height: 1.2;
-  font-weight: 500;
+  font-weight: 600;
   color: #1e293b;
 }
 
@@ -143,13 +151,12 @@ const hasWinner = computed(() => (props.contest.winners?.length ?? 0) > 0)
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #f4f4fb;
+  background: #f3f1fb;
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 11px 14px;
   color: #334155;
   font-size: .88rem;
   font-weight: 600;
-  max-height: 40px;
 }
 
 .endedpill svg {

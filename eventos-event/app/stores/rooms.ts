@@ -1,4 +1,12 @@
 import { defineStore } from 'pinia'
+import type { ReceptionAd } from '~/stores/reception'
+
+export interface RoomOccupant {
+  identity: string
+  name: string
+  avatar_url: string | null
+  seat: number | null
+}
 
 export interface BreakoutRoom {
   id: number
@@ -15,6 +23,8 @@ export interface BreakoutRoom {
   meeting_url: string | null
   starts_at: string | null
   ends_at: string | null
+  occupied: number
+  occupants: RoomOccupant[]
 }
 
 /** LiveKit join config returned by the attendee token endpoint. */
@@ -36,27 +46,55 @@ export const useRoomsStore = defineStore('rooms', {
     loading: false,
     loaded: false,
     error: false,
+
+    /** Main ads strip targeted at the Rooms page. */
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   actions: {
-    async fetchRooms() {
+    async fetchRooms(silent = false) {
       const identity = useEventIdentity()
       const id = identity.subdomain || identity.host
       if (!id) { this.error = true; return }
 
-      this.loading = true
+      if (!silent) this.loading = true
       this.error = false
       try {
         const { public: { apiBase } } = useRuntimeConfig()
         const res = await $fetch<{ data: BreakoutRoom[] }>(`${apiBase}/public/rooms`, {
           headers: eventIdentityHeaders(),
         })
-        this.rooms = res.data
+        this.rooms = (res.data ?? []).map((r) => ({
+          ...r,
+          occupied: r.occupied ?? 0,
+          occupants: r.occupants ?? [],
+        }))
         this.loaded = true
       } catch {
         this.error = true
       } finally {
-        this.loading = false
+        if (!silent) this.loading = false
+      }
+    },
+
+    /** The organizer's "main ads" strip targeted at the Rooms page. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'rooms' },
+          headers: eventIdentityHeaders(),
+        })
+        this.ads = res.data?.strip ?? []
+      } catch {
+        // Ads are decorative — the page works fine without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
   },

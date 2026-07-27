@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { ReceptionAd } from '~/stores/reception'
 
 export type ContestPhase = 'upcoming' | 'ongoing' | 'ended'
 export type ContestType = 'entry' | 'response'
@@ -74,7 +75,7 @@ export const useContestsStore = defineStore('contests', {
     loading: false,
     loaded: false,
     error: false,
-    filter: 'ongoing' as ContestPhase | 'all',
+    filter: 'all' as ContestPhase | 'all',
 
     // Detail view — one contest at a time.
     current: null as Contest | null,
@@ -86,6 +87,10 @@ export const useContestsStore = defineStore('contests', {
 
     // Comments, keyed by entry id (loaded on demand when a thread is opened).
     comments: {} as Record<string, ContestEntry[]>,
+
+    /** Main ads strip targeted at the Contests page. */
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   getters: {
@@ -119,6 +124,26 @@ export const useContestsStore = defineStore('contests', {
         this.error = true
       } finally {
         this.loading = false
+      }
+    },
+
+    /** The organizer's "main ads" strip targeted at the Contests page. */
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'contests' },
+          headers: eventIdentityHeaders(),
+        })
+        this.ads = res.data?.strip ?? []
+      } catch {
+        // Ads are decorative — the page works fine without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
 
