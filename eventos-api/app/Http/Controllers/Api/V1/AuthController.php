@@ -14,6 +14,7 @@ use App\Services\Tenancy\OrganizationProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -74,6 +75,33 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($this->withIdentity($request->user())),
+        ]);
+    }
+
+    /**
+     * PATCH /auth/me — the signed-in user edits their own basic info from
+     * Profile › Account Settings (any persona: admin, organizer, exhibitor and
+     * event attendee all share the one `users` login). Only the identity fields
+     * a person may safely change about themselves; role/status/platform flags
+     * stay with the super-admin controls.
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:180'],
+            'email' => ['sometimes', 'required', 'email', Rule::unique('users', 'email')->ignore($user->id)->whereNull('deleted_at')],
+            'locale' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'timezone' => ['sometimes', 'nullable', 'string', 'max:64'],
+        ]);
+
+        // forceFill: locale/timezone are not in the User model's $fillable
+        // allow-list, so mass assignment would silently drop them.
+        $user->forceFill($data)->save();
+
+        return response()->json([
+            'user' => new UserResource($this->withIdentity($user->refresh())),
         ]);
     }
 

@@ -88,6 +88,42 @@ class PublicAndAuthTest extends TestCase
             ->assertJsonPath('user.email', $user->email);
     }
 
+    public function test_organizer_can_update_their_profile(): void
+    {
+        $user = $this->actingAsOrganizer();
+        $original = $user->only(['name', 'email', 'locale', 'timezone']);
+
+        try {
+            $this->patchJson('/api/v1/auth/me', [
+                'name' => 'Nadia Osei',
+                'email' => $user->email,
+                'locale' => 'en',
+                'timezone' => 'Asia/Dhaka',
+            ])
+                ->assertOk()
+                ->assertJsonPath('user.name', 'Nadia Osei')
+                ->assertJsonPath('user.timezone', 'Asia/Dhaka');
+
+            $this->assertSame('Nadia Osei', $user->fresh()->name);
+            $this->assertSame('Asia/Dhaka', $user->fresh()->timezone);
+        } finally {
+            // Organizer identity lives on the committed admin connection — restore
+            // so later suites still see the baseline "API Test Organizer" row.
+            $user->forceFill($original)->save();
+        }
+    }
+
+    public function test_profile_update_rejects_duplicate_email(): void
+    {
+        $this->actingAsOrganizer();
+
+        $this->patchJson('/api/v1/auth/me', [
+            'email' => self::PLATFORM_EMAIL,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+    }
+
     public function test_logout_revokes_the_current_token(): void
     {
         // A real (not transient) token is needed because logout deletes it.

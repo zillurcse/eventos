@@ -307,7 +307,8 @@ onMounted(() => {
             <!-- ea2-udrop: absolute top-[46px] right-0 bg-white rounded-lg shadow-[0_6px_24px_rgba(0,0,0,.12)] min-w-[160px] overflow-hidden z-[100] border border-[#ebebf0] -->
             <div v-if="userOpen" class="absolute top-[46px] right-0 bg-white rounded-lg shadow-[0_6px_24px_rgba(0,0,0,.12)] min-w-[160px] overflow-hidden z-[100] border border-[#ebebf0]" @click.stop>
               <div class="px-3.5 py-2 text-[.78rem] text-[#9aa0ab]">{{ auth.user?.email }}</div>
-              <!-- ea2-udrop button: w-full text-left px-3.5 py-2.5 text-[13px] text-[#3a3e42] bg-transparent border-none border-t border-[#f0f0f5] cursor-pointer hover:bg-[#f5f5f8] -->
+              <!-- ea2-udrop item: w-full text-left px-3.5 py-2.5 text-[13px] text-[#3a3e42] bg-transparent border-t border-[#f0f0f5] cursor-pointer hover:bg-[#f5f5f8] -->
+              <NuxtLink to="/account" class="block w-full text-left px-3.5 py-2.5 text-[13px] text-[#3a3e42] no-underline border-t border-[#f0f0f5] cursor-pointer hover:bg-[#f5f5f8]" @click="userOpen = false">Profile</NuxtLink>
               <button class="w-full text-left px-3.5 py-2.5 text-[13px] text-[#3a3e42] bg-transparent border-none border-t border-[#f0f0f5] cursor-pointer font-[inherit] hover:bg-[#f5f5f8]" @click="auth.logout()">Sign out</button>
             </div>
           </div>

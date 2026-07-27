@@ -18,9 +18,19 @@ interface User {
   name: string
   email: string
   is_platform_staff?: boolean
+  must_change_password?: boolean
+  locale?: string | null
+  timezone?: string | null
   personas?: string[]     // platform | organizer | exhibitor
   memberships?: Array<{ organization: { id?: string, name: string, slug?: string }, status?: string, roles?: string[] }>
   exhibitors?: ExhibitorLink[]
+}
+
+export interface ProfileUpdate {
+  name?: string
+  email?: string
+  locale?: string | null
+  timezone?: string | null
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -88,6 +98,18 @@ export const useAuthStore = defineStore('auth', {
       } catch {
         this.logout()
       }
+    },
+
+    async updateProfile(payload: ProfileUpdate) {
+      if (!this.token) return
+      const { public: { apiBase } } = useRuntimeConfig()
+      const res = await $fetch<{ user: User }>(`${apiBase}/auth/me`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${this.token}` },
+        body: payload,
+      })
+      this.user = res.user
+      return res.user
     },
 
     logout() {
