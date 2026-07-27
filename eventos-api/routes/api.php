@@ -155,6 +155,7 @@ Route::prefix('v1')->group(function () {
     // ── Authenticated (any signed-in user; no tenant required) ──
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::match(['put', 'patch'], '/auth/me', [AuthController::class, 'updateProfile']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
         Route::get('/auth/sessions', [AuthController::class, 'sessions']);
@@ -706,9 +707,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/guest-badges/{batch}/deliver', [GuestBadgeController::class, 'deliver'])->middleware('perm:events.manage');
             Route::delete('/guest-badges/{batch}', [GuestBadgeController::class, 'destroy'])->middleware('perm:events.manage');
 
-            // ── Announcements (§6.6) ──
+            // ── Announcements (§6.6) — Bulk Notification ──
             Route::get('/announcements', [AnnouncementController::class, 'index'])->middleware('perm:announcements.manage');
             Route::post('/announcements', [AnnouncementController::class, 'store'])->middleware('perm:announcements.manage');
+            Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show'])->middleware('perm:announcements.manage');
+            Route::match(['put', 'patch'], '/announcements/{announcement}', [AnnouncementController::class, 'update'])->middleware('perm:announcements.manage');
+            Route::post('/announcements/{announcement}/send', [AnnouncementController::class, 'send'])->middleware('perm:announcements.manage');
+            Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->middleware('perm:announcements.manage');
 
             // ── Notification templates + analytics (§6.7, §6.11) ──
             Route::get('/notification-templates', [NotificationTemplateController::class, 'index'])->middleware('perm:notifications.manage');

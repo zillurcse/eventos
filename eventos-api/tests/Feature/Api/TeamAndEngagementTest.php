@@ -77,7 +77,51 @@ class TeamAndEngagementTest extends TestCase
             'event' => $event['id'],
             'title' => 'Doors open at 9am',
             'body' => 'Welcome!',
-        ])->assertCreated()->assertJsonStructure(['data' => ['id', 'title', 'status']]);
+        ])->assertCreated()
+            ->assertJsonPath('data.status', 'sent')
+            ->assertJsonStructure(['data' => ['id', 'title', 'status']]);
+    }
+
+    public function test_announcement_can_be_saved_as_draft_and_sent(): void
+    {
+        $this->actingAsOrganizer();
+        $event = $this->createEvent();
+
+        $created = $this->postJson('/api/v1/announcements', [
+            'event' => $event['id'],
+            'title' => 'Draft ping',
+            'body' => '<p>Hello</p>',
+            'display_area' => 'reception',
+            'status' => 'draft',
+            'channels' => ['web' => true, 'mobile' => false],
+            'audience' => ['all' => true],
+        ])->assertCreated()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.display_area', 'reception')
+            ->json('data');
+
+        $this->getJson('/api/v1/announcements?event='.$event['id'])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $created['id'], 'status' => 'draft']);
+
+        $this->postJson('/api/v1/announcements/'.$created['id'].'/send')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'sent');
+    }
+
+    public function test_announcement_can_be_scheduled(): void
+    {
+        $this->actingAsOrganizer();
+        $event = $this->createEvent();
+
+        $this->postJson('/api/v1/announcements', [
+            'event' => $event['id'],
+            'title' => 'Later',
+            'status' => 'scheduled',
+            'scheduled_at' => now()->addDay()->toIso8601String(),
+            'display_area' => 'event_feed',
+        ])->assertCreated()
+            ->assertJsonPath('data.status', 'scheduled');
     }
 
     public function test_event_analytics_summary_and_rollup(): void
