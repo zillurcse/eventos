@@ -35,7 +35,8 @@ export default defineNuxtConfig({
         'mdi', 'tabler', 'ph', 'line-md', 'material-symbols', 'carbon',
         'fluent-mdl2', 'solar', 'streamline', 'streamline-plump',
         'streamline-sharp', 'streamline-ultimate', 'bi', 'bitcoin-icons',
-        'quill', 'vaadin',
+        'quill', 'vaadin', 'heroicons', 'hugeicons', 'ic', 'iconoir',
+        'mingcute', 'oui', 'svg-spinners',
       ],
     },
   },
@@ -55,7 +56,7 @@ export default defineNuxtConfig({
   googleFonts: {
     download: false,
     families: {
-      Cairo: true, Roboto: true, 'Open+Sans': true, Lato: true, Montserrat: true,
+      Roboto: true, 'Open+Sans': true, Lato: true, Montserrat: true,
       Oswald: true, Raleway: true, Poppins: true, 'Noto+Sans': true, Ubuntu: true,
       Merriweather: true, 'PT+Sans': true, 'Roboto+Condensed': true,
       'Playfair+Display': true, Nunito: true, Mukta: true, Inconsolata: true,

@@ -541,7 +541,7 @@ class EventController extends Controller
         $panel = $settings->mobile_access_panel ?? [];
 
         $checklist = [
-            ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details'],
+            ['key' => 'basic', 'label' => 'Event Basic Information', 'done' => (bool) ($event->name && $event->starts_at && $event->ends_at), 'to' => 'details/general-information'],
             ['key' => 'branding', 'label' => 'Branding & Theme Setup', 'done' => (bool) $event->cover_file_id, 'to' => 'details/branding'],
             ['key' => 'exhibitors', 'label' => 'Exhibitors & Booth Details', 'done' => $exhibitors > 0, 'to' => 'showcase/exhibitors'],
             ['key' => 'badge', 'label' => 'Badge & QR Setup', 'done' => $badges > 0, 'to' => 'onsite/badge-templates'],

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { activeTab, drawerMode } = useExhibitorContext()
+const { activeTab, drawerMode, draft, canCreate, saving, create, update } = useExhibitorContext()
+
+const isAdd = computed(() => drawerMode.value === 'add')
 </script>
 
 <template>
@@ -18,12 +20,37 @@ const { activeTab, drawerMode } = useExhibitorContext()
 
     <!-- The tabs are shared with the edit drawer; sub-resource adds are buffered
          locally until "Add Exhibitor" on the Details tab creates the record. -->
-    <ExhibitorTabsDetails v-if="activeTab === 'Details'" />
+    <ExhibitorTabsDetails v-if="activeTab === 'Details'" :show-footer="false" />
     <ExhibitorTabsMembers v-else-if="activeTab === 'Teams'" />
     <ExhibitorTabsDocuments v-else-if="activeTab === 'Documents'" />
     <ExhibitorTabsProjects v-else-if="activeTab === 'Projects'" />
     <ExhibitorTabsProducts v-else-if="activeTab === 'Products'" />
     <ExhibitorTabsPermissions v-else-if="activeTab === 'Permissions'" />
+
+    <!-- Details owns the create/update action (it's the only tab that saves the
+         whole exhibitor); render it in the drawer's sticky footer instead of
+         inline so it stays pinned regardless of scroll, like showcase/packages. -->
+    <template v-if="activeTab === 'Details'" #footer>
+      <div class="modal-actions border-t border-line px-5.5 py-4 justify-start">
+        <button
+          v-if="isAdd"
+          class="btn"
+          :disabled="saving || !canCreate"
+          @click="create"
+        >
+          {{ saving ? 'ADDING…' : 'Add Exhibitor' }}
+        </button>
+        <button
+          v-else
+          class="btn"
+          :disabled="saving || !draft.name.trim()"
+          @click="update"
+        >
+          {{ saving ? 'UPDATING…' : 'UPDATE' }}
+        </button>
+        <button class="btn ghost" @click="drawerMode = null">Cancel</button>
+      </div>
+    </template>
   </Drawer>
 </template>
 

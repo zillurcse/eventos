@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Self-hosted Cairo (via @fontsource) — the Google Fonts CDN link is unreliable
+   behind ad-blockers/privacy extensions (fonts.googleapis.com is a common
+   default block), so the app's body font is bundled locally instead. */
+@import "@fontsource/cairo/400.css";
+@import "@fontsource/cairo/500.css";
+@import "@fontsource/cairo/600.css";
+@import "@fontsource/cairo/700.css";
+@import "@fontsource/cairo/800.css";
+
 /* Tailwind v4 auto-detects sources near the stylesheet; this CSS now lives deep
    under modules/, so point the scanner explicitly at the app shell and the
    admin feature modules (paths are relative to this file). Without these, utility
@@ -40,7 +49,7 @@
   *, ::before, ::after, ::backdrop { border-color: var(--color-gray-200, #e5e7eb); }
 
   html, body { @apply m-0 h-full; }
-  body { @apply bg-bg text-ink antialiased; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { @apply bg-bg text-ink antialiased; font-family: "Cairo", sans-serif; }
   a { @apply text-brand no-underline; }
   h1 { @apply text-2xl font-bold mb-1; }
   h2 { @apply font-semibold mb-3; font-size: 1.02rem; }

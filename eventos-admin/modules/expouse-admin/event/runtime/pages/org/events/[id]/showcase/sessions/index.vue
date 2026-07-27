@@ -186,7 +186,7 @@ function onCreated(session: Session) {
 }
 
 function goManageDays() {
-  router.push(`/org/events/${id}/details`)
+  router.push(`/org/events/${id}/details/general-information`)
 }
 
 onMounted(load)

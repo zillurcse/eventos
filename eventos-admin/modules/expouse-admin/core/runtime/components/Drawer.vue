@@ -7,7 +7,7 @@ const emit = defineEmits<{ (e: 'close'): void, (e: 'back'): void }>()
 
 <template>
   <div class="fixed inset-0 bg-[rgba(17,20,36,.35)] z-[200] flex justify-end" @click.self="emit('close')">
-    <div class="w-[480px] max-w-[94vw] h-full bg-white shadow-[-8px_0_30px_rgba(0,0,0,.12)] flex flex-col animate-[drawer-in_.22s_ease]">
+    <div class="w-[440px] max-w-[94vw] h-full bg-white shadow-[-8px_0_30px_rgba(0,0,0,.12)] flex flex-col animate-[drawer-in_.22s_ease]">
       <div class="flex items-center justify-between px-[22px] py-4 border-b border-line bg-[#f7f8fa] shrink-0">
         <div class="flex items-center gap-2.5 min-w-0">
           <button v-if="back" class="w-[34px] h-[34px] rounded-full border-[1.5px] border-[#d7dae1] bg-white cursor-pointer text-[#5f6b7a] grid place-items-center hover:bg-[#f0f0f5] shrink-0" aria-label="Back" @click="emit('back')">
@@ -20,6 +20,7 @@ const emit = defineEmits<{ (e: 'close'): void, (e: 'back'): void }>()
         </button>
       </div>
       <div class="p-[22px] overflow-y-auto flex-1"><slot /></div>
+      <div v-if="$slots.footer" class="shrink-0"><slot name="footer" /></div>
     </div>
   </div>
 </template>

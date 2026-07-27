@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 
 declare const definePageMeta: (meta: Record<string, unknown>) => void
@@ -20,12 +20,18 @@ interface Package {
   id: number
   name: string
   kind: string
+  description: string | null
+  tier: string
+  booth_size: string | null
+  price_cents: number
+  currency: string
   entitlements: FeatureLine[] | null
 }
 
 // ── Feature catalogue ─────────────────────────────────────────────────
 // `countable: false` → on/off only (no quantity stepper in the drawer)
-const ALL_FEATURES: { key: string; label: string; countable?: boolean }[] = [
+// `group: 'perks'` → shown under "Marketing Perks" instead of "Features"
+const ALL_FEATURES: { key: string; label: string; countable?: boolean; group?: 'perks' }[] = [
   { key: 'teams',             label: 'Teams' },
   { key: 'projects',          label: 'Projects' },
   { key: 'products',          label: 'Products' },
@@ -36,18 +42,21 @@ const ALL_FEATURES: { key: string; label: string; countable?: boolean }[] = [
   { key: 'lounge',            label: 'Lounge' },
   // Leads — on/off only. Keep in sync with the exhibitor entitlements
   // catalogue (exhibitor/runtime/utils/exhibitor.ts ALL_FEATURES).
-  { key: 'all_leads',          label: 'All Leads',          countable: false },
-  { key: 'team_connections',   label: 'Team Connections',   countable: false },
-  { key: 'recommended_leads',  label: 'Recommended Leads',  countable: false },
-  { key: 'lead_qualification', label: 'Lead Qualification', countable: false },
-  { key: 'lead_analytics',     label: 'Leads Analytics',    countable: false },
-  { key: 'lead_export',        label: 'Lead Export',         countable: false },
-  { key: 'analytics',         label: 'Analytics',           countable: false },
+  { key: 'all_leads',          label: 'All Leads',          countable: false, group: 'perks' },
+  { key: 'team_connections',   label: 'Team Connections',   countable: false, group: 'perks' },
+  { key: 'recommended_leads',  label: 'Recommended Leads',  countable: false, group: 'perks' },
+  { key: 'lead_qualification', label: 'Lead Qualification', countable: false, group: 'perks' },
+  { key: 'lead_analytics',     label: 'Leads Analytics',    countable: false, group: 'perks' },
+  { key: 'lead_export',        label: 'Lead Export',         countable: false, group: 'perks' },
+  { key: 'analytics',         label: 'Analytics',           countable: false, group: 'perks' },
 ]
 
 function isCountable(key: string) {
   return ALL_FEATURES.find(f => f.key === key)?.countable !== false
 }
+
+const TIER_OPTIONS = ['Standard', 'Premium', 'VIP']
+const BOOTH_SIZE_OPTIONS = ['10x10 ft', '10x20 ft', '20x20 ft', '20x30 ft']
 
 // ── State ─────────────────────────────────────────────────────────────
 const packages   = ref<Package[]>([])
@@ -56,8 +65,17 @@ const editingId  = ref<number | null>(null)
 const saving     = ref(false)
 const error      = ref('')
 
-interface DraftShape { name: string; features: FeatureLine[] }
-const draft = reactive<DraftShape>({ name: '', features: [] })
+interface DraftShape {
+  name: string
+  description: string
+  tier: string
+  boothSize: string
+  price: number | null
+  features: FeatureLine[]
+}
+const draft = reactive<DraftShape>({ name: '', description: '', tier: 'Standard', boothSize: '', price: null, features: [] })
+const mainFeatures = computed(() => draft.features.filter(f => ALL_FEATURES.find(a => a.key === f.key)?.group !== 'perks'))
+const perkFeatures = computed(() => draft.features.filter(f => ALL_FEATURES.find(a => a.key === f.key)?.group === 'perks'))
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function freshFeatures(): FeatureLine[] {
@@ -108,6 +126,10 @@ async function load() {
 function openAdd() {
   editingId.value = null
   draft.name = ''
+  draft.description = ''
+  draft.tier = 'Standard'
+  draft.boothSize = ''
+  draft.price = null
   draft.features = freshFeatures()
   error.value = ''
   drawerOpen.value = true
@@ -116,6 +138,10 @@ function openAdd() {
 function openEdit(pkg: Package) {
   editingId.value = pkg.id
   draft.name = pkg.name
+  draft.description = pkg.description || ''
+  draft.tier = TIER_OPTIONS.find(t => t.toLowerCase() === pkg.tier) || 'Standard'
+  draft.boothSize = pkg.booth_size || ''
+  draft.price = pkg.price_cents ? pkg.price_cents / 100 : null
   draft.features = mergeFeatures(pkg.entitlements)
   error.value = ''
   drawerOpen.value = true
@@ -129,6 +155,10 @@ async function saveDraft() {
     const payload = {
       event:        id,
       name:         draft.name,
+      description:  draft.description || null,
+      tier:         draft.tier.toLowerCase(),
+      booth_size:   draft.boothSize || null,
+      price_cents:  Math.round((draft.price || 0) * 100),
       entitlements: draft.features.map((f: FeatureLine) => ({
         key:     f.key,
         enabled: f.enabled,
@@ -242,47 +272,53 @@ onBeforeUnmount(() => {
 
     <!-- Add / Edit Drawer -->
     <Drawer v-if="drawerOpen" title="Exhibitor Packages" @close="drawerOpen = false">
-      <label>Name</label>
-      <input v-model="draft.name" placeholder="Enter packages name" class="mb-5">
+      <AppInput v-model="draft.name" label="Package Name" placeholder="e.g. Premium booth package" />
 
-      <div class="flex flex-col gap-2">
-        <div
-          v-for="f in draft.features"
+      <AppTextarea v-model="draft.description" label="Description" class="mt-3" rows="3" placeholder="What's included in this package" />
+
+      <AppSelect v-model="draft.tier" label="Tier" :options="TIER_OPTIONS" class="mt-3" />
+
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        <AppSelect v-model="draft.boothSize" label="Booth Size" placeholder="Select size" :options="BOOTH_SIZE_OPTIONS" />
+        <AppInput v-model="draft.price" label="Price (USD)" type="number" min="0" step="0.01" placeholder="0" />
+      </div>
+
+      <label class="mt-4 block text-ink font-semibold text-[.92rem]">Features</label>
+      <div class="flex flex-col gap-3 mt-2">
+        <EntitlementRow
+          v-for="f in mainFeatures"
           :key="f.key"
-          class="flex items-center gap-3 px-4 py-2.75 border border-line rounded-xl bg-[#fafbfc]"
-          :class="{ 'bg-[#F0EEFD] border-brand/20': f.enabled }"
-        >
-          <input
-            v-model="f.enabled"
-            type="checkbox"
-            class="w-4.5 h-4.5 m-0 rounded shrink-0 cursor-pointer accent-brand"
-          >
-          <span class="flex-1 text-[.93rem] font-medium text-ink select-none">{{ featureLabel(f.key) }}</span>
-          <div
-            v-if="isCountable(f.key)"
-            class="flex items-center shrink-0 border border-[#d7dae1] rounded-xl overflow-hidden bg-white"
-          >
-            <button
-              class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer hover:bg-[#f0f0f7] transition-colors select-none"
-              @click="f.limit = Math.max(0, f.limit - 1)"
-            >−</button>
-            <span class="w-8 h-9 flex items-center justify-center text-[.91rem] font-semibold border-x border-[#d7dae1] select-none">{{ f.limit }}</span>
-            <button
-              class="w-9 h-9 flex items-center justify-center text-[1.1rem] text-muted border-0 bg-transparent cursor-pointer hover:bg-[#f0f0f7] transition-colors select-none"
-              @click="f.limit++"
-            >+</button>
-          </div>
-        </div>
+          :model-value="f"
+          :label="featureLabel(f.key)"
+          :countable="isCountable(f.key)"
+          @update:model-value="Object.assign(f, $event)"
+          :isFeatures="true"
+        />
+      </div>
+
+      <label class="mt-4 block text-ink font-semibold text-[.92rem]">Marketing Perks</label>
+      <div class="flex flex-col gap-3 mt-2">
+        <EntitlementRow
+          v-for="f in perkFeatures"
+          :key="f.key"
+          :model-value="f"
+          :label="featureLabel(f.key)"
+          :countable="isCountable(f.key)"
+          @update:model-value="Object.assign(f, $event)"
+          :isFeatures="false"
+        />
       </div>
 
       <p v-if="error" class="error mt-3">{{ error }}</p>
 
-      <div class="modal-actions border-t border-line pt-4 mt-5">
-        <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
-        <button class="btn" :disabled="!draft.name.trim() || saving" @click="saveDraft">
-          {{ saving ? 'Saving…' : editingId ? 'UPDATE' : 'ADD' }}
-        </button>
-      </div>
+      <template #footer>
+        <div class="modal-actions border-t border-line px-5.5 py-4 justify-start">
+          <button class="btn" :disabled="!draft.name.trim() || saving" @click="saveDraft">
+            {{ saving ? 'Saving…' : editingId ? 'Update Package' : 'Create and Add Package' }}
+          </button>
+          <button class="btn ghost" @click="drawerOpen = false">Cancel</button>
+        </div>
+      </template>
     </Drawer>
   </div>
 </template>

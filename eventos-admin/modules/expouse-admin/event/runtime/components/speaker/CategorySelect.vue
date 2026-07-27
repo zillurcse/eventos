@@ -69,11 +69,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- Trigger: chevron on the left, selected value (if any) after it -->
     <button
       type="button"
-      class="w-full flex items-center gap-3 bg-white border rounded-[11px] px-[15px] py-3 text-left transition-colors"
+      class="w-full flex items-center gap-3 bg-white border rounded-lg max-h-12 px-[15px] py-3 text-left transition-colors"
       :class="open ? 'border-brand' : 'border-[#d7dae1]'"
       @click="toggle"
     >
-      <span class="text-[#5f6b7a] text-[.6rem] leading-none order-2 ml-auto">▼</span>
+      <span class="text-[#5f6b7a] text-[.6rem] leading-none order-2 ml-auto">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="8" viewBox="0 0 14 8" fill="none">
+          <path d="M1 1L7 7L13 1" stroke="#9B9D9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span v-if="modelValue" class="text-ink text-[.9rem] order-1">{{ modelValue }}</span>
       <span v-else-if="placeholder" class="text-[#9aa0ac] text-[.9rem] order-1">{{ placeholder }}</span>
     </button>
@@ -81,11 +85,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- Panel (in-flow so it is never clipped by the drawer's scroll area) -->
     <div v-if="open" class="mt-2 bg-white border border-[#d7dae1] rounded-[11px] p-3">
       <!-- Add row -->
-      <div class="flex items-center gap-2 border border-[#e3e3ee] rounded-lg px-2.5 py-2 mb-1">
+      <div class="flex items-center gap-2 border border-[#e3e3ee] rounded-lg px-2.5 py-2 mb-1 max-h-12">
         <input
           v-model="newName"
           placeholder="Enter Category Name"
-          class="flex-1 m-0 border-0 px-0 py-0.5 focus:outline-0 bg-transparent text-[.9rem] placeholder:text-[#9aa0ac]"
+          class="flex-1 m-0 border-0 px-0 py-0.5 focus:outline-0 focus:shadow-none bg-transparent text-[.9rem] placeholder:text-[#9aa0ac]"
           @keydown.enter.prevent="submitNew"
         >
         <button
@@ -119,7 +123,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           <template v-else>
             <button
               type="button"
-              class="flex-1 text-left text-[.9rem]"
+              class="flex-1 text-left text-[.9rem] cursor-pointer"
               :class="modelValue === cat.name ? 'text-brand font-semibold' : 'text-ink'"
               @click="select(cat.name)"
             >{{ cat.name }}</button>

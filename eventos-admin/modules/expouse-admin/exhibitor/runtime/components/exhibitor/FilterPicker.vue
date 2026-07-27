@@ -52,11 +52,11 @@ function filterChips(fid: string) {
       No filters configured yet. Add them in Showcase › Manage Filters.
     </p>
     <div v-else class="flex flex-col gap-2">
-      <div v-for="f in filters" :key="f.id" class="border border-line rounded-xl overflow-hidden">
+      <div v-for="f in filters" :key="f.id" class="border border-line rounded-lg overflow-hidden">
         <!-- Filter title bar -->
         <button
           type="button"
-          class="w-full flex items-center justify-between gap-3 px-4 py-3 bg-[#f7f8fa] cursor-pointer text-left border-0"
+          class="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-12 bg-white cursor-pointer text-left border-0"
           @click="toggleFilter(f)"
         >
           <span class="flex items-center gap-2 min-w-0">

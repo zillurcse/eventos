@@ -54,6 +54,7 @@ function sync() {
       <button v-if="buttons.includes('orderedList')" type="button" class="rt-btn" title="Numbered list" @mousedown.prevent="fmt('insertOrderedList')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 4.5v3.5M4 4.5H3M4 4.5H5M4 12h1.5a1 1 0 010 2H4M4 14h1.5a1 1 0 010 2H4"/></svg>
       </button>
+      <span v-if="buttons.includes('link')" class="w-px h-4 bg-line mx-0.5" />
       <button v-if="buttons.includes('link')" type="button" class="rt-btn" title="Link" @mousedown.prevent="link">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
       </button>

@@ -53,11 +53,11 @@ async function onToggleActive() {
     <!-- Rail + content -->
     <div class="flex items-start gap-5">
       <!-- Vertical tab rail -->
-      <aside class="w-52.5 shrink-0 bg-white border border-line rounded-2xl p-2.5 sticky top-19.5">
+      <aside class="w-60 shrink-0 bg-white border border-line rounded-xl p-4 sticky top-19.5 flex flex-col gap-2.5">
         <button
           v-for="tab in EXHIBITOR_TABS" :key="tab"
-          class="w-full text-left px-3.5 py-2.5 rounded-lg text-[.88rem] font-medium mb-0.5 transition-colors"
-          :class="activeTab === tab ? 'bg-[#F0EEFD] text-brand font-semibold' : 'text-ink hover:bg-[#f7f8fa]'"
+          class="w-full text-left px-3.5 py-2.5 rounded-lg border  text-sm max-h-[42px] cursor-pointer font-medium mb-0.5 transition-colors"
+          :class="activeTab === tab ? 'bg-[#F0EEFD] border-brand text-brand font-semibold' : 'text-ink bg-[#F7F7FB] hover:bg-[#f7f8fa] border-transparent'"
           @click="activeTab = tab"
         >{{ tabLabel(tab) }}</button>
       </aside>
