@@ -11,11 +11,13 @@ use App\Models\EventSetting;
 use App\Models\Exhibitor;
 use App\Models\File;
 use App\Models\Form;
+use App\Models\Gamification;
 use App\Models\Participation;
 use App\Models\Session;
 use App\Models\User;
 use App\Services\Auth\EventAccess;
 use App\Services\BreakoutRoom\Providers\LiveKitProvider;
+use App\Support\CommunicationCapabilities;
 use App\Support\PublicEventCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -125,7 +127,11 @@ class PublicSiteController extends Controller
             ],
             // The tab bar the organizer configured in Navigation & Menu ›
             // Web App Tabs: which sections appear, in what order, and how.
-            'navigation' => $this->navigation($setting->navigation ?? []),
+            // Feed tabs prefer Communication › Functionality when configured.
+            'navigation' => $this->navigation(
+                $setting->navigation ?? [],
+                CommunicationCapabilities::fromSetting($setting),
+            ),
             'subdomain' => $sub,
             'custom_domain' => data_get($setting->domain, 'custom_domain'),
             'registration_form_uuid' => $regForm?->uuid,
@@ -144,12 +150,33 @@ class PublicSiteController extends Controller
                         'options' => $f->options->map(fn ($o) => ['label' => $o->label, 'value' => $o->value])->values(),
                     ])->values(),
             ] : null,
+            // Communication › Gamification award block (login page).
+            'gamification' => $this->publicGamification($event->id),
             'powered_by' => 'EXPOUSE',
         ];
 
         Cache::put(PublicEventCache::siteKey($cacheId), $data, PublicEventCache::SITE_TTL);
 
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Award block for the public login page when gamification is enabled.
+     *
+     * @return array{enabled: bool, award_title: ?string, award_description: ?string}|null
+     */
+    private function publicGamification(int $eventId): ?array
+    {
+        $config = Gamification::on('pgsql_admin')->where('event_id', $eventId)->first();
+        if (! $config || ! $config->enabled) {
+            return null;
+        }
+
+        return [
+            'enabled' => true,
+            'award_title' => $config->award_title,
+            'award_description' => $config->award_description,
+        ];
     }
 
     /**
@@ -166,18 +193,24 @@ class PublicSiteController extends Controller
      * not ours — the organizer chooses the label and the order, and the app maps
      * the key onto the page it ships. So we send keys and labels, nothing else.
      */
-    private function navigation(array $navigation): array
+    private function navigation(array $navigation, array $communication = []): array
     {
         $tabs = $navigation['web_app_tabs'] ?? [];
+
+        // Communication › Functionality › Allowed feed tabs wins when the
+        // organizer has configured it; otherwise Navigation & Menu › Allowed
+        // Feed Tabs. Same wire shape either way.
+        $feedTabs = CommunicationCapabilities::enabledFeedTabs($communication);
+        if ($feedTabs === null) {
+            $feedTabs = $this->enabledItems($navigation['feed_tabs'] ?? []);
+        }
 
         return [
             'tabs' => $this->enabledItems($tabs),
             'icons' => (bool) ($tabs['icons'] ?? true),
             'background' => (bool) ($tabs['background'] ?? true),
             'alignment' => (string) ($tabs['alignment'] ?? 'left'),
-            // Navigation & Menu › Allowed Feed Tabs — the "Filter By" rail on the
-            // event feed. Same contract as the tab bar: enabled items, in order.
-            'feed_tabs' => $this->enabledItems($navigation['feed_tabs'] ?? []),
+            'feed_tabs' => $feedTabs,
             // Navigation & Menu › Modules — the header's brand block and quick
             // actions (briefcase, chat, notifications…).
             'modules' => $this->modules($navigation['modules'] ?? []),

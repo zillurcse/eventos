@@ -12,7 +12,9 @@ export interface ExpoLensPhoto {
 export interface ExpoLensEnrollment {
   consented: boolean
   enrolled: boolean
-  status: 'not_enrolled' | 'processing' | 'ready' | string
+  status: 'not_enrolled' | 'processing' | 'ready' | 'failed' | string
+  /** Why enrollment failed, in wording the attendee can act on. */
+  error: string | null
   enrolled_at: string | null
   quality_score: number | null
 }
@@ -104,6 +106,7 @@ export const useExpoLensStore = defineStore('expolens', {
         consented: false,
         enrolled: false,
         status: 'not_enrolled',
+        error: null,
         enrolled_at: null,
         quality_score: null,
       }

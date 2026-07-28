@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ExpoLensPhotoResource;
 use App\Jobs\ExpoLens\ProcessExpoLensPhotoJob;
+use App\Jobs\ExpoLens\RematchEventFacesJob;
 use App\Jobs\ExpoLens\ReprocessEventFacesJob;
 use App\Models\Event;
 use App\Models\ExpoLensPhoto;
@@ -173,12 +174,97 @@ class ExpoLensAdminController extends Controller
         return ExpoLensPhotoResource::collection($photos);
     }
 
-    public function reprocess(string $uuid): JsonResponse
+    /**
+     * Bulk-set moderation status. Approving is the gate that puts a photo in
+     * front of attendees, and organizers do it a hundred shots at a time.
+     */
+    public function bulkModerate(string $uuid, Request $request): JsonResponse
     {
         $event = $this->event($uuid);
-        ReprocessEventFacesJob::dispatch($event->organization_id, $event->id);
+        $data = $request->validate([
+            'moderation_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            'ids' => ['nullable', 'array', 'max:500'],
+            'ids.*' => ['string'],
+            'all_pending' => ['nullable', 'boolean'],
+        ]);
 
-        return response()->json(['message' => 'ExpoLens photos were queued for reprocessing.'], 202);
+        $query = ExpoLensPhoto::where('event_id', $event->id);
+
+        if ($data['all_pending'] ?? false) {
+            $query->where('moderation_status', 'pending');
+        } else {
+            abort_if(empty($data['ids']), 422, 'Select at least one photo.');
+            $query->whereIn('uuid', $data['ids']);
+        }
+
+        $updated = $query->update(['moderation_status' => $data['moderation_status']]);
+
+        return response()->json([
+            'message' => "{$updated} photo(s) marked {$data['moderation_status']}.",
+            'updated' => $updated,
+        ]);
+    }
+
+    /** Re-run face detection for a single photo — the retry for a failed upload. */
+    public function retry(string $uuid, string $photo): JsonResponse
+    {
+        $event = $this->event($uuid);
+        $model = $this->photo($event, $photo);
+
+        $model->update(['processing_status' => 'pending', 'failure_reason' => null]);
+        ProcessExpoLensPhotoJob::dispatch($event->organization_id, $model->id);
+
+        return response()->json(['message' => 'Photo queued for reprocessing.'], 202);
+    }
+
+    /**
+     * Confirm or drop a suggested match. Confirmed matches survive a rematch;
+     * rejecting removes the row so the attendee stops seeing that photo.
+     */
+    public function updateMatch(string $uuid, string $photo, string $participation, Request $request): JsonResponse
+    {
+        $event = $this->event($uuid);
+        $model = $this->photo($event, $photo);
+        $data = $request->validate(['confirmed' => ['required', 'boolean']]);
+
+        $attendee = Participation::where('event_id', $event->id)
+            ->where('uuid', $participation)
+            ->firstOrFail();
+
+        $match = $model->matches()->where('participation_id', $attendee->id)->firstOrFail();
+
+        if ($data['confirmed']) {
+            $match->update(['confirmed' => true]);
+
+            return response()->json(['message' => 'Match confirmed.']);
+        }
+
+        $match->delete();
+
+        return response()->json(['message' => 'Match removed.']);
+    }
+
+    /**
+     * Queue event-wide matching.
+     *
+     * mode=rematch (default) reuses the face vectors already stored on each
+     * photo — no face-service calls. mode=full re-detects every photo and is
+     * only needed when the detection model or quality floor changed.
+     */
+    public function reprocess(string $uuid, Request $request): JsonResponse
+    {
+        $event = $this->event($uuid);
+        $mode = $request->string('mode', 'rematch')->toString();
+
+        if ($mode === 'full') {
+            ReprocessEventFacesJob::dispatch($event->organization_id, $event->id);
+
+            return response()->json(['message' => 'ExpoLens photos were queued for full reprocessing.'], 202);
+        }
+
+        RematchEventFacesJob::dispatch($event->organization_id, $event->id);
+
+        return response()->json(['message' => 'ExpoLens photos were queued for rematching.'], 202);
     }
 
     private function event(string $uuid): Event

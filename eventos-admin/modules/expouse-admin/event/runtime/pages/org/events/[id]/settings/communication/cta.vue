@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -153,13 +155,16 @@ async function saveDraft() {
       const res = await api<{ data: Cta }>(`/events/${id}/ctas/${editingId.value}`, { method: 'PUT', body: payload })
       const i = ctas.value.findIndex((c: Cta) => c.id === editingId.value)
       if (i >= 0) ctas.value[i] = res.data
+      toast.success('CTA updated')
     } else {
       const res = await api<{ data: Cta }>(`/events/${id}/ctas`, { method: 'POST', body: payload })
       ctas.value.push(res.data)
+      toast.success('CTA added')
     }
     drawerOpen.value = false
   } catch (e: any) {
     error.value = e?.data?.message || 'Could not save CTA.'
+    toast.error(error.value)
   } finally {
     saving.value = false
   }
@@ -170,7 +175,10 @@ async function removeCta(c: Cta) {
   try {
     await api(`/events/${id}/ctas/${c.id}`, { method: 'DELETE' })
     ctas.value = ctas.value.filter((x: Cta) => x.id !== c.id)
-  } catch { /* */ }
+    toast.success('CTA removed')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not remove CTA.')
+  }
 }
 
 function typeBadge(t: CtaType) {

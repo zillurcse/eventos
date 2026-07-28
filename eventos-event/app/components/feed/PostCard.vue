@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import type { FeedComment, FeedPost } from '~/stores/feed'
+import type { FeedMention } from '~/utils/mentions'
+import { pruneMentions } from '~/utils/mentions'
 
 const props = defineProps<{ post: FeedPost }>()
 const feed = useFeedStore()
+const functionality = useFunctionalityStore()
+
+const canLike = computed(() => functionality.can('feed_post_likes'))
+const canComment = computed(() => functionality.can('comment_feed_post'))
+const canVote = computed(() => functionality.can('vote_feed_polls'))
+const showEngagement = computed(() => canLike.value || canComment.value)
 
 const open = ref(false)
 const comments = ref<FeedComment[]>([])
 const loadingComments = ref(false)
 const commentsLoaded = ref(false)
 const commentBody = ref('')
+const commentMentions = ref<FeedMention[]>([])
 const sending = ref(false)
 
 async function toggleComments() {
@@ -28,9 +37,11 @@ async function send() {
   if (!commentBody.value.trim() || sending.value) return
   sending.value = true
   try {
-    const c = await feed.addComment(props.post, commentBody.value)
+    const mentions = pruneMentions(commentBody.value, commentMentions.value).map(m => m.id)
+    const c = await feed.addComment(props.post, commentBody.value, mentions)
     if (c) comments.value.push(c)
     commentBody.value = ''
+    commentMentions.value = []
   } finally {
     sending.value = false
   }
@@ -105,7 +116,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
       </svg>{{ banner.label }}
     </span>
 
-    <p v-if="post.body" class="body">{{ post.body }}</p>
+    <p v-if="post.body" class="body"><FeedMentionText :body="post.body" :mentions="post.mentions" /></p>
 
     <!-- Looking-for / offering tags -->
     <div v-if="post.tags?.length" class="ptags">
@@ -130,7 +141,8 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
     <!-- Poll -->
     <div v-if="post.poll" class="poll">
       <button v-for="o in post.poll.options" :key="o.id" type="button" class="opt" :class="{ mine: votedFor(o.id) }"
-        @click="feed.votePoll(post, o.id)">
+        :disabled="!canVote"
+        @click="canVote && feed.votePoll(post, o.id)">
         <span class="fill" :style="{ width: (hasVoted ? pctOf(o.votes) : 0) + '%' }" />
         <span class="otext">{{ o.text }}</span>
         <span v-if="hasVoted" class="opct">{{ pctOf(o.votes) }}%</span>
@@ -142,15 +154,15 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
     </div>
 
     <!-- No engagement on posts that aren't live on the wall -->
-    <div v-if="post.status === 'published'" class="stats">
-      <button class="stat" :class="{ on: post.reacted }" type="button" @click="feed.toggleReaction(post)">
+    <div v-if="post.status === 'published' && showEngagement" class="stats">
+      <button v-if="canLike" class="stat" :class="{ on: post.reacted }" type="button" @click="feed.toggleReaction(post)">
         <svg viewBox="0 0 24 24">
           <path
             d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8z" />
         </svg>
         {{ post.reaction_count }} {{ post.reaction_count === 1 ? 'Like' : 'Likes' }}
       </button>
-      <button class="stat" :class="{ on: open }" type="button" @click="toggleComments">
+      <button v-if="canComment" class="stat" :class="{ on: open }" type="button" @click="toggleComments">
         <svg viewBox="0 0 24 24">
           <path d="M20 11.5a8 8 0 0 1-9.5 7.9L5 20l1.1-4.2A8 8 0 1 1 20 11.5zM8 11h8M8 15h5" />
         </svg>
@@ -158,7 +170,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
       </button>
     </div>
 
-    <div v-if="post.status === 'published'" class="comments" :class="{ expanded: open }">
+    <div v-if="post.status === 'published' && canComment" class="comments" :class="{ expanded: open }">
       <template v-if="open">
         <div v-if="loadingComments" class="cnote">Loading comments…</div>
         <div v-else-if="!comments.length" class="cnote">Be the first to comment.</div>
@@ -170,7 +182,7 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
           <div class="cbubble">
             <span class="cname">{{ c.author }}<span v-if="c.author_role === 'organizer'"
                 class="tag">Organizer</span></span>
-            <p>{{ c.body }}</p>
+            <p><FeedMentionText :body="c.body" :mentions="c.mentions" /></p>
             <span class="ctime">{{ timeAgo(c.created_at) }}</span>
           </div>
         </div>
@@ -180,7 +192,13 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
           <span class="av" :class="{ org: post.author_role === 'organizer' }">
             <UserAvatar :src="post.author_avatar" :name="post.author" />
           </span>
-        <input v-model="commentBody" type="text" placeholder="Write a comment…" @keyup.enter="send">
+        <FeedMentionInput
+          v-model="commentBody"
+          v-model:mentions="commentMentions"
+          :multiline="false"
+          placeholder="Write a comment… Use @ to mention"
+          @submit="send"
+        />
         <button type="button" :disabled="!commentBody.trim() || sending" @click="send">Send</button>
       </div>
     </div>
@@ -608,9 +626,12 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
   gap: 10px;
 }
 
+.cadd :deep(.mention-input) {
+  flex: 1;
+  min-width: 0;
+}
 
-
-.cadd input {
+.cadd :deep(.mention-input input) {
   flex: 1;
   box-sizing: border-box;
   border: 1px solid #d8dbe4;
@@ -621,9 +642,10 @@ const hasVoted = computed(() => (props.post.poll?.my_vote?.length ?? 0) > 0)
   outline: none;
   color: #334155;
   max-height: 40px;
+  background: #fff;
 }
 
-.cadd input:focus {
+.cadd :deep(.mention-input input:focus) {
   border-color: var(--brand-primary);
 }
 

@@ -15,6 +15,7 @@ const loading = ref(true)
 const state = ref<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
 const isSelf = computed(() => !!chat.me && chat.me === id.value)
+const chatOn = computed(() => site.navigation?.modules?.chat !== false)
 
 
 async function load() {
@@ -43,7 +44,11 @@ async function connect() {
 
 async function message() {
   if (!chat.drawerOpen) chat.toggleDrawer()
-  await chat.openWith(id.value)
+  try {
+    await chat.openWith(id.value)
+  } catch (e: any) {
+    state.value = 'error'
+  }
 }
 
 onMounted(load)
@@ -93,13 +98,18 @@ watch(id, load)
             <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" /></svg>
             {{ state === 'sending' ? 'Sending…' : 'Connect' }}
           </button>
-          <button class="btn ghost" type="button" @click="message">
+          <button
+            v-if="chatOn"
+            class="btn ghost"
+            type="button"
+            @click="message"
+          >
             <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             Message
           </button>
         </div>
 
-        <p v-if="state === 'error'" class="err">Couldn’t send the request. Please try again.</p>
+        <p v-if="state === 'error'" class="err">Something went wrong. Please try again.</p>
       </template>
     </div>
   </div>

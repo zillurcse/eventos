@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\GamificationResource;
 use App\Models\Event;
 use App\Models\Gamification;
+use App\Support\GamificationActions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,10 @@ class GamificationController extends Controller
     public function show(string $uuid): JsonResponse
     {
         $event = Event::where('uuid', $uuid)->firstOrFail();
-        $config = Gamification::firstOrCreate(['event_id' => $event->id]);
+        $config = Gamification::firstOrCreate(
+            ['event_id' => $event->id],
+            ['scores' => GamificationActions::defaultScores(1)],
+        );
 
         return response()->json(['data' => new GamificationResource($config)]);
     }
@@ -35,7 +39,16 @@ class GamificationController extends Controller
             'award_description' => ['sometimes', 'nullable', 'string'],
         ]);
 
-        $config = Gamification::firstOrCreate(['event_id' => $event->id]);
+        if (isset($data['scores'])) {
+            // Drop unknown keys so a stale client can't invent actions.
+            $allowed = array_flip(GamificationActions::keys());
+            $data['scores'] = array_intersect_key($data['scores'], $allowed);
+        }
+
+        $config = Gamification::firstOrCreate(
+            ['event_id' => $event->id],
+            ['scores' => GamificationActions::defaultScores(1)],
+        );
         $config->fill($data)->save();
 
         return response()->json(['data' => new GamificationResource($config->fresh())]);

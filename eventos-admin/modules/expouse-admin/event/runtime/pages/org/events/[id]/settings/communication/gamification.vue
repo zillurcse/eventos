@@ -1,82 +1,53 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
 const api = useApi()
 const id = route.params.id as string
 
-interface Action { key: string, label: string }
+interface Action { key: string, label: string, column: 'left' | 'right', once?: boolean }
 
-// Fixed catalogue of point-scoring actions, split into the two columns shown
-// in the UI. Scores are stored as a { key => points } map.
-const LEFT_ACTIONS: Action[] = [
-  { key: 'create_account', label: 'Create account' },
-  { key: 'complete_onboarding', label: 'Complete onboarding' },
-  { key: 'attend_welcoming_video', label: 'Attend welcoming video' },
-  { key: 'create_feed_text_post', label: 'Create feed text post' },
-  { key: 'create_feed_image_post', label: 'Create feed image post' },
-  { key: 'create_feed_video_post', label: 'Create feed video post' },
-  { key: 'create_feed_polls_post', label: 'Create feed polls post' },
-  { key: 'create_feed_offering_post', label: 'Create feed offering post' },
-  { key: 'create_feed_looking_for_post', label: 'Create feed looking for post' },
-  { key: 'comment_feed_post', label: 'Comment feed post' },
-  { key: 'feed_post_likes', label: 'Feed post likes' },
-  { key: 'vote_feed_polls', label: 'Vote feed Polls' },
-  { key: 'sessions_agenda_chat', label: 'Sessions/ Agenda chat' },
-  { key: 'create_sessions_agenda_qa', label: 'Create sessions/ Agenda Q&A' },
-  { key: 'create_sessions_agenda_polls', label: 'Create sessions/ Agenda polls' },
-  { key: 'vote_sessions_agenda_polls', label: 'Vote sessions/ Agenda polls' },
-  { key: 'rate_session', label: 'Rate session' },
-  { key: 'attend_lounge_meeting', label: 'Attend lounge meeting' },
-  { key: 'lounge_meeting_feedback', label: 'Lounge meeting feedback' },
-]
-
-const RIGHT_ACTIONS: Action[] = [
-  { key: 'attend_breakout_rooms_meeting', label: 'Attend breakout rooms meeting' },
-  { key: 'breakout_rooms_meeting_feedback', label: 'Breakout rooms meeting feedback' },
-  { key: 'visit_exhibitor_profile', label: 'Visit exhibitor profile' },
-  { key: 'visit_exhibitor_social_media', label: 'Visit exhibitor social media' },
-  { key: 'rate_exhibitor', label: 'Rate exhibitor' },
-  { key: 'chat_with_exhibitor_representative', label: 'Chat with exhibitor representative' },
-  { key: 'meet_exhibitor_representative', label: 'Meet exhibitor representative' },
-  { key: 'exhibitor_representative_meeting_feedback', label: 'Exhibitor representative meeting feedback' },
-  { key: 'attend_exhibitor_displayed_videos', label: 'Attend exhibitor displayed videos' },
-  { key: 'attend_exhibitor_displayed_images', label: 'Attend exhibitor displayed images' },
-  { key: 'visit_sponsor_profile', label: 'Visit sponsor profile' },
-  { key: 'visit_sponsor_social_media', label: 'Visit sponsor social media' },
-  { key: 'chat_with_sponsor_representative', label: 'Chat with sponsor representative' },
-  { key: 'meet_sponsor_representative', label: 'Meet sponsor representative' },
-  { key: 'exhibitor_sponsor_meeting_feedback', label: 'Exhibitor sponsor meeting feedback' },
-  { key: 'attend_sponsor_displayed_videos', label: 'Attend sponsor displayed videos' },
-  { key: 'chat_with_delegates', label: 'Chat with delegates' },
-  { key: 'meet_delegates', label: 'Meet delegates' },
-  { key: 'view_speakers_profile', label: 'View speakers profile' },
-]
-
-const ALL_ACTIONS = [...LEFT_ACTIONS, ...RIGHT_ACTIONS]
-
+const actions = ref<Action[]>([])
 const enabled = ref(false)
 const scores = reactive<Record<string, number>>({})
 const award = reactive({ title: '', description: '' })
-
 const saving = ref(false)
-const saved = ref(false)
+const loading = ref(true)
 
-function seedScores(values: Record<string, number> = {}) {
-  for (const a of ALL_ACTIONS) {
-    scores[a.key] = Number.isFinite(values[a.key]) ? values[a.key] : 1
+const leftActions = computed(() => actions.value.filter(a => a.column === 'left'))
+const rightActions = computed(() => actions.value.filter(a => a.column === 'right'))
+
+function seedScores(list: Action[], values: Record<string, number> = {}) {
+  for (const a of list) {
+    scores[a.key] = Number.isFinite(values[a.key]) ? Number(values[a.key]) : 1
   }
 }
 
 async function load() {
+  loading.value = true
   try {
-    const res = await api<{ data: { enabled: boolean, scores: Record<string, number>, award_title: string | null, award_description: string | null } }>(`/events/${id}/gamification`)
+    const res = await api<{
+      data: {
+        enabled: boolean
+        scores: Record<string, number>
+        actions: Action[]
+        award_title: string | null
+        award_description: string | null
+      }
+    }>(`/events/${id}/gamification`)
+
+    actions.value = Array.isArray(res.data.actions) ? res.data.actions : []
     enabled.value = res.data.enabled
-    seedScores(res.data.scores || {})
+    seedScores(actions.value, res.data.scores || {})
     award.title = res.data.award_title || ''
     award.description = res.data.award_description || ''
   } catch {
-    seedScores()
+    actions.value = []
+    seedScores([])
+  } finally {
+    loading.value = false
   }
 }
 
@@ -84,7 +55,9 @@ async function save() {
   saving.value = true
   try {
     const clean: Record<string, number> = {}
-    for (const a of ALL_ACTIONS) clean[a.key] = Math.max(0, Math.trunc(Number(scores[a.key]) || 0))
+    for (const a of actions.value) {
+      clean[a.key] = Math.max(0, Math.trunc(Number(scores[a.key]) || 0))
+    }
     await api(`/events/${id}/gamification`, {
       method: 'PUT',
       body: {
@@ -94,7 +67,9 @@ async function save() {
         award_description: award.description || null,
       },
     })
-    saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Gamification saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save.')
   } finally {
     saving.value = false
   }
@@ -114,7 +89,6 @@ onMounted(load)
         <div>
           <h2 class="font-bold text-base text-ink m-0">
             Gamification
-            <span v-if="saved" class="badge active ml-2">saved ✓</span>
           </h2>
           <p class="muted text-[.86rem] mt-1 mb-0 max-w-[820px]">
             Facilitate a friendly fun gaming networking between users to boost the users with an action-based
@@ -138,14 +112,15 @@ onMounted(load)
     </div>
 
     <template v-if="enabled">
-      <!-- Score matrix -->
+      <!-- Score matrix — actions come from the API catalogue -->
       <div class="card mb-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-bold text-base text-ink m-0">Point Scoring</h3>
-          <span class="badge">{{ ALL_ACTIONS.length }} actions</span>
+          <span class="badge">{{ actions.length }} actions</span>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-0">
-          <div v-for="(col, ci) in [LEFT_ACTIONS, RIGHT_ACTIONS]" :key="ci">
+        <div v-if="loading" class="muted text-[.86rem] py-6">Loading scoring actions…</div>
+        <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-0">
+          <div v-for="(col, ci) in [leftActions, rightActions]" :key="ci">
             <div class="flex items-center justify-between pb-2 mb-1 border-b border-line">
               <span class="text-[.76rem] font-bold text-muted uppercase tracking-wide">When an attendee</span>
               <span class="text-[.76rem] font-bold text-muted uppercase tracking-wide">Score</span>
@@ -175,13 +150,13 @@ onMounted(load)
         <AppInput v-model="award.title" label="Title" placeholder="Enter Title" />
 
         <FormField label="Description" class="mt-3">
-          <SessionDescriptionEditor v-model="award.description"  />
+          <SessionDescriptionEditor v-model="award.description" />
         </FormField>
       </div>
     </template>
 
     <div class="flex justify-end">
-      <button class="btn" :disabled="saving" @click="save">
+      <button class="btn" :disabled="saving || loading" @click="save">
         {{ saving ? 'Saving…' : 'Save' }}
       </button>
     </div>

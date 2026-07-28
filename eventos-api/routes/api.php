@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\BriefcaseController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\CheckInStationController;
+use App\Http\Controllers\Api\V1\CommunicationController;
 use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\ContestController;
 use App\Http\Controllers\Api\V1\CtaController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Api\V1\EventAdController;
 use App\Http\Controllers\Api\V1\EventAdminController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\ExpoLensAdminController;
+use App\Http\Controllers\Api\V1\ExpoLensUploadLinkController;
 use App\Http\Controllers\Api\V1\ExhibitorContactController;
 use App\Http\Controllers\Api\V1\ExhibitorController;
 use App\Http\Controllers\Api\V1\ExhibitorDocumentController;
@@ -57,6 +59,7 @@ use App\Http\Controllers\Api\V1\FloorController;
 use App\Http\Controllers\Api\V1\FormController;
 use App\Http\Controllers\Api\V1\GalleryImageController;
 use App\Http\Controllers\Api\V1\GamificationController;
+use App\Http\Controllers\Api\V1\ParticipantGamificationController;
 use App\Http\Controllers\Api\V1\GateScanningController;
 use App\Http\Controllers\Api\V1\GuestBadgeController;
 use App\Http\Controllers\Api\V1\IconController;
@@ -74,6 +77,7 @@ use App\Http\Controllers\Api\V1\ParticipantBadgeController;
 use App\Http\Controllers\Api\V1\ParticipantController;
 use App\Http\Controllers\Api\V1\ParticipantContestController;
 use App\Http\Controllers\Api\V1\ParticipantExpoLensController;
+use App\Http\Controllers\Api\V1\PublicExpoLensUploadController;
 use App\Http\Controllers\Api\V1\ParticipantProfileController;
 use App\Http\Controllers\Api\V1\ProfileFormController;
 use App\Http\Controllers\Api\V1\ParticipantSurveyController;
@@ -139,6 +143,14 @@ Route::prefix('v1')->group(function () {
     // form, while capping automated abuse: check-email is an account-existence
     // oracle, and form/register submissions are spammable. (throttle:N,M keys
     // guest requests by client IP.)
+    // Tokenised photographer upload link. The token is the only credential, so
+    // the read is cheap and unthrottled while the write is capped per IP — a
+    // photographer dumping a shoot sends many files, but one at a time.
+    Route::get('/public/expolens/upload/{token}', [PublicExpoLensUploadController::class, 'show'])
+        ->middleware('throttle:60,1')->name('expolens.public.show');
+    Route::post('/public/expolens/upload/{token}', [PublicExpoLensUploadController::class, 'store'])
+        ->middleware('throttle:120,1')->name('expolens.public.store');
+
     Route::middleware('throttle:20,1')->group(function () {
         Route::post('/public/check-email', [PublicSiteController::class, 'checkEmail']);
 
@@ -288,6 +300,11 @@ Route::prefix('v1')->group(function () {
             // The attendee's own profile, and the onboarding step that fills it in.
             Route::get('/profile', [ParticipantProfileController::class, 'show']);
             Route::match(['put', 'patch'], '/profile', [ParticipantProfileController::class, 'update']);
+            // Communication › Functionality — role ops, moderation, feed tabs.
+            Route::get('/communication', [CommunicationController::class, 'show']);
+            // Communication › Gamification — leaderboard + award + my points.
+            // Under `my/` so it does not shadow the organizer /events/{uuid}/gamification config route.
+            Route::get('/my/gamification', [ParticipantGamificationController::class, 'show']);
             Route::get('/feed', [FeedController::class, 'index']);
             // Static segment — must precede /feed/{post}/* so it isn't captured.
             Route::get('/feed/tags', [FeedController::class, 'networkingTags']);
@@ -647,8 +664,16 @@ Route::prefix('v1')->group(function () {
                 ->middleware('perm:events.view')->name('expolens.admin.index');
             Route::post('/events/{uuid}/expolens/photos', [ExpoLensAdminController::class, 'store'])
                 ->middleware('perm:events.manage')->name('expolens.admin.store');
+            // Registered ahead of the /photos/{photo} routes so "bulk" is never
+            // swallowed as a photo uuid.
+            Route::post('/events/{uuid}/expolens/photos/bulk', [ExpoLensAdminController::class, 'bulkModerate'])
+                ->middleware('perm:events.manage')->name('expolens.admin.bulk');
             Route::patch('/events/{uuid}/expolens/photos/{photo}', [ExpoLensAdminController::class, 'update'])
                 ->middleware('perm:events.manage')->name('expolens.admin.update');
+            Route::post('/events/{uuid}/expolens/photos/{photo}/retry', [ExpoLensAdminController::class, 'retry'])
+                ->middleware('perm:events.manage')->name('expolens.admin.retry');
+            Route::patch('/events/{uuid}/expolens/photos/{photo}/matches/{participation}', [ExpoLensAdminController::class, 'updateMatch'])
+                ->middleware('perm:events.manage')->name('expolens.admin.match-update');
             Route::delete('/events/{uuid}/expolens/photos/{photo}', [ExpoLensAdminController::class, 'destroy'])
                 ->middleware('perm:events.manage')->name('expolens.admin.destroy');
             Route::get('/events/{uuid}/expolens/photos/{photo}/matches', [ExpoLensAdminController::class, 'matches'])
@@ -659,6 +684,16 @@ Route::prefix('v1')->group(function () {
                 ->middleware('perm:events.view')->name('expolens.admin.attendee-matches');
             Route::post('/events/{uuid}/expolens/reprocess', [ExpoLensAdminController::class, 'reprocess'])
                 ->middleware('perm:events.manage')->name('expolens.admin.reprocess');
+
+            // ── Photographer upload links ──
+            Route::get('/events/{uuid}/expolens/upload-links', [ExpoLensUploadLinkController::class, 'index'])
+                ->middleware('perm:events.view')->name('expolens.links.index');
+            Route::post('/events/{uuid}/expolens/upload-links', [ExpoLensUploadLinkController::class, 'store'])
+                ->middleware('perm:events.manage')->name('expolens.links.store');
+            Route::patch('/events/{uuid}/expolens/upload-links/{link}', [ExpoLensUploadLinkController::class, 'update'])
+                ->middleware('perm:events.manage')->name('expolens.links.update');
+            Route::delete('/events/{uuid}/expolens/upload-links/{link}', [ExpoLensUploadLinkController::class, 'destroy'])
+                ->middleware('perm:events.manage')->name('expolens.links.destroy');
 
             // ── Event services catalogue ──
             Route::get('/events/{uuid}/service-categories', [ServiceCategoryController::class, 'index'])->middleware('perm:events.view');

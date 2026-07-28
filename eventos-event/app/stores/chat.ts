@@ -210,17 +210,71 @@ export const useChatStore = defineStore('chat', {
 
     /** Start (or resume) a thread with a person from the directory. */
     async openWith(participantId: string) {
+      const convo = await this.ensureWith(participantId)
+      if (convo) await this.select(convo.id)
+    },
+
+    /**
+     * Find-or-create a person thread and upsert it into the inbox without
+     * selecting it (used by the Connect modal composer).
+     */
+    async ensureWith(participantId: string): Promise<ChatConversationItem | null> {
       const uuid = this.eventUuid()
-      if (!uuid) return
+      if (!uuid) return null
       const api = useApi()
       const res = await api<{ data: ChatConversationItem }>(`/events/${uuid}/chat`, {
         method: 'POST',
         body: { participant: participantId },
       })
-      if (!this.conversations.some(c => c.id === res.data.id)) {
-        this.conversations.unshift({ ...res.data, kind: res.data.kind ?? 'person' })
+      const item: ChatConversationItem = { ...res.data, kind: res.data.kind ?? 'person' }
+      const existing = this.conversations.find(c => c.id === item.id)
+      if (!existing) this.conversations.unshift(item)
+      return existing ?? item
+    },
+
+    /** Load history for a conversation without changing the drawer selection. */
+    async loadMessages(conversationId: string): Promise<ChatMessageItem[]> {
+      const uuid = this.eventUuid()
+      if (!uuid) return []
+      const api = useApi()
+      const res = await api<{ data: ChatMessageItem[] }>(`/events/${uuid}/chat/${conversationId}/messages`)
+      return res.data
+    },
+
+    /**
+     * Send a text message to a person thread by id (Connect modal). Updates the
+     * inbox preview; also appends to `messages` when that thread is active.
+     */
+    async sendTo(conversationId: string, body: string, attachments: ChatAttachment[] = []): Promise<ChatMessageItem | null> {
+      const uuid = this.eventUuid()
+      const text = body.trim()
+      if (!uuid || (!text && !attachments.length) || this.sending) return null
+      this.sending = true
+      try {
+        const msg = await this.postPersonMessage(conversationId, text, attachments)
+        if (this.activeId === conversationId && !this.messages.some(m => m.id === msg.id)) {
+          this.messages.push(msg)
+        }
+        return msg
+      } finally {
+        this.sending = false
       }
-      await this.select(res.data.id)
+    },
+
+    async postPersonMessage(conversationId: string, body: string, attachments: ChatAttachment[] = []): Promise<ChatMessageItem> {
+      const uuid = this.eventUuid()
+      if (!uuid) throw new Error('No event context')
+      const api = useApi()
+      const res = await api<{ data: ChatMessageItem }>(`/events/${uuid}/chat/${conversationId}/messages`, {
+        method: 'POST',
+        body: { body, attachments },
+      })
+      this.touchPreview(conversationId, {
+        body: res.data.body || previewForAttachment(res.data.attachments[0]),
+        mine: true,
+        created_at: res.data.created_at,
+      })
+      return res.data
     },
 
     async send(body: string, attachments: ChatAttachment[] = []) {
@@ -253,16 +307,8 @@ export const useChatStore = defineStore('chat', {
           return
         }
 
-        const res = await api<{ data: ChatMessageItem }>(`/events/${uuid}/chat/${id}/messages`, {
-          method: 'POST',
-          body: { body: body.trim(), attachments },
-        })
-        this.messages.push(res.data)
-        this.touchPreview(id, {
-          body: res.data.body || previewForAttachment(res.data.attachments[0]),
-          mine: true,
-          created_at: res.data.created_at,
-        })
+        const msg = await this.postPersonMessage(id, body.trim(), attachments)
+        this.messages.push(msg)
       } finally {
         this.sending = false
       }

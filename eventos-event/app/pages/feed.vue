@@ -2,8 +2,10 @@
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const feed = useFeedStore()
+const functionality = useFunctionalityStore()
 
 onMounted(() => {
+  functionality.fetch()
   if (!feed.loaded) feed.fetchFeed()
   if (!feed.adsLoaded) feed.fetchAds()
 })

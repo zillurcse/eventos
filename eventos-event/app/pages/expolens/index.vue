@@ -21,6 +21,34 @@ onMounted(async () => {
 const photos = computed(() => (tab.value === 'mine' ? store.myPhotos : store.photos))
 const loading = computed(() => (tab.value === 'mine' ? store.loadingMine : store.loadingAll))
 const needsConsent = computed(() => !store.enrollment?.consented)
+const failed = computed(() => store.enrollment?.status === 'failed')
+
+const retryInput = ref<HTMLInputElement | null>(null)
+const retrying = ref(false)
+
+/**
+ * Enrollment fails when the profile photo has no face, or several. Let the
+ * attendee fix it in place: a new avatar becomes the enrollment source, so
+ * uploading one and re-enrolling is the whole recovery path.
+ */
+async function retryWithPhoto(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  retrying.value = true
+  try {
+    await profile.uploadAvatar(file)
+    await store.enroll({ consent: true })
+    toast.success('Photo updated — re-checking your face now.')
+    setTimeout(() => store.fetchEnrollment(true), 2500)
+  } catch (err: any) {
+    toast.error(err?.data?.message || 'Could not use that photo.')
+  } finally {
+    retrying.value = false
+  }
+}
 
 async function enableMatching() {
   if (!consentChecked.value) {
@@ -83,6 +111,26 @@ async function refreshMine() {
           Tip: add a clear face photo in Profile first for better matches.
         </p>
       </div>
+      <div v-else-if="failed" class="failed">
+        <div>
+          <strong>We couldn't use your photo</strong>
+          <p>{{ store.enrollment?.error || 'That photo could not be used for face matching.' }}</p>
+        </div>
+        <input
+          ref="retryInput"
+          type="file"
+          class="hidden"
+          accept="image/jpeg,image/png,image/webp,image/jpg"
+          @change="retryWithPhoto"
+        >
+        <div class="actions">
+          <button type="button" class="primary" :disabled="retrying" @click="retryInput?.click()">
+            {{ retrying ? 'Uploading…' : 'Try another photo' }}
+          </button>
+          <button type="button" class="ghost danger" @click="withdraw">Turn off</button>
+        </div>
+      </div>
+
       <div v-else class="status-row">
         <div>
           <strong>
@@ -155,6 +203,9 @@ async function refreshMine() {
 .ghost.danger { color: #b91c1c; }
 .hint { margin-top: 10px; font-size: .86rem; }
 .status-row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.failed { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+.failed strong { color: #b91c1c; }
+.hidden { display: none; }
 .actions { display: flex; gap: 8px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
 .shot { border: none; padding: 0; border-radius: 12px; overflow: hidden; aspect-ratio: 1; cursor: pointer; background: #e2e8f0; }

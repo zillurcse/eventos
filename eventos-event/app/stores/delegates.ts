@@ -23,8 +23,9 @@ export interface SimilarDelegate extends Delegate {
  * to the event via useApi() → `/events/{uuid}/delegates`. Search, sort and
  * pagination are SERVER-side (the directory must scale to very large events,
  * so the client only ever holds the pages it has scrolled through). Each row
- * carries a live `online` flag from the presence heartbeat. Sending a
- * connection request reuses the networking connections endpoint (connect()).
+ * carries a live `online` flag from the presence heartbeat. The Chat / Meet
+ * modal opens via openConnect(); Chat uses participant chat, Meet uses
+ * meetings.request().
  */
 export const useDelegatesStore = defineStore('delegates', {
   state: () => ({
@@ -160,7 +161,7 @@ export const useDelegatesStore = defineStore('delegates', {
       }
     },
 
-    // ── Connect modal ────────────────────────────────────────────────────
+    // ── Connect modal (Chat + Meet with a delegate / speaker) ────────────
     openConnect(delegate: Delegate, tab: 'connect' | 'meet' = 'connect') {
       this.connectTarget = delegate
       this.connectTab = tab

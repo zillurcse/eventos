@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -19,7 +21,6 @@ const ROLES: { key: Role, label: string }[] = [
 type Matrix = Record<Role, Record<Role, boolean>>
 
 const saving = ref(false)
-const saved = ref(false)
 
 function buildMatrix(values: Partial<Matrix> = {}): Matrix {
   const out = {} as Matrix
@@ -51,7 +52,9 @@ async function save() {
     const clean = {} as Matrix
     for (const r of ROLES) clean[r.key] = { ...matrix[r.key] }
     await api(`/events/${id}/settings`, { method: 'PUT', body: { chat: clean } })
-    saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Chat settings saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save.')
   } finally {
     saving.value = false
   }
@@ -69,7 +72,6 @@ onMounted(load)
       <h2 class="section-title m-0">Chat</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">
         Assign user authentication to requests chat within whom.
-        <span v-if="saved" class="badge active ml-2">saved ✓</span>
       </p>
     </div>
 

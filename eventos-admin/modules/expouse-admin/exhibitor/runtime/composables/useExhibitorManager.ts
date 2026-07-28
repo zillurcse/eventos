@@ -437,7 +437,15 @@ export function useExhibitorManager(eventId: string) {
   }
 
   function addCta() {
-    draft.cta.push({ id: `cta_${Date.now()}`, type: 'TEXT', label: '', value: '', open: false })
+    draft.cta.push(freshCta('text'))
+  }
+
+  function addCtaVideo(cta: CtaItem) {
+    cta.videos.push({ platform: 'Youtube', url: '', caption: '' })
+  }
+
+  function removeCtaVideo(cta: CtaItem, index: number) {
+    cta.videos.splice(index, 1)
   }
 
   return {
@@ -446,7 +454,7 @@ export function useExhibitorManager(eventId: string) {
     // drawer / editing
     drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, current,
     init, load, loadMeta, openAdd, loadForEdit, create, update, remove, toggleStatus,
-    pickSpotlight, addTag, removeTag, addCta,
+    pickSpotlight, addTag, removeTag, addCta, addCtaVideo, removeCtaVideo,
     // table (search / filters / paging / row menu)
     ...table,
     // edit tabs — the components see the same flat names they always have

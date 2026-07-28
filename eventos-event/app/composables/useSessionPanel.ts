@@ -61,6 +61,11 @@ interface PanelMeta {
   can_answer: boolean
   my_role: PanelRole
   pending_count: number
+  /** Communication › Functionality session ops for this caller's role. */
+  can_chat?: boolean
+  can_ask?: boolean
+  can_create_poll?: boolean
+  can_vote_poll?: boolean
 }
 
 export function useSessionPanel() {
@@ -79,6 +84,10 @@ export function useSessionPanel() {
   const canAnswer = ref(false)
   const myRole = ref<PanelRole>('attendee')
   const pendingCount = ref(0)
+  const canChat = ref(true)
+  const canAsk = ref(true)
+  const canCreatePoll = ref(true)
+  const canVotePoll = ref(true)
 
   let eventUuid = ''
   let sessionId = ''
@@ -96,6 +105,10 @@ export function useSessionPanel() {
     canAnswer.value = !!meta.can_answer
     myRole.value = meta.my_role ?? 'attendee'
     pendingCount.value = meta.pending_count ?? 0
+    if (meta.can_chat !== undefined) canChat.value = !!meta.can_chat
+    if (meta.can_ask !== undefined) canAsk.value = !!meta.can_ask
+    if (meta.can_create_poll !== undefined) canCreatePoll.value = !!meta.can_create_poll
+    if (meta.can_vote_poll !== undefined) canVotePoll.value = !!meta.can_vote_poll
   }
 
   // ── Chat ──────────────────────────────────────────────────────────────────
@@ -210,6 +223,7 @@ export function useSessionPanel() {
   return {
     chat, questions, polls, attendees, attendeeMeta,
     canModerate, isMuted, qaModeration, qaAnswerPolicy, canAnswer, myRole, pendingCount,
+    canChat, canAsk, canCreatePoll, canVotePoll,
     bind, loaderFor,
     sendChat, askQuestion, upvoteQuestion, replyToQuestion, votePoll,
     moderate, removeMessage,

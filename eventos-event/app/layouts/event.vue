@@ -2,6 +2,7 @@
 // Signed-in attendee chrome: branded topbar + the event navigation, over the
 // grey app canvas. Used by the reception page (and future event tabs).
 const contact = useExhibitorContactStore()
+const delegates = useDelegatesStore()
 </script>
 
 <template>
@@ -16,6 +17,9 @@ const contact = useExhibitorContactStore()
     <!-- Chat / Meet connect modal — opened from delegate cards, speaker
          profiles, similar-people strip, etc. -->
     <DelegatesConnectModal />
+
+    <!-- Delegate profile — also opened from feed @mentions. -->
+    <DelegatesDetailModal v-if="delegates.selected" :key="delegates.selected.id" :delegate="delegates.selected" />
 
     <!-- Profile-completion onboarding (first-time attendees, if the organizer
          turned it on): a renderless gate that sends them to the /onboarding

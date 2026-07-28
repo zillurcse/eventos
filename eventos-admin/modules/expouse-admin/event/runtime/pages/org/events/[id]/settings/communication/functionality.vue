@@ -61,7 +61,8 @@ function hydrate(c: any) {
     func[op.key] = {}
     ROLES.forEach((r) => { func[op.key][r.key] = c?.functionality?.[op.key]?.[r.key] ?? true })
   })
-  MODERATION.forEach((m) => { moderation[m.key] = c?.moderation?.[m.key] ?? true })
+  // Moderation off by default — matches API (missing keys = not moderated).
+  MODERATION.forEach((m) => { moderation[m.key] = c?.moderation?.[m.key] ?? false })
   // Always show the full tab catalogue: honour the saved order/enabled state,
   // then append any catalogue tabs not yet present.
   const saved: any[] = Array.isArray(c?.feed_tabs) ? c.feed_tabs : []

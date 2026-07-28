@@ -6,6 +6,10 @@ use App\Events\NewFeedPost;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\FeedPost;
+use App\Models\Participation;
+use App\Services\Gamification\GamificationScorer;
+use App\Support\FeedMentions;
+use App\Support\GamificationActions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -99,6 +103,28 @@ class FeedModerationController extends Controller
         // attendee feeds pick up newly approved posts live.
         if ($feedPost->status === 'published' && ! $wasVisible) {
             broadcast(new NewFeedPost($feedPost));
+
+            if ($feedPost->author_type === 'participation' && $feedPost->author_id) {
+                $author = Participation::find($feedPost->author_id);
+                if ($author) {
+                    $type = (string) data_get($feedPost->meta, 'type', 'text');
+                    app(GamificationScorer::class)->queue(
+                        (int) $author->organization_id,
+                        (int) $feedPost->event_id,
+                        (int) $author->id,
+                        GamificationActions::feedPostAction($type),
+                        'feed_post',
+                        (int) $feedPost->id,
+                    );
+
+                    FeedMentions::notify(
+                        (int) $feedPost->event_id,
+                        (int) $author->id,
+                        (array) data_get($feedPost->meta, 'mentions', []),
+                        'mentioned you in a post',
+                    );
+                }
+            }
         }
 
         return response()->json(['data' => $this->payload($feedPost)]);

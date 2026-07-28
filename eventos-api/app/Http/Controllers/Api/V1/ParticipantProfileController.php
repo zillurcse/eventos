@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\FormFieldValue;
 use App\Models\FormSubmission;
 use App\Models\Participation;
+use App\Services\Gamification\GamificationScorer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -107,11 +108,22 @@ class ParticipantProfileController extends Controller
         }
 
         $meta = $participation->meta ?? [];
+        $justOnboarded = false;
         if ($request->boolean('complete_onboarding')) {
+            $justOnboarded = empty($meta['onboarded_at']);
             $meta['onboarded_at'] = now()->toIso8601String();
         }
 
         $participation->update(['profile_data' => $profile, 'meta' => $meta]);
+
+        if ($justOnboarded) {
+            app(GamificationScorer::class)->queue(
+                (int) $participation->organization_id,
+                (int) $participation->event_id,
+                (int) $participation->id,
+                'complete_onboarding',
+            );
+        }
 
         if (
             ! empty($data['avatar_file_id'])
@@ -286,6 +298,7 @@ class ParticipantProfileController extends Controller
             'offering' => $profile['offering'] ?? [],
             'social' => $profile['social'] ?? [],
             'onboarded_at' => $participation->meta['onboarded_at'] ?? null,
+            'points_total' => (int) ($participation->points_total ?? 0),
         ];
     }
 

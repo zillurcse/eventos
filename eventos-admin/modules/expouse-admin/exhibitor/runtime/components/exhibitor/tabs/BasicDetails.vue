@@ -160,6 +160,8 @@ async function save() {
         <span v-else class="text-[.88rem]">{{ spotlightUploading ? 'Uploading…' : '+ Click to upload' }}</span>
         <input type="file" accept="video/*" @change="pickSpotlight">
       </label>
+
+      <ExhibitorCtaEditor />
     </div>
 
     <!-- Social Links -->

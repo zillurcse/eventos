@@ -80,7 +80,15 @@ class ContentHubTest extends TestCase
         $this->putJson($base, [
             'enabled' => true,
             'award_title' => 'Top Networker',
-        ])->assertOk()->assertJsonStructure(['data']);
+            'scores' => [
+                'create_feed_text_post' => 5,
+                'comment_feed_post' => 2,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.enabled', true)
+            ->assertJsonPath('data.award_title', 'Top Networker')
+            ->assertJsonPath('data.scores.create_feed_text_post', 5)
+            ->assertJsonStructure(['data' => ['actions']]);
     }
 
     public function test_service_category_and_service_flow(): void

@@ -62,6 +62,8 @@ class ParticipantExpoLensController extends Controller
 
         $profile['expolens_consent_at'] = now()->toIso8601String();
         $profile['avatar_file_id'] = $file->id;
+        $profile['expolens_enrollment_status'] = 'processing';
+        unset($profile['expolens_enrollment_error']);
         $participation->update(['profile_data' => $profile]);
 
         EnrollParticipationFaceJob::dispatch(
@@ -88,7 +90,11 @@ class ParticipantExpoLensController extends Controller
         app(ExpoLensRetention::class)->purgeParticipation($participation->id);
 
         $profile = $participation->profile_data ?? [];
-        unset($profile['expolens_consent_at']);
+        unset(
+            $profile['expolens_consent_at'],
+            $profile['expolens_enrollment_status'],
+            $profile['expolens_enrollment_error'],
+        );
         $participation->update(['profile_data' => $profile]);
 
         return response()->json(['message' => 'Face matching consent and biometric data were removed.']);
@@ -106,13 +112,25 @@ class ParticipantExpoLensController extends Controller
     {
         $participation = Participation::findOrFail($participationId);
         $embedding = ExpoLensFaceEmbedding::where('participation_id', $participationId)->first();
+        $profile = $participation->profile_data ?? [];
+        $consented = (bool) data_get($profile, 'expolens_consent_at');
+
+        // A stored embedding is the ground truth; otherwise fall back to what
+        // the enrollment job last recorded, so a failed enrollment stops
+        // reporting "processing" forever.
+        $status = match (true) {
+            (bool) $embedding => 'ready',
+            ! $consented => 'not_enrolled',
+            default => (string) (data_get($profile, 'expolens_enrollment_status') ?: 'processing'),
+        };
 
         return [
-            'consented' => (bool) data_get($participation->profile_data, 'expolens_consent_at'),
+            'consented' => $consented,
             'enrolled' => (bool) $embedding,
-            'status' => $embedding ? 'ready' : (
-                data_get($participation->profile_data, 'expolens_consent_at') ? 'processing' : 'not_enrolled'
-            ),
+            'status' => $status,
+            'error' => $status === 'failed'
+                ? (string) data_get($profile, 'expolens_enrollment_error')
+                : null,
             'enrolled_at' => $embedding?->enrolled_at?->toIso8601String(),
             'quality_score' => $embedding?->quality_score,
         ];

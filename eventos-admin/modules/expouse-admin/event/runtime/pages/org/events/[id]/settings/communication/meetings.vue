@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -22,7 +24,6 @@ type Restrictions = Record<Role, { requests: number, confirmed: number }>
 const intelligent = ref(false)
 const slotDuration = ref(10)
 const saving = ref(false)
-const saved = ref(false)
 const restrictionOpen = ref(false)
 
 // Meeting locations — where one-to-one meetings physically happen ("Hall 4").
@@ -114,7 +115,9 @@ async function save() {
         },
       },
     })
-    saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Meeting settings saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save.')
   } finally {
     saving.value = false
   }
@@ -137,7 +140,6 @@ onMounted(load)
     <div class="card mb-4">
       <h2 class="font-bold text-base text-[#1a1a2e] m-0">
         Meeting
-        <span v-if="saved" class="badge active ml-2">saved ✓</span>
       </h2>
       <p class="muted text-[.86rem] mt-1 mb-4">Define who can send meetings via chat to whom.</p>
 

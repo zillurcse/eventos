@@ -9,6 +9,11 @@ use App\Models\Event;
 use App\Models\FeedComment;
 use App\Models\FeedPost;
 use App\Models\FeedReaction;
+use App\Models\Participation;
+use App\Services\Gamification\GamificationScorer;
+use App\Support\CommunicationCapabilities;
+use App\Support\FeedMentions;
+use App\Support\GamificationActions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -68,7 +73,19 @@ class FeedController extends Controller
         $posts = $query->orderByDesc('is_pinned')->latest('id')->paginate(20)->withQueryString();
         FeedPost::warmAuthorCache($posts->getCollection());
 
-        return FeedPostResource::collection($posts);
+        $collection = FeedPostResource::collection($posts);
+        $event = Event::with('settings')->find($request->attributes->get('event_id'));
+        $participation = Participation::find($request->attributes->get('participation_id'));
+        if ($event && $participation) {
+            $collection->additional([
+                'communication' => CommunicationCapabilities::forParticipant(
+                    $participation,
+                    CommunicationCapabilities::communication($event),
+                ),
+            ]);
+        }
+
+        return $collection;
     }
 
     /**
@@ -125,26 +142,37 @@ class FeedController extends Controller
             'poll.allow_multiple' => ['nullable', 'boolean'],
             'tags' => ['nullable', 'array', 'max:12'],
             'tags.*' => ['string', 'max:40'],
+            'mentions' => ['nullable', 'array', 'max:20'],
+            'mentions.*' => ['uuid'],
         ]);
 
         $type = $data['type'] ?? 'text';
-        $meta = $this->buildMeta($type, $data);
+        $meta = $this->buildMeta($type, $data, (int) $request->attributes->get('event_id'));
 
         // A post must carry *something* — body text, an attachment, or a poll.
         if (trim((string) ($data['body'] ?? '')) === '' && empty($meta['attachments']) && $type !== 'poll') {
             throw ValidationException::withMessages(['body' => 'Write something or attach media.']);
         }
 
-        // Honor the organizer's moderation switch (Engagement › Manage
-        // Activity Feed): while it's on, attendee posts start `pending` and
-        // only reach the feed once approved.
         $eventId = $request->attributes->get('event_id');
-        $moderated = (bool) data_get(Event::find($eventId)?->meta, 'feed_moderation', false);
+        $event = Event::with('settings')->findOrFail($eventId);
+        $participation = Participation::findOrFail($request->attributes->get('participation_id'));
+        $communication = CommunicationCapabilities::communication($event);
+
+        CommunicationCapabilities::abortUnless(
+            $participation,
+            $communication,
+            CommunicationCapabilities::feedTypeOp($type),
+            'You are not allowed to create this type of post.',
+        );
+
+        // Engagement › Manage Activity Feed: on → pending, off → auto-published.
+        $moderated = CommunicationCapabilities::feedPostNeedsModeration($event, $type, $communication);
 
         $post = FeedPost::create([
             'event_id' => $eventId,
             'author_type' => 'participation',
-            'author_id' => $request->attributes->get('participation_id'),
+            'author_id' => $participation->id,
             'body' => $data['body'] ?? '',
             'visibility' => $data['visibility'] ?? 'attendees',
             'status' => $moderated ? 'pending' : 'published',
@@ -153,13 +181,31 @@ class FeedController extends Controller
 
         if (! $moderated) {
             broadcast(new NewFeedPost($post));
+            FeedMentions::notify(
+                (int) $eventId,
+                (int) $participation->id,
+                (array) ($meta['mentions'] ?? []),
+                'mentioned you in a post',
+            );
+        }
+
+        // Points only when the post is live; pending posts award on approval.
+        if (! $moderated) {
+            app(GamificationScorer::class)->queue(
+                (int) $participation->organization_id,
+                (int) $eventId,
+                (int) $participation->id,
+                GamificationActions::feedPostAction($type),
+                'feed_post',
+                (int) $post->id,
+            );
         }
 
         return response()->json(['data' => new FeedPostResource($post)], 201);
     }
 
     /** Assemble the type-specific `meta` payload for a new post. */
-    protected function buildMeta(string $type, array $data): array
+    protected function buildMeta(string $type, array $data, int $eventId): array
     {
         $meta = ['type' => $type];
 
@@ -192,6 +238,11 @@ class FeedController extends Controller
             $meta['tags'] = array_values(array_unique(array_map('trim', $data['tags'])));
         }
 
+        $mentions = FeedMentions::resolve($eventId, $data['mentions'] ?? []);
+        if ($mentions !== []) {
+            $meta['mentions'] = $mentions;
+        }
+
         return $meta;
     }
 
@@ -201,6 +252,8 @@ class FeedController extends Controller
      */
     public function votePoll(string $event, string $post, Request $request): JsonResponse
     {
+        $this->abortUnlessOp($request, 'vote_feed_polls', 'You are not allowed to vote on feed polls.');
+
         $pid = (string) $request->attributes->get('participation_id');
         $feedPost = $this->resolvePost($request, $post);
 
@@ -215,6 +268,7 @@ class FeedController extends Controller
 
         $voters = (array) ($poll['voters'] ?? []);
         $mine = (array) ($voters[$pid] ?? []);
+        $hadVote = $mine !== [];
         $allowMultiple = (bool) ($poll['allow_multiple'] ?? false);
 
         if (in_array($data['option_id'], $mine, true)) {
@@ -251,6 +305,21 @@ class FeedController extends Controller
         $feedPost->meta = $meta;
         $feedPost->save();
 
+        // First vote on this poll only (idempotent ledger key = feed_post id).
+        if (! $hadVote && ! empty($voters[$pid] ?? [])) {
+            $participation = Participation::find($request->attributes->get('participation_id'));
+            if ($participation) {
+                app(GamificationScorer::class)->queue(
+                    (int) $participation->organization_id,
+                    (int) $feedPost->event_id,
+                    (int) $participation->id,
+                    'vote_feed_polls',
+                    'feed_post',
+                    (int) $feedPost->id,
+                );
+            }
+        }
+
         return response()->json(['data' => new FeedPostResource($feedPost->fresh())]);
     }
 
@@ -273,20 +342,43 @@ class FeedController extends Controller
 
     public function comment(string $event, string $post, Request $request): JsonResponse
     {
+        $this->abortUnlessOp($request, 'comment_feed_post', 'You are not allowed to comment on posts.');
+
         $feedPost = $this->resolvePost($request, $post);
 
-        $data = $request->validate(['body' => ['required', 'string', 'max:2000']]);
+        $data = $request->validate([
+            'body' => ['required', 'string', 'max:2000'],
+            'mentions' => ['nullable', 'array', 'max:20'],
+            'mentions.*' => ['uuid'],
+        ]);
 
+        $pid = (int) $request->attributes->get('participation_id');
+        $mentions = FeedMentions::resolve((int) $feedPost->event_id, $data['mentions'] ?? []);
         $comment = FeedComment::create([
             'post_id' => $feedPost->id,
             'event_id' => $feedPost->event_id,
             'author_type' => 'participation',
-            'author_id' => $request->attributes->get('participation_id'),
+            'author_id' => $pid,
             'body' => $data['body'],
             'status' => 'published',
+            'meta' => $mentions !== [] ? ['mentions' => $mentions] : null,
         ]);
 
         $feedPost->increment('comment_count');
+
+        $participation = Participation::find($pid);
+        if ($participation) {
+            app(GamificationScorer::class)->queue(
+                (int) $participation->organization_id,
+                (int) $feedPost->event_id,
+                $pid,
+                'comment_feed_post',
+                'feed_comment',
+                (int) $comment->id,
+            );
+        }
+
+        FeedMentions::notify((int) $feedPost->event_id, $pid, $mentions, 'mentioned you in a comment');
 
         return response()->json(['data' => $this->commentPayload($comment)], 201);
     }
@@ -297,6 +389,8 @@ class FeedController extends Controller
      */
     public function react(string $event, string $post, Request $request): JsonResponse
     {
+        $this->abortUnlessOp($request, 'feed_post_likes', 'You are not allowed to like posts.');
+
         $pid = $request->attributes->get('participation_id');
         $feedPost = $this->resolvePost($request, $post);
 
@@ -323,6 +417,18 @@ class FeedController extends Controller
             ]);
             $feedPost->increment('reaction_count');
             $reacted = true;
+
+            $participation = Participation::find($pid);
+            if ($participation) {
+                app(GamificationScorer::class)->queue(
+                    (int) $participation->organization_id,
+                    (int) $feedPost->event_id,
+                    (int) $pid,
+                    'feed_post_likes',
+                    'feed_post',
+                    (int) $feedPost->id,
+                );
+            }
         }
 
         return response()->json([
@@ -344,6 +450,20 @@ class FeedController extends Controller
             ->firstOrFail();
     }
 
+    /** Enforce Communication › Functionality for the caller's role. */
+    protected function abortUnlessOp(Request $request, string $operation, string $message): void
+    {
+        $event = Event::with('settings')->findOrFail($request->attributes->get('event_id'));
+        $participation = Participation::findOrFail($request->attributes->get('participation_id'));
+
+        CommunicationCapabilities::abortUnless(
+            $participation,
+            CommunicationCapabilities::communication($event),
+            $operation,
+            $message,
+        );
+    }
+
     /** Shared comment projection (author label + avatar + timestamp). */
     protected function commentPayload(FeedComment $c): array
     {
@@ -355,6 +475,7 @@ class FeedController extends Controller
             'author' => $author['name'],
             'author_avatar' => $author['avatar'],
             'author_role' => $author['role'],
+            'mentions' => data_get($c->meta, 'mentions', []),
             'created_at' => $c->created_at?->toIso8601String(),
         ];
     }

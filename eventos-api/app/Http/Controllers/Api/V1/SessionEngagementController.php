@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Event;
 use App\Models\Participation;
 use App\Models\Session;
 use App\Models\SessionMessage;
 use App\Models\SessionMute;
 use App\Models\SessionPoll;
 use App\Models\SessionPollVote;
+use App\Services\Gamification\GamificationScorer;
 use App\Support\Agora\AccessToken2;
+use App\Support\CommunicationCapabilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +57,7 @@ class SessionEngagementController extends Controller
     {
         $s = $this->session($request);
         $this->abortIfMuted($request, $s);
+        $this->abortUnlessCommunicationOp($request, 'create_agenda_post', 'You are not allowed to post in session chat.');
 
         $data = $request->validate(['body' => ['required', 'string', 'max:1000']]);
 
@@ -66,6 +70,8 @@ class SessionEngagementController extends Controller
             'status' => SessionMessage::STATUS_PUBLISHED,
             'body' => trim($data['body']),
         ])->load('participation.contact');
+
+        $this->queuePoints($request, 'sessions_agenda_chat', 'session_message', (int) $m->id);
 
         return response()->json(['data' => $this->message($m, $request)], 201);
     }
@@ -143,6 +149,7 @@ class SessionEngagementController extends Controller
 
         $role = $this->authorRole($request);
         $official = $role !== SessionMessage::ROLE_ATTENDEE;
+        $moderated = $s->qaModerated() || $this->agendaQuestionModerated($request);
 
         $reply = SessionMessage::create([
             'event_id' => $request->attributes->get('event_id'),
@@ -153,7 +160,7 @@ class SessionEngagementController extends Controller
             'author_role' => $role,
             // An attendee's reply (policy=everyone) queues like their questions
             // do; one from the stage goes straight up — it is the moderation.
-            'status' => (! $official && $s->qaModerated())
+            'status' => (! $official && $moderated)
                 ? SessionMessage::STATUS_PENDING
                 : SessionMessage::STATUS_PUBLISHED,
             'body' => trim($data['body']),
@@ -170,21 +177,25 @@ class SessionEngagementController extends Controller
     {
         $s = $this->session($request);
         $this->abortIfMuted($request, $s);
+        $this->abortUnlessCommunicationOp($request, 'create_agenda_qa', 'You are not allowed to ask questions in this session.');
 
         $data = $request->validate(['body' => ['required', 'string', 'max:500']]);
 
         // With pre-moderation on, the question waits for the host; the asker
         // still sees it (scopeVisibleTo) marked as pending.
+        $moderated = $s->qaModerated() || $this->agendaQuestionModerated($request);
         $m = SessionMessage::create([
             'event_id' => $request->attributes->get('event_id'),
             'session_id' => $s->id,
             'participation_id' => $this->participationId($request),
             'kind' => SessionMessage::KIND_QUESTION,
             'author_role' => $this->authorRole($request),
-            'status' => $s->qaModerated() ? SessionMessage::STATUS_PENDING : SessionMessage::STATUS_PUBLISHED,
+            'status' => $moderated ? SessionMessage::STATUS_PENDING : SessionMessage::STATUS_PUBLISHED,
             'body' => trim($data['body']),
             'meta' => ['voters' => []],
         ])->load('participation.contact');
+
+        $this->queuePoints($request, 'create_sessions_agenda_qa', 'session_message', (int) $m->id);
 
         return response()->json(['data' => $this->message($m, $request)], 201);
     }
@@ -307,6 +318,8 @@ class SessionEngagementController extends Controller
 
     public function pollVote(Request $request): JsonResponse
     {
+        $this->abortUnlessCommunicationOp($request, 'vote_agenda_polls', 'You are not allowed to vote on session polls.');
+
         $s = $this->session($request);
         $pid = $this->participationId($request);
 
@@ -326,6 +339,8 @@ class SessionEngagementController extends Controller
             ['option_id' => $data['option_id']],
         );
 
+        $this->queuePoints($request, 'vote_sessions_agenda_polls', 'session_poll', (int) $p->id);
+
         return $this->pollIndex($request);
     }
 
@@ -334,6 +349,7 @@ class SessionEngagementController extends Controller
     {
         $s = $this->session($request);
         $this->abortUnlessModerator($request);
+        $this->abortUnlessCommunicationOp($request, 'create_agenda_polls', 'You are not allowed to create session polls.');
 
         $data = $request->validate([
             'question' => ['required', 'string', 'max:300'],
@@ -345,7 +361,7 @@ class SessionEngagementController extends Controller
 
         $status = $data['status'] ?? SessionPoll::STATUS_LIVE;
 
-        SessionPoll::create([
+        $poll = SessionPoll::create([
             'event_id' => $request->attributes->get('event_id'),
             'session_id' => $s->id,
             'question' => trim($data['question']),
@@ -356,6 +372,8 @@ class SessionEngagementController extends Controller
             'created_by' => $request->user()?->id,
             'created_by_participation_id' => $this->participationId($request),
         ]);
+
+        $this->queuePoints($request, 'create_sessions_agenda_polls', 'session_poll', (int) $poll->id);
 
         return $this->pollIndex($request);
     }
@@ -721,17 +739,20 @@ class SessionEngagementController extends Controller
     private function meta(Request $request, Session $s): array
     {
         $host = $this->canModerate($request);
+        $communication = $this->communication($request);
+        $participation = $this->participation($request);
+        $caps = CommunicationCapabilities::forParticipant($participation, $communication);
 
         return [
             'can_moderate' => $host,
             'is_muted' => SessionMute::where('session_id', $s->id)
                 ->where('participation_id', $this->participationId($request))
                 ->exists(),
-            'qa_moderation' => $s->qaModerated(),
+            'qa_moderation' => $s->qaModerated() || CommunicationCapabilities::agendaQuestionModerated($communication),
             // Who the organizer has allowed to reply, and whether that's this
             // caller — the panel draws a reply box off the second one.
             'qa_answer_policy' => $s->qaAnswerPolicy(),
-            'can_answer' => $s->canAnswerQa($this->participation($request)),
+            'can_answer' => $s->canAnswerQa($participation),
             'my_role' => $this->authorRole($request),
             'pending_count' => $host
                 ? SessionMessage::where('session_id', $s->id)
@@ -739,7 +760,54 @@ class SessionEngagementController extends Controller
                     ->where('status', SessionMessage::STATUS_PENDING)
                     ->count()
                 : 0,
+            // Communication › Functionality — session ops for this caller's role.
+            'can_chat' => $caps['operations']['create_agenda_post'],
+            'can_ask' => $caps['operations']['create_agenda_qa'],
+            'can_create_poll' => $host && $caps['operations']['create_agenda_polls'],
+            'can_vote_poll' => $caps['operations']['vote_agenda_polls'],
         ];
+    }
+
+    private function communication(Request $request): array
+    {
+        return once(function () use ($request) {
+            $event = Event::with('settings')->find($request->attributes->get('event_id'));
+
+            return CommunicationCapabilities::communication($event);
+        });
+    }
+
+    private function abortUnlessCommunicationOp(Request $request, string $operation, string $message): void
+    {
+        CommunicationCapabilities::abortUnless(
+            $this->participation($request),
+            $this->communication($request),
+            $operation,
+            $message,
+        );
+    }
+
+    /** Queue a dynamic gamification point award (no-op when scoring is off). */
+    private function queuePoints(Request $request, string $actionKey, ?string $subjectType = null, ?int $subjectId = null): void
+    {
+        $participation = $this->participation($request);
+        if (! $participation) {
+            return;
+        }
+
+        app(GamificationScorer::class)->queue(
+            (int) $participation->organization_id,
+            (int) $request->attributes->get('event_id'),
+            (int) $participation->id,
+            $actionKey,
+            $subjectType,
+            $subjectId,
+        );
+    }
+
+    private function agendaQuestionModerated(Request $request): bool
+    {
+        return CommunicationCapabilities::agendaQuestionModerated($this->communication($request));
     }
 
     /** @param  \Illuminate\Support\Collection|null  $replies  answers grouped by question id */

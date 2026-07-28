@@ -89,8 +89,73 @@ export interface Exhibitor {
 /** Credentials revealed after an auto password reset. */
 export interface ResetResult { email: string; password: string }
 
-export interface CtaItem { id: string; type: string; label: string; value: string; open: boolean }
+export type CtaType = 'text' | 'image' | 'video'
+export interface CtaVideo { platform: string; url: string; caption: string }
+/** Exhibitor CTA — same shapes as event Communication › CTA (text / image / video). */
+export interface CtaItem {
+  id: string
+  type: CtaType
+  title: string
+  description: string
+  button_label: string
+  button_link: string
+  image_url: string
+  image_file_id: number | null
+  videos: CtaVideo[]
+  /** Accordion open state in the editor — UI only, stripped on save. */
+  open: boolean
+}
 export interface Social { facebook: string; linkedin: string; twitter: string; instagram: string; whatsapp: string; youtube: string }
+export const CTA_TYPES: { value: CtaType; label: string }[] = [
+  { value: 'text', label: 'Text' },
+  { value: 'image', label: 'Image' },
+  { value: 'video', label: 'Video' },
+]
+export const CTA_VIDEO_PLATFORMS = ['Youtube', 'Vimeo', 'Facebook', 'Other']
+
+export function freshCta(type: CtaType = 'text'): CtaItem {
+  return {
+    id: `cta_${Date.now()}`,
+    type,
+    title: '',
+    description: '',
+    button_label: '',
+    button_link: '',
+    image_url: '',
+    image_file_id: null,
+    videos: [],
+    open: true,
+  }
+}
+
+/** Coerce API / legacy CTA rows (TEXT/LINK/BUTTON) into the current shape. */
+export function normalizeCta(raw: Record<string, unknown> | CtaItem): CtaItem {
+  const blank = freshCta()
+  const t = String((raw as CtaItem).type || 'text').toLowerCase()
+  const type: CtaType = t === 'image' || t === 'video' || t === 'text' ? t : 'text'
+  const videos = Array.isArray((raw as CtaItem).videos)
+    ? (raw as CtaItem).videos.map(v => ({
+        platform: v.platform || 'Youtube',
+        url: v.url || '',
+        caption: v.caption || '',
+      }))
+    : []
+  // Legacy TEXT/LINK/BUTTON used label/value.
+  const legacy = raw as { label?: string; value?: string }
+  return {
+    ...blank,
+    id: String((raw as CtaItem).id || blank.id),
+    type,
+    title: String((raw as CtaItem).title || legacy.label || ''),
+    description: String((raw as CtaItem).description || (type === 'text' ? legacy.value || '' : '')),
+    button_label: String((raw as CtaItem).button_label || (t === 'button' ? legacy.label || '' : '')),
+    button_link: String((raw as CtaItem).button_link || (t === 'link' || t === 'button' ? legacy.value || '' : '')),
+    image_url: String((raw as CtaItem).image_url || ''),
+    image_file_id: (raw as CtaItem).image_file_id ?? null,
+    videos,
+    open: false,
+  }
+}
 export interface Contact { full_name: string; company_name: string; position: string; email: string; phone_code: string; phone: string }
 export interface FeatureLine { key: string; enabled: boolean; limit: number }
 export interface Draft {
@@ -273,8 +338,7 @@ export function draftFromExhibitor(e: Exhibitor | null | undefined): Draft {
     spotlight_type: e.spotlight_type || 'image',
     spotlight_url: e.spotlight_url || '',
     spotlight_file_id: e.spotlight_file_id ?? null,
-    // `open` drives the accordion in the CTA editor; it is UI state, not data.
-    cta: Array.isArray(e.cta) ? e.cta.filter(Boolean).map(c => ({ ...c, open: false })) : [],
+    cta: Array.isArray(e.cta) ? e.cta.filter(Boolean).map(c => normalizeCta(c as CtaItem)) : [],
     social: { ...blank.social, ...(e.social || {}) },
     contact: { ...blank.contact, ...(e.contact || {}) },
   }
@@ -312,7 +376,8 @@ export function draftToPayload(draft: Draft, eventId: string) {
     spotlight_type: draft.spotlight_type,
     spotlight_url: draft.spotlight_url,
     spotlight_file_id: draft.spotlight_file_id,
-    cta: plain(draft.cta),
+    // Drop accordion `open` — UI-only.
+    cta: draft.cta.map(({ open: _open, ...rest }) => plain(rest)),
     social: plain(draft.social),
     contact: plain(draft.contact),
   }

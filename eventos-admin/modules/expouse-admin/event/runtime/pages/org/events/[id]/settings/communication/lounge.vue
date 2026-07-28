@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -137,6 +139,9 @@ async function persist() {
         },
       },
     })
+    toast.success('Lounge settings saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save.')
   } finally {
     saving.value = false
   }

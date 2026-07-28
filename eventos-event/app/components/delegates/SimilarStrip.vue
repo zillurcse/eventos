@@ -2,6 +2,10 @@
 import type { SimilarDelegate } from '~/stores/delegates'
 
 const store = useDelegatesStore()
+const site = useSiteStore()
+const auth = useAuthStore()
+
+const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
 
 function open(d: SimilarDelegate) {
   store.openConnect(d)
@@ -9,7 +13,7 @@ function open(d: SimilarDelegate) {
 </script>
 
 <template>
-  <section v-if="store.similar.length" class="similar">
+  <section v-if="store.similar.length && chatEnabled" class="similar">
     <div class="head">
       <h2>Similar profiles</h2>
       <p class="sub">People here with your designation or company.</p>

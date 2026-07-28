@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
+
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
 const route = useRoute()
@@ -29,7 +31,6 @@ const ACTIONS: Action[] = [
 type Matrix = Record<string, Record<Channel, boolean>>
 
 const saving = ref(false)
-const saved = ref(false)
 
 function buildMatrix(values: Matrix = {}): Matrix {
   const out: Matrix = {}
@@ -66,7 +67,9 @@ async function save() {
     const clean: Matrix = {}
     for (const a of ACTIONS) clean[a.key] = { ...matrix[a.key] }
     await api(`/events/${id}/settings`, { method: 'PUT', body: { notifications: clean } })
-    saved.value = true; setTimeout(() => (saved.value = false), 1500)
+    toast.success('Notification settings saved')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not save.')
   } finally {
     saving.value = false
   }
@@ -84,7 +87,6 @@ onMounted(load)
       <h2 class="section-title m-0">Notification</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">
         Configure and select automatic notification option to be triggered for attendees for your web/mobile app.
-        <span v-if="saved" class="badge active ml-2">saved ✓</span>
       </p>
     </div>
 

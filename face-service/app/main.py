@@ -11,6 +11,11 @@ from insightface.app import FaceAnalysis
 from pydantic import BaseModel
 
 MODEL_NAME = os.getenv("FACE_MODEL_NAME", "buffalo_l")
+# insightface resolves model downloads from the `root` kwarg (defaulting to
+# ~/.insightface), NOT from INSIGHTFACE_HOME. Passing it explicitly is what
+# keeps the ~275 MB model inside the mounted volume instead of re-downloading
+# it on every container recreate.
+MODEL_ROOT = os.getenv("INSIGHTFACE_HOME", "/models")
 DETECTION_SIZE = int(os.getenv("FACE_DETECTION_SIZE", "640"))
 MAX_UPLOAD_BYTES = int(os.getenv("FACE_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 SERVICE_TOKEN = os.getenv("FACE_SERVICE_TOKEN", "")
@@ -39,7 +44,7 @@ class EmbeddingResponse(BaseModel):
 
 def _load_analyzer() -> FaceAnalysis:
     providers = ["CPUExecutionProvider"]
-    face_analyzer = FaceAnalysis(name=MODEL_NAME, providers=providers)
+    face_analyzer = FaceAnalysis(name=MODEL_NAME, root=MODEL_ROOT, providers=providers)
     face_analyzer.prepare(ctx_id=-1, det_size=(DETECTION_SIZE, DETECTION_SIZE))
     return face_analyzer
 

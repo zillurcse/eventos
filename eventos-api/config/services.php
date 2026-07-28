@@ -53,6 +53,10 @@ return [
         'face_service_token' => env('FACE_SERVICE_TOKEN'),
         'match_threshold' => (float) env('EXPOLENS_MATCH_THRESHOLD', 0.45),
         'minimum_quality' => (float) env('EXPOLENS_MIN_QUALITY', 0.18),
+        // Nearest enrolled faces considered per detected face. >1 lets a group
+        // shot resolve two faces to two different people instead of collapsing
+        // both onto whoever happens to be nearest.
+        'match_candidates' => (int) env('EXPOLENS_MATCH_CANDIDATES', 5),
     ],
 
     /*

@@ -4,8 +4,11 @@ import type { Delegate } from '~/stores/delegates'
 const props = defineProps<{ delegate: Delegate }>()
 const store = useDelegatesStore()
 const bookmarks = useBookmarksStore()
+const site = useSiteStore()
+const auth = useAuthStore()
 
 const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
+const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
 
 function openDetail() {
   store.open(props.delegate)
@@ -38,7 +41,7 @@ function contact() {
     <div class="reveal" @click.stop>
       <div class="reveal-inner">
         <EventNotePopover type="delegate" :id="delegate.id" block />
-        <button type="button" class="act chat" @click="contact">
+        <button v-if="chatEnabled" type="button" class="act chat" @click="contact">
           <svg viewBox="0 0 24 24">
             <path
               d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />

@@ -1,14 +1,26 @@
 <script setup lang="ts">
 import type { FeedAttachment, FeedPost, FeedType, NewPostPayload } from '~/stores/feed'
+import type { FeedMention } from '~/utils/mentions'
+import { pruneMentions } from '~/utils/mentions'
 
 const feed = useFeedStore()
 const auth = useAuthStore()
 const profile = useProfileStore()
+const functionality = useFunctionalityStore()
 
 type Mode = 'compose' | 'poll' | 'looking_for' | 'offering'
 const mode = ref<Mode>('compose')
 
+const canText = computed(() => functionality.can('create_feed_text'))
+const canImage = computed(() => functionality.can('create_feed_image'))
+const canVideo = computed(() => functionality.can('create_feed_video'))
+const canPoll = computed(() => functionality.can('create_feed_polls'))
+const canLookingFor = computed(() => functionality.can('create_feed_looking_for'))
+const canOffering = computed(() => functionality.can('create_feed_offering'))
+const showComposer = computed(() => functionality.canComposeAnything)
+
 const body = ref('')
+const mentions = ref<FeedMention[]>([])
 const visibility = ref<FeedPost['visibility']>('attendees')
 
 // Poll
@@ -154,10 +166,15 @@ onBeforeUnmount(() => { for (const m of media.value) URL.revokeObjectURL(m.previ
 const placeholder = computed(() => {
   if (mode.value === 'looking_for') return 'What are you looking for?'
   if (mode.value === 'offering') return 'What are you offering?'
-  return 'Got a spark of an idea? Let the community feel your energy!'
+  return 'Got a spark of an idea? Use @ to mention someone!'
 })
 
-function setMode(m: Mode) { mode.value = mode.value === m ? 'compose' : m }
+function setMode(m: Mode) {
+  if (m === 'poll' && !canPoll.value) return
+  if (m === 'looking_for' && !canLookingFor.value) return
+  if (m === 'offering' && !canOffering.value) return
+  mode.value = mode.value === m ? 'compose' : m
+}
 function addPollOption() { if (pollOptions.value.length < 8) pollOptions.value.push('') }
 function removePollOption(i: number) { if (pollOptions.value.length > 2) pollOptions.value.splice(i, 1) }
 function addTag() {
@@ -185,6 +202,7 @@ const canPost = computed(() => {
 function reset() {
   mode.value = 'compose'
   body.value = ''
+  mentions.value = []
   for (const m of media.value) URL.revokeObjectURL(m.preview)
   media.value = []
   errors.value = []
@@ -199,11 +217,27 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
 async function submit() {
   if (!canPost.value) return
+  const type = postType.value
+  const opMap = {
+    text: 'create_feed_text',
+    image: 'create_feed_image',
+    video: 'create_feed_video',
+    pdf: 'create_feed_text',
+    poll: 'create_feed_polls',
+    looking_for: 'create_feed_looking_for',
+    offering: 'create_feed_offering',
+  } as const
+  if (!functionality.can(opMap[type])) {
+    flashError('You are not allowed to create this type of post.')
+    return
+  }
+  const keptMentions = pruneMentions(body.value, mentions.value)
   const payload: NewPostPayload = {
-    type: postType.value,
+    type,
     body: body.value,
     visibility: visibility.value,
     attachments: doneAttachments.value,
+    mentions: keptMentions.map(m => m.id),
   }
   if (mode.value === 'poll') payload.poll = { options: validPollOptions.value, allow_multiple: allowMultiple.value }
   if (mode.value === 'looking_for' || mode.value === 'offering') payload.tags = tags.value
@@ -219,13 +253,19 @@ async function submit() {
 </script>
 
 <template>
-  <div class="composer" :class="{ dragging }" @dragenter.prevent="onDragEnter" @dragover.prevent
+  <div v-if="showComposer" class="composer" :class="{ dragging }" @dragenter.prevent="onDragEnter" @dragover.prevent
     @dragleave="onDragLeave" @drop.prevent="onDrop">
     <div class="row">
       <span class="me">
         <UserAvatar :src="profile.data?.avatar_url" :name="auth.user?.name" />
       </span>
-      <textarea v-model="body" rows="2" :placeholder="placeholder" />
+      <FeedMentionInput
+        v-model="body"
+        v-model:mentions="mentions"
+        :rows="2"
+        :placeholder="placeholder"
+        :disabled="!canText && mode === 'compose'"
+      />
     </div>
 
     <!-- Poll editor -->
@@ -307,34 +347,34 @@ async function submit() {
 
     <div class="toolbar">
       <div class="tools">
-        <button class="tool" type="button" title="Photo" @click="pick(ACCEPT_IMAGE)">
+        <button v-if="canImage" class="tool" type="button" title="Photo" @click="pick(ACCEPT_IMAGE)">
           <svg viewBox="0 0 24 24">
             <path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
           </svg>
         </button>
-        <button class="tool" type="button" title="Video" @click="pick(ACCEPT_VIDEO)">
+        <button v-if="canVideo" class="tool" type="button" title="Video" @click="pick(ACCEPT_VIDEO)">
           <svg viewBox="0 0 24 24">
             <path d="M3 6h13v12H3zM16 10l5-3v10l-5-3z" />
           </svg>
         </button>
-        <button class="tool" type="button" title="PDF" @click="pick(ACCEPT_PDF)">
+        <button v-if="canText" class="tool" type="button" title="PDF" @click="pick(ACCEPT_PDF)">
           <svg viewBox="0 0 24 24">
             <path d="M7 3h8l4 4v14H7zM15 3v4h4M9 13h6M9 17h6" />
           </svg>
         </button>
-        <span class="sep" />
-        <button class="tool" :class="{ on: mode === 'poll' }" type="button" title="Poll" @click="setMode('poll')">
+        <span v-if="canPoll || canLookingFor || canOffering" class="sep" />
+        <button v-if="canPoll" class="tool" :class="{ on: mode === 'poll' }" type="button" title="Poll" @click="setMode('poll')">
           <svg viewBox="0 0 24 24">
             <path d="M5 21V10M12 21V4M19 21v-7" />
           </svg>
         </button>
-        <button class="tool" :class="{ on: mode === 'looking_for' }" type="button" title="Looking for"
+        <button v-if="canLookingFor" class="tool" :class="{ on: mode === 'looking_for' }" type="button" title="Looking for"
           @click="setMode('looking_for')">
           <svg viewBox="0 0 24 24">
             <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5" />
           </svg>
         </button>
-        <button class="tool" :class="{ on: mode === 'offering' }" type="button" title="Offering"
+        <button v-if="canOffering" class="tool" :class="{ on: mode === 'offering' }" type="button" title="Offering"
           @click="setMode('offering')">
           <svg viewBox="0 0 24 24">
             <path
@@ -389,6 +429,7 @@ async function submit() {
   display: flex;
   gap: 14px;
   min-height: 62px;
+  overflow: visible;
 }
 
 .me {
@@ -404,28 +445,6 @@ async function submit() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-textarea {
-  flex: 1;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 0;
-  font: inherit;
-  font-size: .92rem;
-  resize: vertical;
-  outline: none;
-  color: #353942;
-  min-height: 42px;
-  padding-top: 0;
-}
-
-textarea::placeholder {
-  color: #a3a5ab;
-}
-
-textarea:focus {
-  background: #fcfcfe;
 }
 
 .panel {

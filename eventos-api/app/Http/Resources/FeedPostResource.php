@@ -32,6 +32,7 @@ class FeedPostResource extends JsonResource
             'reacted' => $this->relationLoaded('reactions') ? $this->reactions->isNotEmpty() : false,
             'attachments' => $meta['attachments'] ?? [],
             'tags' => $meta['tags'] ?? [],
+            'mentions' => $meta['mentions'] ?? [],
             'poll' => $this->pollPayload($meta, $request),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

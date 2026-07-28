@@ -36,6 +36,7 @@ export interface FeedPost {
   reacted: boolean
   attachments: FeedAttachment[]
   tags: string[]
+  mentions: import('~/utils/mentions').FeedMention[]
   poll: FeedPoll | null
   created_at: string | null
 }
@@ -46,6 +47,7 @@ export interface FeedComment {
   author: string
   author_avatar: string | null
   author_role: 'attendee' | 'organizer'
+  mentions: import('~/utils/mentions').FeedMention[]
   created_at: string | null
 }
 
@@ -56,6 +58,7 @@ export interface NewPostPayload {
   attachments?: FeedAttachment[]
   poll?: { options: string[], allow_multiple: boolean }
   tags?: string[]
+  mentions?: string[]
 }
 
 export interface UploadedMedia {
@@ -130,11 +133,15 @@ export const useFeedStore = defineStore('feed', {
         else if (this.filter !== 'all') query.type = this.filter
         if (this.search.trim()) query.q = this.search.trim()
 
-        const res = await api<Paginated<FeedPost>>(`/events/${uuid}/feed`, { query })
+        const res = await api<Paginated<FeedPost> & { communication?: import('~/stores/functionality').CommunicationPayload }>(
+          `/events/${uuid}/feed`,
+          { query },
+        )
         this.posts = reset ? res.data : [...this.posts, ...res.data]
         this.page = res.meta?.current_page ?? 1
         this.lastPage = res.meta?.last_page ?? 1
         this.loaded = true
+        if (res.communication) useFunctionalityStore().absorb(res.communication)
       } catch {
         this.error = true
       } finally {
@@ -271,6 +278,7 @@ export const useFeedStore = defineStore('feed', {
             attachments: payload.attachments ?? [],
             poll: payload.poll,
             tags: payload.tags ?? [],
+            mentions: payload.mentions ?? [],
           },
         })
         // Moderated events return the post as `pending` — it must not appear
@@ -324,13 +332,13 @@ export const useFeedStore = defineStore('feed', {
       return res.data
     },
 
-    async addComment(post: FeedPost, body: string): Promise<FeedComment | null> {
+    async addComment(post: FeedPost, body: string, mentions: string[] = []): Promise<FeedComment | null> {
       const uuid = this.eventUuid()
       if (!uuid || !body.trim()) return null
       const api = useApi()
       const res = await api<{ data: FeedComment }>(`/events/${uuid}/feed/${post.id}/comments`, {
         method: 'POST',
-        body: { body: body.trim() },
+        body: { body: body.trim(), mentions },
       })
       post.comment_count += 1
       return res.data

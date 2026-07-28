@@ -3,6 +3,7 @@
 namespace App\Jobs\ExpoLens;
 
 use App\Models\ExpoLensPhoto;
+use App\Services\ExpoLens\FaceMatcher;
 use App\Services\ExpoLens\FaceService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,7 @@ class ProcessExpoLensPhotoJob implements ShouldQueue
         $this->onQueue('media');
     }
 
-    public function handle(FaceService $faceService, TenantContext $tenant): void
+    public function handle(FaceService $faceService, FaceMatcher $matcher, TenantContext $tenant): void
     {
         $this->activateTenant($tenant);
 
@@ -39,9 +40,8 @@ class ProcessExpoLensPhotoJob implements ShouldQueue
         $result = $faceService->detectAndEmbed($photo->file);
         $faces = $result['faces'] ?? [];
         $minimumQuality = (float) config('services.expolens.minimum_quality', 0.18);
-        $threshold = (float) config('services.expolens.match_threshold', 0.45);
 
-        DB::transaction(function () use ($photo, $faces, $result, $minimumQuality, $threshold) {
+        DB::transaction(function () use ($photo, $faces, $result, $minimumQuality, $matcher) {
             $photo->matches()->delete();
             $photo->faces()->delete();
 
@@ -54,13 +54,11 @@ class ProcessExpoLensPhotoJob implements ShouldQueue
                     throw new RuntimeException('Face service returned an invalid photo embedding.');
                 }
 
-                $vector = json_encode(array_map('floatval', $face['embedding']), JSON_THROW_ON_ERROR);
-                $faceRow = DB::selectOne(
+                DB::statement(
                     'INSERT INTO expolens_photo_faces
                         (organization_id, photo_id, bbox, detection_score, quality_score, model,
                          created_at, updated_at, embedding)
-                     VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?::vector)
-                     RETURNING id',
+                     VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?::vector)',
                     [
                         $this->organizationId,
                         $photo->id,
@@ -70,49 +68,14 @@ class ProcessExpoLensPhotoJob implements ShouldQueue
                         $result['model'] ?? 'buffalo_l',
                         now(),
                         now(),
-                        $vector,
+                        json_encode(array_map('floatval', $face['embedding']), JSON_THROW_ON_ERROR),
                     ],
                 );
 
-                $match = DB::selectOne(
-                    'SELECT participation_id, 1 - (embedding <=> ?::vector) AS similarity
-                       FROM expolens_face_embeddings
-                      WHERE event_id = ?
-                      ORDER BY embedding <=> ?::vector
-                      LIMIT 1',
-                    [$vector, $photo->event_id, $vector],
-                );
-
-                if ($match && (float) $match->similarity >= $threshold) {
-                    DB::statement(
-                        'INSERT INTO expolens_photo_matches
-                            (event_id, organization_id, photo_id, photo_face_id, participation_id,
-                             similarity_score, confirmed, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, ?, false, ?, ?)
-                         ON CONFLICT (photo_id, participation_id) DO UPDATE SET
-                            photo_face_id = CASE
-                                WHEN EXCLUDED.similarity_score > expolens_photo_matches.similarity_score
-                                THEN EXCLUDED.photo_face_id ELSE expolens_photo_matches.photo_face_id END,
-                            similarity_score = GREATEST(
-                                expolens_photo_matches.similarity_score,
-                                EXCLUDED.similarity_score
-                            ),
-                            updated_at = EXCLUDED.updated_at',
-                        [
-                            $photo->event_id,
-                            $this->organizationId,
-                            $photo->id,
-                            $faceRow->id,
-                            $match->participation_id,
-                            $match->similarity,
-                            now(),
-                            now(),
-                        ],
-                    );
-                }
-
                 $accepted++;
             }
+
+            $matcher->matchPhoto($this->organizationId, $photo->event_id, $photo->id);
 
             $photo->update([
                 'processing_status' => 'ready',

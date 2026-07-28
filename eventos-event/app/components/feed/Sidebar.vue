@@ -42,9 +42,14 @@ const DEFAULT_FILTERS: { key: string, label: string }[] = [
 ]
 
 const site = useSiteStore()
+const functionality = useFunctionalityStore()
 
 const filters = computed<{ key: FeedFilter, label: string, icon: string }[]>(() => {
-  const configured = site.navigation?.feed_tabs ?? []
+  // Communication › Functionality › Allowed feed tabs wins when configured;
+  // otherwise Navigation & Menu › Allowed Feed Tabs (already on the public site).
+  const configured = functionality.feedTabs?.length
+    ? functionality.feedTabs
+    : (site.navigation?.feed_tabs ?? [])
   const source: { key: string, label: string }[] = configured.length ? configured : DEFAULT_FILTERS
 
   return source

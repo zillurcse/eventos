@@ -9,6 +9,7 @@ use App\Models\Participation;
 use App\Models\User;
 use App\Services\Forms\FormSubmissionService;
 use App\Services\Forms\FormValidatorBuilder;
+use App\Services\Gamification\GamificationScorer;
 use App\Services\Ticketing\OrderService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +90,13 @@ class RegistrationService
                     'status' => 'registered',
                     'registration_submission_id' => $result['submission']->id,
                 ])->save();
+
+                app(GamificationScorer::class)->queue(
+                    (int) $participation->organization_id,
+                    (int) $event->id,
+                    (int) $participation->id,
+                    'create_account',
+                );
             }
             $participation->projectDynamic($projection)->save();
 

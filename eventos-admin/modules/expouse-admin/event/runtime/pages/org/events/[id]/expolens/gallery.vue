@@ -47,12 +47,65 @@ const matches = ref<Array<{
   email: string | null
   avatar_url: string | null
   score: number
+  confirmed: boolean
 }>>([])
+
+interface UploadLink {
+  id: string
+  label: string
+  album: string | null
+  token: string
+  auto_approve: boolean
+  expires_at: string | null
+  max_uploads: number | null
+  uploads_count: number
+  remaining: number | null
+  revoked: boolean
+  usable: boolean
+  last_used_at: string | null
+}
+
+// Same base the layout's "Go to Event" uses — the public event app.
+const SITE_BASE = 'http://localhost:3001'
+const linksDrawerOpen = ref(false)
+const linksLoading = ref(false)
+const links = ref<UploadLink[]>([])
+const linkSaving = ref(false)
+const newLink = ref({ label: '', album: '', auto_approve: false, max_uploads: '' as string | number, expires_at: '' })
+
+const uploadUrl = (link: UploadLink) => `${SITE_BASE}/expolens/upload/${link.token}`
 
 const filtered = computed(() => {
   if (filter.value === 'all') return photos.value
   return photos.value.filter(p => p.processing_status === filter.value)
 })
+
+const pendingApproval = computed(
+  () => photos.value.filter(p => p.moderation_status === 'pending').length,
+)
+
+// Face detection is queued, so a freshly uploaded batch lands as "pending" and
+// only becomes "ready" once Horizon works through it. Poll while that's true so
+// the grid settles on its own instead of needing a manual reload.
+const inFlight = computed(
+  () => photos.value.some(p => p.processing_status === 'pending' || p.processing_status === 'processing'),
+)
+
+let poll: ReturnType<typeof setInterval> | null = null
+
+function stopPolling() {
+  if (poll) { clearInterval(poll); poll = null }
+}
+
+watch(inFlight, (busy) => {
+  if (busy && !poll) {
+    poll = setInterval(() => load({ quiet: true }), 5000)
+  } else if (!busy) {
+    stopPolling()
+  }
+})
+
+onBeforeUnmount(stopPolling)
 
 function flash() {
   saved.value = true
@@ -67,18 +120,20 @@ function asPhotoList(payload: unknown): ExpoLensPhoto[] {
   return []
 }
 
-async function load() {
-  loading.value = true
+async function load({ quiet = false } = {}) {
+  if (!quiet) loading.value = true
   try {
     const res = await api<any>(`/events/${id}/expolens/photos`, {
       query: { per_page: 100 },
     })
     photos.value = asPhotoList(res?.data ?? res)
   } catch (e: any) {
+    // A failed background poll shouldn't wipe the grid or spam toasts.
+    if (quiet) return
     photos.value = []
     toast.error(e?.data?.message || e?.message || 'Could not load ExpoLens photos.')
   } finally {
-    loading.value = false
+    if (!quiet) loading.value = false
   }
 }
 
@@ -213,14 +268,130 @@ async function openMatches(photo: ExpoLensPhoto) {
   }
 }
 
-async function reprocess() {
+async function retry(photo: ExpoLensPhoto) {
   try {
-    await api(`/events/${id}/expolens/reprocess`, { method: 'POST' })
-    toast.success('Reprocessing queued')
+    await api(`/events/${id}/expolens/photos/${photo.id}/retry`, { method: 'POST' })
+    const i = photos.value.findIndex(p => p.id === photo.id)
+    if (i >= 0) photos.value[i] = { ...photos.value[i]!, processing_status: 'pending', failure_reason: null }
+    toast.success('Photo re-queued')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not retry this photo.')
+  }
+}
+
+async function approveAllPending() {
+  if (!pendingApproval.value) return
+  if (!confirm(`Approve all ${pendingApproval.value} pending photo(s)? Attendees will be able to see them.`)) return
+  try {
+    const res = await api<{ message: string }>(`/events/${id}/expolens/photos/bulk`, {
+      method: 'POST',
+      body: { moderation_status: 'approved', all_pending: true },
+    })
+    toast.success(res.message)
+    await load()
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not approve photos.')
+  }
+}
+
+async function setMatch(participationId: string, confirmed: boolean) {
+  if (!matchPhoto.value) return
+  try {
+    await api(`/events/${id}/expolens/photos/${matchPhoto.value.id}/matches/${participationId}`, {
+      method: 'PATCH',
+      body: { confirmed },
+    })
+    if (confirmed) {
+      const m = matches.value.find(x => x.participation_id === participationId)
+      if (m) m.confirmed = true
+      toast.success('Match confirmed')
+    } else {
+      matches.value = matches.value.filter(x => x.participation_id !== participationId)
+      toast.success('Match removed')
+      await load({ quiet: true })
+    }
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update this match.')
+  }
+}
+
+// `rematch` reuses the face vectors already stored per photo (cheap). `full`
+// re-runs detection through the face service and is only needed if detection
+// settings changed.
+async function reprocess(mode: 'rematch' | 'full' = 'rematch') {
+  if (mode === 'full' && !confirm('Re-run face detection on every photo? This is slow for large galleries.')) return
+  try {
+    const res = await api<{ message: string }>(`/events/${id}/expolens/reprocess`, {
+      method: 'POST',
+      body: { mode },
+    })
+    toast.success(res.message)
     await load()
   } catch {
     toast.error('Could not queue reprocessing.')
   }
+}
+
+async function openLinks() {
+  linksDrawerOpen.value = true
+  linksLoading.value = true
+  try {
+    const res = await api<{ data: UploadLink[] }>(`/events/${id}/expolens/upload-links`)
+    links.value = res.data
+  } catch {
+    toast.error('Could not load upload links.')
+    links.value = []
+  } finally {
+    linksLoading.value = false
+  }
+}
+
+async function createLink() {
+  if (!newLink.value.label.trim()) {
+    toast.error('Give the link a name so you know who it went to.')
+    return
+  }
+  linkSaving.value = true
+  try {
+    const res = await api<{ data: UploadLink }>(`/events/${id}/expolens/upload-links`, {
+      method: 'POST',
+      body: {
+        label: newLink.value.label.trim(),
+        album: newLink.value.album.trim() || undefined,
+        auto_approve: newLink.value.auto_approve,
+        max_uploads: newLink.value.max_uploads ? Number(newLink.value.max_uploads) : undefined,
+        expires_at: newLink.value.expires_at || undefined,
+      },
+    })
+    links.value.unshift(res.data)
+    newLink.value = { label: '', album: '', auto_approve: false, max_uploads: '', expires_at: '' }
+    toast.success('Upload link created — copy it to your photographer')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not create the upload link.')
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+async function toggleRevoke(link: UploadLink) {
+  const revoking = !link.revoked
+  if (revoking && !confirm(`Revoke the link for "${link.label}"? They will not be able to upload again.`)) return
+  try {
+    const res = await api<{ data: UploadLink }>(`/events/${id}/expolens/upload-links/${link.id}`, {
+      method: 'PATCH',
+      body: { revoked: revoking },
+    })
+    const i = links.value.findIndex(l => l.id === link.id)
+    if (i >= 0) links.value[i] = res.data
+    toast.success(revoking ? 'Link revoked' : 'Link re-enabled')
+  } catch {
+    toast.error('Could not update the link.')
+  }
+}
+
+async function copy(text: string, what: string) {
+  try { await navigator.clipboard.writeText(text); toast.success(`${what} copied`) }
+  catch { toast.error('Copy failed') }
 }
 
 onMounted(load)
@@ -238,14 +409,27 @@ onMounted(load)
           Photographers upload event photos here. Faces are matched automatically so attendees can find their shots.
         </p>
       </div>
-      <div class="flex gap-2">
-        <button class="btn ghost" @click="reprocess">REPROCESS</button>
+      <div class="flex gap-2 flex-wrap">
+        <button v-if="pendingApproval" class="btn ghost" @click="approveAllPending">
+          APPROVE ALL ({{ pendingApproval }})
+        </button>
+        <button class="btn ghost" title="Re-match using stored face data (fast)" @click="reprocess('rematch')">
+          REMATCH
+        </button>
+        <button class="btn ghost" title="Re-run face detection on every photo (slow)" @click="reprocess('full')">
+          FULL REPROCESS
+        </button>
+        <button class="btn ghost" @click="openLinks">PHOTOGRAPHER LINKS</button>
         <button class="btn" @click="openAddDrawer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           UPLOAD PHOTOS
         </button>
       </div>
     </div>
+
+    <p v-if="inFlight" class="muted text-[.82rem] mb-3">
+      Face matching in progress — this list refreshes automatically.
+    </p>
 
     <div class="flex flex-wrap gap-2 mb-4">
       <button
@@ -275,11 +459,22 @@ onMounted(load)
           <span class="status-chip" :class="photo.moderation_status">{{ photo.moderation_status }}</span>
         </div>
         <div class="absolute bottom-0 left-0 right-0 px-2.5 py-1.5 bg-[rgba(0,0,0,.55)] text-white text-xs">
-          {{ photo.faces_count }} face{{ photo.faces_count === 1 ? '' : 's' }}
-          <span v-if="photo.matches_count != null"> · {{ photo.matches_count }} match{{ photo.matches_count === 1 ? '' : 'es' }}</span>
+          <template v-if="photo.processing_status === 'failed'">
+            <span :title="photo.failure_reason || ''">Processing failed</span>
+          </template>
+          <template v-else>
+            {{ photo.faces_count }} face{{ photo.faces_count === 1 ? '' : 's' }}
+            <span v-if="photo.matches_count != null"> · {{ photo.matches_count }} match{{ photo.matches_count === 1 ? '' : 'es' }}</span>
+          </template>
         </div>
         <div class="img-card-actions">
           <button class="img-action" title="Matches" @click="openMatches(photo)">👁</button>
+          <button
+            v-if="photo.processing_status === 'failed'"
+            class="img-action"
+            title="Retry face detection"
+            @click="retry(photo)"
+          >↻</button>
           <button
             v-if="photo.moderation_status !== 'approved'"
             class="img-action"
@@ -362,10 +557,90 @@ onMounted(load)
           >
           <div class="w-10 h-10 rounded-full bg-[#eee] grid place-items-center text-xs" v-else>?</div>
           <div class="min-w-0 flex-1">
-            <div class="font-medium truncate">{{ m.name || 'Attendee' }}</div>
+            <div class="font-medium truncate">
+              {{ m.name || 'Attendee' }}
+              <span v-if="m.confirmed" class="badge active ml-1">confirmed</span>
+            </div>
             <div class="muted text-xs truncate">{{ m.email }}</div>
           </div>
-          <div class="text-sm font-medium">{{ Math.round(m.score * 100) }}%</div>
+          <div class="text-sm font-medium shrink-0">{{ Math.round(m.score * 100) }}%</div>
+          <div class="flex gap-1 shrink-0">
+            <button
+              v-if="!m.confirmed"
+              class="img-action"
+              title="Confirm this is them"
+              @click="setMatch(m.participation_id, true)"
+            >✓</button>
+            <button
+              class="img-action danger"
+              title="Not them — remove match"
+              @click="setMatch(m.participation_id, false)"
+            >✕</button>
+          </div>
+        </li>
+      </ul>
+    </Drawer>
+
+    <Drawer v-if="linksDrawerOpen" title="Photographer Upload Links" @close="linksDrawerOpen = false">
+      <p class="muted text-[.82rem] mb-4">
+        Share a link with a photographer so they can upload straight into this event — no account needed.
+        Every upload runs through face matching, and lands in the moderation queue unless you auto-approve.
+      </p>
+
+      <div class="border border-line rounded-xl p-3 mb-5 bg-[#f8f8fb]">
+        <label class="block">Who is this link for?</label>
+        <input v-model="newLink.label" placeholder="e.g. Rahim (main stage photographer)">
+
+        <label>Album</label>
+        <input v-model="newLink.album" placeholder="Optional — e.g. Day 1 (blank = General)">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label>Max uploads</label>
+            <input v-model="newLink.max_uploads" type="number" min="1" placeholder="Unlimited">
+          </div>
+          <div>
+            <label>Expires</label>
+            <input v-model="newLink.expires_at" type="datetime-local">
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 mt-3 font-normal">
+          <input v-model="newLink.auto_approve" type="checkbox">
+          <span class="text-[.86rem]">Auto-approve — skip moderation for this photographer</span>
+        </label>
+
+        <button class="btn w-full justify-center mt-3" :disabled="linkSaving" @click="createLink">
+          {{ linkSaving ? 'Creating…' : 'CREATE LINK' }}
+        </button>
+      </div>
+
+      <div v-if="linksLoading" class="muted text-sm text-center py-6">Loading links…</div>
+      <div v-else-if="!links.length" class="muted text-sm text-center py-6">No upload links yet.</div>
+      <ul v-else class="space-y-3">
+        <li v-for="link in links" :key="link.id" class="border border-line rounded-xl p-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-medium truncate">{{ link.label }}</div>
+              <div class="muted text-xs">
+                {{ link.uploads_count }} uploaded
+                <span v-if="link.max_uploads"> / {{ link.max_uploads }}</span>
+                <span v-if="link.album"> · {{ link.album }}</span>
+                <span v-if="link.auto_approve"> · auto-approve</span>
+              </div>
+            </div>
+            <span class="status-chip" :class="link.usable ? 'approved' : 'rejected'">
+              {{ link.revoked ? 'revoked' : link.usable ? 'active' : 'unusable' }}
+            </span>
+          </div>
+
+          <div class="flex gap-2 mt-2">
+            <input :value="uploadUrl(link)" readonly class="flex-1 m-0 text-[.78rem]" @focus="($event.target as HTMLInputElement).select()">
+            <button class="btn ghost sm shrink-0" @click="copy(uploadUrl(link), 'Link')">Copy</button>
+            <button class="btn ghost sm shrink-0" @click="toggleRevoke(link)">
+              {{ link.revoked ? 'Enable' : 'Revoke' }}
+            </button>
+          </div>
         </li>
       </ul>
     </Drawer>
@@ -386,4 +661,5 @@ onMounted(load)
 .status-chip.approved { background: rgba(16, 185, 129, .85); }
 .status-chip.rejected { background: rgba(239, 68, 68, .85); }
 .status-chip.pending { background: rgba(245, 158, 11, .85); }
+.btn.sm { padding: 6px 10px; font-size: .78rem; }
 </style>

@@ -8,6 +8,7 @@ use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\Event;
 use App\Models\Participation;
+use App\Services\Gamification\GamificationScorer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -217,6 +218,18 @@ class ChatController extends Controller
         $thread->update(['last_message_at' => now()]);
 
         broadcast(new NewChatMessage($message, $thread->uuid, $thread->counterpartId($me)));
+
+        $sender = Participation::find($me);
+        if ($sender) {
+            app(GamificationScorer::class)->queue(
+                (int) $sender->organization_id,
+                (int) $thread->event_id,
+                $me,
+                'chat_with_delegates',
+                'chat_message',
+                (int) $message->id,
+            );
+        }
 
         return response()->json(['data' => $this->message($message, $me)], 201);
     }

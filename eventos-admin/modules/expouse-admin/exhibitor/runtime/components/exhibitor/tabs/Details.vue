@@ -2,7 +2,7 @@
 const {
   eventId, draft, packages, editingId,
   spotlightUploading, pickSpotlight,
-  tagInput, addTag, removeTag, addCta,
+  tagInput, addTag, removeTag,
   error, saving, create, update, remove, drawerMode, canCreate,
 } = useExhibitorContext()
 
@@ -205,27 +205,7 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
       <input type="file" accept="video/*" @change="pickSpotlight">
     </label>
 
-    <!-- CTA -->
-    <!-- <div class="flex items-center justify-between mt-4 mb-2">
-      <label class="m-0 text-ink font-semibold text-[.92rem]">CTA</label>
-      <button class="btn sm" @click="addCta">ADD CTA</button>
-    </div>
-    <div v-for="(cta, i) in draft.cta" :key="cta.id" class="border border-line rounded-xl mb-2 overflow-hidden">
-      <div class="flex items-center gap-2 px-4 py-3 bg-[#f7f8fa] cursor-pointer" @click="cta.open = !cta.open">
-        <span class="font-bold text-[.9rem]">CTA {{ i + 1 }}</span>
-        <span class="bg-white border border-line rounded px-2 py-0.5 text-[.78rem] font-semibold">{{ cta.type }}</span>
-        <div class="flex-1" />
-        <button type="button" class="border-0 bg-transparent cursor-pointer text-[#dc2626] p-1" @click.stop="draft.cta.splice(i,1)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-        </button>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 text-muted transition-transform" :class="cta.open ? 'rotate-180' : ''"><path d="M6 9l6 6 6-6"/></svg>
-      </div>
-      <div v-if="cta.open" class="p-4 border-t border-line">
-        <AppSelect v-model="cta.type" label="Type" :options="['TEXT', 'LINK', 'BUTTON']" />
-        <AppInput v-model="cta.label" label="Label" placeholder="Button label" />
-        <AppInput v-model="cta.value" label="Value / URL" placeholder="Link or text value" />
-      </div>
-    </div> -->
+    <ExhibitorCtaEditor />
 
     <!-- Social Links -->
     <div class="border-t border-line my-5" />

@@ -189,7 +189,6 @@ const filtered = computed<Delegate[]>(() => store.delegates.filter((d: Delegate)
       </div>
     </aside>
 
-    <DelegatesDetailModal v-if="store.selected" :key="store.selected.id" :delegate="store.selected" />
   </div>
 </template>
 

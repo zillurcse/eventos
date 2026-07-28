@@ -21,9 +21,60 @@ interface ExpoLensPhoto {
 
 const photos = ref<ExpoLensPhoto[]>([])
 const loading = ref(true)
+const bulkBusy = ref(false)
 const tab = ref<'pending' | 'approved' | 'rejected'>('pending')
+const selected = ref<Set<string>>(new Set())
 
 const filtered = computed(() => photos.value.filter(p => p.moderation_status === tab.value))
+const allSelected = computed(
+  () => filtered.value.length > 0 && filtered.value.every(p => selected.value.has(p.id)),
+)
+
+function toggle(id: string) {
+  const next = new Set(selected.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selected.value = next
+}
+
+function toggleAll() {
+  selected.value = allSelected.value ? new Set() : new Set(filtered.value.map(p => p.id))
+}
+
+async function bulkSet(moderation_status: 'approved' | 'rejected') {
+  if (!selected.value.size) return
+  bulkBusy.value = true
+  try {
+    const res = await api<{ message: string }>(`/events/${id}/expolens/photos/bulk`, {
+      method: 'POST',
+      body: { moderation_status, ids: [...selected.value] },
+    })
+    toast.success(res.message)
+    selected.value = new Set()
+    await load()
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not update those photos.')
+  } finally {
+    bulkBusy.value = false
+  }
+}
+
+async function approveAllPending() {
+  if (!confirm('Approve every pending photo? Attendees will be able to see them.')) return
+  bulkBusy.value = true
+  try {
+    const res = await api<{ message: string }>(`/events/${id}/expolens/photos/bulk`, {
+      method: 'POST',
+      body: { moderation_status: 'approved', all_pending: true },
+    })
+    toast.success(res.message)
+    selected.value = new Set()
+    await load()
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not approve photos.')
+  } finally {
+    bulkBusy.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -65,7 +116,10 @@ async function removePhoto(photo: ExpoLensPhoto) {
   }
 }
 
-watch(tab, load)
+watch(tab, () => {
+  selected.value = new Set()
+  load()
+})
 onMounted(load)
 </script>
 
@@ -94,12 +148,49 @@ onMounted(load)
 
     <div v-if="loading" class="muted text-center py-10">Loading…</div>
 
-    <div v-else-if="filtered.length" class="grid gap-3">
+    <template v-else-if="filtered.length">
+      <div class="flex flex-wrap items-center gap-3 mb-3 p-3 border border-line rounded-xl bg-[#f8f8fb]">
+        <label class="flex items-center gap-2 text-sm font-medium m-0">
+          <input type="checkbox" :checked="allSelected" @change="toggleAll">
+          Select all ({{ filtered.length }})
+        </label>
+        <span v-if="selected.size" class="muted text-sm">{{ selected.size }} selected</span>
+        <div class="flex gap-2 ml-auto flex-wrap">
+          <button
+            v-if="tab !== 'approved'"
+            class="btn"
+            :disabled="!selected.size || bulkBusy"
+            @click="bulkSet('approved')"
+          >
+            Approve selected
+          </button>
+          <button
+            v-if="tab !== 'rejected'"
+            class="btn ghost"
+            :disabled="!selected.size || bulkBusy"
+            @click="bulkSet('rejected')"
+          >
+            Reject selected
+          </button>
+          <button v-if="tab === 'pending'" class="btn ghost" :disabled="bulkBusy" @click="approveAllPending">
+            Approve all pending
+          </button>
+        </div>
+      </div>
+
+      <div class="grid gap-3">
       <div
         v-for="photo in filtered"
         :key="photo.id"
         class="flex gap-4 p-3 border border-line rounded-xl bg-white"
+        :class="selected.has(photo.id) ? 'border-[#6352e7] bg-[#f8f7ff]' : ''"
       >
+        <input
+          type="checkbox"
+          class="mt-1 shrink-0"
+          :checked="selected.has(photo.id)"
+          @change="toggle(photo.id)"
+        >
         <img :src="photo.url" class="w-28 h-28 rounded-lg object-cover shrink-0" alt="">
         <div class="min-w-0 flex-1">
           <div class="font-medium truncate">{{ photo.caption || photo.album || 'Untitled photo' }}</div>
@@ -133,7 +224,8 @@ onMounted(load)
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </template>
 
     <p v-else class="muted text-center py-10">No {{ tab }} uploads.</p>
   </div>

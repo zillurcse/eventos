@@ -595,6 +595,7 @@ function goToSession(sid: string) { router.push(`/session/${sid}`) }
 const {
   chat, questions, polls, attendees, attendeeMeta,
   canModerate, isMuted, qaModeration, qaAnswerPolicy, canAnswer, pendingCount,
+  canChat, canAsk, canCreatePoll, canVotePoll,
   bind, loaderFor, sendChat, askQuestion, upvoteQuestion, replyToQuestion, votePoll,
   moderate, removeMessage, createPoll, updatePoll, deletePoll, toggleMute,
 } = useSessionPanel()
@@ -1062,6 +1063,9 @@ function docKind(name: string) {
             <p v-if="isMuted" class="mutedbar">
               The host has muted you for this session. You can still watch and vote.
             </p>
+            <p v-else-if="!canChat" class="mutedbar">
+              Chat posting is disabled for your role.
+            </p>
             <form v-else class="pinput" @submit.prevent="submitChat">
               <input v-model="chatInput" type="text" placeholder="Type a message" maxlength="1000">
               <button type="submit" :disabled="!chatInput.trim()" aria-label="Send">
@@ -1074,6 +1078,9 @@ function docKind(name: string) {
           <div v-else-if="activeTab === 'qa'" class="qa">
             <p v-if="isMuted" class="mutedbar solid">
               The host has muted you for this session.
+            </p>
+            <p v-else-if="!canAsk" class="mutedbar solid">
+              Asking questions is disabled for your role.
             </p>
             <form v-else class="pinput solid" @submit.prevent="submitQuestion">
               <input v-model="qaInput" type="text" placeholder="Ask a question…" maxlength="500">
@@ -1195,7 +1202,7 @@ function docKind(name: string) {
           <!-- POLLS -->
           <div v-else-if="activeTab === 'polls'" class="polls">
             <!-- Host composes a poll and launches it mid-session. -->
-            <template v-if="canModerate">
+            <template v-if="canModerate && canCreatePoll">
               <button v-if="!composerOpen" class="newpoll" @click="composerOpen = true">+ New poll</button>
               <div v-else class="composer">
                 <label class="clab">Question</label>
@@ -1224,7 +1231,7 @@ function docKind(name: string) {
             </template>
 
             <p v-if="!polls.length" class="empty">
-              {{ canModerate ? 'No polls yet — create one above.' : 'No polls yet.' }}
+              {{ canModerate && canCreatePoll ? 'No polls yet — create one above.' : 'No polls yet.' }}
             </p>
 
             <div v-for="p in polls" :key="p.id" class="poll" :class="{ draft: p.status === 'draft' }">
@@ -1236,8 +1243,8 @@ function docKind(name: string) {
               <button
                 v-for="o in p.options" :key="o.id"
                 class="popt" :class="{ picked: p.my_vote === o.id }"
-                :disabled="!p.is_active || isMuted"
-                @click="votePoll(p.id, o.id)"
+                :disabled="!p.is_active || isMuted || !canVotePoll"
+                @click="canVotePoll && votePoll(p.id, o.id)"
               >
                 <span v-if="pollBarsVisible(p)" class="pbar" :style="{ width: pct(o, p) + '%' }" />
                 <span class="pot">{{ o.text }}</span>

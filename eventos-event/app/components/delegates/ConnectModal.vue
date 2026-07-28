@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import type { ChatMessageItem } from '~/stores/chat'
 
 const store = useDelegatesStore()
 const meetings = useMeetingsStore()
 const site = useSiteStore()
+const chat = useChatStore()
 
 const target = computed(() => store.connectTarget)
-const status = computed(() => (target.value ? store.connected[target.value.id] : undefined))
 
 const message = ref('')
 const agenda = ref('')
@@ -16,6 +17,10 @@ const pickedSlot = ref('')
 const sending = ref(false)
 const meetSuccess = ref(false)
 const meetError = ref('')
+const chatError = ref('')
+const threadId = ref<string | null>(null)
+const messages = ref<ChatMessageItem[]>([])
+const threadLoading = ref(false)
 
 const quick = [
   'Hello! How can I help you?',
@@ -58,11 +63,39 @@ watch(target, (t) => {
   lounge.value = null
   meetSuccess.value = false
   meetError.value = ''
+  chatError.value = ''
+  threadId.value = null
+  messages.value = []
   if (t) {
     agenda.value = `Hello ${t.name || 'there'}, I would like to connect with you.`
     loadLounge()
+    if (store.connectTab === 'connect') loadThread()
   }
 }, { immediate: true })
+
+watch(() => store.connectTab, (tab) => {
+  if (tab === 'connect' && target.value && !threadId.value && !threadLoading.value) {
+    loadThread()
+  }
+})
+
+async function loadThread() {
+  if (!target.value) return
+  threadLoading.value = true
+  chatError.value = ''
+  try {
+    const convo = await chat.ensureWith(target.value.id)
+    if (!convo) return
+    threadId.value = convo.id
+    messages.value = await chat.loadMessages(convo.id)
+  }
+  catch (e: any) {
+    chatError.value = e?.data?.message || 'Chat is not available with this person.'
+  }
+  finally {
+    threadLoading.value = false
+  }
+}
 
 async function loadLounge() {
   const uuid = site.event?.uuid
@@ -107,17 +140,29 @@ const canSendMeeting = computed(() => {
   return true
 })
 
-async function sendConnect() {
-  if (!target.value || sending.value) return
+async function sendChat() {
+  if (!target.value || sending.value || !message.value.trim()) return
   sending.value = true
+  chatError.value = ''
   try {
-    const ok = await store.connect(target.value, message.value)
-    if (ok) {
+    if (!threadId.value) {
+      const convo = await chat.ensureWith(target.value.id)
+      if (!convo) throw new Error('Could not open chat.')
+      threadId.value = convo.id
+    }
+    const msg = await chat.sendTo(threadId.value, message.value)
+    if (msg) {
+      messages.value.push(msg)
       message.value = ''
-      toast.success('Connection request sent!')
+      toast.success('Message sent!')
     }
   }
-  finally { sending.value = false }
+  catch (e: any) {
+    chatError.value = e?.data?.message || e?.message || 'Could not send your message.'
+  }
+  finally {
+    sending.value = false
+  }
 }
 
 async function sendMeeting() {
@@ -185,12 +230,19 @@ async function sendMeeting() {
 
         <!-- ── Chat ── -->
         <section v-if="store.connectTab === 'connect'" class="pane">
-          <div v-if="status === 'pending'" class="banner ok">
-            <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
-            Connection request sent.
+          <div v-if="threadLoading" class="hint">Loading…</div>
+          <div v-else-if="messages.length" class="thread">
+            <div
+              v-for="m in messages.filter(msg => (msg.body || '').trim())"
+              :key="m.id"
+              class="bubble"
+              :class="{ mine: m.mine }"
+            >
+              {{ m.body }}
+            </div>
           </div>
 
-          <template v-else>
+          <template v-if="!chatError || threadId">
             <div class="ta-wrap">
               <textarea v-model="message" maxlength="1000" rows="5" placeholder="Type your message..." />
               <span class="count">{{ 1000 - message.length }}</span>
@@ -200,15 +252,16 @@ async function sendMeeting() {
             </div>
           </template>
 
-          <div class="foot">
+          <p v-if="chatError" class="err">{{ chatError }}</p>
+
+          <div v-if="!chatError || threadId" class="foot">
             <button
-              v-if="status !== 'pending'"
               class="btn"
               type="button"
-              :disabled="sending"
-              @click="sendConnect"
+              :disabled="sending || !message.trim()"
+              @click="sendChat"
             >
-              {{ sending ? 'Sending…' : 'Send connection request' }}
+              {{ sending ? 'Sending…' : 'Send message' }}
             </button>
           </div>
         </section>
@@ -240,7 +293,7 @@ async function sendMeeting() {
                 </select>
                 <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
               </div>
-              <p v-else class="hint">No slots for this day — send your request and propose a time in the note.</p>
+              <p v-else class="hint-sm">No slots for this day — send your request and propose a time in the note.</p>
             </div>
 
             <label class="lbl">Notes</label>
@@ -420,6 +473,54 @@ async function sendMeeting() {
 
 .lbl span { font-weight: 500; }
 
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px 0 8px;
+  flex: none;
+}
+
+.bubble {
+  align-self: flex-start;
+  max-width: 78%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: .9rem;
+  line-height: 1.45;
+  border-top-left-radius: 4px;
+}
+.bubble.mine {
+  align-self: flex-end;
+  background: var(--brand-primary);
+  color: #fff;
+  border-top-left-radius: 14px;
+  border-top-right-radius: 4px;
+}
+
+.hint {
+  color: #94a3b8;
+  font-size: .88rem;
+  text-align: center;
+  padding: 12px 8px;
+}
+.hint-sm {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  font-size: .82rem;
+}
+
+.err {
+  margin: 0;
+  color: #dc2626;
+  font-size: .84rem;
+  font-weight: 600;
+}
+
 .ta-wrap {
   position: relative;
   flex: none;
@@ -471,8 +572,6 @@ textarea,
 textarea:focus,
 .in:focus { border-color: var(--brand-primary); }
 
-/* Keep Notes at a stable 3-line height — flex parents were shrinking it
-   down to a single clipped line when Meeting location filled the pane. */
 .notes {
   width: 100%;
   min-height: 5.75rem;
@@ -572,8 +671,6 @@ textarea:focus,
   stroke-linejoin: round;
   pointer-events: none;
 }
-
-.hint { margin: 6px 0 0; color: #94a3b8; font-size: .82rem; }
 
 .places { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .place {

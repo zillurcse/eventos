@@ -11,7 +11,18 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# insightface ships only an sdist and compiles a Cython mesh extension, so it
+# needs a C++ toolchain at install time. g++ is dropped again in the same layer
+# to keep the runtime image small; the import check below proves nothing that
+# onnxruntime/cv2 need at runtime went with it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends g++ \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove g++ \
+    && apt-get install -y --no-install-recommends libstdc++6 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -c "import insightface, onnxruntime, cv2; print('deps ok')"
 
 COPY app ./app
 
