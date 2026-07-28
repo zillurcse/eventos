@@ -96,11 +96,15 @@ class ExhibitorInboxController extends Controller
             (int) $convo->participation_id,
         ));
 
-        $notifications->notify(
-            'participation', (int) $convo->participation_id, $convo->organization_id, $convo->event_id,
-            'exhibitor.message_reply',
-            ['title' => 'New reply', 'body' => $this->bookName($convo).' replied to your message.', 'exhibitor_id' => $convo->exhibitor->uuid ?? null],
-        );
+        $channels = $notifications->channelsForEventAction((int) $convo->event_id, 'message');
+        if ($channels !== []) {
+            $notifications->notify(
+                'participation', (int) $convo->participation_id, $convo->organization_id, $convo->event_id,
+                'exhibitor.message_reply',
+                ['title' => 'New reply', 'body' => $this->bookName($convo).' replied to your message.', 'exhibitor_id' => $convo->exhibitor->uuid ?? null],
+                $channels,
+            );
+        }
 
         return response()->json(['data' => $this->formatMessage($message)], 201);
     }
@@ -140,14 +144,19 @@ class ExhibitorInboxController extends Controller
             ->where('uuid', $request_uuid)
             ->firstOrFail();
 
+        $channels = $notifications->channelsForEventAction((int) $req->event_id, 'meeting');
+
         if ($data['action'] === 'decline') {
             $req->update(['status' => 'declined', 'responded_at' => now()]);
 
-            $notifications->notify(
-                'participation', (int) $req->participation_id, $req->organization_id, $req->event_id,
-                'exhibitor.meeting_declined',
-                ['title' => 'Meeting declined', 'body' => $this->bookName($req).' declined your meeting request.'],
-            );
+            if ($channels !== []) {
+                $notifications->notify(
+                    'participation', (int) $req->participation_id, $req->organization_id, $req->event_id,
+                    'exhibitor.meeting_declined',
+                    ['title' => 'Meeting declined', 'body' => $this->bookName($req).' declined your meeting request.'],
+                    $channels,
+                );
+            }
 
             return response()->json(['data' => $this->requestPayload(
                 $req->fresh(['assignedMember.contact', 'participation.contact']), $actingMemberId,
@@ -165,16 +174,19 @@ class ExhibitorInboxController extends Controller
             'responded_at' => now(),
         ]);
 
-        $notifications->notify(
-            'participation', (int) $req->participation_id, $req->organization_id, $req->event_id,
-            'exhibitor.meeting_confirmed',
-            ['title' => 'Meeting confirmed', 'body' => $this->bookName($req).' confirmed your meeting with '.$this->memberName($member).'.'],
-        );
+        if ($channels !== []) {
+            $notifications->notify(
+                'participation', (int) $req->participation_id, $req->organization_id, $req->event_id,
+                'exhibitor.meeting_confirmed',
+                ['title' => 'Meeting confirmed', 'body' => $this->bookName($req).' confirmed your meeting with '.$this->memberName($member).'.'],
+                $channels,
+            );
+        }
 
         // The assignee only ever saw the booth-wide "New meeting request" fan-out
         // at request time, which says nothing about who owns it. Tell them the
         // meeting is now theirs — this is the notification they act on.
-        if ($member->contact_id) {
+        if ($member->contact_id && $channels !== []) {
             $notifications->notify(
                 'contact', (int) $member->contact_id, $req->organization_id, $req->event_id,
                 'exhibitor.meeting_assigned',
@@ -184,6 +196,7 @@ class ExhibitorInboxController extends Controller
                     'exhibitor_id' => $req->exhibitor->uuid ?? null,
                     'meeting_request_id' => $req->uuid,
                 ],
+                $channels,
             );
         }
 

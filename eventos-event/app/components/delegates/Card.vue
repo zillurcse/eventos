@@ -34,7 +34,7 @@ function contact() {
       <p v-if="delegate.company" class="co">{{ delegate.company }}</p>
     </div>
 
-    <!-- Reveal row: slides the card taller instead of covering the photo. -->
+    <!-- Reveal row: photo shrinks so buttons fit without growing the card. -->
     <div class="reveal" @click.stop>
       <div class="reveal-inner">
         <EventNotePopover type="delegate" :id="delegate.id" block />
@@ -53,6 +53,7 @@ function contact() {
 <style scoped>
 .card {
   --reveal-h: 56px;
+  --photo-h: 180px;
   position: relative;
   background: #fff;
   border-radius: 12px;
@@ -71,8 +72,18 @@ function contact() {
 
 .photo {
   position: relative;
-  max-height: 180px;
+  height: var(--photo-h);
+  max-height: var(--photo-h);
   background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  overflow: hidden;
+  transition: height .2s ease, max-height .2s ease;
+}
+
+/* Shrink photo on hover so reveal fits without growing the card. */
+.card:hover .photo,
+.card:focus-within .photo {
+  height: calc(var(--photo-h) - var(--reveal-h));
+  max-height: calc(var(--photo-h) - var(--reveal-h));
 }
 
 .photo :deep(img),
@@ -80,7 +91,6 @@ function contact() {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  max-height: 180px;
 }
 
 .bm {
@@ -155,7 +165,7 @@ function contact() {
   text-overflow: ellipsis;
 }
 
-/* ── Reveal: Add Note / Chat, slides the card taller ── */
+/* ── Reveal: Add Note / Chat under body; card size stays fixed ── */
 .reveal {
   height: 0;
   opacity: 0;

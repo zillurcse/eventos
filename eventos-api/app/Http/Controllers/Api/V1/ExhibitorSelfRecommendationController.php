@@ -181,16 +181,20 @@ class ExhibitorSelfRecommendationController extends Controller
 
         broadcast(new NewExhibitorMessage($message, $convo->uuid, $exhibitor->uuid, $target->id));
 
-        $notifications->notify(
-            'participation', $target->id, $exhibitor->organization_id, $exhibitor->event_id,
-            'exhibitor.connection_request',
-            [
-                'title' => 'Connection request',
-                'body' => $exhibitor->name.' would like to connect with you.',
-                'exhibitor_id' => $exhibitor->uuid,
-                'conversation_id' => $convo->uuid,
-            ],
-        );
+        $channels = $notifications->channelsForEventAction((int) $exhibitor->event_id, 'message');
+        if ($channels !== []) {
+            $notifications->notify(
+                'participation', $target->id, $exhibitor->organization_id, $exhibitor->event_id,
+                'exhibitor.connection_request',
+                [
+                    'title' => 'Connection request',
+                    'body' => $exhibitor->name.' would like to connect with you.',
+                    'exhibitor_id' => $exhibitor->uuid,
+                    'conversation_id' => $convo->uuid,
+                ],
+                $channels,
+            );
+        }
 
         $memberId = isset($data['member_id']) && $data['member_id']
             ? (int) $data['member_id']

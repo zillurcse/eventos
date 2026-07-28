@@ -263,8 +263,14 @@ class MeetingController extends Controller
 
         $organizerName = $this->name($meeting->organizer);
 
+        $channels = $notifications->channelsForEventAction((int) $eventId, 'meeting');
+
         foreach ($invitees as $invitee) {
             $meeting->participants()->attach($invitee->id, ['role' => 'guest', 'rsvp' => 'pending']);
+
+            if ($channels === []) {
+                continue;
+            }
 
             $notifications->notify(
                 'participation', $invitee->id, $orgId, $eventId,
@@ -274,6 +280,7 @@ class MeetingController extends Controller
                     'body' => $organizerName.' wants to meet'.($meeting->title ? ' — '.$meeting->title : '').'.',
                     'meeting_id' => $meeting->uuid,
                 ],
+                $channels,
             );
         }
 
@@ -303,11 +310,16 @@ class MeetingController extends Controller
 
             $record->update(['status' => 'canceled']);
 
+            $channels = $notifications->channelsForEventAction((int) $eventId, 'meeting');
             foreach ($record->participants->where('pivot.role', 'guest') as $guest) {
+                if ($channels === []) {
+                    break;
+                }
                 $notifications->notify(
                     'participation', $guest->id, $orgId, $eventId,
                     'meeting.canceled',
                     ['title' => 'Meeting canceled', 'body' => $this->name($record->organizer).' canceled the meeting.', 'meeting_id' => $record->uuid],
+                    $channels,
                 );
             }
 
@@ -326,15 +338,19 @@ class MeetingController extends Controller
         // until the organizer wraps up (a single accept confirms it).
         $record->update(['status' => $data['action'] === 'accept' ? 'confirmed' : 'declined']);
 
-        $notifications->notify(
-            'participation', $record->organizer_participation_id, $orgId, $eventId,
-            $data['action'] === 'accept' ? 'meeting.confirmed' : 'meeting.declined',
-            [
-                'title' => $data['action'] === 'accept' ? 'Meeting confirmed' : 'Meeting declined',
-                'body' => $this->name($mine).($data['action'] === 'accept' ? ' accepted your meeting request.' : ' declined your meeting request.'),
-                'meeting_id' => $record->uuid,
-            ],
-        );
+        $channels = $notifications->channelsForEventAction((int) $eventId, 'meeting');
+        if ($channels !== []) {
+            $notifications->notify(
+                'participation', $record->organizer_participation_id, $orgId, $eventId,
+                $data['action'] === 'accept' ? 'meeting.confirmed' : 'meeting.declined',
+                [
+                    'title' => $data['action'] === 'accept' ? 'Meeting confirmed' : 'Meeting declined',
+                    'body' => $this->name($mine).($data['action'] === 'accept' ? ' accepted your meeting request.' : ' declined your meeting request.'),
+                    'meeting_id' => $record->uuid,
+                ],
+                $channels,
+            );
+        }
 
         return response()->json(['data' => $this->format($record->fresh('participants.contact'), $me)]);
     }

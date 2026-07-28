@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\Participation;
+use App\Services\Notifications\NotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -171,15 +172,21 @@ class DelegateController extends Controller
      * Single-delegate profile for the detail modal — bio + social that the
      * directory list deliberately omits to keep the paged payload light.
      * GET /events/{event}/delegates/{uuid}
+     *
+     * Also fires a profile_view notification to the viewed attendee when the
+     * event's Communication → Notification matrix has that trigger enabled.
      */
-    public function show(Request $request, string $uuid): JsonResponse
+    public function show(Request $request, string $uuid, NotificationService $notifications): JsonResponse
     {
         $eventId = $request->attributes->get('event_id');
+        $orgId = $request->attributes->get('organization_id');
         $me = $request->attributes->get('participation_id');
 
         $row = $this->directoryQuery($eventId, $me)
             ->where('participations.uuid', $uuid)
             ->firstOrFail();
+
+        $this->notifyProfileView($notifications, (int) $eventId, (int) $orgId, (int) $me, $row);
 
         $online = $this->onlineMap($eventId, collect([$row->id]));
         $avatarFiles = $this->avatarFileUrls(collect([$row]));
@@ -206,6 +213,64 @@ class DelegateController extends Controller
                 ],
             ),
         ]);
+    }
+
+    /**
+     * Notify the viewed delegate that someone opened their profile, when
+     * Communication → Notification → Profile view is enabled. Rate-limited
+     * per viewer→viewee pair so reopening the modal doesn't spam the bell.
+     */
+    private function notifyProfileView(
+        NotificationService $notifications,
+        int $eventId,
+        int $orgId,
+        int $viewerId,
+        Participation $viewee,
+    ): void {
+        if ($viewerId === (int) $viewee->id) {
+            return;
+        }
+
+        $channels = $notifications->channelsForEventAction($eventId, 'profile_view');
+        if ($channels === []) {
+            return;
+        }
+
+        // One notice per viewer→viewee per hour (best-effort; skip if Redis is down).
+        try {
+            $throttleKey = "profile_view:{$eventId}:{$viewerId}:{$viewee->id}";
+            if (Redis::exists($throttleKey)) {
+                return;
+            }
+            Redis::setex($throttleKey, 3600, '1');
+        } catch (\Throwable) {
+            // Fall through and notify — missing Redis shouldn't block delivery.
+        }
+
+        $viewer = Participation::with('contact')->find($viewerId);
+        $viewerName = trim(($viewer?->contact?->first_name ?? '').' '.($viewer?->contact?->last_name ?? ''));
+        if ($viewerName === '') {
+            $viewerName = 'Someone';
+        }
+
+        try {
+            $notifications->notify(
+                'participation',
+                (int) $viewee->id,
+                $orgId,
+                $eventId,
+                'engagement.profile_viewed',
+                [
+                    'title' => 'Profile viewed',
+                    'body' => $viewerName.' viewed your profile.',
+                    'viewer_participation_id' => $viewerId,
+                    'viewer_name' => $viewerName,
+                ],
+                $channels,
+            );
+        } catch (\Throwable) {
+            // Profile response must succeed even if notification delivery fails.
+        }
     }
 
     /** Why this person surfaced — shown under the name in the strip. */

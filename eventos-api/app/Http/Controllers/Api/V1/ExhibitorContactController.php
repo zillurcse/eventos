@@ -210,7 +210,10 @@ class ExhibitorContactController extends Controller
             ->firstOrFail();
     }
 
-    /** Notify every admin/staff member of the exhibitor (in-app, per contact). */
+    /**
+     * Notify every admin/staff member of the exhibitor (per contact).
+     * Channels come from Communication → Notification (`message` / `meeting`).
+     */
     private function notifyAdmins(
         NotificationService $notifications,
         Exhibitor $exh,
@@ -221,6 +224,12 @@ class ExhibitorContactController extends Controller
         string $body,
         array $extra = [],
     ): void {
+        $action = str_contains($key, 'meeting') ? 'meeting' : 'message';
+        $channels = $notifications->channelsForEventAction($eventId, $action);
+        if ($channels === []) {
+            return;
+        }
+
         $members = ExhibitorMember::where('exhibitor_id', $exh->id)
             ->whereIn('role', ['admin', 'staff'])
             ->whereNotNull('contact_id')
@@ -231,6 +240,7 @@ class ExhibitorContactController extends Controller
                 'contact', (int) $member->contact_id, $orgId, $eventId,
                 $key,
                 array_merge(['title' => $title, 'body' => $body, 'exhibitor_id' => $exh->uuid], $extra),
+                $channels,
             );
         }
     }

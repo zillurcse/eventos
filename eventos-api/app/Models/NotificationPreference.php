@@ -6,6 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class NotificationPreference extends Model
 {
+    /**
+     * Fixed Profile › Notifications catalogue and pre-save defaults.
+     * Meetings/Messages email and Meeting Status / Messages / Organiser in-app
+     * start on so existing delivery keeps working until the user opts out;
+     * everything else starts off until its trigger is fully wired.
+     *
+     * @var array<string, array{email: bool, in_app: bool}>
+     */
+    public const CATEGORIES = [
+        'meetings' => ['email' => true, 'in_app' => true],
+        'messages' => ['email' => true, 'in_app' => true],
+        'profile_views' => ['email' => false, 'in_app' => false],
+        'mentions' => ['email' => false, 'in_app' => false],
+        'admin_post' => ['email' => false, 'in_app' => false],
+        'new_activity' => ['email' => false, 'in_app' => false],
+        'organiser' => ['email' => false, 'in_app' => true],
+        'meeting_status' => ['email' => false, 'in_app' => true],
+        'session_live' => ['email' => false, 'in_app' => false],
+    ];
+
     protected $guarded = [];
 
     protected $casts = [
