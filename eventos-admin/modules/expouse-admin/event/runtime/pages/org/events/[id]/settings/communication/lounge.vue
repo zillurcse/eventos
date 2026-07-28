@@ -165,6 +165,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Communication</h1>
+    <CommunicationTabs :event-id="id" active="lounge" />
+
     <!-- Networking Lounge -->
     <CommunicationLoungeSettingCard
       title="Networking Lounge" class="mb-4"

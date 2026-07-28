@@ -188,6 +188,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Communication</h1>
+    <CommunicationTabs :event-id="id" active="cta" />
+
     <div class="mb-4">
       <h2 class="section-title m-0">CTA</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Sponsor calls-to-action shown across your event website and app.</p>

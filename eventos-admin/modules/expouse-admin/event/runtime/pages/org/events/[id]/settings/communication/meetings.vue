@@ -130,6 +130,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Communication</h1>
+    <CommunicationTabs :event-id="id" active="meetings" />
+
     <!-- Meeting permission matrix -->
     <div class="card mb-4">
       <h2 class="font-bold text-base text-[#1a1a2e] m-0">

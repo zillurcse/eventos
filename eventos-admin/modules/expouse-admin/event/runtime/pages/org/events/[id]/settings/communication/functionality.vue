@@ -111,7 +111,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="card">
+  <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Communication</h1>
+    <CommunicationTabs :event-id="id" active="functionality" />
+
+    <div class="card">
     <!-- ── Functionality matrix ──────────────────────────────────────── -->
     <div class="mb-4">
       <h2 class="section-title m-0">Functionality</h2>
@@ -181,5 +185,6 @@ onMounted(load)
       <p class="muted text-[.84rem] mt-0 mb-3">Drag to reorder, toggle to show/hide on the feed page.</p>
       <SortableList v-model="feedTabs" />
     </Drawer>
+    </div>
   </div>
 </template>

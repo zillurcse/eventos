@@ -49,6 +49,7 @@ const sections = computed<any[]>(() => [
     { label: 'Domain', to: r('settings/domain') },
     { label: 'Video', to: r('settings/video') },
     { label: 'SEO & Meta Data', to: r('settings/seo') },
+    { label: 'Communication', to: r('settings/communication/functionality') },
   ] },
   { key: 'showcase', label: 'Showcase Area', svg: I.showcase, children: [
     { label: 'Manage filters', to: r('showcase/filters') },
@@ -66,7 +67,6 @@ const sections = computed<any[]>(() => [
     { label: 'Form Builder', to: r('settings/forms') },
     { label: 'Surveys', to: r('engagement/surveys') },
   ] },
-  { key: 'communication', label: 'Communication', svg: I.comm, children: kids([['Communication', 'communication/functionality'], ['Profiles', 'communication/profiles'], ['Lounge', 'communication/lounge'], ['Meetings', 'communication/meetings'], ['Chats', 'communication/chats'], ['CTA', 'communication/cta'], ['Gamification', 'communication/gamification'], ['Notification', 'communication/notification']]) },
   { key: 'onsite', label: 'Onsite', svg: I.onsite, children: kids([['Badge templates', 'onsite/badge-templates'], ['Lead generation', 'onsite/lead-generation'], ['Gates Scanning', 'onsite/gates-scanning'], ['Exhibitors Scanning', 'onsite/exhibitors-scanning']]) },
   { key: 'services', label: 'Services', svg: I.services, children: kids([['Services', 'services/all'], ['Requested Services', 'services/requested']]) },
   { key: 'mail', label: 'Mail & Notification', svg: I.mail, children: kids([['Emails', 'mail/emails'], ['Email Templates', 'mail/email-builder'], ['Sender Details', 'mail/sender-details'], ['Invite Mailer', 'mail/invite-mailer']]) },

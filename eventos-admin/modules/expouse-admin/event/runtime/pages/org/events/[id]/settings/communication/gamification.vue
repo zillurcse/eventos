@@ -105,6 +105,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Communication</h1>
+    <CommunicationTabs :event-id="id" active="gamification" />
+
     <!-- Header card with the master toggle -->
     <div class="card mb-4">
       <div class="flex items-start justify-between gap-4">
