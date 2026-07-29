@@ -69,8 +69,12 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8080
 1. **Splash** — purple Expouse branded screen (~1.8s)
 2. **Onboarding** — 3-page carousel from design assets (Skip / Previous / Next)
 3. **Event picker** — enter event subdomain → `GET /public/site`
-4. **Login** — email + password → `POST /auth/login`
-5. **Home** — placeholder shell (feature screens come next)
+4. **Sign in** — email + terms → Continue
+   - Existing user → password step
+   - New user → Sign Up screen
+   - OTP / social buttons when enabled for the event
+5. **Sign up** — email, name, password → register + auto login
+6. **Home** — placeholder shell (feature screens come next)
 
 Auth token, subdomain, and onboarding completion are stored with
 `flutter_secure_storage`. Every API request sends `Authorization: Bearer …`

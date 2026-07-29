@@ -23,6 +23,13 @@ class AuthUser {
   final String email;
 }
 
+class EmailCheckResult {
+  const EmailCheckResult({required this.exists, required this.hasPassword});
+
+  final bool exists;
+  final bool hasPassword;
+}
+
 class AuthState {
   const AuthState({
     this.token,
@@ -71,7 +78,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final response = await _api.get<Map<String, dynamic>>('/auth/me');
-      final userJson = response.data?['data'] ?? response.data;
+      final userJson = response.data?['user'] ?? response.data?['data'] ?? response.data;
       if (userJson is Map<String, dynamic>) {
         state = state.copyWith(
           user: AuthUser.fromJson(userJson),
@@ -90,13 +97,63 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  Future<EmailCheckResult> checkEmail(String email) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/public/check-email',
+      data: {'email': email},
+    );
+    final data = response.data ?? {};
+    return EmailCheckResult(
+      exists: data['exists'] == true,
+      hasPassword: data['has_password'] == true,
+    );
+  }
+
   Future<void> login(String email, String password) async {
     final response = await _api.post<Map<String, dynamic>>(
       '/auth/login',
       data: {'email': email, 'password': password},
     );
-    final data = response.data;
-    if (data == null) throw Exception('Empty login response');
+    await _adoptSession(response.data);
+  }
+
+  Future<void> requestOtp(String email) async {
+    await _api.post<Map<String, dynamic>>(
+      '/public/auth/otp',
+      data: {'email': email},
+    );
+  }
+
+  Future<void> verifyOtp(String email, String code) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/public/auth/otp/verify',
+      data: {'email': email, 'code': code},
+    );
+    await _adoptSession(response.data);
+  }
+
+  /// Register for an event, then sign in with the new password.
+  Future<void> registerForEvent({
+    required String eventUuid,
+    required String email,
+    required String firstName,
+    required String lastName,
+    required String password,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/events/$eventUuid/register',
+      data: {
+        'email': email,
+        'first_name': firstName,
+        'last_name': lastName,
+        'password': password,
+      },
+    );
+    await login(email, password);
+  }
+
+  Future<void> _adoptSession(Map<String, dynamic>? data) async {
+    if (data == null) throw Exception('Empty auth response');
 
     final token = data['token'] as String?;
     final userJson = data['user'];

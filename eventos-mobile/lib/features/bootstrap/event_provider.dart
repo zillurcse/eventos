@@ -7,11 +7,21 @@ class EventState {
   const EventState({
     this.subdomain,
     this.eventName,
+    this.eventUuid,
+    this.logoUrl,
+    this.signupEnabled = true,
+    this.otpEnabled = false,
+    this.socialChannels = const {},
     this.isLoading = false,
   });
 
   final String? subdomain;
   final String? eventName;
+  final String? eventUuid;
+  final String? logoUrl;
+  final bool signupEnabled;
+  final bool otpEnabled;
+  final Map<String, bool> socialChannels;
   final bool isLoading;
 
   bool get hasEvent => subdomain != null && subdomain!.isNotEmpty;
@@ -19,11 +29,21 @@ class EventState {
   EventState copyWith({
     String? subdomain,
     String? eventName,
+    String? eventUuid,
+    String? logoUrl,
+    bool? signupEnabled,
+    bool? otpEnabled,
+    Map<String, bool>? socialChannels,
     bool? isLoading,
   }) {
     return EventState(
       subdomain: subdomain ?? this.subdomain,
       eventName: eventName ?? this.eventName,
+      eventUuid: eventUuid ?? this.eventUuid,
+      logoUrl: logoUrl ?? this.logoUrl,
+      signupEnabled: signupEnabled ?? this.signupEnabled,
+      otpEnabled: otpEnabled ?? this.otpEnabled,
+      socialChannels: socialChannels ?? this.socialChannels,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -69,9 +89,31 @@ class EventNotifier extends StateNotifier<EventState> {
     try {
       final response = await _api.get<Map<String, dynamic>>('/public/site');
       final data = response.data?['data'] ?? response.data;
-      final event = data is Map<String, dynamic> ? data['event'] : null;
-      final name = event is Map<String, dynamic> ? event['name'] as String? : null;
-      state = state.copyWith(eventName: name, isLoading: false);
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Invalid site response');
+      }
+
+      final event = data['event'];
+      final branding = data['branding'];
+      final login = data['login'];
+      final channels = login is Map ? login['channels'] : null;
+
+      final social = <String, bool>{};
+      if (channels is Map) {
+        for (final key in ['facebook', 'google', 'linkedin']) {
+          social[key] = channels[key] == true;
+        }
+      }
+
+      state = state.copyWith(
+        eventName: event is Map ? event['name'] as String? : null,
+        eventUuid: event is Map ? event['uuid']?.toString() : null,
+        logoUrl: branding is Map ? branding['logo_url'] as String? : null,
+        signupEnabled: channels is Map ? channels['signup'] != false : true,
+        otpEnabled: channels is Map ? channels['otp'] == true : false,
+        socialChannels: social,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;

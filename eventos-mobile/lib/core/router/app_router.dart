@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/signup_screen.dart';
 import '../../features/bootstrap/event_provider.dart';
 import '../../features/bootstrap/onboarding_provider.dart';
 import '../../features/bootstrap/screens/event_picker_screen.dart';
@@ -24,7 +25,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final path = state.matchedLocation;
 
-      // Stay on splash until branding hold + session restore finish.
       if (!splashReady || auth.isBootstrapping || onboarding.isLoading) {
         return path == '/splash' ? null : '/splash';
       }
@@ -38,13 +38,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (!auth.isAuthenticated) {
-        return path == '/login' ? null : '/login';
+        if (path == '/login' || path == '/signup') return null;
+        return '/login';
       }
 
       if (path == '/splash' ||
           path == '/onboarding' ||
           path == '/event' ||
-          path == '/login') {
+          path == '/login' ||
+          path == '/signup') {
         return '/home';
       }
 
@@ -66,6 +68,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) {
+          final email = state.extra is String ? state.extra as String : null;
+          return SignUpScreen(initialEmail: email);
+        },
       ),
       GoRoute(
         path: '/home',
