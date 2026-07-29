@@ -16,8 +16,8 @@ const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.ch
 const bioExpanded = ref(false)
 
 onMounted(() => {
-  // The schedule reuses the public agenda payload; fetch it once on demand.
   if (!sessionsStore.loaded && !sessionsStore.loading) sessionsStore.fetchSessions()
+  useMeetingsStore().fetchCapabilities({ force: true })
   window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
@@ -41,8 +41,29 @@ function openConnect() {
     job_title: props.speaker.designation,
     avatar_url: props.speaker.image_url,
     online: false,
+    role: 'speaker',
   }, 'connect')
 }
+
+function openMeet() {
+  delegates.openConnect({
+    id: props.speaker.id,
+    name: props.speaker.name,
+    company: props.speaker.company,
+    job_title: props.speaker.designation,
+    avatar_url: props.speaker.image_url,
+    online: false,
+    role: 'speaker',
+  }, 'meet')
+}
+
+const meetEnabled = computed(() => {
+  const meetings = useMeetingsStore()
+  return auth.isAuthed
+    && site.meetingsTabEnabled
+    && meetings.canRequest
+    && meetings.canMeetRole('speaker')
+})
 
 const socialIcons: Record<string, string> = {
   linkedin: 'M4 4h4v16H4zM6 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4M10 8h4v2a4 4 0 0 1 6 3v7h-4v-6a2 2 0 0 0-4 0v6h-4z',
@@ -124,6 +145,10 @@ function whenLabel(s: AgendaSession) {
           <button v-if="chatEnabled" class="hact chat" type="button" @click="openConnect">
             <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
             Chat
+          </button>
+          <button v-if="meetEnabled" class="hact meet" type="button" @click="openMeet">
+            <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" /></svg>
+            Meet
           </button>
         </div>
 
@@ -340,7 +365,8 @@ function whenLabel(s: AgendaSession) {
   fill: currentColor;
 }
 
-.hact.chat {
+.hact.chat,
+.hact.meet {
   flex: 1;
   gap: 10px;
   font: inherit;

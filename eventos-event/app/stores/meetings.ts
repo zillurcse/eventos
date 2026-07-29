@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
+import { useApi } from '~/composables/useApi'
+import { eventIdentityHeaders, useEventIdentity } from '~/composables/useEventSubdomain'
 import type { JoinConfig } from '~/stores/rooms'
+import { useSiteStore } from '~/stores/site'
 import type { ReceptionAd } from '~/stores/reception'
 
 export interface MeetingPerson {
@@ -30,6 +33,7 @@ export interface Meeting {
   ends_at: string | null
   date: string | null   // lounge slot day, YYYY-MM-DD
   slot: string | null   // lounge slot, HH:MM-HH:MM
+  allocated_table: MeetingAllocatedTable | null
   counterpart: MeetingPerson | null
   participants: MeetingParticipant[]
   // A booth meeting (attendee ↔ exhibitor) rather than a delegate one. Answered
@@ -51,6 +55,42 @@ export interface MeetingRequest {
   slot?: string        // lounge slot, HH:MM-HH:MM
 }
 
+export interface MeetingAllocatedTable {
+  id: string
+  name: string
+  capacity: number
+  design: 'round' | 'boardroom' | 'lounge'
+  image_url: string | null
+  accent: string | null
+}
+
+export interface MeetingAreaTable extends MeetingAllocatedTable {
+  bookings: Array<{ date: string, slot: string, status: string }>
+}
+  id: string
+  name: string
+  role: 'attendee' | 'speaker' | 'exhibitor' | 'sponsor'
+  company: string
+  job_title: string
+  avatar_url: string | null
+}
+
+export interface MeetingCapabilities {
+  enabled: boolean
+  role: string
+  allowed_roles: string[]
+  restrictions: {
+    requests: number | null
+    confirmed: number | null
+    requests_used: number
+    confirmed_used: number
+  }
+  slot_duration: number
+  intelligent: boolean
+  locations: string[]
+  can_request: boolean
+}
+
 /**
  * The one-to-one meetings tab. Authenticated + scoped to the event via
  * useApi() → `/events/{uuid}/meetings`. A request is sent to a single delegate
@@ -70,12 +110,31 @@ export const useMeetingsStore = defineStore('meetings', {
     joinError: '' as string,
     ads: [] as ReceptionAd[],
     adsLoaded: false,
+    capabilities: null as MeetingCapabilities | null,
+    capabilitiesLoaded: false,
+    areaTables: [] as MeetingAreaTable[],
+    areaLoaded: false,
   }),
 
   getters: {
     pending: (s): Meeting[] => s.meetings.filter(m => m.status === 'requested'),
     approved: (s): Meeting[] => s.meetings.filter(m => m.status === 'confirmed'),
     rejected: (s): Meeting[] => s.meetings.filter(m => m.status === 'declined' || m.status === 'canceled'),
+    canRequest: (s): boolean => {
+      const site = useSiteStore()
+      if (!site.meetingsTabEnabled) return false
+      if (s.capabilities?.enabled === false) return false
+      const allowed = s.capabilities?.allowed_roles
+      if (allowed && allowed.length === 0) return false
+      return s.capabilities?.can_request !== false
+    },
+    allowedRoles: (s): string[] => s.capabilities?.allowed_roles ?? ['attendee', 'speaker', 'exhibitor', 'sponsor'],
+    canMeetRole: (s) => (role: string): boolean => {
+      const allowed = s.capabilities?.allowed_roles
+      if (!allowed?.length) return true
+      return allowed.includes(role)
+    },
+    intelligent: (s): boolean => s.capabilities?.intelligent === true,
   },
 
   actions: {
@@ -94,6 +153,61 @@ export const useMeetingsStore = defineStore('meetings', {
         this.error = true
       } finally {
         this.loading = false
+      }
+    },
+
+    /** Role matrix + caps from Admin → Communication → Meetings. */
+    async fetchCapabilities(options?: { force?: boolean }) {
+      if (this.capabilitiesLoaded && !options?.force) return
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid) return
+      this.capabilitiesLoaded = false
+      try {
+        const api = useApi()
+        const res = await api<{ data: MeetingCapabilities }>(`/events/${uuid}/meetings/capabilities`)
+        this.capabilities = res.data
+      } catch {
+        this.capabilities = null
+      } finally {
+        this.capabilitiesLoaded = true
+      }
+    },
+
+    /** Attendee tables + bookings for the meeting area map (Intelligent Meeting). */
+    async fetchArea() {
+      if (this.areaLoaded || !this.capabilities?.intelligent) return
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid) return
+      try {
+        const api = useApi()
+        const res = await api<{ data: { tables: MeetingAreaTable[] } }>(`/events/${uuid}/meetings/area`)
+        this.areaTables = res.data.tables
+      } catch {
+        this.areaTables = []
+      } finally {
+        this.areaLoaded = true
+      }
+    },
+
+    /** People this viewer may request a meeting with (permission matrix). */
+    async fetchPartners(q?: string, role?: string): Promise<MeetingPartner[]> {
+      const uuid = useSiteStore().event?.uuid
+      if (!uuid) return []
+      try {
+        const api = useApi()
+        const query: Record<string, string> = {}
+        if (q?.trim()) query.q = q.trim()
+        if (role) query.role = role
+        const res = await api<{ data: MeetingPartner[], roles: string[] }>(
+          `/events/${uuid}/meetings/partners`,
+          { query },
+        )
+        if (this.capabilities) {
+          this.capabilities = { ...this.capabilities, allowed_roles: res.roles }
+        }
+        return res.data
+      } catch {
+        return []
       }
     },
 
@@ -142,6 +256,13 @@ export const useMeetingsStore = defineStore('meetings', {
         })
         // New request lands at the top of the list (outgoing, pending).
         this.meetings.unshift(res.data)
+        if (this.capabilities) {
+          this.capabilities.restrictions.requests_used += 1
+          const max = this.capabilities.restrictions.requests
+          if (max !== null && this.capabilities.restrictions.requests_used >= max) {
+            this.capabilities.can_request = false
+          }
+        }
         return true
       } catch (e: any) {
         // Surface a server-provided reason (e.g. slot already booked) when present.
@@ -187,6 +308,13 @@ export const useMeetingsStore = defineStore('meetings', {
         })
         const i = this.meetings.findIndex(m => m.id === meeting.id)
         if (i !== -1) this.meetings[i] = res.data
+        if (action === 'accept' && this.capabilities) {
+          this.capabilities.restrictions.confirmed_used += 1
+          if (this.capabilities.intelligent) {
+            this.areaLoaded = false
+            this.fetchArea()
+          }
+        }
       } finally {
         this.acting[meeting.id] = false
       }

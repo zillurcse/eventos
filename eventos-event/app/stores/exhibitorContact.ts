@@ -173,7 +173,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
         if (chat.loaded) chat.syncExhibitorConversations()
         return true
       } catch (e: any) {
-        this.error = e?.data?.message || 'Could not send your message.'
+        this.error = e?.data?.message || e?.response?._data?.message || 'Could not send your message.'
         return false
       } finally {
         this.sending = false
@@ -225,7 +225,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
         this.requests.unshift(res.data)
         return true
       } catch (e: any) {
-        this.error = e?.data?.message || 'Could not send your meeting request.'
+        this.error = e?.data?.message || e?.response?._data?.message || 'Could not send your meeting request.'
         return false
       } finally {
         this.requesting = false

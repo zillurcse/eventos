@@ -11,6 +11,9 @@ use App\Models\ExhibitorMeetingRequest;
 use App\Models\ExhibitorMember;
 use App\Models\Meeting;
 use App\Models\Participation;
+use App\Support\CommunicationCapabilities;
+use App\Support\IntelligentMeeting;
+use App\Support\MeetingCapabilities;
 use App\Services\BreakoutRoom\Providers\LiveKitProvider;
 use App\Services\Notifications\NotificationService;
 use Carbon\Carbon;
@@ -40,6 +43,100 @@ class MeetingController extends Controller
     private const JOIN_GRACE_MINUTES = 15;
 
     public function __construct(private LiveKitProvider $livekit) {}
+
+    /** GET /events/{event}/meetings/capabilities — role matrix + caps for the caller. */
+    public function capabilities(Request $request): JsonResponse
+    {
+        $eventId = (int) $request->attributes->get('event_id');
+        $me = Participation::findOrFail($request->attributes->get('participation_id'));
+        $meeting = MeetingCapabilities::configForEvent($eventId);
+
+        return response()->json([
+            'data' => MeetingCapabilities::forParticipant($me, $meeting, $eventId),
+        ]);
+    }
+
+    /**
+     * Meeting area map — attendee tables and their slot bookings.
+     * Only meaningful when Intelligent Meeting is enabled.
+     * GET /events/{event}/meetings/area
+     */
+    public function area(Request $request): JsonResponse
+    {
+        $eventId = (int) $request->attributes->get('event_id');
+        $meeting = MeetingCapabilities::configForEvent($eventId);
+
+        abort_unless(
+            MeetingCapabilities::isIntelligent($meeting),
+            404,
+            'Meeting area map is not enabled for this event.',
+        );
+
+        return response()->json(['data' => [
+            'tables' => IntelligentMeeting::areaMap($eventId),
+        ]]);
+    }
+
+    /**
+     * People the caller may request a meeting with — honors the meeting permission
+     * matrix, block flags and networking opt-out (mirrors chat/partners).
+     */
+    public function partners(Request $request): JsonResponse
+    {
+        $eventId = (int) $request->attributes->get('event_id');
+        $me = (int) $request->attributes->get('participation_id');
+        $meP = Participation::findOrFail($me);
+        $meeting = MeetingCapabilities::configForEvent($eventId);
+
+        if (! MeetingCapabilities::meetingsTabEnabled(EventSetting::where('event_id', $eventId)->first())) {
+            return response()->json(['data' => [], 'roles' => []]);
+        }
+
+        $myRole = CommunicationCapabilities::roleFor($meP);
+
+        $data = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'role' => ['nullable', 'in:attendee,speaker,exhibitor,sponsor'],
+        ]);
+
+        $allowedRoles = MeetingCapabilities::allowedTargetRoles($meeting, $myRole);
+        if (! empty($data['role'])) {
+            $allowedRoles = array_values(array_intersect($allowedRoles, [$data['role']]));
+        }
+        if (! $allowedRoles) {
+            return response()->json(['data' => [], 'roles' => []]);
+        }
+
+        $query = Participation::query()
+            ->with('contact')
+            ->select('participations.*')
+            ->join('contacts', 'contacts.id', '=', 'participations.contact_id')
+            ->where('participations.event_id', $eventId)
+            ->whereIn('participations.role', ['attendee', 'speaker', 'sponsor', 'partner_member', 'exhibitor'])
+            ->where('participations.id', '!=', $me)
+            ->where(fn ($q) => $q->whereNull('participations.meta->blocked')->orWhere('participations.meta->blocked', false))
+            ->where(fn ($q) => $q->whereNull('participations.networking_opt_in')->orWhere('participations.networking_opt_in', true));
+
+        if (! empty($data['q'])) {
+            $term = '%'.$data['q'].'%';
+            $query->where(fn ($q) => $q
+                ->whereRaw("coalesce(contacts.first_name,'')||' '||coalesce(contacts.last_name,'') ilike ?", [$term])
+                ->orWhere('contacts.company', 'ilike', $term));
+        }
+
+        $people = $query
+            ->orderByRaw("lower(coalesce(contacts.first_name,'')||' '||coalesce(contacts.last_name,''))")
+            ->limit(100)
+            ->get()
+            ->filter(fn (Participation $p) => MeetingCapabilities::allowsFor($meP, $p, $meeting))
+            ->map(fn (Participation $p) => $this->partnerPerson($p))
+            ->values();
+
+        return response()->json([
+            'data' => $people,
+            'roles' => MeetingCapabilities::allowedTargetRoles($meeting, $myRole),
+        ]);
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -147,6 +244,8 @@ class MeetingController extends Controller
 
         $event = Event::findOrFail($eventId);
         $lounge = $this->loungeConfig($eventId);
+        $meetingConfig = MeetingCapabilities::configForEvent((int) $eventId);
+        $intelligent = MeetingCapabilities::isIntelligent($meetingConfig);
 
         $partyIds = [$me];
         if ($with = $request->query('with')) {
@@ -169,16 +268,17 @@ class MeetingController extends Controller
             ->values();
 
         return response()->json(['data' => [
-            'enabled' => (bool) ($lounge['enabled'] ?? false),
-            'slots_open_all' => (bool) ($lounge['slots_open_all'] ?? false),
+            'enabled' => $intelligent || (bool) ($lounge['enabled'] ?? false),
+            'intelligent' => $intelligent,
+            'slots_open_all' => $intelligent || (bool) ($lounge['slots_open_all'] ?? false),
             'timezone' => $event->resolvedTimezone(),
             'dates' => $this->loungeDates($event),
-            'slots' => $this->effectiveSlots($event, $lounge),
+            'slots' => $this->effectiveSlots($event, $lounge, $meetingConfig),
             'busy' => $busy,
             // Where the meeting happens. On an online event there is nowhere to
             // be, so the picker hides the field entirely.
             'format' => $event->format,
-            'location_required' => $this->isPhysicalEvent($event),
+            'location_required' => ! $intelligent && $this->isPhysicalEvent($event),
             'locations' => $this->meetingLocationOptions((int) $eventId),
         ]]);
     }
@@ -190,13 +290,18 @@ class MeetingController extends Controller
         $me = $request->attributes->get('participation_id');
 
         $event = Event::findOrFail($eventId);
+        $meP = Participation::findOrFail($me);
+        $meetingConfig = MeetingCapabilities::configForEvent((int) $eventId);
+
+        MeetingCapabilities::abortUnlessMeetingsEnabled((int) $eventId);
+        MeetingCapabilities::abortUnlessCanSendRequest((int) $eventId, $meP, $meetingConfig);
 
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string', 'max:1000'],
             // Required on a venue/hybrid event: the two of them have to meet
             // somewhere ("Hall 4"). Ignored on an online event.
-            'location' => $this->meetingLocationRules($event),
+            'location' => $this->meetingLocationRules($event, $meetingConfig),
             'type' => ['nullable', 'in:one_on_one,group'],
             'max_participants' => ['nullable', 'integer', 'min:2'],
             'starts_at' => ['nullable', 'date'],
@@ -217,6 +322,22 @@ class MeetingController extends Controller
 
         abort_if($invitees->isEmpty(), 422, 'Select at least one person to meet.');
 
+        foreach ($invitees as $invitee) {
+            abort_unless(
+                MeetingCapabilities::allowsFor($meP, $invitee, $meetingConfig),
+                403,
+                'The organizer has not enabled meetings with this role.',
+            );
+        }
+
+        if (
+            MeetingCapabilities::isIntelligent($meetingConfig)
+            && $this->isPhysicalEvent($event)
+            && (empty($data['date']) || empty($data['slot']))
+        ) {
+            abort(422, 'Pick a time slot for your meeting.');
+        }
+
         // Resolve a lounge-slot booking into concrete start/end + a canonical
         // slot key, enforcing that the slot is offered and not already taken.
         $startsAt = $data['starts_at'] ?? null;
@@ -224,7 +345,7 @@ class MeetingController extends Controller
         $meta = null;
 
         if (! empty($data['slot']) && ! empty($data['date'])) {
-            $effective = $this->effectiveSlots($event, $this->loungeConfig($eventId));
+            $effective = $this->effectiveSlots($event, $this->loungeConfig($eventId), $meetingConfig);
 
             abort_unless(
                 in_array($data['slot'], $effective[$data['date']] ?? [], true),
@@ -331,12 +452,52 @@ class MeetingController extends Controller
         abort_if(! $mine || $mine->pivot->role !== 'guest', 403, 'You were not invited to this meeting.');
         abort_if($mine->pivot->rsvp !== 'pending', 422, 'You have already responded to this request.');
 
+        if ($data['action'] === 'accept') {
+            $meetingConfig = MeetingCapabilities::configForEvent((int) $eventId);
+            MeetingCapabilities::abortUnlessCanConfirm((int) $eventId, $mine, $meetingConfig);
+
+            $organizer = Participation::find($record->organizer_participation_id);
+            if ($organizer) {
+                MeetingCapabilities::abortUnlessCanConfirm(
+                    (int) $eventId,
+                    $organizer,
+                    $meetingConfig,
+                    'This meeting cannot be confirmed because the requester has reached their confirmed meeting limit.',
+                );
+            }
+
+            $event = Event::findOrFail($eventId);
+            if (
+                MeetingCapabilities::isIntelligent($meetingConfig)
+                && $this->isPhysicalEvent($event)
+            ) {
+                $date = $record->meta['lounge_date'] ?? null;
+                $slot = $record->meta['lounge_slot'] ?? null;
+                if ($date && $slot) {
+                    $table = IntelligentMeeting::allocateTable((int) $eventId, $date, $slot, $record->id);
+                    if ($table) {
+                        $meta = is_array($record->meta) ? $record->meta : [];
+                        $meta['allocated_table_id'] = $table['id'];
+                        $meta['allocated_table_name'] = $table['name'];
+                        $area = MeetingCapabilities::locations($meetingConfig)[0] ?? null;
+                        $record->location = $area ? $area.' · '.$table['name'] : $table['name'];
+                        $record->meta = $meta;
+                    }
+                }
+            }
+        }
+
         $rsvp = $data['action'] === 'accept' ? 'accepted' : 'declined';
         $record->participants()->updateExistingPivot($me, ['rsvp' => $rsvp]);
 
         // For one-on-one the RSVP is the whole decision; groups stay "requested"
         // until the organizer wraps up (a single accept confirms it).
-        $record->update(['status' => $data['action'] === 'accept' ? 'confirmed' : 'declined']);
+        $updates = ['status' => $data['action'] === 'accept' ? 'confirmed' : 'declined'];
+        if ($data['action'] === 'accept' && $record->isDirty(['location', 'meta'])) {
+            $updates['location'] = $record->location;
+            $updates['meta'] = $record->meta;
+        }
+        $record->update($updates);
 
         $channels = $notifications->channelsForEventAction((int) $eventId, 'meeting');
         if ($channels !== []) {
@@ -426,6 +587,7 @@ class MeetingController extends Controller
             'ends_at' => $m->ends_at?->toIso8601String(),
             'date' => $m->meta['lounge_date'] ?? null,
             'slot' => $m->meta['lounge_slot'] ?? null,
+            'allocated_table' => $this->allocatedTable($m),
             'counterpart' => $counterpart ? $this->person($counterpart) : null,
             'participants' => $m->participants->map(fn ($p) => [
                 'name' => $this->name($p),
@@ -470,16 +632,17 @@ class MeetingController extends Controller
 
     /**
      * The bookable slots per date: the organizer's configured slots, or the
-     * full half-hour grid when "Open all meeting slot" is on.
+     * full grid when "Open all meeting slot" or Intelligent Meeting is on.
      */
-    private function effectiveSlots(Event $event, array $lounge): array
+    private function effectiveSlots(Event $event, array $lounge, array $meeting = []): array
     {
         $dates = $this->loungeDates($event);
+        $intelligent = MeetingCapabilities::isIntelligent($meeting);
 
-        if (! empty($lounge['slots_open_all'])) {
-            $grid = $this->fullDayGrid();
+        if ($intelligent || ! empty($lounge['slots_open_all'])) {
+            $duration = MeetingCapabilities::slotDurationMinutes($meeting);
 
-            return collect($dates)->mapWithKeys(fn ($d) => [$d => $grid])->all();
+            return collect($dates)->mapWithKeys(fn ($d) => [$d => $this->fullDayGrid($duration)])->all();
         }
 
         $configured = is_array($lounge['slots'] ?? null) ? $lounge['slots'] : [];
@@ -491,13 +654,21 @@ class MeetingController extends Controller
         return $out;
     }
 
-    /** Half-hour grid 10:00–18:00 — mirrors the admin slot manager. */
-    private function fullDayGrid(): array
+    /** Bookable grid 10:00–18:00 using the organizer's slot duration (10/15/30 min). */
+    private function fullDayGrid(int $durationMinutes = 30): array
     {
+        $durationMinutes = in_array($durationMinutes, [10, 15, 30], true) ? $durationMinutes : 30;
         $slots = [];
-        for ($h = 10; $h < 18; $h++) {
-            $slots[] = sprintf('%02d:00-%02d:30', $h, $h);
-            $slots[] = sprintf('%02d:30-%02d:00', $h, $h + 1);
+        $startMinutes = 10 * 60;
+        $endMinutes = 18 * 60;
+
+        for ($m = $startMinutes; $m + $durationMinutes <= $endMinutes; $m += $durationMinutes) {
+            $fromH = intdiv($m, 60);
+            $fromM = $m % 60;
+            $end = $m + $durationMinutes;
+            $toH = intdiv($end, 60);
+            $toM = $end % 60;
+            $slots[] = sprintf('%02d:%02d-%02d:%02d', $fromH, $fromM, $toH, $toM);
         }
 
         return $slots;
@@ -514,6 +685,23 @@ class MeetingController extends Controller
                 ->whereIn('organizer_participation_id', $partyIds)
                 ->orWhereHas('participants', fn ($p) => $p->whereIn('participations.id', $partyIds)))
             ->exists();
+    }
+
+    /** Directory row for the meeting partner picker (includes matrix role). */
+    private function partnerPerson(Participation $p): array
+    {
+        $c = $p->contact;
+        $meta = $p->meta ?? [];
+        $profile = $p->profile_data ?? [];
+
+        return [
+            'id' => $p->uuid,
+            'name' => $this->name($p),
+            'role' => CommunicationCapabilities::roleFor($p),
+            'company' => $c?->company ?? ($profile['company'] ?? ''),
+            'job_title' => $c?->job_title ?? ($profile['designation'] ?? ''),
+            'avatar_url' => $meta['avatar_url'] ?? ($profile['avatar_url'] ?? ($profile['image_url'] ?? null)),
+        ];
     }
 
     /** Public projection of a participation (name, title, avatar). */
@@ -540,5 +728,29 @@ class MeetingController extends Controller
         $c = $p?->contact;
 
         return trim(($c->first_name ?? '').' '.($c->last_name ?? '')) ?: 'Attendee';
+    }
+
+    /** Table assigned by Intelligent Meeting when the invite was accepted. */
+    private function allocatedTable(Meeting $m): ?array
+    {
+        $tableId = $m->meta['allocated_table_id'] ?? null;
+        if (! $tableId) {
+            return null;
+        }
+
+        foreach (IntelligentMeeting::attendeeTables((int) $m->event_id) as $t) {
+            if ($t['id'] === $tableId) {
+                return $t;
+            }
+        }
+
+        return [
+            'id' => $tableId,
+            'name' => $m->meta['allocated_table_name'] ?? 'Table',
+            'capacity' => 4,
+            'design' => 'round',
+            'image_url' => null,
+            'accent' => null,
+        ];
     }
 }

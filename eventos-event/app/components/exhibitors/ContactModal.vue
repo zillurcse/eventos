@@ -2,6 +2,19 @@
 import { toast } from 'vue-sonner'
 
 const contact = useExhibitorContactStore()
+const meetings = useMeetingsStore()
+const site = useSiteStore()
+const auth = useAuthStore()
+
+const exhibitorRole = computed(() =>
+  contact.target?.type === 'sponsor' ? 'sponsor' : 'exhibitor',
+)
+const meetEnabled = computed(() =>
+  auth.isAuthed
+  && site.meetingsTabEnabled
+  && meetings.canRequest
+  && meetings.canMeetRole(exhibitorRole.value),
+)
 
 const draft = ref('')
 const agenda = ref('')
@@ -84,6 +97,10 @@ watch(() => contact.target?.id, (id) => {
   agenda.value = id && contact.target?.name
     ? `Hello ${contact.target.name}, I would like to connect with you.`
     : ''
+  if (id) {
+    meetings.fetchCapabilities({ force: true })
+    if (!meetEnabled.value && contact.tab === 'meet') contact.tab = 'chat'
+  }
 })
 
 watch(() => contact.lounge, (l) => {
@@ -128,6 +145,7 @@ async function sendMeeting() {
   }
   else if (contact.error) {
     meetError.value = contact.error
+    toast.error(contact.error)
   }
 }
 </script>
@@ -142,7 +160,15 @@ async function sendMeeting() {
       <div class="modal" role="dialog" aria-modal="true" :aria-label="contact.tab === 'chat' ? 'Start chat' : 'Schedule a meeting'">
         <div class="tabs">
           <button type="button" class="tab" :class="{ on: contact.tab === 'chat' }" @click="contact.tab = 'chat'">Chat</button>
-          <button type="button" class="tab" :class="{ on: contact.tab === 'meet' }" @click="contact.tab = 'meet'">Meet</button>
+          <button
+            v-if="meetEnabled"
+            type="button"
+            class="tab"
+            :class="{ on: contact.tab === 'meet' }"
+            @click="contact.tab = 'meet'"
+          >
+            Meet
+          </button>
         </div>
 
         <div class="who-block">
@@ -189,7 +215,7 @@ async function sendMeeting() {
         </section>
 
         <!-- ── Meet ── -->
-        <section v-else class="pane">
+        <section v-else-if="meetEnabled" class="pane">
           <div class="meet-scroll">
             <div v-if="contact.lounge?.enabled && contact.lounge.dates.length" class="slots">
               <div class="days">

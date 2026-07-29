@@ -1,39 +1,57 @@
 <script setup lang="ts">
-import type { Delegate } from '~/stores/delegates'
-import type { LoungeAvailability } from '~/stores/lounge'
+import type { MeetingPartner } from '~/stores/meetings'
 
 const emit = defineEmits<{ close: [] }>()
 
 const meetings = useMeetingsStore()
-const delegates = useDelegatesStore()
 const lounge = useLoungeStore()
 
 const step = ref<'pick' | 'form'>('pick')
 const search = ref('')
-const selected = ref<Delegate | null>(null)
+const roleFilter = ref('')
+const people = ref<MeetingPartner[]>([])
+const peopleLoading = ref(false)
+const selected = ref<MeetingPartner | null>(null)
 const title = ref('')
 const agenda = ref('')
 const location = ref('')
 const errorMsg = ref('')
+
+const ROLE_LABEL: Record<string, string> = {
+  attendee: 'Attendees', speaker: 'Speakers', exhibitor: 'Exhibitors', sponsor: 'Sponsors',
+}
 
 // ── Fallback date/time picker (no lounge slots configured) ────────────────
 const fallbackDate = ref('')
 const fallbackTime = ref('')
 
 // ── Lounge slot picker state ──────────────────────────────────────────────
-const avail = ref<LoungeAvailability | null>(null)
+const avail = ref<Awaited<ReturnType<typeof lounge.fetchFor>> | null>(null)
 const loadingSlots = ref(false)
 const selectedDate = ref('')
 const selectedSlot = ref('')
 
-onMounted(() => { if (!delegates.loaded) delegates.fetchDelegates() })
-
-const filtered = computed<Delegate[]>(() => {
-  const q = search.value.trim().toLowerCase()
-  if (!q) return delegates.delegates
-  return delegates.delegates.filter(d =>
-    `${d.name} ${d.job_title} ${d.company}`.toLowerCase().includes(q))
+onMounted(() => {
+  meetings.fetchCapabilities({ force: true })
+  searchPeople()
 })
+
+async function searchPeople() {
+  peopleLoading.value = true
+  try {
+    people.value = await meetings.fetchPartners(search.value, roleFilter.value || undefined)
+  } finally {
+    peopleLoading.value = false
+  }
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(searchPeople, 300)
+})
+watch(roleFilter, () => searchPeople())
+onBeforeUnmount(() => clearTimeout(searchTimer))
 
 // Dates that actually have at least one bookable slot configured.
 const slotDates = computed<string[]>(() => {
@@ -42,15 +60,10 @@ const slotDates = computed<string[]>(() => {
   return a.dates.filter(d => (a.slots[d]?.length ?? 0) > 0)
 })
 
-// Are we booking into lounge slots, or falling back to a free-form time?
 const useSlots = computed(() => !!avail.value?.enabled && slotDates.value.length > 0)
-
-// A venue/hybrid event puts the two of you in a room together, so the request
-// has to say where ("Hall 4"). Online events have nowhere to be — field hidden.
-const needsLocation = computed(() => avail.value?.location_required === true)
-
-// The organizer can publish the places meetings may be held in; when they have,
-// the requester picks one of them rather than typing a free-form spot.
+const isIntelligent = computed(() => avail.value?.intelligent === true || meetings.capabilities?.intelligent === true)
+const isPhysical = computed(() => ['venue', 'hybrid'].includes(avail.value?.format ?? ''))
+const needsLocation = computed(() => !isIntelligent.value && avail.value?.location_required === true)
 const locationOptions = computed<string[]>(() => avail.value?.locations ?? [])
 
 const busyKeys = computed<Set<string>>(() =>
@@ -75,17 +88,12 @@ function todayIso(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-// The event's own day list (always returned by /lounge, whether or not slot
-// booking is enabled) — reused here so the fallback picker offers the same
-// days the event actually runs on, instead of a bare native date input.
 const fallbackDates = computed<string[]>(() => avail.value?.dates ?? [])
 
 function isPastDate(d: string): boolean {
   return d < todayIso()
 }
 
-// Half-hour points across the day — this is a proposed time, not a booked
-// slot, so no busy/availability check applies, only "has it already passed".
 const timeOptions = computed<string[]>(() => {
   const out: string[] = []
   for (let h = 0; h < 24; h++) {
@@ -114,7 +122,7 @@ function pickFallbackTime(t: string) {
   fallbackTime.value = fallbackTime.value === t ? '' : t
 }
 
-async function choose(d: Delegate) {
+async function choose(d: MeetingPartner) {
   selected.value = d
   title.value = `Meeting with ${d.name || 'you'}`
   step.value = 'form'
@@ -129,7 +137,6 @@ async function choose(d: Delegate) {
   avail.value = await lounge.fetchFor(d.id)
   loadingSlots.value = false
   selectedDate.value = slotDates.value[0] ?? ''
-  // One place on offer is not a choice — pre-select it.
   if (needsLocation.value && locationOptions.value.length === 1) {
     location.value = locationOptions.value[0] ?? ''
   }
@@ -144,7 +151,21 @@ async function submit() {
   if (!selected.value) return
   errorMsg.value = ''
 
-  if (useSlots.value && !selectedSlot.value) {
+  if (!meetings.canRequest) {
+    errorMsg.value = 'You have reached the maximum number of meeting requests.'
+    return
+  }
+
+  if (isIntelligent.value && isPhysical.value) {
+    if (!useSlots.value) {
+      errorMsg.value = 'No meeting slots are available right now.'
+      return
+    }
+    if (!selectedSlot.value) {
+      errorMsg.value = 'Pick an available time slot.'
+      return
+    }
+  } else if (useSlots.value && !selectedSlot.value) {
     errorMsg.value = 'Pick an available time slot.'
     return
   }
@@ -156,9 +177,6 @@ async function submit() {
     return
   }
 
-  // The proposed-time picker is optional, but a half-filled pair (date with
-  // no time, or vice versa) isn't a usable time — and a picked time that has
-  // since passed (e.g. left the modal open) must be caught before sending.
   let startsAtIso: string | undefined
   if (!useSlots.value && (fallbackDate.value || fallbackTime.value)) {
     if (!fallbackDate.value || !fallbackTime.value) {
@@ -178,14 +196,13 @@ async function submit() {
     title: title.value.trim() || undefined,
     agenda: agenda.value.trim() || undefined,
     location: needsLocation.value ? location.value.trim() : undefined,
-    ...(useSlots.value
+    ...(useSlots.value || (isIntelligent.value && isPhysical.value)
       ? { date: selectedDate.value, slot: selectedSlot.value }
       : { starts_at: startsAtIso }),
   })
 
   if (ok) { emit('close'); return }
 
-  // A taken slot is the likely cause — refresh availability so it greys out.
   if (useSlots.value && selected.value) {
     avail.value = await lounge.fetchFor(selected.value.id)
     if (selectedSlot.value && isBusy(selectedSlot.value)) selectedSlot.value = ''
@@ -204,18 +221,28 @@ async function submit() {
         </button>
       </header>
 
-      <!-- Step 1: choose a delegate -->
+      <!-- Step 1: choose someone -->
       <div v-if="step === 'pick'" class="body">
         <div class="search">
           <input v-model="search" type="text" placeholder="Search people">
           <svg viewBox="0 0 24 24"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
         </div>
 
-        <div v-if="delegates.loading && !delegates.loaded" class="state">Loading people…</div>
-        <div v-else-if="!filtered.length" class="state">No one matches your search.</div>
+        <div v-if="meetings.allowedRoles.length > 1" class="chips">
+          <button type="button" class="chip" :class="{ on: !roleFilter }" @click="roleFilter = ''">All</button>
+          <button
+            v-for="r in meetings.allowedRoles" :key="r"
+            type="button" class="chip" :class="{ on: roleFilter === r }"
+            @click="roleFilter = roleFilter === r ? '' : r"
+          >{{ ROLE_LABEL[r] || r }}</button>
+        </div>
+
+        <div v-if="peopleLoading && !people.length" class="state">Loading people…</div>
+        <div v-else-if="!meetings.canRequest" class="state">You have reached your meeting request limit.</div>
+        <div v-else-if="!people.length" class="state">No one matches your search.</div>
 
         <ul v-else class="people">
-          <li v-for="d in filtered" :key="d.id">
+          <li v-for="d in people" :key="d.id">
             <button type="button" class="person" @click="choose(d)">
               <span class="pa">
                 <UserAvatar :src="d.avatar_url" :name="d.name" />
@@ -252,8 +279,11 @@ async function submit() {
           <textarea v-model="agenda" rows="3" maxlength="1000" placeholder="Add a note for the invitee" />
         </label>
 
-        <!-- Meeting location — in-person / hybrid events only. The organizer's
-             places are quick-fills; you can always type somewhere else. -->
+        <div v-if="isIntelligent" class="intel">
+          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L5.7 21l2.3-7-6-4.6h7.6z" /></svg>
+          <p>A table will be assigned automatically when your invite is accepted.</p>
+        </div>
+
         <div v-if="needsLocation" class="field">
           <span>Meeting location</span>
 
@@ -275,11 +305,10 @@ async function submit() {
           >
         </div>
 
-        <!-- Lounge slot picker -->
         <div v-if="loadingSlots" class="field"><span>Pick a time</span><p class="hint">Loading available slots…</p></div>
 
         <div v-else-if="useSlots" class="field">
-          <span>Pick a lounge slot</span>
+          <span>Pick a time slot</span>
 
           <div class="dates">
             <button
@@ -301,7 +330,6 @@ async function submit() {
           <p v-else class="hint">No slots on this day.</p>
         </div>
 
-        <!-- Fallback: pick a day, then a time — when the lounge has no configured slots -->
         <div v-else class="field">
           <span>Proposed time <em>(optional)</em></span>
 
@@ -355,6 +383,10 @@ async function submit() {
 .search input:focus { border-color: var(--brand-primary); }
 .search svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; fill: none; stroke: var(--brand-primary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.chip { border: 1px solid #e2e8f0; background: #fff; color: #64748b; font: inherit; font-size: .76rem; font-weight: 700; border-radius: 999px; padding: 5px 13px; cursor: pointer; }
+.chip.on { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+
 .state { padding: 28px 0; text-align: center; color: #94a3b8; font-size: .88rem; }
 
 .people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -370,6 +402,10 @@ async function submit() {
 .chosen { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #f7f8fa; border-radius: 12px; margin-bottom: 16px; }
 .chosen strong { display: block; font-size: .92rem; color: #1e293b; }
 .change { border: none; background: none; color: var(--brand-primary); font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; padding: 0; }
+
+.intel { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; background: color-mix(in srgb, var(--brand-primary) 8%, #fff); border: 1px solid color-mix(in srgb, var(--brand-primary) 20%, #fff); border-radius: 12px; margin-bottom: 14px; }
+.intel svg { width: 18px; height: 18px; flex: 0 0 auto; fill: var(--brand-primary); margin-top: 1px; }
+.intel p { margin: 0; font-size: .82rem; color: #475569; line-height: 1.45; }
 
 .field { display: block; margin-bottom: 14px; }
 .field span { display: block; font-size: .82rem; font-weight: 600; color: #334155; margin-bottom: 6px; }

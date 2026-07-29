@@ -8,7 +8,9 @@ use App\Models\ExhibitorConversation;
 use App\Models\ExhibitorMeetingRequest;
 use App\Models\ExhibitorMember;
 use App\Models\ExhibitorMessage;
+use App\Models\Participation;
 use App\Services\Notifications\NotificationService;
+use App\Support\MeetingCapabilities;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -167,6 +169,16 @@ class ExhibitorInboxController extends Controller
         $member = ExhibitorMember::with('contact')
             ->where('exhibitor_id', $exhibitorId)
             ->findOrFail($data['member_id']);
+
+        $attendee = Participation::find($req->participation_id);
+        if ($attendee) {
+            MeetingCapabilities::abortUnlessCanConfirm(
+                (int) $req->event_id,
+                $attendee,
+                MeetingCapabilities::configForEvent((int) $req->event_id),
+                'This attendee has reached their confirmed meeting limit.',
+            );
+        }
 
         $req->update([
             'assigned_member_id' => $member->id,

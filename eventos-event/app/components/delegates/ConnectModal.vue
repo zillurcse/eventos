@@ -6,8 +6,17 @@ const store = useDelegatesStore()
 const meetings = useMeetingsStore()
 const site = useSiteStore()
 const chat = useChatStore()
+const auth = useAuthStore()
 
 const target = computed(() => store.connectTarget)
+
+const targetRole = computed(() => target.value?.role ?? 'attendee')
+const meetEnabled = computed(() =>
+  auth.isAuthed
+  && site.meetingsTabEnabled
+  && meetings.canRequest
+  && meetings.canMeetRole(targetRole.value),
+)
 
 const message = ref('')
 const agenda = ref('')
@@ -30,6 +39,8 @@ const quick = [
 
 interface Lounge {
   enabled: boolean
+  intelligent?: boolean
+  format?: string
   timezone: string
   dates: string[]
   slots: Record<string, string[]>
@@ -39,7 +50,15 @@ interface Lounge {
 }
 const lounge = ref<Lounge | null>(null)
 
-const needsLocation = computed(() => lounge.value?.location_required === true)
+const isIntelligent = computed(() => lounge.value?.intelligent === true || meetings.capabilities?.intelligent === true)
+const isPhysical = computed(() => ['venue', 'hybrid'].includes(lounge.value?.format ?? ''))
+const needsLocation = computed(() => !isIntelligent.value && lounge.value?.location_required === true)
+const useSlots = computed(() => {
+  const l = lounge.value
+  if (!l?.enabled) return false
+  const dates = l.dates.filter(d => (l.slots[d]?.length ?? 0) > 0)
+  return dates.length > 0
+})
 const placeOptions = computed<string[]>(() => lounge.value?.locations ?? [])
 const defaultNote = computed(() =>
   target.value?.name
@@ -68,8 +87,10 @@ watch(target, (t) => {
   messages.value = []
   if (t) {
     agenda.value = `Hello ${t.name || 'there'}, I would like to connect with you.`
+    meetings.fetchCapabilities({ force: true })
     loadLounge()
     if (store.connectTab === 'connect') loadThread()
+    if (store.connectTab === 'meet' && !meetEnabled.value) store.connectTab = 'connect'
   }
 }, { immediate: true })
 
@@ -135,7 +156,10 @@ function fmtDay(iso: string): string {
 const pastDue = computed(() => !!pickedDate.value && isPastDate(pickedDate.value))
 const canSendMeeting = computed(() => {
   if (sending.value || pastDue.value || meetSuccess.value) return false
-  if (lounge.value?.enabled && lounge.value.dates.length && !pickedSlot.value) return false
+  if (isIntelligent.value && isPhysical.value) {
+    return useSlots.value && !!pickedSlot.value
+  }
+  if (useSlots.value && !pickedSlot.value) return false
   if (needsLocation.value && !place.value.trim()) return false
   return true
 })
@@ -212,7 +236,7 @@ async function sendMeeting() {
       <div class="modal" role="dialog" aria-modal="true" :aria-label="store.connectTab === 'connect' ? 'Start chat' : 'Schedule a meeting'">
         <div class="tabs">
           <button type="button" class="tab" :class="{ on: store.connectTab === 'connect' }" @click="store.connectTab = 'connect'">Chat</button>
-          <button type="button" class="tab" :class="{ on: store.connectTab === 'meet' }" @click="store.connectTab = 'meet'">Meet</button>
+          <button v-if="meetEnabled" type="button" class="tab" :class="{ on: store.connectTab === 'meet' }" @click="store.connectTab = 'meet'">Meet</button>
         </div>
 
         <div class="who-block">
@@ -298,6 +322,8 @@ async function sendMeeting() {
 
             <label class="lbl">Notes</label>
             <textarea v-model="agenda" class="notes" rows="3" maxlength="1000" :placeholder="defaultNote" />
+
+            <p v-if="isIntelligent" class="hint-sm intel">A table will be assigned automatically when your invite is accepted.</p>
 
             <template v-if="needsLocation">
               <label class="lbl">Meeting location</label>

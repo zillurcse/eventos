@@ -4,6 +4,7 @@ export interface LoungeBusy { date: string, slot: string }
 
 export interface LoungeAvailability {
   enabled: boolean
+  intelligent: boolean
   slots_open_all: boolean
   timezone: string
   dates: string[]

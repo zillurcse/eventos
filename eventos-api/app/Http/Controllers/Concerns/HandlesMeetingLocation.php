@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Event;
 use App\Models\EventSetting;
+use App\Support\MeetingCapabilities;
 
 /**
  * The "where do we meet?" side of a one-to-one meeting request.
@@ -40,15 +41,17 @@ trait HandlesMeetingLocation
 
     /**
      * Validation rules for the `location` field of a meeting request: required
-     * on a venue/hybrid event, free text otherwise unconstrained. The
-     * organizer's list is a set of suggestions, not a whitelist — the two people
-     * meeting may well agree on a spot the organizer never listed ("Booth B12",
-     * "the coffee bar"), so we take whatever they type.
+     * on a venue/hybrid event unless Intelligent Meeting auto-assigns tables;
+     * free text otherwise unconstrained.
      *
      * @return array<int,mixed>
      */
-    protected function meetingLocationRules(Event $event): array
+    protected function meetingLocationRules(Event $event, ?array $meeting = null): array
     {
+        if ($meeting && MeetingCapabilities::isIntelligent($meeting)) {
+            return ['nullable', 'string', 'max:180'];
+        }
+
         return $this->isPhysicalEvent($event)
             ? ['required', 'string', 'max:180']
             : ['nullable', 'string', 'max:180'];

@@ -1,4 +1,7 @@
 import { defineStore } from 'pinia'
+import { useApi } from '~/composables/useApi'
+import { eventIdentityHeaders, useEventIdentity } from '~/composables/useEventSubdomain'
+import { useSiteStore } from '~/stores/site'
 import type { ReceptionAd } from './reception'
 
 export interface Delegate {
@@ -8,6 +11,7 @@ export interface Delegate {
   job_title: string
   avatar_url: string | null
   online: boolean
+  role?: 'attendee' | 'speaker' | 'exhibitor' | 'sponsor'
   bio?: string
   social?: Record<string, string>
   is_featured?: boolean

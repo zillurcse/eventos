@@ -18,6 +18,7 @@ const selectedStatuses = ref<string[]>([])
 
 onMounted(() => {
   if (!store.loaded) store.fetchMeetings()
+  store.fetchCapabilities({ force: true }).then(() => store.fetchArea())
   store.fetchAds()
 })
 
@@ -115,7 +116,7 @@ const emptyText = computed(() =>
             </select>
           </div>
 
-          <button type="button" class="new" @click="showModal = true">
+          <button type="button" class="new" :disabled="!store.canRequest" @click="showModal = true">
             <svg viewBox="0 0 24 24">
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -135,7 +136,9 @@ const emptyText = computed(() =>
       </div>
 
       <aside class="rail">
-        <div class="afhead">
+        <MeetingsAreaMap v-if="store.intelligent" :tables="store.areaTables" />
+
+        <div class="afhead" :class="{ spaced: store.intelligent }">
           <span>Advance Filter</span>
           <button v-if="hasFilters" type="button" class="clearall" @click="clearAll">Clear All</button>
         </div>
@@ -350,6 +353,12 @@ const emptyText = computed(() =>
   gap: 20px;
   position: sticky;
   top: 16px;
+}
+
+.afhead.spaced {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eef0f3;
 }
 
 .afhead {

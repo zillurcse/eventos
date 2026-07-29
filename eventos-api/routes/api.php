@@ -400,6 +400,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/connections', [ConnectionController::class, 'store']);
             Route::patch('/connections/{connection}', [ConnectionController::class, 'respond']);
             Route::get('/meetings', [MeetingController::class, 'index']);
+            Route::get('/meetings/capabilities', [MeetingController::class, 'capabilities']);
+            Route::get('/meetings/area', [MeetingController::class, 'area']);
+            Route::get('/meetings/partners', [MeetingController::class, 'partners']);
             Route::get('/lounge', [MeetingController::class, 'lounge']);
             Route::post('/meetings', [MeetingController::class, 'store']);
             Route::patch('/meetings/{meeting}', [MeetingController::class, 'respond']);

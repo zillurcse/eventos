@@ -13,6 +13,7 @@ use App\Models\ExhibitorMember;
 use App\Models\ExhibitorMessage;
 use App\Models\Participation;
 use App\Services\Notifications\NotificationService;
+use App\Support\MeetingCapabilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -154,6 +155,17 @@ class ExhibitorContactController extends Controller
         $orgId = (int) $request->attributes->get('organization_id');
         $exh = $this->resolveExhibitor($request, $exhibitor);
         $eventModel = Event::findOrFail($eventId);
+
+        $meP = Participation::findOrFail($me);
+        $meetingConfig = MeetingCapabilities::configForEvent($eventId);
+
+        MeetingCapabilities::abortUnlessMeetingsEnabled($eventId);
+        MeetingCapabilities::abortUnlessAllowsExhibitor($meP, $exh, $meetingConfig);
+        MeetingCapabilities::abortUnlessCanSendRequest(
+            $eventId,
+            $meP,
+            $meetingConfig,
+        );
 
         $data = $request->validate([
             'subject' => ['nullable', 'string', 'max:200'],

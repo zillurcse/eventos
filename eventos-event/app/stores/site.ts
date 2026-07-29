@@ -103,6 +103,12 @@ export const useSiteStore = defineStore('site', {
     logoUrl: (s): string | null => s.site?.branding?.logo_url ?? null,
     navigation: (s): SiteNavigation | null => s.site?.navigation ?? null,
     welcomeVideo: (s): WelcomeVideo | null => s.site?.navigation?.welcome_video ?? null,
+    /** Navigation & Menu › Web App Tabs — Meetings tab enabled (default on). */
+    meetingsTabEnabled: (s): boolean => {
+      const tabs = s.site?.navigation?.tabs
+      if (!tabs?.length) return true
+      return tabs.some(t => t.key === 'meetings' || t.key === 'meeting')
+    },
     poweredBy: (s): string => s.site?.powered_by ?? 'EXPOUSE',
     registrationFormUuid: (s): string | null => s.site?.registration_form_uuid ?? null,
     /** Registration-surface fields of the attendee profile form — what the

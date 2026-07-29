@@ -77,12 +77,19 @@ const badge = computed(() => {
       </div>
     </div>
 
-    <div class="place" :class="{ empty: !meeting.location }">
+    <div class="place" :class="{ empty: !meeting.location && !meeting.allocated_table }">
       <svg viewBox="0 0 24 24">
         <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" />
         <circle cx="12" cy="10" r="2.6" />
       </svg>
-      <span>{{ meeting.location || 'Location not added yet.' }}</span>
+      <span v-if="meeting.allocated_table">{{ meeting.location || meeting.allocated_table.name }}</span>
+      <span v-else>{{ meeting.location || 'Location not added yet.' }}</span>
+    </div>
+
+    <div v-if="meeting.allocated_table" class="table-chip">
+      <span class="table-dot" :class="meeting.allocated_table.design" />
+      <span>{{ meeting.allocated_table.name }}</span>
+      <em v-if="meeting.allocated_table.design">{{ meeting.allocated_table.design }}</em>
     </div>
 
     <div v-if="meeting.can_respond" class="acts">
@@ -96,13 +103,7 @@ const badge = computed(() => {
         @click="store.respond(meeting, 'cancel')">Withdraw</button>
     </div>
     <div v-else-if="isRunning" class="acts">
-      <button type="button" class="btn primary" :disabled="joining" @click="join">{{ joining ? 'Joining…' : 'Join'
-        }}</button>
-    </div>
-    <div v-else class="acts"> 
-        <button type="button" class="btn primary" disabled @click="join">
-          {{ joining ? 'Joining…' : 'Join'}}
-        </button>
+      <button type="button" class="btn primary" :disabled="joining" @click="join">{{ joining ? 'Joining…' : 'Join' }}</button>
     </div>
   </article>
 </template>
@@ -289,6 +290,35 @@ const badge = computed(() => {
   font-weight: 400;
   font-style: italic;
 }
+
+.table-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  color: #334155;
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.table-chip em {
+  font-style: normal;
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+
+.table-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+}
+
+.table-dot.boardroom { background: #6366f1; }
+.table-dot.lounge { background: #14b8a6; }
 
 .acts {
   display: flex;
