@@ -47,7 +47,7 @@ export const useNotificationsStore = defineStore('notifications', {
       n.read_at = new Date().toISOString()
       this.unread = Math.max(0, this.unread - 1)
       const api = useApi()
-      await api(`/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {})
+      await api(`/notifications/${n.id}/read`, { method: 'PATCH', silent: true }).catch(() => {})
     },
 
     async readAll() {
@@ -56,7 +56,7 @@ export const useNotificationsStore = defineStore('notifications', {
       this.items.forEach((n) => { n.read_at = n.read_at ?? now })
       this.unread = 0
       const api = useApi()
-      await api('/notifications/read-all', { method: 'POST' }).catch(() => {})
+      await api('/notifications/read-all', { method: 'POST', silent: true }).catch(() => {})
     },
 
     /** Poll every 45s + refresh when the tab regains focus. Idempotent. */

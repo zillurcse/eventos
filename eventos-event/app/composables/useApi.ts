@@ -1,8 +1,19 @@
+import { toast } from 'vue-sonner'
 import { useAuthStore } from '~/stores/auth'
+
+declare module 'ofetch' {
+  interface FetchOptions {
+    /**
+     * Skip the global 403 toast. Use for intentional probes (e.g. organizer-only
+     * endpoints that attendees are expected to miss).
+     */
+    silent?: boolean
+  }
+}
 
 /**
  * Typed wrapper around $fetch bound to the EventOS API base URL. Attaches the
- * Sanctum bearer token and signs the user out on 401.
+ * Sanctum bearer token, signs the user out on 401, and toasts 403 messages.
  */
 export function useApi() {
   const { public: { apiBase } } = useRuntimeConfig()
@@ -22,8 +33,25 @@ export function useApi() {
 
       options.headers = headers
     },
-    onResponseError({ response }) {
-      if (response.status === 401) auth.logout()
+    onResponseError({ response, options }) {
+      if (response.status === 401) {
+        auth.logout()
+        return
+      }
+
+      if (response.status !== 403 || !import.meta.client) return
+      if (options.silent) return
+
+      const body = response._data as { message?: string } | string | null | undefined
+      const fromBody = typeof body === 'string'
+        ? body
+        : (body?.message || '')
+      const raw = (fromBody || response.statusText || '').trim()
+      const msg = !raw || /^forbidden$/i.test(raw)
+        ? 'You are not allowed to do that.'
+        : raw
+
+      toast.error(msg)
     },
   })
 }

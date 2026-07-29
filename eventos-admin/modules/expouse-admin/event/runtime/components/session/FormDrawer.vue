@@ -274,7 +274,9 @@ async function save() {
       emit('created', newSession)
     }
   } catch (e: any) {
-    error.value = e?.data?.message || 'Could not save session.'
+    error.value = e?.data?.errors?.track_id?.[0]
+      || e?.data?.message
+      || 'Could not save session.'
   } finally {
     saving.value = false
   }

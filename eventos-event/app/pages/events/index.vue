@@ -6,7 +6,7 @@ const events = ref<any[]>([])
 const loaded = ref(false)
 
 onMounted(async () => {
-  try { events.value = (await api<any>('/events')).data } catch { /* attendee w/o org */ }
+  try { events.value = (await api<any>('/events', { silent: true })).data } catch { /* attendee w/o org */ }
   loaded.value = true
 })
 </script>

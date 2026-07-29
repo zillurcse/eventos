@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
 import type { FeedAttachment, FeedPost, FeedType, NewPostPayload } from '~/stores/feed'
 import type { FeedMention } from '~/utils/mentions'
 import { pruneMentions } from '~/utils/mentions'
@@ -254,7 +253,6 @@ async function submit() {
   }
   catch (e: any) {
     const msg = e?.data?.message || e?.response?._data?.message || 'Could not create your post.'
-    toast.error(msg)
     flashError(msg)
   }
 }

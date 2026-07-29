@@ -79,6 +79,109 @@ class ProgramTest extends TestCase
             ->assertJsonValidationErrors(['event', 'title']);
     }
 
+    public function test_cannot_schedule_two_sessions_on_the_same_track_at_overlapping_times(): void
+    {
+        $this->actingAsOrganizer();
+        $eventUuid = $this->createEvent()['id'];
+
+        $trackId = $this->postJson('/api/v1/tracks', [
+            'event' => $eventUuid,
+            'name' => 'Main Stage',
+            'color' => '#3366ff',
+        ])->assertCreated()->json('data.id');
+
+        $otherTrackId = $this->postJson('/api/v1/tracks', [
+            'event' => $eventUuid,
+            'name' => 'Breakout',
+            'color' => '#22aa66',
+        ])->assertCreated()->json('data.id');
+
+        $start = now()->addWeek()->startOfHour();
+        $end = $start->copy()->addHour();
+
+        $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'First talk',
+            'track_id' => $trackId,
+            'starts_at' => $start->toIso8601String(),
+            'ends_at' => $end->toIso8601String(),
+        ])->assertCreated();
+
+        // Same track + overlapping window → rejected.
+        $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'Conflicting talk',
+            'track_id' => $trackId,
+            'starts_at' => $start->copy()->addMinutes(30)->toIso8601String(),
+            'ends_at' => $end->copy()->addMinutes(30)->toIso8601String(),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['track_id']);
+
+        // Same time on a different track is fine.
+        $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'Parallel talk',
+            'track_id' => $otherTrackId,
+            'starts_at' => $start->toIso8601String(),
+            'ends_at' => $end->toIso8601String(),
+        ])->assertCreated();
+
+        // Adjacent (touching endpoint only) on the same track is fine.
+        $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'Next slot',
+            'track_id' => $trackId,
+            'starts_at' => $end->toIso8601String(),
+            'ends_at' => $end->copy()->addHour()->toIso8601String(),
+        ])->assertCreated();
+    }
+
+    public function test_editing_a_session_cannot_move_onto_an_occupied_track_slot(): void
+    {
+        $this->actingAsOrganizer();
+        $eventUuid = $this->createEvent()['id'];
+
+        $trackId = $this->postJson('/api/v1/tracks', [
+            'event' => $eventUuid,
+            'name' => 'Main Stage',
+            'color' => '#3366ff',
+        ])->assertCreated()->json('data.id');
+
+        $start = now()->addWeek()->startOfHour();
+        $end = $start->copy()->addHour();
+
+        $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'Occupied slot',
+            'track_id' => $trackId,
+            'starts_at' => $start->toIso8601String(),
+            'ends_at' => $end->toIso8601String(),
+        ])->assertCreated();
+
+        $movableUuid = $this->postJson('/api/v1/sessions', [
+            'event' => $eventUuid,
+            'title' => 'Movable talk',
+            'track_id' => $trackId,
+            'starts_at' => $end->toIso8601String(),
+            'ends_at' => $end->copy()->addHour()->toIso8601String(),
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/v1/sessions/{$movableUuid}", [
+            'starts_at' => $start->toIso8601String(),
+            'ends_at' => $end->toIso8601String(),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['track_id']);
+
+        // Saving itself without changing the schedule must still succeed.
+        $this->putJson("/api/v1/sessions/{$movableUuid}", [
+            'title' => 'Movable talk (renamed)',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Movable talk (renamed)');
+    }
+
     public function test_creating_a_venue_requires_a_name(): void
     {
         $this->actingAsOrganizer();

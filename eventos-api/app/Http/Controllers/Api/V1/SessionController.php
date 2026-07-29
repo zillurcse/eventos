@@ -12,6 +12,8 @@ use App\Models\Session;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class SessionController extends Controller
 {
@@ -66,6 +68,13 @@ class SessionController extends Controller
         // event's own zone, not the app's UTC default — otherwise a Dhaka
         // organizer's 2pm gets stored as 2pm UTC (8pm Dhaka) instead of 8am UTC.
         $data = $this->utcDates($data, ['starts_at', 'ends_at'], $data['timezone'] ?? $event->resolvedTimezone());
+
+        $this->assertNoTrackTimeConflict(
+            $event->id,
+            $data['track_id'] ?? null,
+            $data['starts_at'] ?? null,
+            $data['ends_at'] ?? null,
+        );
 
         $session = Session::create([
             'event_id'   => $event->id,
@@ -131,6 +140,18 @@ class SessionController extends Controller
         if ($metaUpdate) {
             $coreUpdate['meta'] = array_merge($session->meta ?? [], $metaUpdate);
         }
+
+        // Conflict check uses the resulting schedule after this update — a
+        // title-only edit still needs to remain valid against peers, and a
+        // track/time change must not land on an occupied slot.
+        $this->assertNoTrackTimeConflict(
+            $session->event_id,
+            array_key_exists('track_id', $coreUpdate) ? $coreUpdate['track_id'] : $session->track_id,
+            array_key_exists('starts_at', $coreUpdate) ? $coreUpdate['starts_at'] : $session->starts_at,
+            array_key_exists('ends_at', $coreUpdate) ? $coreUpdate['ends_at'] : $session->ends_at,
+            $session->id,
+            array_key_exists('status', $coreUpdate) ? $coreUpdate['status'] : $session->status,
+        );
 
         $session->update($coreUpdate);
 
@@ -270,6 +291,52 @@ class SessionController extends Controller
             'documents.*.name'    => ['required_with:documents', 'string', 'max:250'],
             'documents.*.url'     => ['required_with:documents', 'string', 'max:2000'],
         ];
+    }
+
+    /**
+     * A track is a single lane on the schedule — two sessions cannot occupy it
+     * at overlapping times. Sessions without a track (or without a start time)
+     * are unrestricted; canceled sessions free the slot.
+     *
+     * Adjacent ranges that only touch at an endpoint (10:00–11:00 then
+     * 11:00–12:00) are allowed.
+     */
+    private function assertNoTrackTimeConflict(
+        int $eventId,
+        mixed $trackId,
+        mixed $startsAt,
+        mixed $endsAt,
+        ?int $excludeSessionId = null,
+        ?string $status = null,
+    ): void {
+        if ($trackId === null || $trackId === '' || $startsAt === null || $startsAt === '') {
+            return;
+        }
+
+        if ($status === 'canceled') {
+            return;
+        }
+
+        $startsAt = $startsAt instanceof Carbon ? $startsAt : Carbon::parse($startsAt);
+        $endsAt = $endsAt !== null && $endsAt !== ''
+            ? ($endsAt instanceof Carbon ? $endsAt : Carbon::parse($endsAt))
+            : $startsAt->copy();
+
+        $conflict = Session::query()
+            ->where('event_id', $eventId)
+            ->where('track_id', $trackId)
+            ->where('status', '!=', 'canceled')
+            ->whereNotNull('starts_at')
+            ->when($excludeSessionId, fn ($q) => $q->where('id', '!=', $excludeSessionId))
+            ->where('starts_at', '<', $endsAt)
+            ->whereRaw('COALESCE(ends_at, starts_at) > ?', [$startsAt])
+            ->exists();
+
+        if ($conflict) {
+            throw ValidationException::withMessages([
+                'track_id' => 'Another session is already scheduled on this track at that time. Choose a different track or time slot.',
+            ]);
+        }
     }
 
     /**

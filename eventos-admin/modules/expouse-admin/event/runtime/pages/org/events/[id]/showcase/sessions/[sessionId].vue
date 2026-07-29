@@ -493,7 +493,9 @@ async function saveBasic() {
     session.value = { ...res.data, speakers: res.data.speakers ?? session.value?.speakers ?? [] }
     toast.success('Session details saved')
   } catch (e: any) {
-    basicError.value = e?.data?.message || 'Could not save changes.'
+    basicError.value = e?.data?.errors?.track_id?.[0]
+      || e?.data?.message
+      || 'Could not save changes.'
     toast.error(basicError.value)
   } finally {
     basicSaving.value = false

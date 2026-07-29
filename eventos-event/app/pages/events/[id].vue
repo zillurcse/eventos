@@ -13,10 +13,10 @@ const live = ref(false)
 let echo: any = null
 
 async function loadFeed() {
-  try { posts.value = (await api<any>(`/events/${id}/feed`)).data } catch { /* not a participant */ }
+  try { posts.value = (await api<any>(`/events/${id}/feed`, { silent: true })).data } catch { /* not a participant */ }
 }
 async function loadAgenda() {
-  try { agenda.value = (await api<any>(`/events/${id}/agenda`)).data } catch { /* no perm */ }
+  try { agenda.value = (await api<any>(`/events/${id}/agenda`, { silent: true })).data } catch { /* no perm */ }
 }
 async function post() {
   if (!newBody.value.trim()) return

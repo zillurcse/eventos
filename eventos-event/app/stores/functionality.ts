@@ -110,7 +110,7 @@ export const useFunctionalityStore = defineStore('functionality', {
       this.loading = true
       try {
         const api = useApi()
-        const res = await api<{ data: CommunicationPayload }>(`/events/${uuid}/communication`)
+        const res = await api<{ data: CommunicationPayload }>(`/events/${uuid}/communication`, { silent: true })
         this.absorb(res.data)
       } catch {
         // Fail open — the API still enforces; UI just shows the full controls.

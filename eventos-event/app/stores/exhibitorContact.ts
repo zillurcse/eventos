@@ -109,6 +109,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
         const api = useApi()
         const res = await api<{ data: { me: string | null, messages: ExhibitorMessage[] } }>(
           `/events/${uuid}/exhibitors/${this.target.id}/thread`,
+          { silent: true },
         )
         this.messages = res.data.messages
         this.me = res.data.me
@@ -186,7 +187,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
       this.loungeLoading = true
       try {
         const api = useApi()
-        const res = await api<{ data: LoungeInfo }>(`/events/${uuid}/lounge`)
+        const res = await api<{ data: LoungeInfo }>(`/events/${uuid}/lounge`, { silent: true })
         this.lounge = res.data
       } catch { /* lounge optional */ } finally {
         this.loungeLoading = false
@@ -200,6 +201,7 @@ export const useExhibitorContactStore = defineStore('exhibitorContact', {
         const api = useApi()
         const res = await api<{ data: ExhibitorMeetingRequest[] }>(
           `/events/${uuid}/exhibitors/${this.target.id}/meeting-requests`,
+          { silent: true },
         )
         this.requests = res.data
       } catch { /* */ }

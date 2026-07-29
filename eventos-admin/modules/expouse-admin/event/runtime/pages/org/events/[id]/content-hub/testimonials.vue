@@ -89,6 +89,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Content Hub</h1>
+    <ContentHubTabs :event-id="id" active="testimonials" />
+
     <div class="mb-4">
       <h2 class="section-title m-0">Testimonials</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Showcase quotes from past attendees, speakers and sponsors.</p>

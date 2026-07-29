@@ -166,7 +166,7 @@ export const useMeetingsStore = defineStore('meetings', {
       this.capabilitiesLoaded = false
       try {
         const api = useApi()
-        const res = await api<{ data: MeetingCapabilities }>(`/events/${uuid}/meetings/capabilities`)
+        const res = await api<{ data: MeetingCapabilities }>(`/events/${uuid}/meetings/capabilities`, { silent: true })
         this.capabilities = res.data
       } catch {
         this.capabilities = null
