@@ -4,9 +4,21 @@ import type { ChatPerson } from '~/stores/chat'
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const chat = useChatStore()
+const site = useSiteStore()
 const pickerOpen = ref(false)
 
-onMounted(() => { if (!chat.loaded) chat.fetchInbox() })
+const chatOn = computed(() => site.chatModuleEnabled)
+
+watch(chatOn, (on) => {
+  if (!on) navigateTo('/reception')
+}, { immediate: true })
+
+onMounted(() => {
+  if (chatOn.value) {
+    chat.fetchCapabilities()
+    if (!chat.loaded) chat.fetchInbox()
+  }
+})
 
 async function pick(person: ChatPerson) {
   pickerOpen.value = false
@@ -18,13 +30,14 @@ const mobileThread = computed(() => !!chat.activeId)
 </script>
 
 <template>
-  <div class="wrap">
+  <div v-if="chatOn" class="wrap">
     <div class="shell" :class="{ 'show-thread': mobileThread }">
       <ChatConversationList
         class="left"
         :conversations="chat.conversations"
         :active-id="chat.activeId"
         :loading="chat.loading"
+        :can-new="chat.canStartChat"
         @select="chat.openConversation($event)"
         @new="pickerOpen = true"
       />

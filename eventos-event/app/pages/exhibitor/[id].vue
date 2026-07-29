@@ -9,6 +9,10 @@ const store = useExhibitorsStore()
 const contact = useExhibitorContactStore()
 const bookmarks = useBookmarksStore()
 const briefcase = useBriefcaseStore()
+const site = useSiteStore()
+const auth = useAuthStore()
+const meetings = useMeetingsStore()
+const chat = useChatStore()
 
 function docKind(url?: string | null) {
   return url ? briefcaseKind(url) : 'file'
@@ -23,37 +27,50 @@ const ex = computed(() => store.detail)
 onMounted(() => {
   store.fetchDetail(id.value)
   bookmarks.fetch()
+  meetings.fetchCapabilities({ force: true })
+  if (auth.isAuthed) chat.fetchCapabilities()
 })
 watch(id, v => v && store.fetchDetail(v))
 
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', id.value))
+const exhibitorRole = computed(() => ex.value?.type === 'sponsor' ? 'sponsor' : 'exhibitor')
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole(exhibitorRole.value),
+)
+const meetEnabled = computed(() => {
+  return auth.isAuthed
+    && site.meetingsTabEnabled
+    && meetings.canRequest
+    && meetings.canMeetRole(exhibitorRole.value)
+})
 
 function openChat() {
-  if (ex.value) {
-    contact.openFor({
-      id: ex.value.id,
-      name: ex.value.name,
-      logo_url: ex.value.logo_url,
-      booth: ex.value.booth,
-      type: ex.value.type,
-      category: ex.value.category,
-    }, 'chat')
-  }
+  if (!chatEnabled.value || !ex.value) return
+  contact.openFor({
+    id: ex.value.id,
+    name: ex.value.name,
+    logo_url: ex.value.logo_url,
+    booth: ex.value.booth,
+    type: ex.value.type,
+    category: ex.value.category,
+  }, 'chat')
 }
 function openMeet() {
-  if (ex.value) {
-    contact.openFor({
-      id: ex.value.id,
-      name: ex.value.name,
-      logo_url: ex.value.logo_url,
-      booth: ex.value.booth,
-      type: ex.value.type,
-      category: ex.value.category,
-    }, 'meet')
-  }
+  if (!meetEnabled.value || !ex.value) return
+  contact.openFor({
+    id: ex.value.id,
+    name: ex.value.name,
+    logo_url: ex.value.logo_url,
+    booth: ex.value.booth,
+    type: ex.value.type,
+    category: ex.value.category,
+  }, 'meet')
 }
 function openShareDetails() {
-  openChat()
+  if (chatEnabled.value) openChat()
+  else if (meetEnabled.value) openMeet()
 }
 
 const copied = ref(false)
@@ -155,11 +172,11 @@ function toggleMemberSaved(i: number) {
           @click="bookmarks.toggle('exhibitor', id)">
           <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         </button>
-        <button class="pill" type="button" @click="openChat">
+        <button v-if="chatEnabled" class="pill" type="button" @click="openChat">
           <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
           Chat
         </button>
-        <button class="pill" type="button" @click="openMeet">
+        <button v-if="meetEnabled" class="pill" type="button" @click="openMeet">
           <svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
           Meet
         </button>

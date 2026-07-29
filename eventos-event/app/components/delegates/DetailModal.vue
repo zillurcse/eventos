@@ -7,20 +7,26 @@ const store = useDelegatesStore()
 const bookmarks = useBookmarksStore()
 const auth = useAuthStore()
 const site = useSiteStore()
+const chat = useChatStore()
 
-const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole(props.delegate.role ?? 'attendee'),
+)
 const meetEnabled = computed(() => {
   const meetings = useMeetingsStore()
   return auth.isAuthed
     && site.meetingsTabEnabled
     && meetings.canRequest
-    && meetings.canMeetRole('attendee')
+    && meetings.canMeetRole(props.delegate.role ?? 'attendee')
 })
 
 const bioExpanded = ref(false)
 
 onMounted(() => {
   useMeetingsStore().fetchCapabilities({ force: true })
+  if (auth.isAuthed) chat.fetchCapabilities()
   window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))

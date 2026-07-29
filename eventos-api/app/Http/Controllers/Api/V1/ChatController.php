@@ -7,8 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\Event;
+use App\Models\EventSetting;
 use App\Models\Participation;
 use App\Services\Gamification\GamificationScorer;
+use App\Support\ChatCapabilities;
+use App\Support\CommunicationCapabilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,7 +21,8 @@ use Illuminate\Http\Request;
  * normalized participation pair (a < b); who may START a chat with whom is
  * governed by the per-event role matrix in event_settings.chat
  * (Communication → Chat in the admin) — replies in an existing thread are
- * always allowed. Messages fan out live over Reverb (NewChatMessage).
+ * always allowed. The whole feature is gated by Navigation › Modules › Chat.
+ * Messages fan out live over Reverb (NewChatMessage).
  */
 class ChatController extends Controller
 {
@@ -28,6 +32,7 @@ class ChatController extends Controller
     /** The signed-in participant's inbox: threads, counterparts, unread. */
     public function index(Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $me = (int) $request->attributes->get('participation_id');
 
         $conversations = ChatConversation::where(function ($q) use ($me) {
@@ -74,12 +79,28 @@ class ChatController extends Controller
     }
 
     /**
+     * GET /events/{event}/chat/capabilities — module flag + allowed target
+     * roles for the caller (Communication › Chats matrix).
+     */
+    public function capabilities(Request $request): JsonResponse
+    {
+        $eventId = (int) $request->attributes->get('event_id');
+        $me = Participation::findOrFail($request->attributes->get('participation_id'));
+        $setting = EventSetting::where('event_id', $eventId)->first();
+
+        return response()->json([
+            'data' => ChatCapabilities::forParticipant($me, $setting),
+        ]);
+    }
+
+    /**
      * Directory of people the current participant may start a chat with —
      * fellow attendees, speakers, exhibitors, sponsors — honoring the
      * event's chat permission matrix, block flags and networking opt-out.
      */
     public function partners(Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $eventId = $request->attributes->get('event_id');
         $me = (int) $request->attributes->get('participation_id');
 
@@ -126,6 +147,7 @@ class ChatController extends Controller
     /** Find-or-create the 1:1 thread with another participant. */
     public function open(Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $eventId = $request->attributes->get('event_id');
         $me = (int) $request->attributes->get('participation_id');
 
@@ -144,8 +166,9 @@ class ChatController extends Controller
 
         // The matrix only gates STARTING a conversation; existing threads stay open.
         if (! $conversation) {
+            $otherRole = CommunicationCapabilities::roleFor($other);
             abort_unless(
-                in_array($other->role ?? 'attendee', $this->allowedTargetRoles($request), true),
+                in_array($otherRole, $this->allowedTargetRoles($request), true),
                 403,
                 'The organizer has not enabled chat with this role.',
             );
@@ -167,6 +190,7 @@ class ChatController extends Controller
     /** Thread history (paginated, oldest-first page) + marks incoming read. */
     public function messages(string $event, string $conversation, Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $me = (int) $request->attributes->get('participation_id');
         $thread = $this->resolveConversation($request, $conversation, $me);
 
@@ -189,6 +213,7 @@ class ChatController extends Controller
     /** Send a message (text and/or attachments) and fan it out over Reverb. */
     public function send(string $event, string $conversation, Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $me = (int) $request->attributes->get('participation_id');
         $thread = $this->resolveConversation($request, $conversation, $me);
 
@@ -237,6 +262,7 @@ class ChatController extends Controller
     /** Mark the whole thread read (badge clearing while the thread is open). */
     public function read(string $event, string $conversation, Request $request): JsonResponse
     {
+        $this->abortUnlessChatEnabled($request);
         $me = (int) $request->attributes->get('participation_id');
         $thread = $this->resolveConversation($request, $conversation, $me);
 
@@ -249,6 +275,11 @@ class ChatController extends Controller
     }
 
     // ── Internals ──────────────────────────────────────────────────────────
+
+    protected function abortUnlessChatEnabled(Request $request): void
+    {
+        ChatCapabilities::abortUnlessEnabled((int) $request->attributes->get('event_id'));
+    }
 
     /** A thread the current participant belongs to, or 404. */
     protected function resolveConversation(Request $request, string $uuid, int $me): ChatConversation
@@ -267,20 +298,10 @@ class ChatController extends Controller
     protected function allowedTargetRoles(Request $request): array
     {
         $me = Participation::find($request->attributes->get('participation_id'));
-        $myRole = in_array($me?->role, self::CHAT_ROLES, true) ? $me->role : 'attendee';
+        $setting = Event::find($request->attributes->get('event_id'))?->settings;
+        $myRole = $me ? CommunicationCapabilities::roleFor($me) : 'attendee';
 
-        $matrix = Event::find($request->attributes->get('event_id'))
-            ?->settings?->chat ?? [];
-        $row = $matrix[$myRole] ?? null;
-
-        if (! is_array($row)) {
-            return self::CHAT_ROLES;
-        }
-
-        return array_values(array_filter(
-            self::CHAT_ROLES,
-            fn ($role) => (bool) ($row[$role] ?? true),
-        ));
+        return ChatCapabilities::allowedTargetRoles($setting, $myRole);
     }
 
     /** Directory projection of a participation (mirrors DelegateController). */

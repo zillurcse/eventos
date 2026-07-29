@@ -5,6 +5,7 @@ const props = defineProps<{
   conversations: ChatConversationItem[]
   activeId: string | null
   loading?: boolean
+  canNew?: boolean
 }>()
 
 defineEmits<{
@@ -28,7 +29,7 @@ const ROLE_CLS: Record<string, string> = { speaker: 'speaker', exhibitor: 'exhib
   <aside class="pane">
     <header class="head">
       <h2>Messaging</h2>
-      <button class="new" type="button" title="New chat" @click="$emit('new')">
+      <button v-if="canNew !== false" class="new" type="button" title="New chat" @click="$emit('new')">
         <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
         New chat
       </button>

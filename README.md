@@ -7,6 +7,7 @@ one `docker-compose.yml` runs the whole stack locally.
 eventos-api/     Laravel 13 API (PHP 8.3) — domain logic, builders, billing, queues, real-time
 eventos-admin/   Nuxt 4 SPA — Super-Admin control plane
 eventos-event/   Nuxt 4 SPA — Organizer + attendee experience
+eventos-mobile/  Flutter app — attendee iOS/Android client
 docker/          Shared container configs (postgres init, nginx vhost)
 ```
 

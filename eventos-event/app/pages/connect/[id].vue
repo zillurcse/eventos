@@ -15,7 +15,7 @@ const loading = ref(true)
 const state = ref<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
 const isSelf = computed(() => !!chat.me && chat.me === id.value)
-const chatOn = computed(() => site.navigation?.modules?.chat !== false)
+const chatOn = computed(() => site.chatModuleEnabled)
 
 
 async function load() {

@@ -43,6 +43,12 @@ export interface ChatMessageItem {
   created_at: string | null
 }
 
+export interface ChatCapabilities {
+  enabled: boolean
+  role: 'attendee' | 'speaker' | 'exhibitor' | 'sponsor' | string
+  allowed_roles: Array<'attendee' | 'speaker' | 'exhibitor' | 'sponsor' | string>
+}
+
 interface LiveChatPayload {
   conversation_id: string
   message: {
@@ -95,16 +101,55 @@ export const useChatStore = defineStore('chat', {
     sending: false,
     subscribed: false,
     exhibitorChannel: null as string | null,
+    capabilities: null as ChatCapabilities | null,
+    capabilitiesLoaded: false,
   }),
 
   getters: {
     unreadTotal: s => s.conversations.reduce((n, c) => n + c.unread, 0),
     active: s => s.conversations.find(c => c.id === s.activeId) ?? null,
+
+    /** Navigation module on AND at least one role allowed by the Chats matrix. */
+    canStartChat: (s): boolean => {
+      if (!useSiteStore().chatModuleEnabled) return false
+      if (s.capabilities?.enabled === false) return false
+      const allowed = s.capabilities?.allowed_roles
+      if (allowed && allowed.length === 0) return false
+      return true
+    },
+
+    /**
+     * Whether the signed-in participant may start a chat with someone of
+     * this role (Communication › Chats matrix). Fail-open until loaded.
+     */
+    canChatRole: (s) => (role: string): boolean => {
+      if (!useSiteStore().chatModuleEnabled) return false
+      if (s.capabilities?.enabled === false) return false
+      const allowed = s.capabilities?.allowed_roles
+      if (!s.capabilitiesLoaded || !allowed) return true
+      return allowed.includes(role)
+    },
   },
 
   actions: {
     eventUuid(): string | null {
       return useSiteStore().event?.uuid ?? null
+    },
+
+    /** Role matrix from Admin → Communication → Chats. */
+    async fetchCapabilities(options?: { force?: boolean }) {
+      if (this.capabilitiesLoaded && !options?.force) return
+      const uuid = this.eventUuid()
+      if (!uuid) return
+      try {
+        const api = useApi()
+        const res = await api<{ data: ChatCapabilities }>(`/events/${uuid}/chat/capabilities`)
+        this.capabilities = res.data
+      } catch {
+        this.capabilities = null
+      } finally {
+        this.capabilitiesLoaded = true
+      }
     },
 
     toggleDrawer() {

@@ -10,14 +10,20 @@ const sessionsStore = useSessionsStore()
 const bookmarks = useBookmarksStore()
 const auth = useAuthStore()
 const site = useSiteStore()
+const chat = useChatStore()
 
-const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole('speaker'),
+)
 
 const bioExpanded = ref(false)
 
 onMounted(() => {
   if (!sessionsStore.loaded && !sessionsStore.loading) sessionsStore.fetchSessions()
   useMeetingsStore().fetchCapabilities({ force: true })
+  if (auth.isAuthed) chat.fetchCapabilities()
   window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))

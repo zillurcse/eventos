@@ -109,6 +109,8 @@ export const useSiteStore = defineStore('site', {
       if (!tabs?.length) return true
       return tabs.some(t => t.key === 'meetings' || t.key === 'meeting')
     },
+    /** Navigation & Menu › Modules › Chat (default on). */
+    chatModuleEnabled: (s): boolean => s.site?.navigation?.modules?.chat !== false,
     poweredBy: (s): string => s.site?.powered_by ?? 'EXPOUSE',
     registrationFormUuid: (s): string | null => s.site?.registration_form_uuid ?? null,
     /** Registration-surface fields of the attendee profile form — what the

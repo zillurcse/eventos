@@ -91,7 +91,10 @@ const tabAlignment = computed(() => site.navigation?.alignment || 'left')
  * drawer below, so a switched-off chat isn't quietly fetching an inbox nobody
  * can open.
  */
-const mod = (key: string) => site.navigation?.modules?.[key] !== false
+const mod = (key: string) => {
+  if (key === 'chat') return site.chatModuleEnabled
+  return site.navigation?.modules?.[key] !== false
+}
 const auth = useAuthStore()
 const notifications = useNotificationsStore()
 const chat = useChatStore()
@@ -99,6 +102,10 @@ const presence = usePresenceStore()
 const briefcase = useBriefcaseStore()
 const leaderboard = useLeaderboardStore()
 const profile = useProfileStore()
+
+watch(() => site.chatModuleEnabled, (on) => {
+  if (!on && chat.drawerOpen) chat.closeDrawer()
+})
 
 const menuOpen = ref(false)
 const bellOpen = ref(false)
@@ -124,6 +131,7 @@ function bootShell() {
   if (mod('notifications')) notifications.start()
   // Kick shell data in parallel — don't serialize 3–4 RTTs after login.
   void Promise.all([
+    mod('chat') ? chat.fetchCapabilities() : Promise.resolve(),
     mod('chat') && !chat.loaded ? chat.fetchInbox() : Promise.resolve(),
     mod('briefcase') ? briefcase.fetch() : Promise.resolve(),
     // So the header avatar shows the same photo the Edit Profile page saves —

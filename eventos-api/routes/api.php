@@ -378,6 +378,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/sessions/{sessionUuid}/mutes/{participation}', [SessionEngagementController::class, 'muteDestroy']);
             // One-to-one participant chat (attendee ↔ attendee/speaker/exhibitor).
             Route::get('/chat', [ChatController::class, 'index']);
+            Route::get('/chat/capabilities', [ChatController::class, 'capabilities']);
             Route::get('/chat/partners', [ChatController::class, 'partners']);
             Route::post('/chat', [ChatController::class, 'open']);
             Route::get('/chat/{conversation}/messages', [ChatController::class, 'messages']);

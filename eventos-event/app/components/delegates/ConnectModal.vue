@@ -11,6 +11,11 @@ const auth = useAuthStore()
 const target = computed(() => store.connectTarget)
 
 const targetRole = computed(() => target.value?.role ?? 'attendee')
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole(targetRole.value),
+)
 const meetEnabled = computed(() =>
   auth.isAuthed
   && site.meetingsTabEnabled
@@ -88,13 +93,32 @@ watch(target, (t) => {
   if (t) {
     agenda.value = `Hello ${t.name || 'there'}, I would like to connect with you.`
     meetings.fetchCapabilities({ force: true })
+    chat.fetchCapabilities()
     loadLounge()
+    // Prefer the requested tab, but fall back when that feature is off.
+    if (store.connectTab === 'connect' && !chatEnabled.value && meetEnabled.value) {
+      store.connectTab = 'meet'
+    }
+    else if (store.connectTab === 'meet' && !meetEnabled.value && chatEnabled.value) {
+      store.connectTab = 'connect'
+    }
+    else if (!chatEnabled.value && !meetEnabled.value) {
+      store.closeConnect()
+      return
+    }
     if (store.connectTab === 'connect') loadThread()
-    if (store.connectTab === 'meet' && !meetEnabled.value) store.connectTab = 'connect'
   }
 }, { immediate: true })
 
 watch(() => store.connectTab, (tab) => {
+  if (tab === 'connect' && !chatEnabled.value) {
+    store.connectTab = meetEnabled.value ? 'meet' : 'connect'
+    return
+  }
+  if (tab === 'meet' && !meetEnabled.value) {
+    store.connectTab = chatEnabled.value ? 'connect' : 'meet'
+    return
+  }
   if (tab === 'connect' && target.value && !threadId.value && !threadLoading.value) {
     loadThread()
   }
@@ -234,9 +258,25 @@ async function sendMeeting() {
       </button>
 
       <div class="modal" role="dialog" aria-modal="true" :aria-label="store.connectTab === 'connect' ? 'Start chat' : 'Schedule a meeting'">
-        <div class="tabs">
-          <button type="button" class="tab" :class="{ on: store.connectTab === 'connect' }" @click="store.connectTab = 'connect'">Chat</button>
-          <button v-if="meetEnabled" type="button" class="tab" :class="{ on: store.connectTab === 'meet' }" @click="store.connectTab = 'meet'">Meet</button>
+        <div v-if="chatEnabled || meetEnabled" class="tabs">
+          <button
+            v-if="chatEnabled"
+            type="button"
+            class="tab"
+            :class="{ on: store.connectTab === 'connect' }"
+            @click="store.connectTab = 'connect'"
+          >
+            Chat
+          </button>
+          <button
+            v-if="meetEnabled"
+            type="button"
+            class="tab"
+            :class="{ on: store.connectTab === 'meet' }"
+            @click="store.connectTab = 'meet'"
+          >
+            Meet
+          </button>
         </div>
 
         <div class="who-block">
@@ -253,7 +293,7 @@ async function sendMeeting() {
         </div>
 
         <!-- ── Chat ── -->
-        <section v-if="store.connectTab === 'connect'" class="pane">
+        <section v-if="store.connectTab === 'connect' && chatEnabled" class="pane">
           <div v-if="threadLoading" class="hint">Loading…</div>
           <div v-else-if="messages.length" class="thread">
             <div

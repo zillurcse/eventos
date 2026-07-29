@@ -4,11 +4,19 @@ import type { SimilarDelegate } from '~/stores/delegates'
 const store = useDelegatesStore()
 const site = useSiteStore()
 const auth = useAuthStore()
+const chat = useChatStore()
 
-const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole('attendee'),
+)
+
+onMounted(() => { if (auth.isAuthed) chat.fetchCapabilities() })
 
 function open(d: SimilarDelegate) {
-  store.openConnect(d)
+  if (!chatEnabled.value) return
+  store.openConnect({ ...d, role: d.role ?? 'attendee' })
 }
 </script>
 

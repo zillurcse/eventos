@@ -6,16 +6,23 @@ const store = useDelegatesStore()
 const bookmarks = useBookmarksStore()
 const site = useSiteStore()
 const auth = useAuthStore()
+const chat = useChatStore()
 
 const bookmarked = computed(() => bookmarks.isOn('delegate', props.delegate.id))
-const chatEnabled = computed(() => auth.isAuthed && site.navigation?.modules?.chat !== false)
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole(props.delegate.role ?? 'attendee'),
+)
+
+onMounted(() => { if (auth.isAuthed) chat.fetchCapabilities() })
 
 function openDetail() {
   store.open(props.delegate)
 }
 
 function contact() {
-  store.openConnect(props.delegate, 'connect')
+  store.openConnect({ ...props.delegate, role: props.delegate.role ?? 'attendee' }, 'connect')
 }
 </script>
 

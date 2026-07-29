@@ -142,7 +142,14 @@ function visitExhibitor() {
               <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z" /></svg>
               Conversations
             </span>
-            <button class="hbtn" type="button" title="New chat" aria-label="New chat" @click="pickerOpen = true">
+            <button
+              v-if="chat.canStartChat"
+              class="hbtn"
+              type="button"
+              title="New chat"
+              aria-label="New chat"
+              @click="pickerOpen = true"
+            >
               <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
             </button>
             <button class="hbtn" type="button" title="Search" aria-label="Search" @click="searchOpen = !searchOpen">

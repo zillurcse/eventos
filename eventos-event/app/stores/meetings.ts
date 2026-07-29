@@ -67,6 +67,8 @@ export interface MeetingAllocatedTable {
 export interface MeetingAreaTable extends MeetingAllocatedTable {
   bookings: Array<{ date: string, slot: string, status: string }>
 }
+
+export interface MeetingPartner {
   id: string
   name: string
   role: 'attendee' | 'speaker' | 'exhibitor' | 'sponsor'

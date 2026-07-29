@@ -6,8 +6,12 @@ const contact = useExhibitorContactStore()
 const meetings = useMeetingsStore()
 const site = useSiteStore()
 const auth = useAuthStore()
+const chat = useChatStore()
 
-onMounted(() => meetings.fetchCapabilities({ force: true }))
+onMounted(() => {
+  meetings.fetchCapabilities({ force: true })
+  if (auth.isAuthed) chat.fetchCapabilities()
+})
 
 const exhibitorRole = computed(() =>
   props.exhibitor.type === 'sponsor' ? 'sponsor' : 'exhibitor',
@@ -18,6 +22,11 @@ const meetEnabled = computed(() =>
   && meetings.canRequest
   && meetings.canMeetRole(exhibitorRole.value),
 )
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chat.canChatRole(exhibitorRole.value),
+)
 
 const bookmarks = useBookmarksStore()
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', props.exhibitor.id))
@@ -27,6 +36,7 @@ function toggleBookmark() {
 }
 
 function openChat() {
+  if (!chatEnabled.value) return
   contact.openFor({
     id: props.exhibitor.id,
     name: props.exhibitor.name,
@@ -89,7 +99,7 @@ const coverUrl = computed(() => {
     <div class="reveal" @click.stop>
       <div class="reveal-inner">
         <div class="actions">
-          <button type="button" class="act" @click="openChat">
+          <button v-if="chatEnabled" type="button" class="act" @click="openChat">
             <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
             Chat
           </button>

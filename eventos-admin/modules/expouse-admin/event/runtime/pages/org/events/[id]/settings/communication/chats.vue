@@ -71,7 +71,7 @@ onMounted(load)
     <div class="mb-4">
       <h2 class="section-title m-0">Chat</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">
-        Assign user authentication to requests chat within whom.
+        Choose which roles may start a chat with which other roles. Unchecked cells hide Chat on the event app for that pair.
       </p>
     </div>
 

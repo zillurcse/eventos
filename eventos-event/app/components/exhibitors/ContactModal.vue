@@ -5,6 +5,7 @@ const contact = useExhibitorContactStore()
 const meetings = useMeetingsStore()
 const site = useSiteStore()
 const auth = useAuthStore()
+const chatStore = useChatStore()
 
 const exhibitorRole = computed(() =>
   contact.target?.type === 'sponsor' ? 'sponsor' : 'exhibitor',
@@ -14,6 +15,11 @@ const meetEnabled = computed(() =>
   && site.meetingsTabEnabled
   && meetings.canRequest
   && meetings.canMeetRole(exhibitorRole.value),
+)
+const chatEnabled = computed(() =>
+  auth.isAuthed
+  && site.chatModuleEnabled
+  && chatStore.canChatRole(exhibitorRole.value),
 )
 
 const draft = ref('')
@@ -99,7 +105,10 @@ watch(() => contact.target?.id, (id) => {
     : ''
   if (id) {
     meetings.fetchCapabilities({ force: true })
-    if (!meetEnabled.value && contact.tab === 'meet') contact.tab = 'chat'
+    chatStore.fetchCapabilities()
+    if (!chatEnabled.value && contact.tab === 'chat' && meetEnabled.value) contact.tab = 'meet'
+    else if (!meetEnabled.value && contact.tab === 'meet' && chatEnabled.value) contact.tab = 'chat'
+    else if (!chatEnabled.value && !meetEnabled.value) contact.close()
   }
 })
 
@@ -158,8 +167,16 @@ async function sendMeeting() {
       </button>
 
       <div class="modal" role="dialog" aria-modal="true" :aria-label="contact.tab === 'chat' ? 'Start chat' : 'Schedule a meeting'">
-        <div class="tabs">
-          <button type="button" class="tab" :class="{ on: contact.tab === 'chat' }" @click="contact.tab = 'chat'">Chat</button>
+        <div v-if="chatEnabled || meetEnabled" class="tabs">
+          <button
+            v-if="chatEnabled"
+            type="button"
+            class="tab"
+            :class="{ on: contact.tab === 'chat' }"
+            @click="contact.tab = 'chat'"
+          >
+            Chat
+          </button>
           <button
             v-if="meetEnabled"
             type="button"
@@ -186,7 +203,7 @@ async function sendMeeting() {
         </div>
 
         <!-- ── Chat ── -->
-        <section v-if="contact.tab === 'chat'" class="pane">
+        <section v-if="contact.tab === 'chat' && chatEnabled" class="pane">
           <div v-if="contact.threadLoading" class="hint">Loading…</div>
           <div v-else-if="contact.messages.length" class="thread">
             <div
