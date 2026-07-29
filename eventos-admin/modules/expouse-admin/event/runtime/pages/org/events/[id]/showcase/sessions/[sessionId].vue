@@ -1033,8 +1033,7 @@ onMounted(load)
             <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Streaming Settings</h3>
 
             <div class="mb-4">
-              <label class="block mb-1.5">Who will host?</label>
-              <select v-model="stream.who_will_host" class="m-0 w-full max-w-xs">
+              <AppSelect v-model="stream.who_will_host" label="Who will host?" class="w-full max-w-xs">
                 <option value="self">Self-hosted</option>
                 <option value="youtube">YouTube</option>
                 <option value="vimeo">Vimeo</option>
@@ -1043,7 +1042,7 @@ onMounted(load)
                 <option value="zoom">Zoom</option>
                 <option value="meet">Google Meet</option>
                 <option value="rtmp">RTMP</option>
-              </select>
+              </AppSelect>
             </div>
 
             <!-- Vimeo uses a numeric Live ID; every other host uses a link. -->
@@ -1073,12 +1072,12 @@ onMounted(load)
               By schedule, the player opens 15 minutes before the start time and stays up
               30 minutes past the end. Override it here when you run early or late.
             </p>
-            <select v-model="stream.status" class="m-0 w-full max-w-xs">
+            <AppSelect v-model="stream.status" class="w-full max-w-xs">
               <option value="scheduled">Follow the schedule</option>
               <option value="live">Live now (open the player)</option>
               <option value="ended">Ended (show the replay)</option>
               <option value="canceled">Canceled</option>
-            </select>
+            </AppSelect>
           </div>
         </template>
 
@@ -1116,11 +1115,11 @@ onMounted(load)
                    yourself — this is about who else may. -->
               <div v-if="stream.can_qa" class="ml-8">
                 <div class="font-medium text-ink text-[.93rem] mb-1">Who can reply to questions</div>
-                <select v-model="stream.qa_answer_policy" class="m-0 w-full max-w-sm">
+                <AppSelect v-model="stream.qa_answer_policy" class="w-full max-w-sm">
                   <option value="organizers">Organizers only</option>
                   <option value="hosts">Organizers and this session’s speakers</option>
                   <option value="everyone">Anyone in the session</option>
-                </select>
+                </AppSelect>
                 <p class="muted text-[.8rem] mt-1.5 mb-0">
                   <template v-if="stream.qa_answer_policy === 'organizers'">
                     Speakers can still ask and upvote, but answers come from your team only.
@@ -1169,7 +1168,7 @@ onMounted(load)
       </div>
 
       <!-- ── Engagement Tab ──────────────────────────────────────────────── -->
-      <div v-else-if="activeTab === 'engagement'" class="max-w-2xl">
+      <div v-else-if="activeTab === 'engagement'" class="w-full">
 
         <!-- Polls -->
         <div class="card mb-5 p-5">
