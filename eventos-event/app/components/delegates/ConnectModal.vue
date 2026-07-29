@@ -135,7 +135,9 @@ async function loadThread() {
     messages.value = await chat.loadMessages(convo.id)
   }
   catch (e: any) {
-    chatError.value = e?.data?.message || 'Chat is not available with this person.'
+    const msg = e?.data?.message || e?.response?._data?.message || 'Chat is not available with this person.'
+    chatError.value = msg
+    toast.error(msg)
   }
   finally {
     threadLoading.value = false
@@ -206,7 +208,9 @@ async function sendChat() {
     }
   }
   catch (e: any) {
-    chatError.value = e?.data?.message || e?.message || 'Could not send your message.'
+    const msg = e?.data?.message || e?.response?._data?.message || e?.message || 'Could not send your message.'
+    chatError.value = msg
+    toast.error(msg)
   }
   finally {
     sending.value = false
@@ -243,7 +247,9 @@ async function sendMeeting() {
       toast.success('Meeting request sent!')
     }
     else {
-      meetError.value = meetings.lastError || 'Could not send the meeting request.'
+      const msg = meetings.lastError || 'Could not send the meeting request.'
+      meetError.value = msg
+      toast.error(msg)
     }
   }
   finally { sending.value = false }

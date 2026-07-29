@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
 import type { FeedAttachment, FeedPost, FeedType, NewPostPayload } from '~/stores/feed'
 import type { FeedMention } from '~/utils/mentions'
 import { pruneMentions } from '~/utils/mentions'
@@ -242,12 +243,19 @@ async function submit() {
   if (mode.value === 'poll') payload.poll = { options: validPollOptions.value, allow_multiple: allowMultiple.value }
   if (mode.value === 'looking_for' || mode.value === 'offering') payload.tags = tags.value
 
-  const post = await feed.createPost(payload)
-  reset()
-  if (post && post.status !== 'published') {
-    pendingNotice.value = true
-    clearTimeout(noticeTimer)
-    noticeTimer = setTimeout(() => { pendingNotice.value = false }, 8000)
+  try {
+    const post = await feed.createPost(payload)
+    reset()
+    if (post && post.status !== 'published') {
+      pendingNotice.value = true
+      clearTimeout(noticeTimer)
+      noticeTimer = setTimeout(() => { pendingNotice.value = false }, 8000)
+    }
+  }
+  catch (e: any) {
+    const msg = e?.data?.message || e?.response?._data?.message || 'Could not create your post.'
+    toast.error(msg)
+    flashError(msg)
   }
 }
 </script>
