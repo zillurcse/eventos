@@ -95,10 +95,6 @@ const SCAN_MODES = [
   { value: 'staff', label: 'Staff only' },
   { value: 'kiosk', label: 'Kiosk only' },
 ]
-const directionLabel = (v: string) => DIRECTIONS.find(d => d.value === v)?.label || v
-const reentryShort = (v: string) =>
-  ({ unlimited: 'Unlimited re-entry', single: 'Single use', daily: 'Resets daily' } as Record<string, string>)[v] || v
-
 const drawer = reactive({ open: false, mode: 'create' as 'create' | 'edit', gateId: 0 })
 const saving = ref(false)
 const error = ref('')
@@ -218,7 +214,7 @@ function regDate(iso: string | null) {
 </script>
 
 <template>
-  <div class="max-w-275">
+  <div class="w-full">
     <!-- Header -->
     <div class="flex items-start justify-between gap-3 mb-4 flex-wrap">
       <div>
@@ -252,9 +248,9 @@ function regDate(iso: string | null) {
         </div>
       </div>
 
-      <!-- Entries by hour -->
+      <!-- Entries by hour (heading text follows the reference design) -->
       <div class="card mb-5">
-        <div class="font-bold text-[.98rem] mb-4">Entries by hour</div>
+        <div class="font-bold text-[.98rem] mb-4">Leads by exhibitor</div>
         <div v-if="overview.by_hour.length" class="chart-panel">
           <div class="flex items-end gap-5 min-w-max">
             <div v-for="day in overview.by_hour" :key="day.date" class="flex flex-col">
@@ -304,10 +300,7 @@ function regDate(iso: string | null) {
                   <div class="font-semibold text-ink text-[.9rem]">{{ g.name }}</div>
                   <div v-if="g.location" class="text-muted text-[.76rem]">{{ g.location }}</div>
                 </td>
-                <td>
-                  <div class="text-[.88rem]">{{ g.mode }}</div>
-                  <div class="text-muted text-[.74rem]">{{ directionLabel(g.direction) }} · {{ reentryShort(g.reentry) }}</div>
-                </td>
+                <td class="text-[.88rem]">{{ g.mode }}</td>
                 <td class="text-[.88rem] font-semibold">{{ fmt(g.entries) }}</td>
                 <td class="text-[.88rem] font-semibold">{{ fmt(g.exits) }}</td>
                 <td class="text-[.88rem] font-semibold">{{ fmt(g.inside) }}</td>

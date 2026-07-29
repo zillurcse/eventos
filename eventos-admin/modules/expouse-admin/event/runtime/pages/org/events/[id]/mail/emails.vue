@@ -16,6 +16,11 @@ const selected = ref<(string | number)[]>([])
 const openMenuId = ref<string | null>(null)
 const saving = ref(false)
 
+// The popover is teleported to <body> so it can't be clipped by the table's
+// own overflow/scroll container; position is computed from the trigger
+// button's rect each time it opens, right-edge aligned like the old absolute layout.
+const menuPos = reactive({ top: 0, right: 0 })
+
 const testModal = ref<{ row: MailEmail } | null>(null)
 const testEmail = ref('')
 const testSending = ref(false)
@@ -267,8 +272,12 @@ function openNew() {
   persist().then(() => navigateTo(editRoute(id)))
 }
 
-function toggleMenu(id: string) {
-  openMenuId.value = openMenuId.value === id ? null : id
+function toggleMenu(id: string, e: MouseEvent) {
+  if (openMenuId.value === id) { openMenuId.value = null; return }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  menuPos.top = rect.bottom + 4
+  menuPos.right = window.innerWidth - rect.right
+  openMenuId.value = id
 }
 
 function onDocClick() {
@@ -297,20 +306,20 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="flex items-center gap-4 flex-wrap mb-4">
-      <div class="tabs !mb-0 flex-1 min-w-0">
-        <button class="tab" :class="{ active: tab === 'automated' }" @click="tab = 'automated'">Automated</button>
-        <button class="tab" :class="{ active: tab === 'manual' }" @click="tab = 'manual'">Manual</button>
+      <div class="tabs border-b-0 !mb-0 flex-1 min-w-0">
+        <button class="tab font-bold" :class="{ active: tab === 'automated' }" @click="tab = 'automated'">Automated</button>
+        <button class="tab font-bold" :class="{ active: tab === 'manual' }" @click="tab = 'manual'">Manual</button>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <SearchInput v-model="search" placeholder="Search" class="w-[220px]" />
-        <select v-model="sortBy" class="w-auto m-0 py-2 px-3 text-[.85rem] h-10">
+        <SearchInput v-model="search" placeholder="Search" class="search-lg w-60" />
+        <AppSelect v-model="sortBy" class="w-44">
           <option value="name">Sort by</option>
           <option value="name">Name</option>
           <option value="status">Status</option>
           <option value="sent_to">Sent to</option>
           <option value="date_label">Date</option>
-        </select>
-        <button class="btn" @click="openNew">
+        </AppSelect>
+        <button class="btn bg-brand" @click="openNew">
           <AppIcon name="plus" class="w-[14px] h-[14px]" /> New Email
         </button>
       </div>
@@ -327,6 +336,9 @@ onBeforeUnmount(() => {
       row-key="id"
       storage-key="mail-emails"
       empty-text="No emails yet. Click + New Email to get started."
+      per-page-label="Records per page"
+      :show-range-text="false"
+      class="round-pager"
     >
       <template #cell-emails="{ row }">
         <div class="min-w-0">
@@ -336,12 +348,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template #cell-status="{ row }">
-        <span
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[.72rem] font-semibold"
-          :class="row.status === 'draft'
-            ? 'bg-[#fef3c7] text-[#92400e]'
-            : 'bg-[#dcfce7] text-[#15803d]'"
-        >{{ row.status === 'draft' ? 'Draft' : 'Active' }}</span>
+        <span class="badge" :class="row.status === 'draft' ? 'draft' : 'active'">{{ row.status === 'draft' ? 'Draft' : 'Active' }}</span>
       </template>
 
       <template #cell-sent_to="{ row }">
@@ -400,31 +407,35 @@ onBeforeUnmount(() => {
               type="button"
               class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer"
               aria-label="Actions"
-              @click="toggleMenu(row.id)"
+              @click="toggleMenu(row.id, $event)"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
             </button>
-            <div
-              v-if="openMenuId === row.id"
-              class="absolute right-0 top-full mt-1 bg-white border border-[#1a1a2e] rounded-lg shadow-lg z-30 min-w-[160px] overflow-hidden py-1"
-            >
-              <NuxtLink
-                :to="editRoute(row.id)"
-                class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
-                @click="openMenuId = null"
-              >Edit Email</NuxtLink>
-              <button
-                type="button"
-                class="block w-full text-left px-4 py-2.5 text-[.88rem] text-ink hover:bg-[#f7f8fa] bg-transparent border-0 cursor-pointer"
-                @click="openTestModal(row)"
-              >Send Test Email</button>
-              <NuxtLink
-                :to="reportRoute(row.id, '#analytics')"
-                class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
-                @click="openMenuId = null"
-              >Analytics</NuxtLink>
-              <button class="block w-full text-left px-4 py-2.5 text-[.88rem] text-[#dc2626] hover:bg-[#fef2f2] bg-transparent border-0 cursor-pointer" @click="removeEmail(row)">Delete</button>
-            </div>
+            <Teleport to="body">
+              <div
+                v-if="openMenuId === row.id"
+                class="bg-white border border-[#1a1a2e] rounded-lg shadow-lg z-30 min-w-40 overflow-hidden py-1"
+                :style="{ position: 'fixed', top: menuPos.top + 'px', right: menuPos.right + 'px', left: 'auto' }"
+                @click.stop
+              >
+                <NuxtLink
+                  :to="editRoute(row.id)"
+                  class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
+                  @click="openMenuId = null"
+                >Edit Email</NuxtLink>
+                <button
+                  type="button"
+                  class="block w-full text-left px-4 py-2.5 text-[.88rem] text-ink hover:bg-[#f7f8fa] bg-transparent border-0 cursor-pointer"
+                  @click="openTestModal(row)"
+                >Send Test Email</button>
+                <NuxtLink
+                  :to="reportRoute(row.id, '#analytics')"
+                  class="block w-full text-left px-4 py-2.5 text-[.88rem] no-underline text-ink hover:bg-[#f7f8fa]"
+                  @click="openMenuId = null"
+                >Analytics</NuxtLink>
+                <button class="block w-full text-left px-4 py-2.5 text-[.88rem] text-[#dc2626] hover:bg-[#fef2f2] bg-transparent border-0 cursor-pointer" @click="removeEmail(row)">Delete</button>
+              </div>
+            </Teleport>
           </div>
         </div>
       </template>
@@ -465,3 +476,11 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Bump the shared SearchInput up to match the taller Sort-by control here. */
+.search-lg :deep(input) { height: 3rem; }
+
+/* Circular prev/next + page buttons, scoped to this page's table only. */
+.round-pager :deep(.dt-page-btn) { border-radius: 9999px; }
+</style>

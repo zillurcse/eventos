@@ -14,6 +14,8 @@ const props = withDefaults(defineProps<{
   hint?: string
   removable?: boolean
   cardWidth?: string
+  /** Hide the built-in dashed "add" tile — use when a caller triggers the picker from its own button via the exposed `open()` method. */
+  hideEmpty?: boolean
 }>(), { removable: true })
 
 const emit = defineEmits<{
@@ -78,6 +80,8 @@ function remove(index: number) {
 function view(url: string) {
   window.open(url, '_blank', 'noopener')
 }
+
+defineExpose({ open: () => openChooser(null) })
 </script>
 
 <template>
@@ -134,7 +138,7 @@ function view(url: string) {
       </button> -->
       <!-- EMPTY CARD (Add new image) -->
         <div class="card-empty" :style="{ width: cardW, aspectRatio: cardAspect }" @click="openChooser(null)"
-            v-if="canAdd">
+            v-if="canAdd && !hideEmpty">
             <div class="plus-icon-box">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 13 12" fill="none">
                     <path d="M7.97344 0H5.57344V4.8H0.773438V7.2H5.57344V12H7.97344V7.2H12.7734V4.8H7.97344V0Z"

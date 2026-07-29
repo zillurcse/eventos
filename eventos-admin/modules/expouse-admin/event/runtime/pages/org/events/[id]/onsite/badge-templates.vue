@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 
@@ -55,9 +55,9 @@ const loading = ref(true)
 const search = ref('')
 
 const columns = [
-  { key: 'name', label: 'Badge Template Name', sortable: true },
-  { key: 'format', label: 'Format' },
+  { key: 'name', label: 'Name', sortable: true },
   { key: 'badge_for', label: 'Type', sortable: true },
+  { key: 'format', label: 'Format' },
   { key: 'created_at', label: 'Created Date', sortable: true },
 ]
 
@@ -178,9 +178,23 @@ async function createTemplate() {
 }
 
 // ── Row actions ───────────────────────────────────────────────────────────────
+// The popover is teleported to <body> so it can't be clipped by the table's
+// own overflow/scroll container; position is computed from the trigger
+// button's rect each time it opens, right-edge aligned like the old absolute layout.
 const openMenu = ref<number | null>(null)
+const menuPos = reactive({ top: 0, right: 0 })
 const previewing = ref<BadgeTemplate | null>(null)
 const previewSide = ref<'front' | 'back'>('front')
+
+function toggleMenu(t: BadgeTemplate, e: MouseEvent) {
+  if (openMenu.value === t.id) { openMenu.value = null; return }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  menuPos.top = rect.bottom + 4
+  menuPos.right = window.innerWidth - rect.right
+  openMenu.value = t.id
+}
+
+function onDocClick() { openMenu.value = null }
 
 function editTemplate(t: BadgeTemplate) {
   navigateTo(`/org/events/${id}/badge?design=${t.id}`)
@@ -266,11 +280,17 @@ function createdOn(t: BadgeTemplate) {
     : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  if (import.meta.client) document.addEventListener('click', onDocClick)
+})
+onBeforeUnmount(() => {
+  if (import.meta.client) document.removeEventListener('click', onDocClick)
+})
 </script>
 
 <template>
-  <div class="max-w-275" @click="openMenu = null">
+  <div class="w-full" @click="openMenu = null">
     <!-- Header -->
     <div class="mb-5">
       <h2 class="section-title m-0">Badges</h2>
@@ -280,15 +300,15 @@ onMounted(load)
     </div>
 
     <!-- Tabs + primary action -->
-    <div class="flex items-end justify-between gap-3 flex-wrap border-b border-line mb-4">
+    <div class="flex items-end justify-between gap-3 flex-wrap mb-4">
       <div class="flex gap-1">
         <button
-          class="px-1 mr-5 py-2.5 text-[.95rem] font-semibold border-b-2 -mb-px bg-transparent cursor-pointer"
+          class="px-1 mr-5 py-2.5 text-[.95rem] font-bold border-b-2 -mb-px bg-transparent cursor-pointer"
           :class="tab === 'default' ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink'"
           @click="tab = 'default'"
         >Default</button>
         <button
-          class="px-1 py-2.5 text-[.95rem] font-semibold border-b-2 -mb-px bg-transparent cursor-pointer"
+          class="px-1 py-2.5 text-[.95rem] font-bold border-b-2 -mb-px bg-transparent cursor-pointer"
           :class="tab === 'guest' ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink'"
           @click="tab = 'guest'"
         >Guest Badges</button>
@@ -323,21 +343,15 @@ onMounted(load)
         :search-text="searchText"
       >
         <template #cell-name="{ row }">
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-ink">{{ row.name }}</span>
-            <span v-if="row.is_default" class="badge">Default</span>
-          </div>
-        </template>
-
-        <template #cell-format="{ row }">
-          <span class="text-muted">{{ formatOf(row) }}</span>
+          <span class="font-semibold text-ink">{{ row.name }}</span>
         </template>
 
         <template #cell-badge_for="{ row }">
-          <span v-if="row.badge_for" class="badge draft">
-            {{ row.guest_type || typeLabel(row.badge_for) }}
-          </span>
-          <span v-else class="text-faint">—</span>
+          <span class="text-ink">{{ row.badge_for ? (row.guest_type || typeLabel(row.badge_for)) : '—' }}</span>
+        </template>
+
+        <template #cell-format="{ row }">
+          <span class="text-ink">{{ formatOf(row) }}</span>
         </template>
 
         <template #cell-created_at="{ row }">
@@ -346,30 +360,41 @@ onMounted(load)
 
         <template #actions="{ row }">
           <div class="inline-flex items-center gap-3 relative">
-            <button class="inline-flex items-center gap-1.5 text-brand text-[.84rem] font-medium bg-transparent border-0 cursor-pointer hover:underline" @click="viewTemplate(row)">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              View
-            </button>
-            <button class="inline-flex items-center gap-1.5 text-brand text-[.84rem] font-medium bg-transparent border-0 cursor-pointer hover:underline" @click="editTemplate(row)">
-              <AppIcon name="pencil" class="w-3.5 h-3.5" />
-              Edit
+            <span v-if="row.is_default" class="badge">Default</span>
+
+            <button
+              type="button"
+              class="relative w-10 h-5.5 rounded-full transition-colors shrink-0"
+              :class="row.is_default ? 'bg-brand' : 'bg-[#d7dae1]'"
+              :disabled="row.is_default"
+              :aria-label="row.is_default ? 'Already the default badge' : 'Set as default badge'"
+              @click="makeDefault(row)"
+            >
+              <span class="absolute top-0.75 left-0.75 w-4 h-4 rounded-full bg-white transition-transform" :class="row.is_default ? 'translate-x-4.5' : ''" />
             </button>
 
             <button
               class="w-7 h-7 rounded-lg grid place-items-center text-faint hover:text-ink hover:bg-[#f1f1f5] border-0 bg-transparent cursor-pointer"
               title="More actions"
-              @click.stop="openMenu = openMenu === row.id ? null : row.id"
+              @click.stop="toggleMenu(row, $event)"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
             </button>
 
-            <div v-if="openMenu === row.id" class="menu-pop top-9! text-[.85rem]" @click.stop>
-              <button v-if="!row.is_default" @click="makeDefault(row)">Set as default</button>
-              <button @click="duplicateTemplate(row)">Duplicate</button>
-              <button class="text-[#dc2626]!" @click="deleteTemplate(row)">Delete</button>
-            </div>
+            <Teleport to="body">
+              <div
+                v-if="openMenu === row.id"
+                class="menu-pop text-[.85rem]"
+                :style="{ position: 'fixed', top: menuPos.top + 'px', right: menuPos.right + 'px', left: 'auto' }"
+                @click.stop
+              >
+                <button @click="viewTemplate(row)">View</button>
+                <button @click="editTemplate(row)">Edit</button>
+                <button v-if="!row.is_default" @click="makeDefault(row)">Set as default</button>
+                <button @click="duplicateTemplate(row)">Duplicate</button>
+                <button class="text-[#dc2626]!" @click="deleteTemplate(row)">Delete</button>
+              </div>
+            </Teleport>
           </div>
         </template>
 

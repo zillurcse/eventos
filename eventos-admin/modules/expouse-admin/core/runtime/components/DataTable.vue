@@ -29,11 +29,17 @@ const props = withDefaults(defineProps<{
   /** localStorage namespace for the per-page preference. */
   storageKey?: string
   emptyText?: string
+  /** Label in front of the per-page select — defaults to "Rows per page". */
+  perPageLabel?: string
+  /** Show the "X–Y of Z items" range text on the left of the footer. Set false to show the per-page control there instead. */
+  showRangeText?: boolean
 }>(), {
   rowKey: 'id',
   perPageOptions: () => [10, 25, 50, 100],
   storageKey: 'default',
   emptyText: 'No data available',
+  perPageLabel: 'Rows per page',
+  showRangeText: true,
 })
 
 const emit = defineEmits<{
@@ -264,11 +270,17 @@ function alignClass(col: DataTableColumn) {
 
       <!-- Pagination footer -->
       <div v-if="sorted.length" class="dt-foot">
-        <span class="text-muted text-[.82rem]">{{ rangeText }}</span>
+        <span v-if="showRangeText" class="text-muted text-[.82rem]">{{ rangeText }}</span>
+        <label v-else class="flex items-center gap-2 text-[.82rem] text-muted m-0">
+          {{ perPageLabel }}
+          <select v-model.number="perPage" class="w-auto m-0 py-1.5 px-2 text-[.82rem]">
+            <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </label>
 
         <div class="flex items-center gap-4 flex-wrap">
-          <label class="flex items-center gap-2 text-[.82rem] text-muted m-0">
-            Rows per page
+          <label v-if="showRangeText" class="flex items-center gap-2 text-[.82rem] text-muted m-0">
+            {{ perPageLabel }}
             <select v-model.number="perPage" class="w-auto m-0 py-1.5 px-2 text-[.82rem]">
               <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
             </select>

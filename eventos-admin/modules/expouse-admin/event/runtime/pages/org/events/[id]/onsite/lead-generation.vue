@@ -112,17 +112,45 @@ function time(iso: string) {
 }
 
 const cards = computed(() => [
-  { label: 'Total leads', value: fmt(totals.value.leads), sub: `across ${totals.value.exhibitors_capturing} exhibitor${totals.value.exhibitors_capturing === 1 ? '' : 's'}` },
+  { label: 'Total leads', value: fmt(totals.value.leads), sub: `across ${totals.value.exhibitors} exhibitor${totals.value.exhibitors === 1 ? '' : 's'}` },
   { label: 'Hot leads', value: fmt(totals.value.hot), sub: `${totals.value.hot_pct}% of total` },
   { label: 'Consent rate', value: `${totals.value.consent_rate}%`, sub: 'opted in to share data' },
-  { label: 'Capture rate', value: `${totals.value.capture_rate}%`, sub: `${totals.value.exhibitors_capturing} of ${totals.value.exhibitors} exhibitors logging leads` },
+  // No real "booth visit" count is tracked yet — this reuses capture_rate
+  // (exhibitors actively logging leads) under the label from the reference design.
+  { label: 'Lead : visit ratio', value: `${totals.value.capture_rate}%`, sub: 'conversion from booth visits' },
 ])
+
+// ── Toolbar select options (AppSelect) ────────────────────────────────────────
+const exhibitorOptions = computed(() => [
+  { value: '', label: 'All exhibitors' },
+  ...(insights.value?.exhibitors ?? []).map(e => ({ value: e.id, label: e.name })),
+])
+const ratingOptions = computed(() => [
+  { value: '', label: 'All ratings' },
+  ...RATINGS.map(r => ({ value: r, label: label(r) })),
+])
+const statusOptions = computed(() => [
+  { value: '', label: 'All statuses' },
+  ...STATUSES.map(s => ({ value: s, label: label(s) })),
+])
+const SORT_OPTIONS = [
+  { value: 'recent', label: 'Most recent' },
+  { value: 'name', label: 'Name' },
+  { value: 'company', label: 'Company' },
+  { value: 'rating', label: 'Rating' },
+  { value: 'oldest', label: 'Oldest' },
+]
+const PER_PAGE_OPTIONS = [
+  { value: 10, label: '10' },
+  { value: 25, label: '25' },
+  { value: 50, label: '50' },
+]
 
 onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-275">
+  <div class="w-full">
     <!-- Header -->
     <div class="flex items-start justify-between gap-3 mb-4 flex-wrap">
       <div>
@@ -201,25 +229,10 @@ onMounted(load)
             <input v-model="filters.search" placeholder="Search name, email, company or exhibitor" class="!pl-9 !m-0 w-full">
           </div>
           <div class="grow max-sm:hidden" />
-          <select v-model="filters.exhibitor" class="!m-0 !w-auto">
-            <option value="">All exhibitors</option>
-            <option v-for="e in insights?.exhibitors ?? []" :key="e.id" :value="e.id">{{ e.name }}</option>
-          </select>
-          <select v-model="filters.rating" class="!m-0 !w-auto">
-            <option value="">All ratings</option>
-            <option v-for="r in RATINGS" :key="r" :value="r">{{ label(r) }}</option>
-          </select>
-          <select v-model="filters.status" class="!m-0 !w-auto">
-            <option value="">All statuses</option>
-            <option v-for="s in STATUSES" :key="s" :value="s">{{ label(s) }}</option>
-          </select>
-          <select v-model="filters.sort" class="!m-0 !w-auto">
-            <option value="recent">Most recent</option>
-            <option value="name">Name</option>
-            <option value="company">Company</option>
-            <option value="rating">Rating</option>
-            <option value="oldest">Oldest</option>
-          </select>
+          <AppSelect v-model="filters.exhibitor" :options="exhibitorOptions" class="w-48" />
+          <AppSelect v-model="filters.rating" :options="ratingOptions" class="w-36" />
+          <AppSelect v-model="filters.status" :options="statusOptions" class="w-36" />
+          <AppSelect v-model="filters.sort" :options="SORT_OPTIONS" class="w-40" />
         </div>
 
         <!-- Table -->
@@ -230,7 +243,6 @@ onMounted(load)
                 <th>Contact</th>
                 <th>Phone</th>
                 <th>Organization</th>
-                <th>Exhibitor</th>
                 <th>Rating</th>
                 <th>Scanned by</th>
                 <th>Status</th>
@@ -238,8 +250,8 @@ onMounted(load)
               </tr>
             </thead>
             <tbody>
-              <tr v-if="tableLoading && !leads.length"><td colspan="8" class="py-10 text-center muted">Loading…</td></tr>
-              <tr v-else-if="!leads.length"><td colspan="8" class="py-10 text-center muted">No leads match these filters.</td></tr>
+              <tr v-if="tableLoading && !leads.length"><td colspan="7" class="py-10 text-center muted">Loading…</td></tr>
+              <tr v-else-if="!leads.length"><td colspan="7" class="py-10 text-center muted">No leads match these filters.</td></tr>
               <tr v-for="l in leads" :key="l.id">
                 <td>
                   <div class="flex items-center gap-2.5">
@@ -252,7 +264,6 @@ onMounted(load)
                 </td>
                 <td class="muted text-[.86rem] whitespace-nowrap">{{ l.phone || '—' }}</td>
                 <td class="text-[.88rem]">{{ l.company || '—' }}</td>
-                <td class="text-[.86rem]">{{ l.exhibitor?.name || '—' }}</td>
                 <td>
                   <span class="pill" :class="`pill-${l.rating}`">{{ label(l.rating) }}</span>
                 </td>
@@ -274,11 +285,15 @@ onMounted(load)
 
         <!-- Pagination -->
         <div class="flex items-center justify-end gap-4 p-4 border-t border-line text-[.84rem] text-muted flex-wrap">
-          <label class="flex items-center gap-2">Nb / page
-            <select v-model.number="filters.per_page" class="!m-0 !w-auto !py-1.5">
-              <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option>
-            </select>
-          </label>
+          <div class="flex items-center gap-2">
+            Nb / page
+            <AppSelect
+              :model-value="filters.per_page"
+              :options="PER_PAGE_OPTIONS"
+              class="w-20"
+              @update:model-value="filters.per_page = Number($event)"
+            />
+          </div>
           <span>{{ meta.total ? `${meta.from}–${meta.to}` : 0 }} of {{ meta.total }}</span>
           <div class="flex items-center gap-1">
             <button class="page-btn" :disabled="meta.current_page <= 1" @click="filters.page--">‹</button>
