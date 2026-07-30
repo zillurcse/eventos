@@ -166,7 +166,7 @@ function expandGroup(key: string) {
     <div class="grid">
       <!-- All main content -->
       <div class="col">
-        <ReceptionAdStrip v-if="store.ads.length" :ads="store.ads" class="banner" />
+        <ReceptionAdStrip v-if="store.ads.length" :ads="store.ads" />
 
         <!-- Day selector -->
         <div v-if="days.length" class="days">

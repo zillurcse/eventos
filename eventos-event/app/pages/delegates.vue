@@ -43,6 +43,22 @@ const sortOptions: Array<{ key: 'az' | 'za', label: string }> = [
   { key: 'az', label: 'Default' },
   { key: 'za', label: 'Z to A' },
 ]
+const currentSortLabel = computed(() => sortOptions.find(o => o.key === sort.value)?.label ?? 'Default')
+
+const sortOpen = ref(false)
+const sortWrap = ref<HTMLElement | null>(null)
+function onOutsideSort(e: MouseEvent) {
+  if (sortWrap.value && !sortWrap.value.contains(e.target as Node)) sortOpen.value = false
+}
+watch(sortOpen, (open) => {
+  if (open) document.addEventListener('click', onOutsideSort, true)
+  else document.removeEventListener('click', onOutsideSort, true)
+})
+onBeforeUnmount(() => document.removeEventListener('click', onOutsideSort, true))
+function selectSort(key: typeof sort.value) {
+  sort.value = key
+  sortOpen.value = false
+}
 
 // ── Advance Filter — the directory has no server-side facet search, so this
 // is a client-side quick-filter over the page(s) already loaded, built from
@@ -103,22 +119,25 @@ const filtered = computed<Delegate[]>(() => store.delegates.filter((d: Delegate)
           </svg>
         </div>
 
-        <div class="sortby">
-          <span>Sort By:</span>
-          <select v-model="sort">
-            <option v-for="o in sortOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
-          </select>
-          <svg viewBox="0 0 24 24">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+        <div ref="sortWrap" class="sort">
+          <button type="button" class="sort-btn" @click="sortOpen = !sortOpen">
+            <span>Sort By: {{ currentSortLabel }}</span>
+            <svg class="chev" :class="{ open: sortOpen }" viewBox="0 0 24 24">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div v-if="sortOpen" class="sort-pop">
+            <button v-for="o in sortOptions" :key="o.key" type="button" class="sort-opt" :class="{ on: sort === o.key }"
+              @click="selectSort(o.key)">{{ o.label }}</button>
+          </div>
         </div>
 
-        <button type="button" class="saved" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
+        <!-- <button type="button" class="saved" :class="{ on: savedOnly }" @click="savedOnly = !savedOnly">
           <svg viewBox="0 0 24 24">
             <path d="M6 3h12v18l-6-4-6 4z" />
           </svg>
           Saved{{ bookmarks.count('delegate') ? ` (${bookmarks.count('delegate')})` : '' }}
-        </button>
+        </button> -->
       </div>
 
       <div class="head">
@@ -230,13 +249,14 @@ const filtered = computed<Delegate[]>(() => store.delegates.filter((d: Delegate)
   width: 100%;
   border: none;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 14px 46px 14px 18px;
+  max-height: 44px;
   font: inherit;
   font-size: .95rem;
   color: #334155;
   outline: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  border: 1px solid #D1D2DE;
 }
 
 .search input::placeholder {
@@ -261,37 +281,30 @@ const filtered = computed<Delegate[]>(() => store.delegates.filter((d: Delegate)
   stroke-linejoin: round;
 }
 
-.sortby {
+.sort {
   position: relative;
+  flex: none;
+}
+
+.sort-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  height: 100%;
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px 40px 12px 16px;
-  font-size: .88rem;
-  color: #475569;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
-}
-
-.sortby select {
-  border: none;
-  background: none;
+  border: 1px solid #D1D2DE;
+  border-radius: 8px;
+  padding: 14px 16px;
+  max-height: 44px;
+  min-height: 44px;
   font: inherit;
   font-size: .88rem;
-  color: #1e293b;
-  font-weight: 600;
-  outline: none;
-  appearance: none;
-  padding-right: 4px;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.sortby svg {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
+.sort-btn .chev {
   width: 15px;
   height: 15px;
   fill: none;
@@ -299,7 +312,51 @@ const filtered = computed<Delegate[]>(() => store.delegates.filter((d: Delegate)
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  pointer-events: none;
+  transition: transform .15s ease;
+}
+
+.sort-btn .chev.open {
+  transform: rotate(180deg);
+}
+
+.sort-pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .15);
+  border: 1px solid #eef0f3;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.sort-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  max-height: 44px;
+  font: inherit;
+  font-size: .9rem;
+  color: #475569;
+  cursor: pointer;
+}
+
+.sort-opt:hover {
+  background: #f7f8fa;
+}
+
+.sort-opt.on {
+  color: var(--brand-primary);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
 }
 
 .saved {

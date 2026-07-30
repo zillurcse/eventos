@@ -65,6 +65,7 @@ function onLeave() {
 // Keep occupancy + the live dot fresh while the page is open.
 let poll: ReturnType<typeof setInterval> | null = null
 onMounted(async () => {
+  if (!store.adsLoaded) store.fetchAds()
   await store.fetchTables()
   poll = setInterval(async () => {
     if (active.value) return
@@ -76,6 +77,8 @@ onBeforeUnmount(() => { if (poll) clearInterval(poll) })
 
 <template>
   <div class="page">
+    <ReceptionAdStrip v-if="store.ads.length" :ads="store.ads" />
+
     <div class="head">
       <h1>Lounge</h1>
     </div>

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { JoinConfig } from '~/stores/rooms'
+import type { ReceptionAd } from './reception'
 
 export type LoungeTableKind = 'attendee' | 'exhibitor' | 'sponsor'
 
@@ -50,6 +51,11 @@ export const useLoungeTablesStore = defineStore('loungeTables', {
     error: false,
     joining: '' as string,
     joinError: '' as string,
+
+    // "Main ads" strip (organizer's AD Managements, targeted to the Lounge
+    // page) — shown atop the lounge, like the Exhibitors/Feed pages' strips.
+    ads: [] as ReceptionAd[],
+    adsLoaded: false,
   }),
 
   actions: {
@@ -97,6 +103,25 @@ export const useLoungeTablesStore = defineStore('loungeTables', {
         return null
       } finally {
         this.joining = ''
+      }
+    },
+
+    async fetchAds() {
+      if (this.adsLoaded) return
+      const identity = useEventIdentity()
+      const id = identity.subdomain || identity.host
+      if (!id) return
+      try {
+        const { public: { apiBase } } = useRuntimeConfig()
+        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
+          query: { page: 'lounge' },
+          headers: eventIdentityHeaders(),
+        })
+        this.ads = res.data.strip
+      } catch {
+        // Ads are decorative — fail silently, the lounge still works without them.
+      } finally {
+        this.adsLoaded = true
       }
     },
   },

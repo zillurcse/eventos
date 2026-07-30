@@ -67,7 +67,7 @@ function filterChips(fid: string) {
         </button>
 
         <!-- Selected chips -->
-        <div v-if="openFilter === f.id && filterChips(f.id).length" class="flex flex-wrap gap-1.5 px-4 pt-3 border-t border-line">
+        <div v-if="openFilter === f.id && filterChips(f.id).length" class="flex flex-wrap gap-1.5 px-4 py-3 border-t border-line">
           <span
             v-for="chip in filterChips(f.id)"
             :key="chip.heading + '::' + chip.opt"

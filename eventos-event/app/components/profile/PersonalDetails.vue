@@ -217,16 +217,19 @@ function cancel() { fillFromProfile() }
 }
 
 .av {
-  width: 84px;
-  height: 84px;
-  border-radius: 12px;
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
   overflow: hidden;
   flex: 0 0 auto;
   background: #e2e8f0;
 }
-
+.av  img{
+  object-fit: cover;
+}
 .av-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 

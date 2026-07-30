@@ -96,7 +96,7 @@ async function save() {
 
     <!-- Manage Filters -->
     <div class="mt-4">
-      <label class="block mb-1.5">Mange Fliters</label>
+      <label class="block mb-1.5">Manage Filters</label>
       <ExhibitorFilterPicker />
     </div>
 

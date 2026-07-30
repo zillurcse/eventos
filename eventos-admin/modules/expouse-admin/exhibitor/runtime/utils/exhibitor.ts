@@ -408,7 +408,15 @@ export function draftFromExhibitor(e: Exhibitor | null | undefined): Draft {
     website_url: e.website_url || '',
     tags: Array.isArray(e.tags) ? [...e.tags] : [],
     filter_id: e.filter_id || '',
-    filter_selections: e.filter_selections ? plain(e.filter_selections) : {},
+    // The API can hand back `[]` instead of `{}` for an untouched selection map
+    // (PHP can't tell an empty associative array from an empty list, so an
+    // empty profile_data.filter_selections round-trips as a JSON array). `[]`
+    // is truthy in JS, so without this guard the drawer keeps it as a real
+    // array — FilterPicker then adds selections as non-index string keys on
+    // it, which `JSON.stringify` silently drops on save (arrays only
+    // serialize their indexed elements), so nothing the user picks ever
+    // persists.
+    filter_selections: (e.filter_selections && !Array.isArray(e.filter_selections)) ? plain(e.filter_selections) : {},
     spotlight_type: e.spotlight_type || 'image',
     spotlight_url: e.spotlight_url || '',
     spotlight_file_id: e.spotlight_file_id ?? null,

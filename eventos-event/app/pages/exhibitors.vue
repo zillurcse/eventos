@@ -80,6 +80,23 @@ function selectType(key: typeof type.value) {
   typeOpen.value = false
 }
 
+const currentSortLabel = computed(() => sortOptions.find(o => o.key === sort.value)?.label ?? 'Default')
+
+const sortOpen = ref(false)
+const sortWrap = ref<HTMLElement | null>(null)
+function onOutsideSort(e: MouseEvent) {
+  if (sortWrap.value && !sortWrap.value.contains(e.target as Node)) sortOpen.value = false
+}
+watch(sortOpen, (open) => {
+  if (open) document.addEventListener('click', onOutsideSort, true)
+  else document.removeEventListener('click', onOutsideSort, true)
+})
+onBeforeUnmount(() => document.removeEventListener('click', onOutsideSort, true))
+function selectSort(key: typeof sort.value) {
+  sort.value = key
+  sortOpen.value = false
+}
+
 const filterPanelTitle = computed(() => store.filters[0]?.title ?? 'Filters')
 
 const activeChips = computed(() => {
@@ -171,7 +188,7 @@ const filtered = computed<Exhibitor[]>(() => {
         <div class="fc-head">
           <h2>{{ filterPanelTitle }}</h2>
           <div class="fc-actions">
-            <button
+            <!-- <button
               type="button"
               class="saved-icon"
               :class="{ on: savedOnly }"
@@ -179,8 +196,12 @@ const filtered = computed<Exhibitor[]>(() => {
               @click="savedOnly = !savedOnly"
             >
               <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+            </button> -->
+            <button v-if="anyFilterActive || search" type="button" class="clear-all" @click="clearAll">
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="16" viewBox="0 0 17 16" fill="none">
+                <path d="M9.4158 8.00409L15.7158 1.71409C15.9041 1.52579 16.0099 1.27039 16.0099 1.00409C16.0099 0.73779 15.9041 0.482395 15.7158 0.294092C15.5275 0.105788 15.2721 0 15.0058 0C14.7395 0 14.4841 0.105788 14.2958 0.294092L8.0058 6.59409L1.7158 0.294092C1.52749 0.105788 1.2721 2.36434e-07 1.0058 2.38419e-07C0.739497 2.40403e-07 0.484102 0.105788 0.295798 0.294092C0.107495 0.482395 0.00170684 0.73779 0.00170684 1.00409C0.00170684 1.27039 0.107495 1.52579 0.295798 1.71409L6.5958 8.00409L0.295798 14.2941C0.20207 14.3871 0.127676 14.4977 0.0769072 14.6195C0.0261385 14.7414 0 14.8721 0 15.0041C0 15.1361 0.0261385 15.2668 0.0769072 15.3887C0.127676 15.5105 0.20207 15.6211 0.295798 15.7141C0.388761 15.8078 0.499362 15.8822 0.621222 15.933C0.743081 15.9838 0.873786 16.0099 1.0058 16.0099C1.13781 16.0099 1.26852 15.9838 1.39038 15.933C1.51223 15.8822 1.62284 15.8078 1.7158 15.7141L8.0058 9.41409L14.2958 15.7141C14.3888 15.8078 14.4994 15.8822 14.6212 15.933C14.7431 15.9838 14.8738 16.0099 15.0058 16.0099C15.1378 16.0099 15.2685 15.9838 15.3904 15.933C15.5122 15.8822 15.6228 15.8078 15.7158 15.7141C15.8095 15.6211 15.8839 15.5105 15.9347 15.3887C15.9855 15.2668 16.0116 15.1361 16.0116 15.0041C16.0116 14.8721 15.9855 14.7414 15.9347 14.6195C15.8839 14.4977 15.8095 14.3871 15.7158 14.2941L9.4158 8.00409Z" fill="#64676A"/>
+                </svg>
             </button>
-            <button v-if="anyFilterActive || search" type="button" class="clear-all" @click="clearAll">Clear All</button>
           </div>
         </div>
 
@@ -208,18 +229,21 @@ const filtered = computed<Exhibitor[]>(() => {
 
         <div class="fsection">
           <h3>Sort By</h3>
-          <div class="sort-opts">
-            <button
-              v-for="o in sortOptions"
-              :key="o.key"
-              type="button"
-              class="sort-opt"
-              :class="{ on: sort === o.key }"
-              @click="sort = o.key"
-            >
-              {{ o.label }}
-              <svg v-if="sort === o.key" class="chk" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
+          <div ref="sortWrap" class="type-select full">
+            <button type="button" class="type-btn" @click="sortOpen = !sortOpen">
+              <span>{{ currentSortLabel }}</span>
+              <svg class="chev" :class="{ open: sortOpen }" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
             </button>
+            <div v-if="sortOpen" class="type-pop">
+              <button
+                v-for="o in sortOptions"
+                :key="o.key"
+                type="button"
+                class="type-opt"
+                :class="{ on: sort === o.key }"
+                @click="selectSort(o.key)"
+              >{{ o.label }}</button>
+            </div>
           </div>
         </div>
 
@@ -247,7 +271,7 @@ const filtered = computed<Exhibitor[]>(() => {
 <style scoped>
 .grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 368px;
   gap: 24px;
   align-items: start;
 }
@@ -314,15 +338,28 @@ const filtered = computed<Exhibitor[]>(() => {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 15%, transparent);
 }
 
-.type-select { position: relative; flex: none; 
+.type-select { position: relative; flex: none;
   max-height: 40px;
+}
+
+.type-select.full {
+  width: 100%;
+  max-height: none;
+}
+
+.type-select.full .type-pop {
+  left: 0;
+  right: 0;
 }
 
 .type-btn {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
   background: #fff;
   border: 1px solid #D1D2DE;
   border-radius: 8px;
@@ -360,6 +397,7 @@ const filtered = computed<Exhibitor[]>(() => {
   border: 1px solid #eef0f3;
   overflow: hidden;
   padding: 6px;
+  width: 100%;
 }
 
 .type-opt {
@@ -424,9 +462,9 @@ const filtered = computed<Exhibitor[]>(() => {
 
 .filter-card {
   background: #fff;
-  border-radius: 20px;
-  padding: 28px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #E8E8EE
 }
 
 .fc-head {
@@ -438,9 +476,10 @@ const filtered = computed<Exhibitor[]>(() => {
 
 .fc-head h2 {
   margin: 0;
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: #3f3f46;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #4D5154;
 }
 
 .fc-actions {
@@ -453,11 +492,18 @@ const filtered = computed<Exhibitor[]>(() => {
   border: none;
   background: none;
   color: var(--brand-primary);
-  font: inherit;
-  font-size: 1.05rem;
-  font-weight: 700;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
+}
+.clear-all svg{
+  width: 14px;
 }
 
 .clear-all:hover { text-decoration: underline; }
@@ -497,18 +543,19 @@ const filtered = computed<Exhibitor[]>(() => {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 22px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   border-radius: 100px;
-  padding: 10px 20px;
+  padding: 6px 8px;
+  max-height: 24px;
   font: inherit;
-  font-size: 1rem;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -531,17 +578,18 @@ const filtered = computed<Exhibitor[]>(() => {
 }
 
 .fsection {
-  padding-top: 22px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   border-top: 1px solid #eef0f3;
 }
 
 .fsection + .fsection { margin-top: 0; }
 
 .fsection h3 {
-  margin: 0 0 18px;
-  font-size: 1.05rem;
+  margin: 0 0 6px;
+  font-size: 14px;
   font-weight: 500;
-  color: #52525b;
+  color: #4D5154;
   letter-spacing: normal;
   text-transform: none;
 }
@@ -549,21 +597,23 @@ const filtered = computed<Exhibitor[]>(() => {
 .cb {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 10px 0;
+  padding-bottom: 8px;
   cursor: pointer;
-  font-size: 1.05rem;
-  color: #3f3f46;
+  font-size: 14px;
+  line-height: 1.2;
+  color: #4D5154;
 }
 
 .cb input { position: absolute; opacity: 0; width: 0; height: 0; }
 
 .box {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  border: 2px solid #d4d4d8;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 2px solid #9B9D9E;
   display: inline-flex;
   align-items: center;
   justify-content: center;
