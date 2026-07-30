@@ -45,6 +45,23 @@ export interface ProductMeta {
   is_job_offer?: boolean
 }
 export interface ExhibitorProduct { id: number; name: string; description?: string; price_cents: number | null; meta?: ProductMeta }
+export interface ExhibitorRatingRow {
+  id: string
+  score: number
+  rated_at: string | null
+  participation: {
+    id: string | null
+    role: string | null
+    status: string | null
+    name: string | null
+    email: string | null
+  }
+}
+export interface ExhibitorRatingsSummary {
+  ratings_count: number
+  average_score: number | null
+  distribution: Array<{ score: number, count: number }>
+}
 
 /** A row in the exhibitors table. The edit drawer additionally loads the
  *  sub-resources below, which the list endpoint does not return. */
@@ -179,7 +196,7 @@ import { PHONE_CODES } from '../../../core/runtime/utils/phoneCodes'
 export const TYPE_OPTIONS  = ['Exhibitor', 'Sponsor']
 export const STALL_OPTIONS = ['A1','A2','A3','B1','B2','B3','C1','C2','C3','D1','D2','D3']
 export const COUNTRIES     = ['Bangladesh','United States','United Kingdom','UAE','India','Saudi Arabia','Qatar','Kuwait','Singapore','Malaysia','Canada','Australia']
-export const EXHIBITOR_TABS = ['Details','Teams','Documents','Projects','Products','Permissions']
+export const EXHIBITOR_TABS = ['Details','Teams','Documents','Projects','Products','Permissions','Ratings']
 export const EXHIBITOR_LIMIT = 50
 
 /** ISO-2 → COUNTRIES label (location select). Dial code comes from PHONE_CODES. */

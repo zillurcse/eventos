@@ -359,6 +359,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/sessions/{sessionUuid}/questions/{message}/replies', [SessionEngagementController::class, 'questionReply']);
             Route::get('/sessions/{sessionUuid}/polls', [SessionEngagementController::class, 'pollIndex']);
             Route::post('/sessions/{sessionUuid}/polls/{poll}/vote', [SessionEngagementController::class, 'pollVote']);
+            Route::get('/sessions/{sessionUuid}/rating', [SessionController::class, 'myRating']);
+            Route::post('/sessions/{sessionUuid}/rating', [SessionController::class, 'rate']);
+            Route::get('/exhibitors/{uuid}/rating', [ExhibitorController::class, 'myRating']);
+            Route::post('/exhibitors/{uuid}/rating', [ExhibitorController::class, 'rate']);
+            Route::get('/speakers/{participation}/rating', [SpeakerController::class, 'myRating']);
+            Route::post('/speakers/{participation}/rating', [SpeakerController::class, 'rate']);
             Route::get('/sessions/{sessionUuid}/attendees', [SessionEngagementController::class, 'attendees']);
             // Embedded Jitsi join details — the host is issued a moderator JWT,
             // so the room starts without anyone logging in to meet.jit.si.
@@ -512,6 +518,8 @@ Route::prefix('v1')->group(function () {
             });
             Route::get('/sessions/{uuid}/polls', [SessionPollController::class, 'index'])->middleware('perm:events.view');
             Route::get('/sessions/{uuid}/messages', [SessionPollController::class, 'messages'])->middleware('perm:events.view');
+            Route::get('/sessions/{uuid}/ratings', [SessionController::class, 'ratings'])->middleware('perm:events.view');
+            Route::get('/events/{uuid}/speakers/{participation}/ratings', [SpeakerController::class, 'ratings'])->middleware('perm:events.view');
             Route::post('/sessions/{uuid}/speakers', [SessionController::class, 'addSpeaker'])->middleware('perm:speakers.manage');
             Route::delete('/sessions/{uuid}/speakers/{participation}', [SessionController::class, 'removeSpeaker'])->middleware('perm:speakers.manage');
 
@@ -627,6 +635,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/exhibitors/import', [ExhibitorImportController::class, 'store']);
                 Route::get('/exhibitors/{uuid}', [ExhibitorController::class, 'show']);
                 Route::match(['put', 'patch'], '/exhibitors/{uuid}', [ExhibitorController::class, 'update']);
+                Route::get('/exhibitors/{uuid}/ratings', [ExhibitorController::class, 'ratings'])->middleware('perm:events.view');
                 Route::post('/exhibitors/{uuid}/reset-password', [ExhibitorController::class, 'resetPassword']);
                 Route::post('/exhibitors/{uuid}/members', [ExhibitorMemberController::class, 'store']);
                 Route::delete('/exhibitors/{uuid}/members/{member}', [ExhibitorMemberController::class, 'destroy']);

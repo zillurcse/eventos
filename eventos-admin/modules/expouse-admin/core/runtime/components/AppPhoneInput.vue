@@ -100,7 +100,10 @@ function onDocPointer(e: Event) {
 }
 
 onMounted(() => document.addEventListener('pointerdown', onDocPointer))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer))
+onBeforeUnmount(() => {
+  closeList()
+  document.removeEventListener('pointerdown', onDocPointer)
+})
 </script>
 
 <template>

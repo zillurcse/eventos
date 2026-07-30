@@ -7,6 +7,19 @@ const bookmarks = useBookmarksStore()
 const auth = useAuthStore()
 const bookmarked = computed(() => bookmarks.isOn('session', props.session.id))
 
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  ticker = setInterval(() => {
+    now.value = Date.now()
+  }, 15_000)
+})
+
+onBeforeUnmount(() => {
+  if (ticker) clearInterval(ticker)
+})
+
 function toggleBookmark() {
   bookmarks.toggle('session', props.session.id)
 }
@@ -27,21 +40,19 @@ const timeLabel = computed(() => {
 /** Live now / ended / upcoming, from the session window in real time. */
 const phase = computed<'live' | 'ended' | 'upcoming'>(() => {
   const s = props.session
-  const now = Date.now()
+  const current = now.value
   const start = s.starts_at ? new Date(s.starts_at).getTime() : null
   const end = s.ends_at ? new Date(s.ends_at).getTime() : null
   if (start && end) {
-    if (now < start) return 'upcoming'
-    if (now > end) return 'ended'
+    if (current < start) return 'upcoming'
+    if (current > end) return 'ended'
     return 'live'
   }
-  if (start && now < start) return 'upcoming'
+  if (start && current < start) return 'upcoming'
   return 'ended'
 })
 
 const replayLink = computed(() => props.session.on_demand_recording_link || null)
-const liveLink = computed(() => props.session.stream_link || props.session.stream_url || null)
-
 /** Google Calendar quick-add link for the session. */
 const calendarLink = computed(() => {
   const s = props.session
@@ -117,7 +128,7 @@ const extraSpeakers = computed(() => Math.max(0, props.session.speakers.length -
       </span>
     </div>
 
-    <NuxtLink v-if="phase === 'live' && liveLink" :to="`/session/${session.id}`" class="cta live">Join Now</NuxtLink>
+    <NuxtLink v-if="phase === 'live'" :to="`/session/${session.id}`" class="cta live">Join Now</NuxtLink>
     <NuxtLink v-else-if="replayLink" :to="`/session/${session.id}`" class="cta">Watch Replay</NuxtLink>
     <span v-else-if="phase === 'upcoming'" class="cta ghost">Upcoming</span>
     <span v-else class="cta ghost">Session Ended</span>

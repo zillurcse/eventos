@@ -1,10 +1,14 @@
 <script setup lang="ts">
+// @ts-expect-error project already uses vue-sonner; this file hits a local ts-plugin false positive
+import { toast } from 'vue-sonner'
 import { briefcaseKind } from '~/stores/briefcase'
+import type { ExhibitorCta } from '~/stores/exhibitors'
 
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const route = useRoute()
 const router = useRouter()
+const api = useApi()
 const store = useExhibitorsStore()
 const contact = useExhibitorContactStore()
 const bookmarks = useBookmarksStore()
@@ -23,6 +27,39 @@ function docKindLabel(url?: string | null) {
 
 const id = computed(() => route.params.id as string)
 const ex = computed(() => store.detail)
+const rating = ref(0)
+const hoverRating = ref(0)
+const ratingSaving = ref(false)
+
+async function loadRating() {
+  if (!site.event?.uuid || !ex.value?.id || !auth.isAuthed) return
+  try {
+    const res = await api<{ data: { score: number | null } }>(`/events/${site.event.uuid}/exhibitors/${ex.value.id}/rating`)
+    rating.value = res.data.score || 0
+  } catch {
+    rating.value = 0
+  }
+}
+
+async function setRating(n: number) {
+  if (!site.event?.uuid || !ex.value?.id || ratingSaving.value) return
+  ratingSaving.value = true
+  const prev = rating.value
+  rating.value = n
+  try {
+    const res = await api<{ data: { score: number } }>(`/events/${site.event.uuid}/exhibitors/${ex.value.id}/rating`, {
+      method: 'POST',
+      body: { score: n },
+    })
+    rating.value = res.data.score
+    toast.success(`You rated this exhibitor ${res.data.score} out of 5.`)
+  } catch (e: any) {
+    rating.value = prev
+    toast.error(e?.data?.message || 'Could not save your rating.')
+  } finally {
+    ratingSaving.value = false
+  }
+}
 
 onMounted(() => {
   store.fetchDetail(id.value)
@@ -30,7 +67,19 @@ onMounted(() => {
   meetings.fetchCapabilities({ force: true })
   if (auth.isAuthed) chat.fetchCapabilities()
 })
-watch(id, v => v && store.fetchDetail(v))
+watch(id, (v: string) => {
+  if (!v) return
+  store.fetchDetail(v)
+  hoverRating.value = 0
+  rating.value = 0
+}, { immediate: true })
+watch([() => site.event?.uuid, () => ex.value?.id, () => auth.isAuthed], ([eventUuid, exhibitorId, authed]: [string | undefined, string | undefined, boolean]) => {
+  if (!eventUuid || !exhibitorId || !authed) {
+    rating.value = 0
+    return
+  }
+  loadRating()
+}, { immediate: true })
 
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', id.value))
 const exhibitorRole = computed(() => ex.value?.type === 'sponsor' ? 'sponsor' : 'exhibitor')
@@ -154,10 +203,26 @@ function toggleMemberSaved(i: number) {
 
       <div class="idrow">
         <div class="logo"><AppImage :src="ex.logo_url" :alt="ex.name" /></div>
-        <div class="stars" :title="ex.can_rate ? 'Rate this exhibitor' : ''">
-          <svg v-for="n in 5" :key="n" viewBox="0 0 24 24">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z" />
-          </svg>
+        <div v-if="ex.can_rate" class="stars" title="Rate this exhibitor" @mouseleave="hoverRating = 0">
+          <button
+            v-for="n in 5" :key="n" type="button" class="star"
+            :class="{ on: (hoverRating || rating) >= n }"
+            :title="`Rate ${n} / 5`"
+            :aria-label="`Rate ${n} out of 5`"
+            :disabled="ratingSaving"
+            @mouseenter="hoverRating = n"
+            @click="setRating(n)"
+          >
+            <svg viewBox="0 0 21 21" aria-hidden="true">
+              <path
+                d="M10.5 0.5L13.59 6.76L20.5 7.77L15.5 12.64L16.68 19.52L10.5 16.27L4.32 19.52L5.5 12.64L0.5 7.77L7.41 6.76L10.5 0.5Z"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -232,7 +297,7 @@ function toggleMemberSaved(i: number) {
           <a v-else-if="c.type === 'LINK'" :href="ctaHref(c.value)" target="_blank" rel="noopener" class="cta-link">{{ c.label || c.value }}</a>
           <a v-else-if="c.type === 'BUTTON'" :href="ctaHref(c.value)" target="_blank" rel="noopener" class="cta-btn">{{ c.label || 'Button' }}</a>
         </template>
-        <button v-if="ex.cta.some(c => (c.type === 'TEXT' || !c.type) && (c.value || '').length > 140)"
+        <button v-if="ex.cta.some((c: ExhibitorCta) => (c.type === 'TEXT' || !c.type) && (c.value || '').length > 140)"
           class="readmore" type="button" @click="ctaExpanded = !ctaExpanded">
           {{ ctaExpanded ? '– READ LESS' : '+ READ MORE' }}
         </button>
@@ -442,13 +507,34 @@ function toggleMemberSaved(i: number) {
   padding-top: 6px;
 }
 
-.stars svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: var(--brand-primary);
-  stroke-width: 1.6;
-  stroke-linejoin: round;
+.star {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color .16s ease, transform .16s ease;
+}
+
+.star svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+}
+
+.star:hover,
+.star.on {
+  color: var(--brand-primary);
+}
+
+.star:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 45%, white);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.star:hover {
+  transform: scale(1.06);
 }
 
 .title {

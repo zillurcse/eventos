@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ExhibitorTabsRatings from './tabs/Ratings.vue'
+
 // Full-page exhibitor editor shell: breadcrumb + top-bar actions (Deactivate /
 // Reset Password), a left vertical tab rail, and the active tab's panel. Reads
 // the exhibitor context provided by the [exhibitorId] route page.
@@ -75,6 +77,7 @@ async function onToggleActive() {
           <ExhibitorTabsProjects v-else-if="activeTab === 'Projects'" />
           <ExhibitorTabsProducts v-else-if="activeTab === 'Products'" />
           <ExhibitorTabsPermissions v-else-if="activeTab === 'Permissions'" />
+          <ExhibitorTabsRatings v-else-if="activeTab === 'Ratings'" />
         </template>
       </div>
     </div>

@@ -89,6 +89,25 @@ interface PanelMessage {
   replies: PanelMessage[]
 }
 
+interface SessionRatingRow {
+  id: string
+  score: number
+  rated_at: string | null
+  participation: {
+    id: string | null
+    role: string | null
+    status: string | null
+    name: string | null
+    email: string | null
+  }
+}
+
+interface SessionRatingsSummary {
+  ratings_count: number
+  average_score: number | null
+  distribution: Array<{ score: number, count: number }>
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const session       = ref<Session | null>(null)
@@ -102,14 +121,15 @@ const iconChooserOpen = ref(false)
 // Older sessions stored an uploaded image URL in icon_url; new ones store a
 // catalog icon key from the /icons registry. Render whichever we have.
 const iconIsImage = computed(() => !!basic.icon_url && /^https?:\/\//.test(basic.icon_url))
-const activeTab     = ref<'basic' | 'stream' | 'engagement'>('basic')
+const activeTab     = ref<'basic' | 'stream' | 'engagement' | 'ratings'>('basic')
 const loading       = ref(true)
 const tagInput      = ref('')
 
-const TABS: { key: 'basic' | 'stream' | 'engagement'; label: string }[] = [
+const TABS: { key: 'basic' | 'stream' | 'engagement' | 'ratings'; label: string }[] = [
   { key: 'basic', label: 'Basic Details' },
   { key: 'stream', label: 'Stream' },
   { key: 'engagement', label: 'Engagement' },
+  { key: 'ratings', label: 'Ratings' },
 ]
 
 // Header "Deactivate" toggle — reuses the session's own status field (the same
@@ -181,6 +201,41 @@ const stream = reactive({
   qa_moderation:            false,
   qa_answer_policy:         'hosts' as Session['qa_answer_policy'],
 })
+
+const HOST_OPTIONS = [
+  { value: 'self', label: 'Self-hosted' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'vimeo', label: 'Vimeo' },
+  { value: 'agora', label: 'Agora (in-page broadcast)' },
+  { value: 'jitsi', label: 'Jitsi (in-page video)' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'meet', label: 'Google Meet' },
+  { value: 'rtmp', label: 'RTMP' },
+] as const
+
+const BROADCAST_STATE_OPTIONS = [
+  { value: 'scheduled', label: 'Follow the schedule' },
+  { value: 'live', label: 'Live now (open the player)' },
+  { value: 'ended', label: 'Ended (show the replay)' },
+  { value: 'canceled', label: 'Canceled' },
+] as const
+
+const QA_REPLY_OPTIONS = [
+  { value: 'organizers', label: 'Organizers only' },
+  { value: 'hosts', label: 'Organizers and this session’s speakers' },
+  { value: 'everyone', label: 'Anyone in the session' },
+] as const
+
+function toBool(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value === 1
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+    if (['0', 'false', 'no', 'off', ''].includes(normalized)) return false
+  }
+  return !!value
+}
 
 // Host-aware label/placeholder/help for the stream link field.
 const HOST_LINK: Record<string, { label: string; placeholder: string; hint: string }> = {
@@ -279,18 +334,18 @@ async function load() {
     basic.is_allowed_to_rate = s.is_allowed_to_rate ?? false
 
     // Populate stream form
-    stream.is_stream                = s.is_stream ?? false
+    stream.is_stream                = toBool(s.is_stream)
     stream.status                   = s.status ?? 'scheduled'
     stream.who_will_host            = s.who_will_host ?? 'self'
     stream.stream_link              = s.stream_link ?? ''
     stream.on_demand_recording_link = s.on_demand_recording_link ?? ''
     stream.vimeo_live_id            = s.vimeo_live_id ?? ''
-    stream.can_live_chat            = s.can_live_chat ?? false
-    stream.can_qa                   = s.can_qa ?? false
-    stream.can_live_polls           = s.can_live_polls ?? false
-    stream.can_attendee_list        = s.can_attendee_list ?? false
-    stream.can_session              = s.can_session ?? false
-    stream.qa_moderation            = s.qa_moderation ?? false
+    stream.can_live_chat            = toBool(s.can_live_chat)
+    stream.can_qa                   = toBool(s.can_qa)
+    stream.can_live_polls           = toBool(s.can_live_polls)
+    stream.can_attendee_list        = toBool(s.can_attendee_list)
+    stream.can_session              = toBool(s.can_session)
+    stream.qa_moderation            = toBool(s.qa_moderation)
     stream.qa_answer_policy         = s.qa_answer_policy ?? 'hosts'
   } catch { /* */ } finally {
     loading.value = false
@@ -306,6 +361,20 @@ const messages     = ref<PanelMessage[]>([])
 const modKind      = ref<'question' | 'chat'>('question')
 const engLoading   = ref(false)
 const pollSaving   = ref(false)
+const ratingsLoading = ref(false)
+const ratingsLoaded = ref(false)
+const ratings = ref<SessionRatingRow[]>([])
+const ratingsSummary = ref<SessionRatingsSummary>({
+  ratings_count: 0,
+  average_score: null,
+  distribution: [
+    { score: 1, count: 0 },
+    { score: 2, count: 0 },
+    { score: 3, count: 0 },
+    { score: 4, count: 0 },
+    { score: 5, count: 0 },
+  ],
+})
 
 const pollDraft = reactive({
   question:     '',
@@ -329,6 +398,21 @@ async function loadEngagement() {
     messages.value = msgRes.data
   } catch { /* */ } finally {
     engLoading.value = false
+  }
+}
+
+async function loadRatings(force = false) {
+  if (ratingsLoading.value || (ratingsLoaded.value && !force)) return
+  ratingsLoading.value = true
+  try {
+    const res = await api<any>(`/sessions/${sessionId}/ratings`)
+    ratings.value = res.data?.ratings ?? []
+    ratingsSummary.value = res.data?.summary ?? ratingsSummary.value
+    ratingsLoaded.value = true
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not load session ratings.')
+  } finally {
+    ratingsLoading.value = false
   }
 }
 
@@ -458,6 +542,7 @@ const pendingCount = computed(() => messages.value.reduce(
 
 // Load the engagement data lazily — only when the organizer opens that tab.
 watch(activeTab, (t) => { if (t === 'engagement') loadEngagement() })
+watch(activeTab, (t) => { if (t === 'ratings') loadRatings() })
 watch(modKind, () => { if (activeTab.value === 'engagement') loadEngagement() })
 
 // ── Save basic ────────────────────────────────────────────────────────────────
@@ -1035,16 +1120,12 @@ onMounted(load)
             <h3 class="font-semibold text-[.9rem] text-ink mb-4 m-0">Streaming Settings</h3>
 
             <div class="mb-4">
-              <AppSelect v-model="stream.who_will_host" label="Who will host?" class="w-full max-w-xs">
-                <option value="self">Self-hosted</option>
-                <option value="youtube">YouTube</option>
-                <option value="vimeo">Vimeo</option>
-                <option value="agora">Agora (in-page broadcast)</option>
-                <option value="jitsi">Jitsi (in-page video)</option>
-                <option value="zoom">Zoom</option>
-                <option value="meet">Google Meet</option>
-                <option value="rtmp">RTMP</option>
-              </AppSelect>
+              <AppSelect
+                v-model="stream.who_will_host"
+                label="Who will host?"
+                :options="HOST_OPTIONS"
+                class="w-full max-w-xs"
+              />
             </div>
 
             <!-- Vimeo uses a numeric Live ID; every other host uses a link. -->
@@ -1074,12 +1155,11 @@ onMounted(load)
               By schedule, the player opens 15 minutes before the start time and stays up
               30 minutes past the end. Override it here when you run early or late.
             </p>
-            <AppSelect v-model="stream.status" class="w-full max-w-xs">
-              <option value="scheduled">Follow the schedule</option>
-              <option value="live">Live now (open the player)</option>
-              <option value="ended">Ended (show the replay)</option>
-              <option value="canceled">Canceled</option>
-            </AppSelect>
+            <AppSelect
+              v-model="stream.status"
+              :options="BROADCAST_STATE_OPTIONS"
+              class="w-full max-w-xs"
+            />
           </div>
         </template>
 
@@ -1117,11 +1197,11 @@ onMounted(load)
                    yourself — this is about who else may. -->
               <div v-if="stream.can_qa" class="ml-8">
                 <div class="font-medium text-ink text-[.93rem] mb-1">Who can reply to questions</div>
-                <AppSelect v-model="stream.qa_answer_policy" class="w-full max-w-sm">
-                  <option value="organizers">Organizers only</option>
-                  <option value="hosts">Organizers and this session’s speakers</option>
-                  <option value="everyone">Anyone in the session</option>
-                </AppSelect>
+                <AppSelect
+                  v-model="stream.qa_answer_policy"
+                  :options="QA_REPLY_OPTIONS"
+                  class="w-full max-w-sm"
+                />
                 <p class="muted text-[.8rem] mt-1.5 mb-0">
                   <template v-if="stream.qa_answer_policy === 'organizers'">
                     Speakers can still ask and upvote, but answers come from your team only.
@@ -1382,6 +1462,100 @@ onMounted(load)
               </button>
               <button type="button" class="btn ghost" @click="replyingTo = null">Cancel</button>
             </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Ratings Tab ─────────────────────────────────────────────────── -->
+      <div v-else-if="activeTab === 'ratings'" class="w-full">
+        <div class="card mb-5 p-5">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 class="font-semibold text-[.9rem] text-ink m-0">Session Ratings</h3>
+              <p class="muted text-[.83rem] mt-1 mb-0">
+                See who rated this session and how the scores are distributed.
+              </p>
+            </div>
+            <button class="btn ghost sm" :disabled="ratingsLoading" @click="loadRatings(true)">
+              {{ ratingsLoading ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            <div class="border border-line rounded-xl p-4 bg-[#fcfcfd]">
+              <div class="muted text-[.76rem] uppercase tracking-wide mb-1">Average Rating</div>
+              <div class="text-[1.7rem] font-bold text-ink">
+                {{ ratingsSummary.average_score ?? '—' }}
+                <span class="text-[1rem] text-muted font-medium">/ 5</span>
+              </div>
+            </div>
+            <div class="border border-line rounded-xl p-4 bg-[#fcfcfd]">
+              <div class="muted text-[.76rem] uppercase tracking-wide mb-1">Total Ratings</div>
+              <div class="text-[1.7rem] font-bold text-ink">{{ ratingsSummary.ratings_count }}</div>
+            </div>
+            <div class="border border-line rounded-xl p-4 bg-[#fcfcfd]">
+              <div class="muted text-[.76rem] uppercase tracking-wide mb-1">Top Score</div>
+              <div class="text-[1.7rem] font-bold text-ink">
+                {{ [...ratingsSummary.distribution].sort((a, b) => b.count - a.count || b.score - a.score)[0]?.score ?? '—' }}
+                <span class="text-[1rem] text-muted font-medium">star</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="border border-line rounded-xl p-4 mb-5">
+            <div class="font-semibold text-[.88rem] text-ink mb-3">Distribution</div>
+            <div class="flex flex-col gap-2">
+              <div v-for="bucket in [...ratingsSummary.distribution].sort((a, b) => b.score - a.score)" :key="bucket.score" class="flex items-center gap-3">
+                <div class="w-12 text-[.84rem] text-ink font-medium">{{ bucket.score }} star</div>
+                <div class="flex-1 h-2.5 rounded-full bg-[#eef0f4] overflow-hidden">
+                  <div
+                    class="h-full bg-brand rounded-full transition-[width]"
+                    :style="{ width: `${ratingsSummary.ratings_count ? (bucket.count / ratingsSummary.ratings_count) * 100 : 0}%` }"
+                  />
+                </div>
+                <div class="w-10 text-right text-[.82rem] text-muted">{{ bucket.count }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="border border-line rounded-xl overflow-hidden">
+            <div class="grid grid-cols-[minmax(0,1.4fr)_120px_160px_120px] gap-3 px-4 py-3 bg-[#f8f9fc] text-[.76rem] font-semibold uppercase tracking-wide text-muted">
+              <div>Attendee</div>
+              <div>Score</div>
+              <div>Rated At</div>
+              <div>Status</div>
+            </div>
+
+            <div v-if="ratingsLoading && !ratings.length" class="px-4 py-8 text-center muted text-[.84rem]">
+              Loading ratings…
+            </div>
+            <div v-else-if="!ratings.length" class="px-4 py-8 text-center muted text-[.84rem]">
+              No one has rated this session yet.
+            </div>
+
+            <div
+              v-for="row in ratings" :key="row.id"
+              class="grid grid-cols-[minmax(0,1.4fr)_120px_160px_120px] gap-3 px-4 py-3 border-t border-line items-center"
+            >
+              <div class="min-w-0">
+                <div class="text-[.88rem] text-ink font-medium truncate">{{ row.participation.name || 'Unnamed attendee' }}</div>
+                <div class="text-[.8rem] text-muted truncate">{{ row.participation.email || 'No email' }}</div>
+              </div>
+              <div class="text-[.88rem] text-ink font-semibold">{{ row.score }} / 5</div>
+              <div class="text-[.82rem] text-muted">
+                {{ row.rated_at ? new Date(row.rated_at).toLocaleString() : '—' }}
+              </div>
+              <div>
+                <span
+                  class="inline-flex items-center px-2 py-1 rounded-full text-[.72rem] font-semibold"
+                  :class="row.participation.status === 'confirmed'
+                    ? 'bg-[#dcfce7] text-[#15803d]'
+                    : 'bg-[#eef0f4] text-[#475569]'"
+                >
+                  {{ row.participation.status || 'unknown' }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

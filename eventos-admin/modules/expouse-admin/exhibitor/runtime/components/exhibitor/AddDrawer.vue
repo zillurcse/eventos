@@ -30,8 +30,9 @@ const isAdd = computed(() => drawerMode.value === 'add')
     <!-- Details owns the create/update action (it's the only tab that saves the
          whole exhibitor); render it in the drawer's sticky footer instead of
          inline so it stays pinned regardless of scroll, like showcase/packages. -->
-    <template v-if="activeTab === 'Details'" #footer>
-      <div class="modal-actions border-t border-line px-5.5 py-4 justify-start">
+    <!-- Keep #footer stable; toggling v-if on the slot template crashes Vue 3.5 unmount. -->
+    <template #footer>
+      <div v-show="activeTab === 'Details'" class="modal-actions border-t border-line px-5.5 py-4 justify-start">
         <button
           v-if="isAdd"
           class="btn"

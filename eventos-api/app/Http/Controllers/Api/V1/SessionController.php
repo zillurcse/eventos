@@ -9,6 +9,7 @@ use App\Models\Contact;
 use App\Models\Event;
 use App\Models\Participation;
 use App\Models\Session;
+use App\Models\SessionRating;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -221,6 +222,91 @@ class SessionController extends Controller
         return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
     }
 
+    /** The signed-in attendee's own rating for one session, plus the current average. */
+    public function myRating(Request $request, string $event, string $sessionUuid): JsonResponse
+    {
+        $session = $this->participantSession($request, $sessionUuid);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $mine = SessionRating::where('session_id', $session->id)
+            ->where('participation_id', $pid)
+            ->first();
+
+        return response()->json([
+            'data' => [
+                'score' => $mine?->score,
+                ...$this->ratingSummary($session),
+            ],
+        ]);
+    }
+
+    /** Create or update the signed-in attendee's rating for a session. */
+    public function rate(Request $request, string $event, string $sessionUuid): JsonResponse
+    {
+        $session = $this->participantSession($request, $sessionUuid, mustAllowRating: true);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $data = $request->validate([
+            'score' => ['required', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        $rating = SessionRating::updateOrCreate(
+            ['session_id' => $session->id, 'participation_id' => $pid],
+            [
+                'organization_id' => $session->organization_id,
+                'event_id' => $session->event_id,
+                'score' => (int) $data['score'],
+                'rated_at' => now(),
+            ],
+        );
+
+        return response()->json([
+            'data' => [
+                'score' => $rating->score,
+                ...$this->ratingSummary($session),
+            ],
+        ]);
+    }
+
+    /** Organizer-facing rating list for one session, including averages. */
+    public function ratings(string $uuid): JsonResponse
+    {
+        $session = Session::with(['ratings.participation.contact', 'event'])->where('uuid', $uuid)->firstOrFail();
+        $summary = $this->ratingSummary($session);
+
+        $ratings = $session->ratings
+            ->sortByDesc(fn (SessionRating $rating) => $rating->rated_at?->getTimestamp() ?? $rating->created_at?->getTimestamp() ?? 0)
+            ->values()
+            ->map(function (SessionRating $rating) {
+                $contact = $rating->participation?->contact;
+                $name = trim(($contact->first_name ?? '').' '.($contact->last_name ?? ''));
+
+                return [
+                    'id' => $rating->uuid,
+                    'score' => $rating->score,
+                    'rated_at' => ($rating->rated_at ?? $rating->created_at)?->toIso8601String(),
+                    'participation' => [
+                        'id' => $rating->participation?->uuid,
+                        'role' => $rating->participation?->role,
+                        'status' => $rating->participation?->status,
+                        'name' => $name !== '' ? $name : null,
+                        'email' => $contact?->email,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'session' => [
+                    'id' => $session->uuid,
+                    'title' => $session->title,
+                ],
+                'summary' => $summary,
+                'ratings' => $ratings,
+            ],
+        ]);
+    }
+
     public function destroy(string $uuid): JsonResponse
     {
         $session = Session::where('uuid', $uuid)->firstOrFail();
@@ -290,6 +376,43 @@ class SessionController extends Controller
             'documents'           => ['nullable', 'array', 'max:10'],
             'documents.*.name'    => ['required_with:documents', 'string', 'max:250'],
             'documents.*.url'     => ['required_with:documents', 'string', 'max:2000'],
+        ];
+    }
+
+    private function participantSession(Request $request, string $sessionUuid, bool $mustAllowRating = false): Session
+    {
+        $session = Session::where('event_id', (int) $request->attributes->get('event_id'))
+            ->where('uuid', $sessionUuid)
+            ->firstOrFail();
+
+        if ($mustAllowRating && ! (bool) ($session->meta['is_allowed_to_rate'] ?? false)) {
+            throw ValidationException::withMessages([
+                'score' => 'Rating is disabled for this session.',
+            ]);
+        }
+
+        return $session;
+    }
+
+    private function ratingSummary(Session $session): array
+    {
+        $query = SessionRating::where('session_id', $session->id);
+        $count = (int) (clone $query)->count();
+        $average = $count > 0 ? round((float) (clone $query)->avg('score'), 1) : null;
+        $distribution = (clone $query)
+            ->selectRaw('score, count(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+
+        return [
+            'ratings_count' => $count,
+            'average_score' => $average,
+            'distribution' => collect(range(1, 5))
+                ->map(fn (int $score) => [
+                    'score' => $score,
+                    'count' => (int) ($distribution[$score] ?? 0),
+                ])
+                ->all(),
         ];
     }
 

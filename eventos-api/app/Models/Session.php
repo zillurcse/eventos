@@ -71,6 +71,11 @@ class Session extends Model
         return $this->hasMany(SessionPoll::class);
     }
 
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(SessionRating::class);
+    }
+
     public function mutes(): HasMany
     {
         return $this->hasMany(SessionMute::class);

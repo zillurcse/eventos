@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\Event;
 use App\Models\Participation;
+use App\Models\SpeakerRating;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -257,6 +258,136 @@ class SpeakerController extends Controller
             'email' => $contact->email,
             'password' => $password,   // shown once, never stored in the clear
         ]]);
+    }
+
+    /** The signed-in attendee's own rating for one speaker, plus the current average. */
+    public function myRating(Request $request, string $event, string $participationUuid): JsonResponse
+    {
+        $speaker = $this->participantSpeaker($request, $participationUuid);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $mine = SpeakerRating::where('speaker_participation_id', $speaker->id)
+            ->where('participation_id', $pid)
+            ->first();
+
+        return response()->json([
+            'data' => [
+                'score' => $mine?->score,
+                ...$this->ratingSummary($speaker),
+            ],
+        ]);
+    }
+
+    /** Create or update the signed-in attendee's rating for a speaker. */
+    public function rate(Request $request, string $event, string $participationUuid): JsonResponse
+    {
+        $speaker = $this->participantSpeaker($request, $participationUuid, mustAllowRating: true);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $data = $request->validate([
+            'score' => ['required', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        $rating = SpeakerRating::updateOrCreate(
+            ['speaker_participation_id' => $speaker->id, 'participation_id' => $pid],
+            [
+                'organization_id' => $speaker->organization_id,
+                'event_id' => $speaker->event_id,
+                'score' => (int) $data['score'],
+                'rated_at' => now(),
+            ],
+        );
+
+        return response()->json([
+            'data' => [
+                'score' => $rating->score,
+                ...$this->ratingSummary($speaker),
+            ],
+        ]);
+    }
+
+    /** Organizer-facing rating list for one speaker, including averages. */
+    public function ratings(string $uuid, string $participationUuid): JsonResponse
+    {
+        $event = Event::where('uuid', $uuid)->firstOrFail();
+
+        $speaker = Participation::with(['speakerRatings.participation.contact', 'contact'])
+            ->where('uuid', $participationUuid)
+            ->where('event_id', $event->id)
+            ->where('role', 'speaker')
+            ->firstOrFail();
+
+        $summary = $this->ratingSummary($speaker);
+
+        $ratings = $speaker->speakerRatings
+            ->sortByDesc(fn (SpeakerRating $rating) => $rating->rated_at?->getTimestamp() ?? $rating->created_at?->getTimestamp() ?? 0)
+            ->values()
+            ->map(function (SpeakerRating $rating) {
+                $contact = $rating->participation?->contact;
+                $name = trim(($contact->first_name ?? '').' '.($contact->last_name ?? ''));
+
+                return [
+                    'id' => $rating->uuid,
+                    'score' => $rating->score,
+                    'rated_at' => ($rating->rated_at ?? $rating->created_at)?->toIso8601String(),
+                    'participation' => [
+                        'id' => $rating->participation?->uuid,
+                        'role' => $rating->participation?->role,
+                        'status' => $rating->participation?->status,
+                        'name' => $name !== '' ? $name : null,
+                        'email' => $contact?->email,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'speaker' => [
+                    'id' => $speaker->uuid,
+                    'name' => $speaker->contact?->fullName(),
+                ],
+                'summary' => $summary,
+                'ratings' => $ratings,
+            ],
+        ]);
+    }
+
+    private function participantSpeaker(Request $request, string $participationUuid, bool $mustAllowRating = false): Participation
+    {
+        $speaker = Participation::where('event_id', (int) $request->attributes->get('event_id'))
+            ->where('uuid', $participationUuid)
+            ->where('role', 'speaker')
+            ->firstOrFail();
+
+        if ($mustAllowRating && ! (bool) (($speaker->profile_data['can_rate'] ?? false))) {
+            throw ValidationException::withMessages([
+                'score' => 'Rating is disabled for this speaker.',
+            ]);
+        }
+
+        return $speaker;
+    }
+
+    private function ratingSummary(Participation $speaker): array
+    {
+        $query = SpeakerRating::where('speaker_participation_id', $speaker->id);
+        $count = (int) (clone $query)->count();
+        $average = $count > 0 ? round((float) (clone $query)->avg('score'), 1) : null;
+        $distribution = (clone $query)
+            ->selectRaw('score, count(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+
+        return [
+            'ratings_count' => $count,
+            'average_score' => $average,
+            'distribution' => collect(range(1, 5))
+                ->map(fn (int $score) => [
+                    'score' => $score,
+                    'count' => (int) ($distribution[$score] ?? 0),
+                ])
+                ->all(),
+        ];
     }
 
     private function format(Participation $p): array

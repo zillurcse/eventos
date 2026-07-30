@@ -115,7 +115,10 @@ function onDocPointer(e: Event) {
 }
 
 onMounted(() => document.addEventListener('pointerdown', onDocPointer))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer))
+onBeforeUnmount(() => {
+  closeList()
+  document.removeEventListener('pointerdown', onDocPointer)
+})
 
 /** Red left bar only while required and still empty. */
 const showRequiredMark = computed(() => {
@@ -151,7 +154,6 @@ const showRequiredMark = computed(() => {
           :key="opt.value"
           :value="opt.value"
         >{{ opt.label }}</option>
-        <slot />
       </select>
     </div>
 

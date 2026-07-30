@@ -137,9 +137,11 @@ const columns = [
           <button class="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-[#f1f2f6] border-0 bg-transparent cursor-pointer" aria-label="Actions" @click="toggleActions(row.id, $event)">
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
           </button>
-          <Teleport to="body">
+          <Teleport
+            v-if="actionsOpenId === row.id && actionsAnchor"
+            to="body"
+          >
             <div
-              v-if="actionsOpenId === row.id && actionsAnchor"
               class="fixed bg-white rounded-xl border border-[#E8E8EE] shadow-xl z-30 min-w-40 overflow-hidden p-2"
               :style="{ top: `${actionsAnchor.top}px`, right: `${actionsAnchor.right}px` }"
               @click.stop

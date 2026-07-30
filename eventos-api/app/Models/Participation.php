@@ -61,6 +61,16 @@ class Participation extends Model
         return $this->hasMany(ExpoLensPhotoMatch::class);
     }
 
+    public function sessionRatings(): HasMany
+    {
+        return $this->hasMany(SessionRating::class);
+    }
+
+    public function speakerRatings(): HasMany
+    {
+        return $this->hasMany(SpeakerRating::class, 'speaker_participation_id');
+    }
+
     public function scopeAttendees($q)
     {
         return $q->where('role', 'attendee');

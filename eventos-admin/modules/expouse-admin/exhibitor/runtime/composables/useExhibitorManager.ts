@@ -18,6 +18,8 @@ import {
   exhibitorError,
   isActive,
   detectLocaleFromIp,
+  type ExhibitorRatingRow,
+  type ExhibitorRatingsSummary,
   type Draft,
   type Exhibitor,
   type ExhibitorMember,
@@ -65,6 +67,20 @@ export function useExhibitorManager(eventId: string) {
   const subSaving = ref(false)
   const subError = ref('')
   const entitlements = ref<FeatureLine[]>([])
+  const ratingsLoading = ref(false)
+  const ratingsLoaded = ref(false)
+  const ratings = ref<ExhibitorRatingRow[]>([])
+  const ratingsSummary = ref<ExhibitorRatingsSummary>({
+    ratings_count: 0,
+    average_score: null,
+    distribution: [
+      { score: 1, count: 0 },
+      { score: 2, count: 0 },
+      { score: 3, count: 0 },
+      { score: 4, count: 0 },
+      { score: 5, count: 0 },
+    ],
+  })
 
   const memberList = useExhibitorCollection<ExhibitorMember, typeof MEMBER_FORM>(editingId, subSaving, subError, {
     path: 'members',
@@ -228,25 +244,27 @@ export function useExhibitorManager(eventId: string) {
     entitlements.value = resolveEntitlements(exhibitor, packages.value)
   }
 
+  // API hydration can temporarily provide nulls, so normalise before validation.
+  const text = (v: unknown) => typeof v === 'string' ? v.trim() : ''
   // Name, package, type, admin email, and full contact details are required to create.
-  const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+  const emailOk = (v: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text(v))
   const contactOk = computed(() => {
     const c = draft.contact
-    return !!c.full_name.trim()
-      && !!c.position.trim()
-      && !!c.company_name.trim()
-      && !!c.phone.trim()
+    return !!text(c.full_name)
+      && !!text(c.position)
+      && !!text(c.company_name)
+      && !!text(c.phone)
       && emailOk(c.email)
   })
   const canCreate = computed(() =>
-    !!draft.name.trim()
+    !!text(draft.name)
     && !!draft.package_id
     && !!draft.type
     && emailOk(draft.email)
     && contactOk.value)
   // Edit save: same required fields (admin email is locked after create).
   const canSave = computed(() =>
-    !!draft.name.trim()
+    !!text(draft.name)
     && !!draft.package_id
     && !!draft.type
     && contactOk.value)
@@ -263,6 +281,19 @@ export function useExhibitorManager(eventId: string) {
     subError.value = ''
     current.value = null
     loadedPackageId = ''
+    ratingsLoaded.value = false
+    ratings.value = []
+    ratingsSummary.value = {
+      ratings_count: 0,
+      average_score: null,
+      distribution: [
+        { score: 1, count: 0 },
+        { score: 2, count: 0 },
+        { score: 3, count: 0 },
+        { score: 4, count: 0 },
+        { score: 5, count: 0 },
+      ],
+    }
     ignorePackageWatch = true
     Object.assign(draft, freshDraft())
     for (const c of collections) { c.set([]); c.reset() }
@@ -289,6 +320,21 @@ export function useExhibitorManager(eventId: string) {
       // Let the package_id assign flush before re-enabling the watch.
       await nextTick()
       ignorePackageWatch = false
+    }
+  }
+
+  async function loadRatings(force = false) {
+    if (!editingId.value || ratingsLoading.value || (ratingsLoaded.value && !force)) return
+    ratingsLoading.value = true
+    try {
+      const res = await api<{ data: { ratings?: ExhibitorRatingRow[], summary?: ExhibitorRatingsSummary } }>(`/exhibitors/${editingId.value}/ratings`)
+      ratings.value = res.data?.ratings ?? []
+      ratingsSummary.value = res.data?.summary ?? ratingsSummary.value
+      ratingsLoaded.value = true
+    } catch (e) {
+      toast.error(exhibitorError(e, 'Could not load exhibitor ratings.'))
+    } finally {
+      ratingsLoading.value = false
     }
   }
 
@@ -506,6 +552,11 @@ export function useExhibitorManager(eventId: string) {
     productForm: productList.form,
     addProduct: productList.add,
     removeProduct: productList.remove,
+    ratingsLoading,
+    ratingsLoaded,
+    ratings,
+    ratingsSummary,
+    loadRatings,
     // previous exhibitors — the picker owns its own state; the table only opens it
     previous,
     // reset password

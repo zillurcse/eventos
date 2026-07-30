@@ -88,7 +88,6 @@ export const PHONE_CODES: PhoneCode[] = [
   { iso: 'IR', name: 'Iran', code: '+98', flag: '🇮🇷' },
   { iso: 'IQ', name: 'Iraq', code: '+964', flag: '🇮🇶' },
   { iso: 'IE', name: 'Ireland', code: '+353', flag: '🇮🇪' },
-  { iso: 'IL', name: 'Israel', code: '+972', flag: '🇮🇱' },
   { iso: 'IT', name: 'Italy', code: '+39', flag: '🇮🇹' },
   { iso: 'CI', name: 'Ivory Coast', code: '+225', flag: '🇨🇮' },
   { iso: 'JM', name: 'Jamaica', code: '+1876', flag: '🇯🇲' },

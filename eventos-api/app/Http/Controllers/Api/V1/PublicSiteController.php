@@ -881,6 +881,7 @@ class PublicSiteController extends Controller
             'bio' => $profile['bio'] ?? '',
             'image_url' => $profile['image_url'] ?? null,
             'is_featured' => (bool) ($profile['is_featured'] ?? false),
+            'can_rate' => (bool) ($profile['can_rate'] ?? false),
             'social' => array_filter([
                 'linkedin' => $profile['linkedin'] ?? null,
                 'twitter' => $profile['twitter'] ?? null,
