@@ -77,7 +77,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[760px]">
+  <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Content Hub</h1>
+    <ContentHubTabs :event-id="id" active="faq" />
+
+    <div class="max-w-[760px]">
     <div class="mb-4">
       <h2 class="section-title m-0">FAQ</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Frequently asked questions shown on your event website.</p>
@@ -176,6 +180,7 @@ onMounted(load)
         </button>
       </div>
     </Drawer>
+    </div>
   </div>
 </template>
 

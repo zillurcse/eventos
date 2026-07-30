@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// @ts-expect-error project already uses vue-sonner; this file hits a local ts-plugin false positive
+import { toast } from 'vue-sonner'
 import type { AgendaSession } from '~/stores/sessions'
 import type { PanelAttendee, PanelMessage, Poll } from '~/composables/useSessionPanel'
 
@@ -8,6 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useSessionsStore()
 const bookmarks = useBookmarksStore()
+const isClient = typeof window !== 'undefined'
 
 const id = computed(() => route.params.id as string)
 
@@ -175,7 +178,7 @@ const zoomError = ref('')
 let zoomClient: any = null
 
 async function startZoom() {
-  if (!import.meta.client) return
+  if (!isClient) return
   if (zoomState.value === 'loading' || zoomState.value === 'joined') return
   const s = session.value
   if (!s) return
@@ -186,6 +189,7 @@ async function startZoom() {
     await nextTick()
     const el = zoomRoot.value
     if (!el) throw new Error('Player container not ready.')
+    // @ts-expect-error Runtime-only SDK is installed, but ships no editor types here.
     const ZoomMtgEmbedded = (await import('@zoom/meetingsdk/embedded')).default
     zoomClient = ZoomMtgEmbedded.createClient()
     await zoomClient.init({ zoomAppRoot: el, language: 'en-US', patchJsMedia: true })
@@ -229,7 +233,7 @@ function loadJitsi(domain: string): Promise<any> {
   })
 }
 async function startJitsi() {
-  if (!import.meta.client) return
+  if (!isClient) return
   if (jitsiState.value === 'loading' || jitsiState.value === 'joined') return
   const s = session.value
   if (!s) return
@@ -306,7 +310,7 @@ function playInStage(track: any) {
 }
 
 async function startAgora() {
-  if (!import.meta.client) return
+  if (!isClient) return
   if (agoraState.value === 'loading' || agoraState.value === 'joined') return
   const s = session.value
   if (!s) return
@@ -324,6 +328,7 @@ async function startAgora() {
     const { data } = await api<any>(`/events/${store.eventUuid}/sessions/${s.id}/agora-token`)
     agoraRole.value = data.role
 
+    // @ts-expect-error Runtime-only SDK is installed, but ships no editor types here.
     const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
     AgoraRTC.setLogLevel(3) // warnings and errors only
 
@@ -428,7 +433,7 @@ function stopVideo() {
 }
 
 async function startVideo(src: string) {
-  if (!import.meta.client) return
+  if (!isClient) return
   stopVideo()
   videoError.value = ''
   await nextTick()
@@ -439,6 +444,7 @@ async function startVideo(src: string) {
   const isHls = /\.m3u8(\?.*)?$/i.test(src)
   if (isHls && !el.canPlayType('application/vnd.apple.mpegurl')) {
     try {
+      // @ts-expect-error Runtime-only SDK is installed, but ships no editor types here.
       const Hls = (await import('hls.js')).default
       if (Hls.isSupported()) {
         const instance = new Hls({ lowLatencyMode: true })
@@ -465,7 +471,7 @@ function syncEmbed(p: Player) {
   else if (p.kind === 'agora') startAgora()
   else if (p.kind === 'video') startVideo(p.src)
 }
-watch(player, (p, prev) => {
+watch(player, (p: Player, prev?: Player) => {
   // Re-attach only when the player actually changes, not on every tick.
   if (prev && p.kind === prev.kind && (p.kind !== 'video' || p.src === (prev as { src?: string }).src)) return
   syncEmbed(p)
@@ -528,22 +534,46 @@ const calendarLink = computed(() => {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 })
 
-// Local, per-session rating + note (kept client-side until the API lands).
+// Session ratings are now persisted server-side per attendee.
 const rating = ref(0)
 const hoverRating = ref(0)
-function setRating(n: number) {
+const ratingSaving = ref(false)
+async function loadRating() {
+  if (!store.eventUuid || !session.value?.id) return
+  try {
+    const res = await api<{ data: { score: number | null } }>(`/events/${store.eventUuid}/sessions/${session.value.id}/rating`)
+    rating.value = res.data.score || 0
+  } catch {
+    rating.value = 0
+  }
+}
+async function setRating(n: number) {
+  if (!store.eventUuid || !session.value?.id || ratingSaving.value) return
+  ratingSaving.value = true
+  const prev = rating.value
   rating.value = n
-  if (import.meta.client) localStorage.setItem(`eventos_rating_${id.value}`, String(n))
+  try {
+    const res = await api<{ data: { score: number } }>(`/events/${store.eventUuid}/sessions/${session.value.id}/rating`, {
+      method: 'POST',
+      body: { score: n },
+    })
+    rating.value = res.data.score
+    toast.success(`You rated this session ${res.data.score} out of 5.`)
+  } catch (e: any) {
+    rating.value = prev
+    toast.error(e?.data?.message || 'Could not save your rating.')
+  } finally {
+    ratingSaving.value = false
+  }
 }
 const noteOpen = ref(false)
 const note = ref('')
 function saveNote() {
-  if (import.meta.client) localStorage.setItem(`eventos_note_${id.value}`, note.value)
+  if (isClient) localStorage.setItem(`eventos_note_${id.value}`, note.value)
   noteOpen.value = false
 }
-watch(id, (v) => {
-  if (!import.meta.client) return
-  rating.value = Number(localStorage.getItem(`eventos_rating_${v}`) || 0)
+watch(id, (v: string) => {
+  if (!isClient) return
   note.value = localStorage.getItem(`eventos_note_${v}`) || ''
 }, { immediate: true })
 
@@ -563,7 +593,7 @@ const enabledTabs = computed(() => {
 })
 const panelOpen = ref(true)
 const activeTab = ref('chat')
-watch(enabledTabs, (tabs) => {
+watch(enabledTabs, (tabs: { key: string, label: string, flag: keyof AgendaSession }[]) => {
   if (tabs.length && !tabs.some(t => t.key === activeTab.value)) activeTab.value = tabs[0]!.key
 }, { immediate: true })
 
@@ -623,7 +653,7 @@ function restartPolling() {
 }
 
 watch([() => store.eventUuid, () => session.value?.id], ([ev, sid]: [string | null, string | undefined]) => {
-  if (ev && sid) { bind(ev, sid); restartPolling() }
+  if (ev && sid) { bind(ev, sid); restartPolling(); loadRating() }
 }, { immediate: true })
 watch(activeTab, restartPolling)
 watch(panelOpen, restartPolling)
@@ -887,8 +917,19 @@ function docKind(name: string) {
                   v-for="n in 5" :key="n" type="button" class="star"
                   :class="{ on: (hoverRating || rating) >= n }"
                   :title="`Rate ${n} / 5`"
+                  :aria-label="`Rate ${n} out of 5`"
                   @mouseenter="hoverRating = n" @click="setRating(n)"
-                >★</button>
+                >
+                  <svg viewBox="0 0 21 21" aria-hidden="true">
+                    <path
+                      d="M10.5 0.5L13.59 6.76L20.5 7.77L15.5 12.64L16.68 19.52L10.5 16.27L4.32 19.52L5.5 12.64L0.5 7.77L7.41 6.76L10.5 0.5Z"
+                      fill="currentColor"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -1210,7 +1251,7 @@ function docKind(name: string) {
 
                 <label class="clab">Options</label>
                 <div v-for="(_, i) in draftOptions" :key="i" class="crow">
-                  <input v-model="draftOptions[i]" class="cin" :placeholder="`Option ${i + 1}`" maxlength="200">
+                  <input v-model="draftOptions[i]" class="cin" :placeholder="`Option ${Number(i) + 1}`" maxlength="200">
                   <button v-if="draftOptions.length > 2" class="cx" title="Remove" @click="removeDraftOption(i)">×</button>
                 </div>
                 <button v-if="draftOptions.length < 8" class="cadd" @click="addDraftOption">+ Add option</button>
@@ -1358,9 +1399,12 @@ function docKind(name: string) {
 .badge.up { color: #1d4ed8; background: #dbeafe; }
 .badge.end { color: #475569; background: #e2e8f0; }
 .badge.feat { color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 12%, #fff); border: 1px solid color-mix(in srgb, var(--brand-primary) 25%, #fff); }
-.stars { display: inline-flex; gap: 2px; }
-.star { border: none; background: none; cursor: pointer; font-size: 1.25rem; line-height: 1; color: #e2e8f0; padding: 0; }
-.star.on { color: #f59e0b; }
+.stars { display: inline-flex; gap: 4px; }
+.star { border: none; background: none; cursor: pointer; color: #cbd5e1; padding: 0; transition: color .16s ease, transform .16s ease; }
+.star svg { display: block; width: 21px; height: 21px; }
+.star:hover, .star.on { color: var(--brand-primary); }
+.star:focus-visible { outline: 2px solid color-mix(in srgb, var(--brand-primary) 45%, white); outline-offset: 3px; border-radius: 4px; }
+.star:hover { transform: scale(1.06); }
 
 .title { margin: 14px 0 0; font-size: 1.3rem; font-weight: 800; color: #1e293b; line-height: 1.3; }
 .when { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #64748b; font-size: .88rem; font-weight: 600; }

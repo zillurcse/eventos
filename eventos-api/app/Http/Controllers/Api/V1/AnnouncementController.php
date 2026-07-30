@@ -199,6 +199,8 @@ class AnnouncementController extends Controller
             'audience' => ['nullable', 'array'],
             'audience.all' => ['sometimes', 'boolean'],
             'audience.specific' => ['sometimes', 'boolean'],
+            'audience.roles' => ['sometimes', 'array'],
+            'audience.roles.*' => ['string', Rule::in(['attendee', 'speaker', 'exhibitor', 'sponsor'])],
             'audience.user_ids' => ['sometimes', 'array'],
             'audience.user_ids.*' => ['string'],
             'audience.target_id' => ['nullable', 'string'],
@@ -216,15 +218,19 @@ class AnnouncementController extends Controller
     private function normalizeAudience(?array $audience): array
     {
         if (! $audience) {
-            return ['all' => true];
+            return ['all' => true, 'roles' => []];
         }
 
         $specific = ! empty($audience['specific']) || ! empty($audience['user_ids']);
-        $all = array_key_exists('all', $audience) ? (bool) $audience['all'] : ! $specific;
+        $roles = array_values(array_unique(array_filter($audience['roles'] ?? [])));
+        $all = array_key_exists('all', $audience)
+            ? (bool) $audience['all']
+            : (! $specific && empty($roles));
 
         return [
-            'all' => $all && ! $specific,
+            'all' => $all && ! $specific && empty($roles),
             'specific' => $specific,
+            'roles' => $specific || $all ? [] : $roles,
             'user_ids' => array_values(array_unique(array_filter($audience['user_ids'] ?? []))),
             'target_id' => $audience['target_id'] ?? null,
             'target_label' => $audience['target_label'] ?? null,
@@ -301,6 +307,17 @@ class AnnouncementController extends Controller
 
         if (! empty($audience['specific']) && ! empty($audience['user_ids'])) {
             $query->whereIn('uuid', $audience['user_ids']);
+        } elseif (! empty($audience['roles']) && empty($audience['all'])) {
+            $roles = array_values($audience['roles']);
+            $query->where(function ($q) use ($roles) {
+                foreach ($roles as $role) {
+                    if ($role === 'exhibitor') {
+                        $q->orWhereIn('role', ['exhibitor', 'partner_member']);
+                    } else {
+                        $q->orWhere('role', $role);
+                    }
+                }
+            });
         }
 
         return $query->get(['id']);
@@ -313,12 +330,14 @@ class AnnouncementController extends Controller
             'title' => $a->title,
             'body' => $a->body,
             'display_area' => $a->display_area,
-            'audience' => $a->audience ?? ['all' => true],
+            'audience' => $a->audience ?? ['all' => true, 'roles' => []],
             'channels' => $a->channels ?? ['web' => true, 'mobile' => true],
             'status' => $a->status,
             'scheduled_at' => optional($a->scheduled_at)?->toIso8601String(),
             'sent_at' => optional($a->sent_at)?->toIso8601String(),
             'created_at' => optional($a->created_at)?->toIso8601String(),
+            'reach' => 0,
+            'clicked' => 0,
         ];
     }
 }

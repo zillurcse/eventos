@@ -137,7 +137,6 @@ async function loadThread() {
   catch (e: any) {
     const msg = e?.data?.message || e?.response?._data?.message || 'Chat is not available with this person.'
     chatError.value = msg
-    toast.error(msg)
   }
   finally {
     threadLoading.value = false
@@ -149,7 +148,7 @@ async function loadLounge() {
   if (!uuid || !target.value) return
   try {
     const api = useApi()
-    const res = await api<{ data: Lounge }>(`/events/${uuid}/lounge`, { query: { with: target.value.id } })
+    const res = await api<{ data: Lounge }>(`/events/${uuid}/lounge`, { query: { with: target.value.id }, silent: true })
     lounge.value = res.data
     pickedDate.value = res.data.dates?.[0] ?? ''
     if (res.data.location_required && res.data.locations?.length === 1) {
@@ -210,7 +209,6 @@ async function sendChat() {
   catch (e: any) {
     const msg = e?.data?.message || e?.response?._data?.message || e?.message || 'Could not send your message.'
     chatError.value = msg
-    toast.error(msg)
   }
   finally {
     sending.value = false
@@ -247,9 +245,7 @@ async function sendMeeting() {
       toast.success('Meeting request sent!')
     }
     else {
-      const msg = meetings.lastError || 'Could not send the meeting request.'
-      meetError.value = msg
-      toast.error(msg)
+      meetError.value = meetings.lastError || 'Could not send the meeting request.'
     }
   }
   finally { sending.value = false }

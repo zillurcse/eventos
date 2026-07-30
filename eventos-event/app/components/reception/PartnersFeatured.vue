@@ -63,7 +63,7 @@ function subtitle(p: ReceptionPartner): string {
 }
 
 .pcard {
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border: 1px solid #eef0f3;
   border-radius: 16px;
   overflow: hidden;
@@ -172,5 +172,32 @@ function subtitle(p: ReceptionPartner): string {
 
 .viewall-btn:hover {
   background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
+}
+
+:global(html[data-theme="minimal"]) .pcard {
+  border-radius: var(--theme-radius, 8px);
+  box-shadow: none;
+}
+:global(html[data-theme="minimal"]) .grid {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+:global(html[data-theme="minimal"]) .viewall-btn {
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: .8rem;
+}
+
+:global(html[data-theme="modern"]) .pcard {
+  border-radius: var(--theme-radius, 18px);
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+  border: none;
+}
+:global(html[data-theme="modern"]) .grid {
+  gap: 24px;
+}
+:global(html[data-theme="modern"]) .viewall-btn {
+  border-radius: 12px;
+  padding: 10px 18px;
 }
 </style>

@@ -63,7 +63,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="max-w-[720px]">
+  <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Content Hub</h1>
+    <ContentHubTabs :event-id="id" active="theme" />
+
+    <div class="max-w-[720px]">
     <div class="mb-4">
       <h2 class="section-title m-0">Website Theme</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Customize the visual appearance of your event website.</p>
@@ -98,6 +102,7 @@ onMounted(load)
       <button class="btn" :disabled="saving" @click="save">
         {{ saving ? 'Saving…' : 'Save Theme' }}
       </button>
+    </div>
     </div>
   </div>
 </template>

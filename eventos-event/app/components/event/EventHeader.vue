@@ -282,7 +282,8 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
 
 <style scoped>
 .event-header {
-  background: #fff;
+  background: var(--brand-nav-bg, #fff);
+  color: var(--brand-nav-text, #212529);
   border-bottom: 1px solid #e6e8ec;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
   position: sticky;
@@ -329,7 +330,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
 
 .logo-name {
   font-weight: 700;
-  color: #334155;
+  color: var(--brand-nav-text, #334155);
   font-size: .82rem;
   line-height: 1.25;
   display: -webkit-box;
@@ -358,7 +359,7 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
   border: none;
   background: none;
   cursor: pointer;
-  color: #94a3b8;
+  color: color-mix(in srgb, var(--brand-nav-text, #94a3b8) 55%, #94a3b8);
   font: inherit;
   font-size: .64rem;
   font-weight: 600;
@@ -544,5 +545,30 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
   .logo-name {
     display: none;
   }
+}
+
+:global(html[data-theme="minimal"]) .event-header {
+  box-shadow: none;
+}
+:global(html[data-theme="minimal"]) .avatar {
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: .8rem;
+}
+
+:global(html[data-theme="modern"]) .event-header {
+  box-shadow: 0 4px 20px rgba(15, 23, 42, .04);
+  border-bottom-color: transparent;
+}
+:global(html[data-theme="modern"]) .avatar {
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+}
+:global(html[data-theme="modern"]) .menu {
+  border-radius: 16px;
+  border: none;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
 }
 </style>

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Signed-in attendee chrome: branded topbar + the event navigation, over the
 // grey app canvas. Used by the reception page (and future event tabs).
+const site = useSiteStore()
 const contact = useExhibitorContactStore()
 const delegates = useDelegatesStore()
 </script>
 
 <template>
-  <div class="event-shell">
+  <div class="event-shell" :data-appearance="site.appearance">
     <EventHeader />
     <main class="event-main">
       <slot />
@@ -33,6 +34,16 @@ const delegates = useDelegatesStore()
 </template>
 
 <style scoped>
-.event-shell { min-height: 100vh; background: #F7F7FB; }
+.event-shell { min-height: 100vh; background: var(--brand-page-bg, #F7F7FB); color: var(--brand-body-text, #212529); }
 .event-main { max-width: 1440px; margin: 0 auto; padding: 30px 18px 56px; }
+
+.event-shell[data-appearance="minimal"] .event-main {
+  max-width: 880px;
+  padding: 18px 14px 40px;
+}
+
+.event-shell[data-appearance="modern"] .event-main {
+  max-width: 1280px;
+  padding: 36px 24px 64px;
+}
 </style>

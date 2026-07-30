@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
@@ -25,14 +26,14 @@ interface BrandingColors {
 
 const theme        = reactive({ accent: '#22d3ee' })
 const colors       = reactive<BrandingColors>({
-  nav_bg:         '#F7F7FB',
+  nav_bg:         '#FFFFFF',
   nav_text:       '#212529',
-  primary_button: '#6352e7',
-  body_text:      '#212529',
+  primary_button: '#6452E7',
+  body_text:      '#FFFFFF',
   page_bg:        '#F7F7FB',
-  content_bg:     '#F0EEFD',
+  content_bg:     '#FFFFFF',
 })
-const appearance   = ref('minimal')
+const appearance   = ref('advanced')
 const logoUrl      = ref<string | null>(null)
 const banners      = ref<BannerItem[]>([])
 const eventBanners = ref<BannerItem[]>([])
@@ -57,8 +58,8 @@ async function load() {
   theme.accent   = s.data.theme?.accent  || '#22d3ee'
   const b = s.data.branding || {}
   logoUrl.value        = b.logo_url ?? null
-  Object.assign(colors, b.colors || {}, { primary_button: s.data.theme?.primary || b.colors?.primary_button || '#6352e7' })
-  appearance.value     = b.appearance || 'minimal'
+  Object.assign(colors, b.colors || {}, { primary_button: s.data.theme?.primary || b.colors?.primary_button || '#6452E7' })
+  appearance.value     = b.appearance || 'advanced'
   banners.value        = normalizeBanners(b.banners)
   eventBanners.value   = normalizeBanners(b.event_banners)
   emailHeaderUrl.value = b.email_header_url ?? null
@@ -94,8 +95,10 @@ async function save() {
     })
     saved.value = true
     setTimeout(() => (saved.value = false), 2000)
+    toast.success('Branding saved')
   } catch (e: any) {
     error.value = e?.data?.message || 'Could not save.'
+    toast.error(error.value)
   } finally {
     saving.value = false
   }

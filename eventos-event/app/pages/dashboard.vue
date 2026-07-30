@@ -9,8 +9,8 @@ const sub = ref<any>(null)
 onMounted(async () => {
   await auth.fetchMe()
   // Organizer-only endpoints — attendees simply won't have these (403 → ignored).
-  try { org.value = await api<any>('/organization') } catch { /* attendee */ }
-  try { sub.value = (await api<any>('/subscription')).data } catch { /* attendee */ }
+  try { org.value = await api<any>('/organization', { silent: true }) } catch { /* attendee */ }
+  try { sub.value = (await api<any>('/subscription', { silent: true })).data } catch { /* attendee */ }
 })
 </script>
 

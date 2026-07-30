@@ -92,7 +92,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div v-if="event" class="max-w-[860px]">
+  <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Content Hub</h1>
+    <ContentHubTabs :event-id="id" active="publishing" />
+
+    <div v-if="event" class="max-w-[860px]">
     <div class="mb-4">
       <h2 class="section-title m-0">Publishing</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Control whether your event website is live and visible to attendees.</p>
@@ -217,7 +221,8 @@ onMounted(load)
         <span v-if="sectionLink(item.to)" class="text-brand font-bold">→</span>
       </component>
     </div>
-  </div>
+    </div>
 
   <p v-else class="muted">Loading…</p>
+  </div>
 </template>

@@ -113,7 +113,7 @@ const ICON: Record<string, string> = {
 
 <style scoped>
 .about-card {
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border-radius: 12px;
   padding: 24px;
   border: 1px solid #E8E8EE
@@ -261,5 +261,71 @@ const ICON: Record<string, string> = {
   .head {
     align-items: flex-start;
   }
+}
+
+:global(html[data-theme="minimal"]) .about-card {
+  border-radius: var(--theme-radius, 8px);
+  padding: 16px;
+}
+:global(html[data-theme="minimal"]) .mark img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+:global(html[data-theme="minimal"]) .mark.placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  font-size: .7rem;
+}
+:global(html[data-theme="minimal"]) .ttl {
+  font-size: 1rem;
+  font-weight: 700;
+}
+:global(html[data-theme="minimal"]) .meta {
+  gap: 4px;
+  margin-top: 6px;
+}
+:global(html[data-theme="minimal"]) .meta-item {
+  font-size: 13px;
+}
+:global(html[data-theme="minimal"]) .socials a {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+:global(html[data-theme="minimal"]) .socials svg {
+  width: 16px;
+  height: 16px;
+}
+:global(html[data-theme="minimal"]) .desc {
+  margin-top: 12px;
+  font-size: .82rem;
+}
+
+:global(html[data-theme="modern"]) .about-card {
+  border-radius: var(--theme-radius, 18px);
+  padding: 28px;
+  border: none;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+  height: 100%;
+}
+:global(html[data-theme="modern"]) .mark img {
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+}
+:global(html[data-theme="modern"]) .ttl {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+:global(html[data-theme="modern"]) .socials a {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+:global(html[data-theme="modern"]) .desc {
+  font-size: .9rem;
+  line-height: 1.65;
 }
 </style>

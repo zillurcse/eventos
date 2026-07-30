@@ -251,7 +251,7 @@ onMounted(load)
           <AppInput v-model="form.address_line_2" label="Address Line 2" placeholder="Enter Address Line 2" />
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <AppSelect v-model="form.country" label="Country" placeholder="Select Country" :options="COUNTRIES" />
+          <AppSelect v-model="form.country" label="Country" placeholder="Select Country" :options="COUNTRIES" searchable />
           <AppInput v-model="form.state" label="State" placeholder="Enter State" />
         </div>
         <div class="grid grid-cols-2 gap-3">

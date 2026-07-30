@@ -177,7 +177,7 @@ function save() {
 
     <div class="mb-4 flex flex-col gap-4">
       <AppInput v-model="draft.email"       label="Email"          required type="email" placeholder="Enter Email" />
-      <AppInput v-model="draft.designation" label="Designation"    placeholder="Enter Designation" />
+      <AppInput v-model="draft.designation" label="Designation"    required placeholder="Enter Designation" />
       <AppInput v-model="draft.company"     label="Company Name"   placeholder="Enter Company Name" />
     </div>
 
@@ -321,7 +321,7 @@ function save() {
     <div class="modal-actions border-t border-line pt-4 mt-5 justify-start">
       <button
         class="btn"
-        :disabled="!firstName.trim() || !draft.email.trim() || saving"
+        :disabled="!firstName.trim() || !draft.email.trim() || !draft.designation.trim() || saving"
         @click="save"
       >
         {{ saving ? 'Saving…' : editing ? 'Update Speaker' : 'Add Speaker' }}

@@ -31,7 +31,7 @@ export const usePresenceStore = defineStore('presence', {
       if (!uuid || !useAuthStore().isAuthed) return
       try {
         const api = useApi()
-        await api(`/events/${uuid}/presence`, { method: 'POST' })
+        await api(`/events/${uuid}/presence`, { method: 'POST', silent: true })
       } catch {
         // Best-effort — a missed beat just shows us offline for a bit.
       }

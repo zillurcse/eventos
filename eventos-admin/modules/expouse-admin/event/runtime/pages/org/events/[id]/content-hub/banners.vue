@@ -73,6 +73,9 @@ onMounted(load)
 
 <template>
   <div>
+    <h1 class="text-[1.4rem] font-bold text-ink mb-4">Content Hub</h1>
+    <ContentHubTabs :event-id="id" active="banners" />
+
     <div class="mb-4">
       <h2 class="section-title m-0">Website Banners</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">Manage banners shown on your event landing page.</p>

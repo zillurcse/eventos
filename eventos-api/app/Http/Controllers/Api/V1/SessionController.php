@@ -9,9 +9,12 @@ use App\Models\Contact;
 use App\Models\Event;
 use App\Models\Participation;
 use App\Models\Session;
+use App\Models\SessionRating;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class SessionController extends Controller
 {
@@ -66,6 +69,13 @@ class SessionController extends Controller
         // event's own zone, not the app's UTC default — otherwise a Dhaka
         // organizer's 2pm gets stored as 2pm UTC (8pm Dhaka) instead of 8am UTC.
         $data = $this->utcDates($data, ['starts_at', 'ends_at'], $data['timezone'] ?? $event->resolvedTimezone());
+
+        $this->assertNoTrackTimeConflict(
+            $event->id,
+            $data['track_id'] ?? null,
+            $data['starts_at'] ?? null,
+            $data['ends_at'] ?? null,
+        );
 
         $session = Session::create([
             'event_id'   => $event->id,
@@ -131,6 +141,18 @@ class SessionController extends Controller
         if ($metaUpdate) {
             $coreUpdate['meta'] = array_merge($session->meta ?? [], $metaUpdate);
         }
+
+        // Conflict check uses the resulting schedule after this update — a
+        // title-only edit still needs to remain valid against peers, and a
+        // track/time change must not land on an occupied slot.
+        $this->assertNoTrackTimeConflict(
+            $session->event_id,
+            array_key_exists('track_id', $coreUpdate) ? $coreUpdate['track_id'] : $session->track_id,
+            array_key_exists('starts_at', $coreUpdate) ? $coreUpdate['starts_at'] : $session->starts_at,
+            array_key_exists('ends_at', $coreUpdate) ? $coreUpdate['ends_at'] : $session->ends_at,
+            $session->id,
+            array_key_exists('status', $coreUpdate) ? $coreUpdate['status'] : $session->status,
+        );
 
         $session->update($coreUpdate);
 
@@ -198,6 +220,91 @@ class SessionController extends Controller
         $session->update($update);
 
         return response()->json(['data' => new SessionResource($session->fresh()->load('event'))]);
+    }
+
+    /** The signed-in attendee's own rating for one session, plus the current average. */
+    public function myRating(Request $request, string $event, string $sessionUuid): JsonResponse
+    {
+        $session = $this->participantSession($request, $sessionUuid);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $mine = SessionRating::where('session_id', $session->id)
+            ->where('participation_id', $pid)
+            ->first();
+
+        return response()->json([
+            'data' => [
+                'score' => $mine?->score,
+                ...$this->ratingSummary($session),
+            ],
+        ]);
+    }
+
+    /** Create or update the signed-in attendee's rating for a session. */
+    public function rate(Request $request, string $event, string $sessionUuid): JsonResponse
+    {
+        $session = $this->participantSession($request, $sessionUuid, mustAllowRating: true);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $data = $request->validate([
+            'score' => ['required', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        $rating = SessionRating::updateOrCreate(
+            ['session_id' => $session->id, 'participation_id' => $pid],
+            [
+                'organization_id' => $session->organization_id,
+                'event_id' => $session->event_id,
+                'score' => (int) $data['score'],
+                'rated_at' => now(),
+            ],
+        );
+
+        return response()->json([
+            'data' => [
+                'score' => $rating->score,
+                ...$this->ratingSummary($session),
+            ],
+        ]);
+    }
+
+    /** Organizer-facing rating list for one session, including averages. */
+    public function ratings(string $uuid): JsonResponse
+    {
+        $session = Session::with(['ratings.participation.contact', 'event'])->where('uuid', $uuid)->firstOrFail();
+        $summary = $this->ratingSummary($session);
+
+        $ratings = $session->ratings
+            ->sortByDesc(fn (SessionRating $rating) => $rating->rated_at?->getTimestamp() ?? $rating->created_at?->getTimestamp() ?? 0)
+            ->values()
+            ->map(function (SessionRating $rating) {
+                $contact = $rating->participation?->contact;
+                $name = trim(($contact->first_name ?? '').' '.($contact->last_name ?? ''));
+
+                return [
+                    'id' => $rating->uuid,
+                    'score' => $rating->score,
+                    'rated_at' => ($rating->rated_at ?? $rating->created_at)?->toIso8601String(),
+                    'participation' => [
+                        'id' => $rating->participation?->uuid,
+                        'role' => $rating->participation?->role,
+                        'status' => $rating->participation?->status,
+                        'name' => $name !== '' ? $name : null,
+                        'email' => $contact?->email,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'session' => [
+                    'id' => $session->uuid,
+                    'title' => $session->title,
+                ],
+                'summary' => $summary,
+                'ratings' => $ratings,
+            ],
+        ]);
     }
 
     public function destroy(string $uuid): JsonResponse
@@ -270,6 +377,89 @@ class SessionController extends Controller
             'documents.*.name'    => ['required_with:documents', 'string', 'max:250'],
             'documents.*.url'     => ['required_with:documents', 'string', 'max:2000'],
         ];
+    }
+
+    private function participantSession(Request $request, string $sessionUuid, bool $mustAllowRating = false): Session
+    {
+        $session = Session::where('event_id', (int) $request->attributes->get('event_id'))
+            ->where('uuid', $sessionUuid)
+            ->firstOrFail();
+
+        if ($mustAllowRating && ! (bool) ($session->meta['is_allowed_to_rate'] ?? false)) {
+            throw ValidationException::withMessages([
+                'score' => 'Rating is disabled for this session.',
+            ]);
+        }
+
+        return $session;
+    }
+
+    private function ratingSummary(Session $session): array
+    {
+        $query = SessionRating::where('session_id', $session->id);
+        $count = (int) (clone $query)->count();
+        $average = $count > 0 ? round((float) (clone $query)->avg('score'), 1) : null;
+        $distribution = (clone $query)
+            ->selectRaw('score, count(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+
+        return [
+            'ratings_count' => $count,
+            'average_score' => $average,
+            'distribution' => collect(range(1, 5))
+                ->map(fn (int $score) => [
+                    'score' => $score,
+                    'count' => (int) ($distribution[$score] ?? 0),
+                ])
+                ->all(),
+        ];
+    }
+
+    /**
+     * A track is a single lane on the schedule — two sessions cannot occupy it
+     * at overlapping times. Sessions without a track (or without a start time)
+     * are unrestricted; canceled sessions free the slot.
+     *
+     * Adjacent ranges that only touch at an endpoint (10:00–11:00 then
+     * 11:00–12:00) are allowed.
+     */
+    private function assertNoTrackTimeConflict(
+        int $eventId,
+        mixed $trackId,
+        mixed $startsAt,
+        mixed $endsAt,
+        ?int $excludeSessionId = null,
+        ?string $status = null,
+    ): void {
+        if ($trackId === null || $trackId === '' || $startsAt === null || $startsAt === '') {
+            return;
+        }
+
+        if ($status === 'canceled') {
+            return;
+        }
+
+        $startsAt = $startsAt instanceof Carbon ? $startsAt : Carbon::parse($startsAt);
+        $endsAt = $endsAt !== null && $endsAt !== ''
+            ? ($endsAt instanceof Carbon ? $endsAt : Carbon::parse($endsAt))
+            : $startsAt->copy();
+
+        $conflict = Session::query()
+            ->where('event_id', $eventId)
+            ->where('track_id', $trackId)
+            ->where('status', '!=', 'canceled')
+            ->whereNotNull('starts_at')
+            ->when($excludeSessionId, fn ($q) => $q->where('id', '!=', $excludeSessionId))
+            ->where('starts_at', '<', $endsAt)
+            ->whereRaw('COALESCE(ends_at, starts_at) > ?', [$startsAt])
+            ->exists();
+
+        if ($conflict) {
+            throw ValidationException::withMessages([
+                'track_id' => 'Another session is already scheduled on this track at that time. Choose a different track or time slot.',
+            ]);
+        }
     }
 
     /**

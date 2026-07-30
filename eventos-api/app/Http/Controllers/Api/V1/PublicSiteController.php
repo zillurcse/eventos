@@ -99,8 +99,10 @@ class PublicSiteController extends Controller
             ],
             'branding' => [
                 'logo_url' => $branding['logo_url'] ?? null,
-                'primary' => $theme['primary'] ?? '#6352e7',
+                'primary' => $theme['primary'] ?? ($branding['colors']['primary_button'] ?? '#6352e7'),
                 'accent' => $theme['accent'] ?? '#22d3ee',
+                'appearance' => $this->publicAppearance($branding),
+                'colors' => $this->publicBrandingColors($branding, $theme),
                 'banners' => $this->publicBanners($branding),
                 'login' => [
                     'type' => $branding['login']['type'] ?? 'banner',
@@ -881,6 +883,7 @@ class PublicSiteController extends Controller
             'bio' => $profile['bio'] ?? '',
             'image_url' => $profile['image_url'] ?? null,
             'is_featured' => (bool) ($profile['is_featured'] ?? false),
+            'can_rate' => (bool) ($profile['can_rate'] ?? false),
             'social' => array_filter([
                 'linkedin' => $profile['linkedin'] ?? null,
                 'twitter' => $profile['twitter'] ?? null,
@@ -1102,6 +1105,40 @@ class PublicSiteController extends Controller
             ->filter(fn ($f) => count($f['headings']) > 0)
             ->values()
             ->all();
+    }
+
+    /**
+     * Admin › Branding › Appearance. Whitelist only — unknown/missing values
+     * fall back to `advanced` (the current eventos-event reception UI).
+     */
+    protected function publicAppearance(array $branding): string
+    {
+        $value = strtolower((string) ($branding['appearance'] ?? 'advanced'));
+
+        return in_array($value, ['minimal', 'modern', 'advanced'], true)
+            ? $value
+            : 'advanced';
+    }
+
+    /**
+     * Admin › Branding colour slots (Colors / Action & Content / Background).
+     * Falls back to theme.primary for the button colour when the nested
+     * colors blob was never filled in.
+     *
+     * @return array{nav_bg: string, nav_text: string, primary_button: string, body_text: string, page_bg: string, content_bg: string}
+     */
+    protected function publicBrandingColors(array $branding, array $theme): array
+    {
+        $c = is_array($branding['colors'] ?? null) ? $branding['colors'] : [];
+
+        return [
+            'nav_bg' => $c['nav_bg'] ?? '#F7F7FB',
+            'nav_text' => $c['nav_text'] ?? '#212529',
+            'primary_button' => $c['primary_button'] ?? ($theme['primary'] ?? '#6352e7'),
+            'body_text' => $c['body_text'] ?? '#212529',
+            'page_bg' => $c['page_bg'] ?? '#F7F7FB',
+            'content_bg' => $c['content_bg'] ?? '#ffffff',
+        ];
     }
 
     /**

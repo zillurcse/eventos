@@ -17,6 +17,9 @@ import {
   productMeta,
   exhibitorError,
   isActive,
+  detectLocaleFromIp,
+  type ExhibitorRatingRow,
+  type ExhibitorRatingsSummary,
   type Draft,
   type Exhibitor,
   type ExhibitorMember,
@@ -64,6 +67,20 @@ export function useExhibitorManager(eventId: string) {
   const subSaving = ref(false)
   const subError = ref('')
   const entitlements = ref<FeatureLine[]>([])
+  const ratingsLoading = ref(false)
+  const ratingsLoaded = ref(false)
+  const ratings = ref<ExhibitorRatingRow[]>([])
+  const ratingsSummary = ref<ExhibitorRatingsSummary>({
+    ratings_count: 0,
+    average_score: null,
+    distribution: [
+      { score: 1, count: 0 },
+      { score: 2, count: 0 },
+      { score: 3, count: 0 },
+      { score: 4, count: 0 },
+      { score: 5, count: 0 },
+    ],
+  })
 
   const memberList = useExhibitorCollection<ExhibitorMember, typeof MEMBER_FORM>(editingId, subSaving, subError, {
     path: 'members',
@@ -181,6 +198,19 @@ export function useExhibitorManager(eventId: string) {
     for (const c of collections) { c.set([]); c.reset() }
     entitlements.value = mergeFeatures(null)
     drawerMode.value = 'add'
+    // Prefill phone code + country from network IP (add form only).
+    void applyGeoDefaults()
+  }
+
+  async function applyGeoDefaults() {
+    const locale = await detectLocaleFromIp()
+    if (!locale || drawerMode.value !== 'add') return
+    // Only fill while the organizer hasn't touched these fields yet.
+    if (draft.phone_code === '+880' && !draft.phone) {
+      draft.phone_code = locale.phone_code
+      draft.contact.phone_code = locale.phone_code
+    }
+    if (!draft.country) draft.country = locale.country
   }
 
   // The record currently open in the full-page edit screen. Drives the top-bar
@@ -214,11 +244,30 @@ export function useExhibitorManager(eventId: string) {
     entitlements.value = resolveEntitlements(exhibitor, packages.value)
   }
 
-  // Name + package are required; an admin email is optional but, if given, valid.
+  // API hydration can temporarily provide nulls, so normalise before validation.
+  const text = (v: unknown) => typeof v === 'string' ? v.trim() : ''
+  // Name, package, type, admin email, and full contact details are required to create.
+  const emailOk = (v: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text(v))
+  const contactOk = computed(() => {
+    const c = draft.contact
+    return !!text(c.full_name)
+      && !!text(c.position)
+      && !!text(c.company_name)
+      && !!text(c.phone)
+      && emailOk(c.email)
+  })
   const canCreate = computed(() =>
-    !!draft.name.trim()
+    !!text(draft.name)
     && !!draft.package_id
-    && (!draft.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())))
+    && !!draft.type
+    && emailOk(draft.email)
+    && contactOk.value)
+  // Edit save: same required fields (admin email is locked after create).
+  const canSave = computed(() =>
+    !!text(draft.name)
+    && !!draft.package_id
+    && !!draft.type
+    && contactOk.value)
 
   /**
    * Load one exhibitor by uuid into the draft + sub-lists for the full-page
@@ -232,6 +281,19 @@ export function useExhibitorManager(eventId: string) {
     subError.value = ''
     current.value = null
     loadedPackageId = ''
+    ratingsLoaded.value = false
+    ratings.value = []
+    ratingsSummary.value = {
+      ratings_count: 0,
+      average_score: null,
+      distribution: [
+        { score: 1, count: 0 },
+        { score: 2, count: 0 },
+        { score: 3, count: 0 },
+        { score: 4, count: 0 },
+        { score: 5, count: 0 },
+      ],
+    }
     ignorePackageWatch = true
     Object.assign(draft, freshDraft())
     for (const c of collections) { c.set([]); c.reset() }
@@ -258,6 +320,21 @@ export function useExhibitorManager(eventId: string) {
       // Let the package_id assign flush before re-enabling the watch.
       await nextTick()
       ignorePackageWatch = false
+    }
+  }
+
+  async function loadRatings(force = false) {
+    if (!editingId.value || ratingsLoading.value || (ratingsLoaded.value && !force)) return
+    ratingsLoading.value = true
+    try {
+      const res = await api<{ data: { ratings?: ExhibitorRatingRow[], summary?: ExhibitorRatingsSummary } }>(`/exhibitors/${editingId.value}/ratings`)
+      ratings.value = res.data?.ratings ?? []
+      ratingsSummary.value = res.data?.summary ?? ratingsSummary.value
+      ratingsLoaded.value = true
+    } catch (e) {
+      toast.error(exhibitorError(e, 'Could not load exhibitor ratings.'))
+    } finally {
+      ratingsLoading.value = false
     }
   }
 
@@ -452,7 +529,7 @@ export function useExhibitorManager(eventId: string) {
     // list + meta
     eventId, exhibitors, packages, filters,
     // drawer / editing
-    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, current,
+    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, canSave, current,
     init, load, loadMeta, openAdd, loadForEdit, create, update, remove, toggleStatus,
     pickSpotlight, addTag, removeTag, addCta, addCtaVideo, removeCtaVideo,
     // table (search / filters / paging / row menu)
@@ -475,6 +552,11 @@ export function useExhibitorManager(eventId: string) {
     productForm: productList.form,
     addProduct: productList.add,
     removeProduct: productList.remove,
+    ratingsLoading,
+    ratingsLoaded,
+    ratings,
+    ratingsSummary,
+    loadRatings,
     // previous exhibitors — the picker owns its own state; the table only opens it
     previous,
     // reset password

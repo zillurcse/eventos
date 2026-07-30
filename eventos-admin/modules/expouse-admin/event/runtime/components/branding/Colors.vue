@@ -1,11 +1,25 @@
 <script setup lang="ts">
-export interface BrandingColors {
+interface BrandingColors {
   nav_bg:         string
   nav_text:       string
   primary_button: string
   body_text:      string
   page_bg:        string
   content_bg:     string
+}
+
+const DEFAULT_BRANDING_COLORS: BrandingColors = {
+  nav_bg:         '#FFFFFF',
+  nav_text:       '#212529',
+  primary_button: '#6452E7',
+  body_text:      '#FFFFFF',
+  page_bg:        '#F7F7FB',
+  content_bg:     '#FFFFFF',
+}
+
+/** Button label color: white on brand purple, otherwise dark gray. */
+function bodyTextForPrimary(primary: string): string {
+  return primary.trim().toLowerCase() === '#6452e7' ? '#FFFFFF' : '#4D5154'
 }
 
 defineProps<{ colors: BrandingColors }>()
@@ -15,7 +29,18 @@ const emit = defineEmits<{
 }>()
 
 function set<K extends keyof BrandingColors>(key: K, value: string) {
+  if (key === 'primary_button') {
+    emit('update', {
+      primary_button: value,
+      body_text: bodyTextForPrimary(value),
+    })
+    return
+  }
   emit('update', { [key]: value } as Partial<BrandingColors>)
+}
+
+function resetToDefault() {
+  emit('update', { ...DEFAULT_BRANDING_COLORS })
 }
 </script>
 
@@ -23,12 +48,17 @@ function set<K extends keyof BrandingColors>(key: K, value: string) {
   <div class="flex flex-col gap-6">
     <!-- Colors -->
     <div>
-      <h2 class="text-[1.05rem] font-bold text-ink mb-3">Colors</h2>
+      <div class="flex items-center justify-between gap-3 mb-3 max-w-xl">
+        <h2 class="text-[1.05rem] font-bold text-ink mb-0">Colors</h2>
+        <button type="button" class="btn ghost sm" @click="resetToDefault">
+          Reset to default
+        </button>
+      </div>
       <div class="grid grid-cols-2 gap-5 max-w-xl">
         <BrandingColorField
           label="Nav Background"
           :model-value="colors.nav_bg"
-          placeholder="#F7F7FB"
+          placeholder="#FFFFFF"
           @update:model-value="set('nav_bg', $event)"
         />
         <BrandingColorField
@@ -53,7 +83,7 @@ function set<K extends keyof BrandingColors>(key: K, value: string) {
         <BrandingColorField
           label="Body Text"
           :model-value="colors.body_text"
-          placeholder="#212529"
+          placeholder="#FFFFFF"
           @update:model-value="set('body_text', $event)"
         />
       </div>
@@ -72,7 +102,7 @@ function set<K extends keyof BrandingColors>(key: K, value: string) {
         <BrandingColorField
           label="Content Block Background"
           :model-value="colors.content_bg"
-          placeholder="#F0EEFD"
+          placeholder="#FFFFFF"
           @update:model-value="set('content_bg', $event)"
         />
       </div>

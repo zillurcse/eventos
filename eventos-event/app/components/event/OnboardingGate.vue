@@ -23,7 +23,7 @@ async function check() {
 
   checked.value = true
   try {
-    const r = await api<any>(`/events/${site.event.uuid}/profile`)
+    const r = await api<any>(`/events/${site.event.uuid}/profile`, { silent: true })
     if (r.meta?.needs_onboarding) navigateTo('/onboarding')
   } catch { /* a failed check just means no onboarding this time */ }
 }

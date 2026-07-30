@@ -41,6 +41,7 @@ export interface AgendaSession {
   sponsors: SessionSponsor[]
   documents: SessionDocument[]
   is_featured: boolean
+  is_allowed_to_rate: boolean
   is_stream: boolean
   stream_link: string | null
   on_demand_recording_link: string | null

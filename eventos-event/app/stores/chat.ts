@@ -143,7 +143,7 @@ export const useChatStore = defineStore('chat', {
       if (!uuid) return
       try {
         const api = useApi()
-        const res = await api<{ data: ChatCapabilities }>(`/events/${uuid}/chat/capabilities`)
+        const res = await api<{ data: ChatCapabilities }>(`/events/${uuid}/chat/capabilities`, { silent: true })
         this.capabilities = res.data
       } catch {
         this.capabilities = null
@@ -190,6 +190,7 @@ export const useChatStore = defineStore('chat', {
         const api = useApi()
         const res = await api<{ data: Array<{ id: string, exhibitor_id: string, name: string, unread: number, last_message: ChatPreview | null }> }>(
           `/events/${uuid}/exhibitor-conversations`,
+          { silent: true },
         )
         const items: ChatConversationItem[] = res.data.map(c => ({
           id: c.id,
@@ -354,6 +355,8 @@ export const useChatStore = defineStore('chat', {
 
         const msg = await this.postPersonMessage(id, body.trim(), attachments)
         this.messages.push(msg)
+      } catch {
+        // 403 (and other errors) are toasted by useApi(); keep the draft with the caller.
       } finally {
         this.sending = false
       }
@@ -470,7 +473,7 @@ export const useChatStore = defineStore('chat', {
         if (!mine) {
           const uuid = this.eventUuid()
           const api = useApi()
-          api(`/events/${uuid}/chat/${convo.id}/read`, { method: 'PATCH' }).catch(() => {})
+          api(`/events/${uuid}/chat/${convo.id}/read`, { method: 'PATCH', silent: true }).catch(() => {})
         }
       } else if (!mine) {
         convo.unread += 1

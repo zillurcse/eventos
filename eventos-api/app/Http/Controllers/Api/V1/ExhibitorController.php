@@ -7,6 +7,7 @@ use App\Http\Resources\ExhibitorResource;
 use App\Models\Contact;
 use App\Models\Event;
 use App\Models\Exhibitor;
+use App\Models\ExhibitorRating;
 use App\Models\ExhibitorMember;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -65,11 +66,18 @@ class ExhibitorController extends Controller
 
         $data = $request->validate([
             'event' => ['required', 'string'],
-            'type' => ['nullable', 'in:exhibitor,sponsor'],
+            'type' => ['required', 'in:exhibitor,sponsor'],
             'name' => ['required', 'string', 'max:180'],
-            'email' => ['nullable', 'email'],   // optional: exhibitor-admin login email (no email → no login provisioned)
+            'email' => ['required', 'email'],   // exhibitor-admin login email (access code emailed on create)
             'package_id' => ['required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['nullable', 'integer'],
+            'contact' => ['required', 'array'],
+            'contact.full_name' => ['required', 'string', 'max:180'],
+            'contact.position' => ['required', 'string', 'max:180'],
+            'contact.company_name' => ['required', 'string', 'max:180'],
+            'contact.email' => ['required', 'email'],
+            'contact.phone' => ['required', 'string', 'max:40'],
+            'contact.phone_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
@@ -112,11 +120,18 @@ class ExhibitorController extends Controller
         $this->nullifyEmpty($request, ['type', 'package_id', 'logo_file_id']);
 
         $request->validate([
-            'name' => ['sometimes', 'string', 'max:180'],
-            'type' => ['sometimes', 'in:exhibitor,sponsor'],
-            'package_id' => ['sometimes', 'nullable', 'integer', 'exists:exhibitor_packages,id'],
+            'name' => ['sometimes', 'required', 'string', 'max:180'],
+            'type' => ['sometimes', 'required', 'in:exhibitor,sponsor'],
+            'package_id' => ['sometimes', 'required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['sometimes', 'nullable', 'integer'],
             'status' => ['sometimes', 'in:draft,active,suspended'],
+            'contact' => ['sometimes', 'array'],
+            'contact.full_name' => ['required_with:contact', 'string', 'max:180'],
+            'contact.position' => ['required_with:contact', 'string', 'max:180'],
+            'contact.company_name' => ['required_with:contact', 'string', 'max:180'],
+            'contact.email' => ['required_with:contact', 'email'],
+            'contact.phone' => ['required_with:contact', 'string', 'max:40'],
+            'contact.phone_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         // Real columns — only those actually present in the request.
@@ -209,6 +224,91 @@ class ExhibitorController extends Controller
         ]);
     }
 
+    /** The signed-in attendee's own rating for one exhibitor, plus the current average. */
+    public function myRating(Request $request, string $event, string $uuid): JsonResponse
+    {
+        $exhibitor = $this->participantExhibitor($request, $uuid);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $mine = ExhibitorRating::where('exhibitor_id', $exhibitor->id)
+            ->where('participation_id', $pid)
+            ->first();
+
+        return response()->json([
+            'data' => [
+                'score' => $mine?->score,
+                ...$this->ratingSummary($exhibitor),
+            ],
+        ]);
+    }
+
+    /** Create or update the signed-in attendee's rating for an exhibitor. */
+    public function rate(Request $request, string $event, string $uuid): JsonResponse
+    {
+        $exhibitor = $this->participantExhibitor($request, $uuid, mustAllowRating: true);
+        $pid = (int) $request->attributes->get('participation_id');
+
+        $data = $request->validate([
+            'score' => ['required', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        $rating = ExhibitorRating::updateOrCreate(
+            ['exhibitor_id' => $exhibitor->id, 'participation_id' => $pid],
+            [
+                'organization_id' => $exhibitor->organization_id,
+                'event_id' => $exhibitor->event_id,
+                'score' => (int) $data['score'],
+                'rated_at' => now(),
+            ],
+        );
+
+        return response()->json([
+            'data' => [
+                'score' => $rating->score,
+                ...$this->ratingSummary($exhibitor),
+            ],
+        ]);
+    }
+
+    /** Organizer-facing rating list for one exhibitor, including averages. */
+    public function ratings(string $uuid): JsonResponse
+    {
+        $exhibitor = Exhibitor::with(['ratings.participation.contact'])->where('uuid', $uuid)->firstOrFail();
+        $summary = $this->ratingSummary($exhibitor);
+
+        $ratings = $exhibitor->ratings
+            ->sortByDesc(fn (ExhibitorRating $rating) => $rating->rated_at?->getTimestamp() ?? $rating->created_at?->getTimestamp() ?? 0)
+            ->values()
+            ->map(function (ExhibitorRating $rating) {
+                $contact = $rating->participation?->contact;
+                $name = trim(($contact->first_name ?? '').' '.($contact->last_name ?? ''));
+
+                return [
+                    'id' => $rating->uuid,
+                    'score' => $rating->score,
+                    'rated_at' => ($rating->rated_at ?? $rating->created_at)?->toIso8601String(),
+                    'participation' => [
+                        'id' => $rating->participation?->uuid,
+                        'role' => $rating->participation?->role,
+                        'status' => $rating->participation?->status,
+                        'name' => $name !== '' ? $name : null,
+                        'email' => $contact?->email,
+                    ],
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'exhibitor' => [
+                    'id' => $exhibitor->uuid,
+                    'name' => $exhibitor->name,
+                ],
+                'summary' => $summary,
+                'ratings' => $ratings,
+            ],
+        ]);
+    }
+
     /** The exhibitor's admin login User, if one exists. */
     protected function resolveAdminUser(Exhibitor $exhibitor): ?User
     {
@@ -247,6 +347,43 @@ class ExhibitorController extends Controller
     protected function profileFrom(Request $request): array
     {
         return $request->only(self::PROFILE_KEYS);
+    }
+
+    private function participantExhibitor(Request $request, string $uuid, bool $mustAllowRating = false): Exhibitor
+    {
+        $exhibitor = Exhibitor::where('event_id', (int) $request->attributes->get('event_id'))
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        if ($mustAllowRating && ! (bool) ($exhibitor->profile_data['rating'] ?? false)) {
+            throw ValidationException::withMessages([
+                'score' => 'Rating is disabled for this exhibitor.',
+            ]);
+        }
+
+        return $exhibitor;
+    }
+
+    private function ratingSummary(Exhibitor $exhibitor): array
+    {
+        $query = ExhibitorRating::where('exhibitor_id', $exhibitor->id);
+        $count = (int) (clone $query)->count();
+        $average = $count > 0 ? round((float) (clone $query)->avg('score'), 1) : null;
+        $distribution = (clone $query)
+            ->selectRaw('score, count(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+
+        return [
+            'ratings_count' => $count,
+            'average_score' => $average,
+            'distribution' => collect(range(1, 5))
+                ->map(fn (int $score) => [
+                    'score' => $score,
+                    'count' => (int) ($distribution[$score] ?? 0),
+                ])
+                ->all(),
+        ];
     }
 
     /** Treat empty-string inputs as null so nullable/typed rules pass. */

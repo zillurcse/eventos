@@ -55,15 +55,15 @@ onBeforeUnmount(() => window.removeEventListener('resize', measure))
 .track :deep(> *) { scroll-snap-align: start; }
 
 .arrow {
-  position: absolute; top: 50%; transform: translateY(-60%); z-index: 2;
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
   width: 30px; height: 30px; border-radius: 50%; border: 1px solid #e2e8f0;
-  background: #fff; box-shadow: 0 2px 8px rgba(15,23,42,.12); cursor: pointer;
+  background: var(--brand-content-bg, #fff); box-shadow: 0 2px 8px rgba(15,23,42,.12); cursor: pointer;
   display: flex; align-items: center; justify-content: center; color: var(--brand-primary);
 }
 .arrow:hover { background: var(--brand-primary); color: #fff; }
 .arrow svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.arrow.left { left: -10px; }
-.arrow.right { right: -10px; }
+.arrow.left { left: 0; }
+.arrow.right { right: 0; }
 
 .dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; }

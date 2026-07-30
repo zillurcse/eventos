@@ -10,6 +10,7 @@ export interface Speaker {
   bio: string
   image_url: string | null
   is_featured: boolean
+  can_rate: boolean
   social: Record<string, string>
 }
 

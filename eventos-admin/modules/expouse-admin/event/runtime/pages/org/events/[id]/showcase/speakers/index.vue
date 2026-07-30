@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import SpeakerRatingsDrawer from '../../../../../../components/speaker/RatingsDrawer.vue'
 
 definePageMeta({ middleware: 'organizer', layout: 'event' })
 
@@ -119,6 +120,7 @@ async function removeSpeaker(s: Speaker) {
 // their signed-in participation, so they also cannot go on camera.
 
 const loginFor = ref<Speaker | null>(null)
+const ratingsFor = ref<Speaker | null>(null)
 const loginMode = ref<'auto' | 'manual'>('auto')
 const loginPassword = ref('')
 const loginSaving = ref(false)
@@ -293,6 +295,7 @@ onMounted(() => { load(); loadCategories() })
       @edit="openEdit"
       @remove="removeSpeaker"
       @login="openLogin"
+      @ratings="(s) => ratingsFor = s"
     />
 
     <!-- Import speakers from the organizer's other events. -->
@@ -384,6 +387,14 @@ onMounted(() => { load(); loadCategories() })
       @add-category="addCategory"
       @rename-category="renameCategory"
       @remove-category="removeCategory"
+    />
+
+    <SpeakerRatingsDrawer
+      v-if="ratingsFor"
+      :event-id="id"
+      :speaker-id="ratingsFor.id"
+      :speaker-name="ratingsFor.name"
+      @close="ratingsFor = null"
     />
   </div>
 </template>

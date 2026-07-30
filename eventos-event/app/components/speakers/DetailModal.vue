@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// @ts-expect-error project already uses vue-sonner; this file hits a local ts-plugin false positive
+import { toast } from 'vue-sonner'
 import type { Speaker } from '~/stores/speakers'
 import type { AgendaSession } from '~/stores/sessions'
 
@@ -11,6 +13,50 @@ const bookmarks = useBookmarksStore()
 const auth = useAuthStore()
 const site = useSiteStore()
 const chat = useChatStore()
+const api = useApi()
+
+const rating = ref(0)
+const hoverRating = ref(0)
+const ratingSaving = ref(false)
+
+async function loadRating() {
+  if (!site.event?.uuid || !props.speaker?.id || !auth.isAuthed) return
+  try {
+    const res = await api<{ data: { score: number | null } }>(`/events/${site.event.uuid}/speakers/${props.speaker.id}/rating`)
+    rating.value = res.data.score || 0
+  } catch {
+    rating.value = 0
+  }
+}
+
+async function setRating(n: number) {
+  if (!site.event?.uuid || !props.speaker?.id || ratingSaving.value) return
+  ratingSaving.value = true
+  const prev = rating.value
+  rating.value = n
+  try {
+    const res = await api<{ data: { score: number } }>(`/events/${site.event.uuid}/speakers/${props.speaker.id}/rating`, {
+      method: 'POST',
+      body: { score: n },
+    })
+    rating.value = res.data.score
+    toast.success(`You rated this speaker ${res.data.score} out of 5.`)
+  } catch (e: any) {
+    rating.value = prev
+    toast.error(e?.data?.message || 'Could not save your rating.')
+  } finally {
+    ratingSaving.value = false
+  }
+}
+
+watch([() => site.event?.uuid, () => props.speaker.id, () => auth.isAuthed], ([eventUuid, speakerId, authed]: [string | undefined, string, boolean]) => {
+  if (!eventUuid || !speakerId || !authed) {
+    rating.value = 0
+    hoverRating.value = 0
+    return
+  }
+  loadRating()
+}, { immediate: true })
 
 const chatEnabled = computed(() =>
   auth.isAuthed
@@ -137,6 +183,32 @@ function whenLabel(s: AgendaSession) {
               </svg>
               Featured
             </span>
+            <div
+              v-if="speaker.can_rate && auth.isAuthed"
+              class="stars"
+              title="Rate this speaker"
+              @mouseleave="hoverRating = 0"
+            >
+              <button
+                v-for="n in 5" :key="n" type="button" class="star"
+                :class="{ on: (hoverRating || rating) >= n }"
+                :title="`Rate ${n} / 5`"
+                :aria-label="`Rate ${n} out of 5`"
+                :disabled="ratingSaving"
+                @mouseenter="hoverRating = n"
+                @click="setRating(n)"
+              >
+                <svg viewBox="0 0 21 21" aria-hidden="true">
+                  <path
+                    d="M10.5 0.5L13.59 6.76L20.5 7.77L15.5 12.64L16.68 19.52L10.5 16.27L4.32 19.52L5.5 12.64L0.5 7.77L7.41 6.76L10.5 0.5Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -330,6 +402,42 @@ function whenLabel(s: AgendaSession) {
   height: 14px;
   fill: var(--brand-primary);
   stroke: none;
+}
+
+.stars {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.star {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color .16s ease, transform .16s ease;
+}
+
+.star svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+}
+
+.star:hover,
+.star.on {
+  color: var(--brand-primary);
+}
+
+.star:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 45%, white);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.star:hover {
+  transform: scale(1.06);
 }
 
 .hacts {

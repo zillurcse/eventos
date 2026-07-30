@@ -13,10 +13,25 @@ interface SiteEvent {
   cover_url?: string | null
 }
 
+interface SiteBrandingColors {
+  nav_bg: string
+  nav_text: string
+  primary_button: string
+  body_text: string
+  page_bg: string
+  content_bg: string
+}
+
+/** Admin › Branding › Appearance. Drives layout chrome via `data-theme`. */
+export type SiteAppearance = 'minimal' | 'modern' | 'advanced'
+
 interface SiteBranding {
   logo_url: string | null
   primary: string
   accent: string
+  /** Layout theme; defaults to advanced (current reception UI). */
+  appearance?: SiteAppearance
+  colors?: SiteBrandingColors
   banners: string[]
   login: { type: string, banner_url: string | null, video_url: string | null, website_url: string | null }
 }
@@ -101,6 +116,11 @@ export const useSiteStore = defineStore('site', {
     branding: (s): SiteBranding | null => s.site?.branding ?? null,
     name: (s): string => s.site?.event?.name ?? 'Event',
     logoUrl: (s): string | null => s.site?.branding?.logo_url ?? null,
+    /** Branding › Appearance. Unknown/missing → advanced (current UI). */
+    appearance: (s): SiteAppearance => {
+      const v = s.site?.branding?.appearance
+      return v === 'minimal' || v === 'modern' || v === 'advanced' ? v : 'advanced'
+    },
     navigation: (s): SiteNavigation | null => s.site?.navigation ?? null,
     welcomeVideo: (s): WelcomeVideo | null => s.site?.navigation?.welcome_video ?? null,
     /** Navigation & Menu › Web App Tabs — Meetings tab enabled (default on). */
@@ -166,8 +186,25 @@ export const useSiteStore = defineStore('site', {
       if (!import.meta.client || !this.site) return
 
       const root = document.documentElement
-      root.style.setProperty('--brand-primary', this.site.branding.primary)
-      root.style.setProperty('--brand-accent', this.site.branding.accent)
+      const b = this.site.branding
+      const c = b.colors ?? {} as Partial<SiteBrandingColors>
+      const primary = c.primary_button || b.primary || '#6352e7'
+      const appearance = this.appearance
+
+      root.style.setProperty('--brand-primary', primary)
+      root.style.setProperty('--brand-accent', b.accent || '#22d3ee')
+      root.style.setProperty('--brand-nav-bg', c.nav_bg || '#F7F7FB')
+      root.style.setProperty('--brand-nav-text', c.nav_text || '#212529')
+      root.style.setProperty('--brand-body-text', c.body_text || '#212529')
+      root.style.setProperty('--brand-page-bg', c.page_bg || '#F7F7FB')
+      root.style.setProperty('--brand-content-bg', c.content_bg || '#ffffff')
+      // Legacy aliases used by older sheets.
+      root.style.setProperty('--bg', c.page_bg || '#F7F7FB')
+      root.style.setProperty('--ink', c.body_text || '#212529')
+      root.style.setProperty('--card', c.content_bg || '#ffffff')
+
+      // Layout theme from Admin › Branding › Appearance.
+      root.setAttribute('data-theme', appearance)
 
       document.title = this.site.seo.meta_title || this.site.event.name
 

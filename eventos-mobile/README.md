@@ -43,7 +43,8 @@ lib/
 │   └── theme/
 └── features/
     ├── auth/
-    └── bootstrap/    # Event picker, splash, home placeholder
+    ├── bootstrap/    # Event picker, splash, onboarding
+    └── reception/    # Post-login home (matches mobile design)
 ```
 
 ## Run locally
@@ -74,7 +75,9 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8080
    - New user → Sign Up screen
    - OTP / social buttons when enabled for the event
 5. **Sign up** — email, name, password → register + auto login
-6. **Home** — placeholder shell (feature screens come next)
+6. **Reception / Home** — greeting, banners, about, live/featured sessions,
+   speakers, exhibitors/sponsors, leaderboard preview, ads + bottom CTA
+   (`GET /public/reception`)
 
 Auth token, subdomain, and onboarding completion are stored with
 `flutter_secure_storage`. Every API request sends `Authorization: Bearer …`

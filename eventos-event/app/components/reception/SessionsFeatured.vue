@@ -230,7 +230,7 @@ function calendarLink(s: ReceptionSession): string | null {
 
 .scard {
   position: relative;
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border: 1px solid #E8E8EE;
   border-radius: 12px;
   padding: 16px;
@@ -563,5 +563,33 @@ function calendarLink(s: ReceptionSession): string | null {
   background: var(--brand-primary);
 } */
 
+:global(html[data-theme="minimal"]) .scard {
+  border-radius: var(--theme-radius, 8px);
+  padding: 12px;
+  padding-bottom: 24px;
+}
+:global(html[data-theme="minimal"]) .grid {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+:global(html[data-theme="minimal"]) .viewall-btn {
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: .8rem;
+}
 
+:global(html[data-theme="modern"]) .scard {
+  border-radius: var(--theme-radius, 18px);
+  padding: 20px;
+  padding-bottom: 32px;
+  border: none;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+}
+:global(html[data-theme="modern"]) .grid {
+  gap: 24px;
+}
+:global(html[data-theme="modern"]) .viewall-btn {
+  border-radius: 12px;
+  padding: 10px 18px;
+}
 </style>

@@ -1,10 +1,14 @@
 <script setup lang="ts">
+// @ts-expect-error project already uses vue-sonner; this file hits a local ts-plugin false positive
+import { toast } from 'vue-sonner'
 import { briefcaseKind } from '~/stores/briefcase'
+import type { ExhibitorCta } from '~/stores/exhibitors'
 
 definePageMeta({ layout: 'event', middleware: 'auth' })
 
 const route = useRoute()
 const router = useRouter()
+const api = useApi()
 const store = useExhibitorsStore()
 const contact = useExhibitorContactStore()
 const bookmarks = useBookmarksStore()
@@ -23,6 +27,39 @@ function docKindLabel(url?: string | null) {
 
 const id = computed(() => route.params.id as string)
 const ex = computed(() => store.detail)
+const rating = ref(0)
+const hoverRating = ref(0)
+const ratingSaving = ref(false)
+
+async function loadRating() {
+  if (!site.event?.uuid || !ex.value?.id || !auth.isAuthed) return
+  try {
+    const res = await api<{ data: { score: number | null } }>(`/events/${site.event.uuid}/exhibitors/${ex.value.id}/rating`)
+    rating.value = res.data.score || 0
+  } catch {
+    rating.value = 0
+  }
+}
+
+async function setRating(n: number) {
+  if (!site.event?.uuid || !ex.value?.id || ratingSaving.value) return
+  ratingSaving.value = true
+  const prev = rating.value
+  rating.value = n
+  try {
+    const res = await api<{ data: { score: number } }>(`/events/${site.event.uuid}/exhibitors/${ex.value.id}/rating`, {
+      method: 'POST',
+      body: { score: n },
+    })
+    rating.value = res.data.score
+    toast.success(`You rated this exhibitor ${res.data.score} out of 5.`)
+  } catch (e: any) {
+    rating.value = prev
+    toast.error(e?.data?.message || 'Could not save your rating.')
+  } finally {
+    ratingSaving.value = false
+  }
+}
 
 onMounted(() => {
   store.fetchDetail(id.value)
@@ -30,7 +67,19 @@ onMounted(() => {
   meetings.fetchCapabilities({ force: true })
   if (auth.isAuthed) chat.fetchCapabilities()
 })
-watch(id, v => v && store.fetchDetail(v))
+watch(id, (v: string) => {
+  if (!v) return
+  store.fetchDetail(v)
+  hoverRating.value = 0
+  rating.value = 0
+}, { immediate: true })
+watch([() => site.event?.uuid, () => ex.value?.id, () => auth.isAuthed], ([eventUuid, exhibitorId, authed]: [string | undefined, string | undefined, boolean]) => {
+  if (!eventUuid || !exhibitorId || !authed) {
+    rating.value = 0
+    return
+  }
+  loadRating()
+}, { immediate: true })
 
 const bookmarked = computed(() => bookmarks.isOn('exhibitor', id.value))
 const exhibitorRole = computed(() => ex.value?.type === 'sponsor' ? 'sponsor' : 'exhibitor')

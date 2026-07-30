@@ -124,9 +124,6 @@ async function send() {
     draft.value = ''
     toast.success('Message sent to the exhibitor.')
   }
-  else if (contact.error) {
-    toast.error(contact.error)
-  }
 }
 
 async function sendMeeting() {
@@ -157,7 +154,6 @@ async function sendMeeting() {
   }
   else if (contact.error) {
     meetError.value = contact.error
-    toast.error(contact.error)
   }
 }
 </script>

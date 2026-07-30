@@ -41,6 +41,7 @@ const sections = computed<any[]>(() => [
     { label: 'General Information', to: r('details/general-information') },
     { label: 'Branding', to: r('details/branding') },
     { label: 'Navigation & Menu', to: r('details/navigation') },
+    { label: 'Content Hub', to: r('content-hub/theme') },
   ] },
   { key: 'settings', label: 'Event Settings', svg: I.doc, children: [
     { label: 'Login Setup', to: r('settings/login-setup') },
@@ -58,9 +59,7 @@ const sections = computed<any[]>(() => [
     { label: 'Speakers', to: r('showcase/speakers') },
     { label: 'Sessions', to: r('showcase/sessions') },
   ] },
-  { key: 'content', label: 'Content Hub', svg: I.content, children: kids([['Website Theme', 'content-hub/theme'], ['Publishing', 'content-hub/publishing'], ['Website Banners', 'content-hub/banners'], ['Social Links', 'content-hub/social'], ['Participant Profile', 'content-hub/profile'], ['Event Highlights', 'content-hub/highlights'], ['Image Gallery', 'content-hub/gallery'], ['FAQ', 'content-hub/faq'], ['Testimonials', 'content-hub/testimonials'], ['Blog', 'content-hub/blog']]) },
   { key: 'engagement', label: 'Engagements', svg: I.engagement, children: [
-    { label: 'Bulk Notification', to: r('engagement/bulk-notification') },
     { label: 'Manage Activity Feed', to: r('engagement/activity-feed') },
     { label: 'Breakout Rooms', to: r('engagement/breakout-rooms') },
     { label: 'Contests', to: r('engagement/contests') },
@@ -69,7 +68,7 @@ const sections = computed<any[]>(() => [
   ] },
   { key: 'onsite', label: 'Onsite', svg: I.onsite, children: kids([['Badge templates', 'onsite/badge-templates'], ['Lead generation', 'onsite/lead-generation'], ['Gates Scanning', 'onsite/gates-scanning'], ['Exhibitors Scanning', 'onsite/exhibitors-scanning']]) },
   { key: 'services', label: 'Services', svg: I.services, children: kids([['Services', 'services/all'], ['Requested Services', 'services/requested']]) },
-  { key: 'mail', label: 'Mail & Notification', svg: I.mail, children: kids([['Emails', 'mail/emails'], ['Email Templates', 'mail/email-builder'], ['Sender Details', 'mail/sender-details'], ['Invite Mailer', 'mail/invite-mailer']]) },
+  { key: 'mail', label: 'Mail & Notification', svg: I.mail, children: kids([['Emails', 'mail/emails'], ['Email Templates', 'mail/email-builder'], ['Sender Details', 'mail/sender-details'], ['Invite Mailer', 'mail/invite-mailer'], ['Bulk Notification', 'mail/bulk-notification']]) },
   { key: 'ads', label: 'ADs-Management', svg: I.ads, children: kids([['Manage ADs', 'ads/manage'], ['Insights', 'ads/insights']]) },
   { key: 'users', label: 'Users', svg: I.users, children: kids([['All Users', 'users/all'], ['WebApp users', 'users/webapp'], ['Blocked users', 'users/blocked']]) },
   { key: 'expolens', label: 'ExpoLens', svg: I.expolens, children: kids([['Photo Gallery', 'expolens/gallery'], ['Find Attendee Photos', 'expolens/find'], ['Moderate Uploads', 'expolens/moderate']]) },
@@ -78,7 +77,14 @@ const sections = computed<any[]>(() => [
   { key: 'mobile', label: 'Mobile App', svg: I.mobile, children: kids([['Help Screens', 'mobile/help-screens'], ['Manage Tabs', 'mobile/manage-tabs'], ['Branded Mobile App', 'mobile/branded-app'], ['Add App Banner', 'mobile/app-banner']]) },
 ])
 
-function childActive(to: string) { return route.path === to || route.path.startsWith(`${to}/`) }
+function childActive(to: string) {
+  if (route.path === to || route.path.startsWith(`${to}/`)) return true
+  // Tabbed sections stay highlighted on any sibling tab
+  for (const folder of ['/settings/communication/', '/content-hub/']) {
+    if (to.includes(folder) && route.path.includes(folder)) return true
+  }
+  return false
+}
 function groupActive(item: any) { return item.children?.some((c: any) => childActive(c.to)) }
 
 function toggle(item: any) {
