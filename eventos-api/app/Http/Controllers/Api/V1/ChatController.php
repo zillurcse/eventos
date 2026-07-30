@@ -10,6 +10,7 @@ use App\Models\Event;
 use App\Models\EventSetting;
 use App\Models\Participation;
 use App\Services\Gamification\GamificationScorer;
+use App\Services\Notifications\NotificationService;
 use App\Support\ChatCapabilities;
 use App\Support\CommunicationCapabilities;
 use Illuminate\Http\JsonResponse;
@@ -211,7 +212,7 @@ class ChatController extends Controller
     }
 
     /** Send a message (text and/or attachments) and fan it out over Reverb. */
-    public function send(string $event, string $conversation, Request $request): JsonResponse
+    public function send(string $event, string $conversation, Request $request, NotificationService $notifications): JsonResponse
     {
         $this->abortUnlessChatEnabled($request);
         $me = (int) $request->attributes->get('participation_id');
@@ -242,9 +243,10 @@ class ChatController extends Controller
         ]);
         $thread->update(['last_message_at' => now()]);
 
-        broadcast(new NewChatMessage($message, $thread->uuid, $thread->counterpartId($me)));
+        $recipientId = $thread->counterpartId($me);
+        broadcast(new NewChatMessage($message, $thread->uuid, $recipientId));
 
-        $sender = Participation::find($me);
+        $sender = Participation::with('contact')->find($me);
         if ($sender) {
             app(GamificationScorer::class)->queue(
                 (int) $sender->organization_id,
@@ -255,6 +257,29 @@ class ChatController extends Controller
                 (int) $message->id,
             );
         }
+
+        $eventModel = Event::find($thread->event_id);
+        $senderName = $sender
+            ? (trim(($sender->contact?->first_name ?? '').' '.($sender->contact?->last_name ?? '')) ?: 'Someone')
+            : 'Someone';
+        $preview = self::previewLabel($message);
+
+        $notifications->notify(
+            'participation',
+            $recipientId,
+            $sender?->organization_id ?? $eventModel?->organization_id,
+            (int) $thread->event_id,
+            'chat.message',
+            [
+                'title' => $senderName,
+                'body' => $preview !== '' ? $preview : 'New message',
+                'type' => 'chat',
+                'conversation_id' => $thread->uuid,
+                'event_uuid' => $eventModel?->uuid,
+                'sender_name' => $senderName,
+            ],
+            ['in_app', 'push'],
+        );
 
         return response()->json(['data' => $this->message($message, $me)], 201);
     }

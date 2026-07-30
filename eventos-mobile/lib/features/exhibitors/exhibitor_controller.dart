@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../models/exhibitor_models.dart';
+import '../../models/mappers/exhibitor_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../bookmarks/bookmark_controller.dart';
@@ -10,15 +11,15 @@ import 'exhibitor_service.dart';
 class ExhibitorController extends GetxController {
   final _service = ExhibitorService();
 
-  // ── List state ────────────────────────────────────────────────────────────
   final dataStatus = ApiState.initial.obs;
   final Rx<ExhibitorPageModel> exhibitorPage = const ExhibitorPageModel().obs;
   final RxnString selectedType = RxnString();
   final RxnInt expandedExhibitorId = RxnInt();
 
-  // Search state
   final RxString searchKey = "".obs;
   final TextEditingController searchController = TextEditingController();
+
+  Map<String, dynamic> _lastPayload = {};
 
   List<ExhibitorModel> get exhibitors => exhibitorPage.value.exhibitors;
   ExhibitorAdModel? get contentAd => exhibitorPage.value.contentAd;
@@ -29,7 +30,7 @@ class ExhibitorController extends GetxController {
     super.onInit();
     debounce(
       searchKey,
-      (_) => fetchExhibitors(),
+      (_) => _applyFilters(),
       time: const Duration(milliseconds: 500),
     );
   }
@@ -43,73 +44,62 @@ class ExhibitorController extends GetxController {
     searchKey.value = "";
   }
 
-  // ── API: list ─────────────────────────────────────────────────────────────
   Future<void> fetchExhibitors() async {
     await handleApiClient(
       onStateChanged: (state) => dataStatus(state),
       handleApiCall: () async {
-        final response = await _service.getExhibitors(
-          type: selectedType.value,
-          s: searchKey.value,
-        );
-        if (response.data is Map) {
-          exhibitorPage.value = ExhibitorPageModel.fromJson(
-            Map<String, dynamic>.from(response.data as Map),
-          );
-        }
+        final response = await _service.getExhibitors();
+        final body = response.data;
+        if (body is! Map) return;
+
+        _lastPayload = body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'] as Map)
+            : Map<String, dynamic>.from(body);
+
+        _applyFilters();
       },
+    );
+  }
+
+  void _applyFilters() {
+    if (_lastPayload.isEmpty) {
+      exhibitorPage.value = const ExhibitorPageModel();
+      return;
+    }
+    exhibitorPage.value = ExhibitorMapper.pageFromV1(
+      _lastPayload,
+      typeFilter: selectedType.value,
+      search: searchKey.value,
     );
   }
 
   void setType(String? type) {
     selectedType.value = type;
-    fetchExhibitors();
+    _applyFilters();
   }
 
-  // ── Detail state ──────────────────────────────────────────────────────────
   final detailStatus = ApiState.initial.obs;
   final Rxn<ExhibitorModel> exhibitorDetail = Rxn<ExhibitorModel>();
 
-  // ── API: details ──────────────────────────────────────────────────────────
-  Future<void> fetchExhibitorDetail(String slug) async {
+  Future<void> fetchExhibitorDetail(String slugOrUuid) async {
     await handleApiClient(
       onStateChanged: (state) => detailStatus(state),
       handleApiCall: () async {
-        final response = await _service.getExhibitorDetails(slug);
-        if (response.data is Map) {
-          final data = Map<String, dynamic>.from(response.data as Map);
-          if (data['exhibitor'] is Map) {
-            exhibitorDetail.value = ExhibitorModel.fromJson(
-              Map<String, dynamic>.from(data['exhibitor'] as Map),
-            );
-          }
+        final response = await _service.getExhibitorDetails(slugOrUuid);
+        final body = response.data;
+        if (body is! Map) {
+          throw Exception('Unexpected exhibitor response');
         }
+        exhibitorDetail.value =
+            ExhibitorMapper.detailFromV1Response(Map<String, dynamic>.from(body));
       },
     );
   }
 
-  // ── API: toggle exhibitor bookmark ────────────────────────────────────────
   Future<bool> toggleBookmark(int exhibitorId) async {
-    bool success = false;
-    await handleApiClient(
-      onStateChanged: (state) {},
-      handleApiCall: () async {
-        final response = await _service.toggleExhibitorBookmark(exhibitorId);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          if (raw['status'] == 'success' || raw['status'] == 1 || raw['success'] == true) {
-            success = true;
-            await fetchExhibitors();
-            if (exhibitorDetail.value?.id == exhibitorId) {
-              await fetchExhibitorDetail(exhibitorDetail.value!.slug);
-            }
-            if (Get.isRegistered<BookmarkController>()) {
-              Get.find<BookmarkController>().fetchBookmarks();
-            }
-          }
-        }
-      },
-    );
-    return success;
+    if (Get.isRegistered<BookmarkController>()) {
+      // Phase 2
+    }
+    return false;
   }
 }

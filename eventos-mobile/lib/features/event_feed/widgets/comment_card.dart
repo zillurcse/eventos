@@ -28,6 +28,11 @@ class _CommentCardState extends State<CommentCard> {
     _controller.addListener(() {
       setState(() => _remaining = 200 - _controller.text.length);
     });
+    // Comments are not embedded on the feed index — load on first paint.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Get.find<EventFeedController>().ensureCommentsLoaded(widget.post.id);
+    });
   }
 
   @override
@@ -58,18 +63,24 @@ class _CommentCardState extends State<CommentCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final ctrl = Get.find<EventFeedController>();
+
+    return Obx(() {
+      final post = ctrl.posts.firstWhereOrNull((p) => p.id == widget.post.id) ??
+          widget.post;
+
+      return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...widget.post.comments.take(3).map((c) => CommentRow(comment: c)),
+        ...post.comments.take(3).map((c) => CommentRow(comment: c)),
         Padding(
           padding: EdgeInsets.only(top: 10.h),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CustomImage(
-                widget.post.user.profilePhotoUrl,
+                post.user.profilePhotoUrl,
                 fit: BoxFit.cover,
                 height: 40.sp,
                 width: 40.sp,
@@ -147,5 +158,6 @@ class _CommentCardState extends State<CommentCard> {
         ),
       ],
     );
+    });
   }
 }

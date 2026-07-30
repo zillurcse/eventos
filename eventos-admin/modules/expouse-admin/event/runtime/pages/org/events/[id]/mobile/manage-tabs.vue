@@ -34,11 +34,14 @@ function hydrate(saved: any[]) {
   tabs.value = [
     ...list
       .filter((t: any) => DEFAULT_TABS.some(d => d.key === t.key))
-      .map((t: any) => ({
-        key: t.key,
-        label: DEFAULT_TABS.find(d => d.key === t.key)!.label,
-        enabled: t.enabled !== false,
-      })),
+      .map((t: any) => {
+        const def = DEFAULT_TABS.find(d => d.key === t.key)!
+        return {
+          key: t.key,
+          label: (typeof t.label === 'string' && t.label.trim()) ? t.label.trim() : def.label,
+          enabled: t.enabled !== false,
+        }
+      }),
     ...DEFAULT_TABS.filter(d => !savedKeys.has(d.key)).map(d => ({ ...d })),
   ]
 }
@@ -75,13 +78,13 @@ onMounted(load)
     <div class="mb-4">
       <h2 class="section-title m-0">Manage Tabs</h2>
       <p class="muted text-[.86rem] mt-0.5 mb-0">
-        Choose which tabs appear in the mobile app and drag to set their order.
+        Choose which tabs appear in the mobile app, rename them, and drag to set their order.
       </p>
     </div>
 
     <div class="max-w-[560px]">
-      <p class="muted text-[.84rem] mt-0 mb-3">Drag to reorder, toggle to show/hide in the app navigation.</p>
-      <SortableList v-model="tabs" />
+      <p class="muted text-[.84rem] mt-0 mb-3">Drag to reorder, click the pencil to rename, toggle to show/hide in the app navigation.</p>
+      <SortableList v-model="tabs" editable />
     </div>
 
     <div class="mt-4 flex flex-wrap gap-1.5">

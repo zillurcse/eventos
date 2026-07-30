@@ -3,23 +3,26 @@ import 'package:get/get.dart';
 
 import '../../models/speaker_model.dart';
 import '../../models/session_model.dart';
+import '../../models/mappers/speaker_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../../utils/helpers/type_helper.dart';
 import '../bookmarks/bookmark_controller.dart';
 import 'speaker_service.dart';
 
 class SpeakerController extends GetxController {
   final _service = SpeakerService();
 
-  // ── List state ────────────────────────────────────────────────────────────
   final dataStatus = ApiState.initial.obs;
   final Rx<SpeakerPageModel> speakerPage = const SpeakerPageModel().obs;
   final RxnInt expandedSpeakerId = RxnInt();
 
-  // Search & Sort state
   final RxString searchKey = "".obs;
   final TextEditingController searchController = TextEditingController();
   final RxnString sortType = RxnString();
+
+  List<Map<String, dynamic>> _allRawSpeakers = [];
+  List<Map<String, dynamic>> _allRawSessions = [];
 
   List<SpeakerItemModel> get speakers => speakerPage.value.speakers;
   SpeakerAdModel? get contentAd => speakerPage.value.contentAd;
@@ -30,7 +33,7 @@ class SpeakerController extends GetxController {
     super.onInit();
     debounce(
       searchKey,
-      (_) => fetchSpeakers(),
+      (_) => _applyFilters(),
       time: const Duration(milliseconds: 500),
     );
   }
@@ -46,99 +49,115 @@ class SpeakerController extends GetxController {
 
   void setSortType(String? type) {
     sortType.value = type;
-    fetchSpeakers();
+    _applyFilters();
   }
 
-  // ── Detail state ──────────────────────────────────────────────────────────
   final detailStatus = ApiState.initial.obs;
   final Rx<SpeakerDetailModel?> speakerDetail = Rx<SpeakerDetailModel?>(null);
   final RxList<SessionModel> speakerSessions = <SessionModel>[].obs;
 
-  // ── API: list ─────────────────────────────────────────────────────────────
   Future<void> fetchSpeakers() async {
     await handleApiClient(
       onStateChanged: (state) => dataStatus(state),
       handleApiCall: () async {
-        final response = await _service.getSpeakers(
-          s: searchKey.value,
-          sortBy: sortType.value,
-        );
-        if (response.data is Map) {
-          speakerPage.value = SpeakerPageModel.fromJson(
-            Map<String, dynamic>.from(response.data as Map),
-          );
-        }
+        final response = await _service.getSpeakers();
+        final body = response.data;
+        if (body is! Map) return;
+
+        final payload = body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'] as Map)
+            : Map<String, dynamic>.from(body);
+
+        _allRawSpeakers = (payload['speakers'] as List? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+
+        _applyFilters();
       },
     );
   }
 
-  // ── API: single speaker detail ────────────────────────────────────────────
+  void _applyFilters() {
+    final filtered = SpeakerMapper.filterRaw(
+      speakers: _allRawSpeakers,
+      search: searchKey.value,
+      sortBy: sortType.value,
+    );
+    speakerPage.value = SpeakerMapper.pageFromV1({'speakers': filtered});
+  }
+
   Future<void> fetchSpeakerDetail(int id) async {
     speakerDetail.value = null;
     speakerSessions.clear();
     await handleApiClient(
       onStateChanged: (state) => detailStatus(state),
       handleApiCall: () async {
-        final response = await _service.getSpeakerDetail(id);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          final data = raw['data'];
-          if (data is Map) {
-            final parsedDetail = SpeakerDetailModel.fromJson(
-              Map<String, dynamic>.from(data),
-            );
-            speakerDetail.value = parsedDetail;
-            speakerSessions.assignAll(parsedDetail.sessions);
+        if (_allRawSpeakers.isEmpty) {
+          final response = await _service.getSpeakers();
+          final body = response.data;
+          if (body is Map) {
+            final payload = body['data'] is Map
+                ? Map<String, dynamic>.from(body['data'] as Map)
+                : Map<String, dynamic>.from(body);
+            _allRawSpeakers = (payload['speakers'] as List? ?? [])
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
           }
         }
+
+        Map<String, dynamic>? raw;
+        for (final s in _allRawSpeakers) {
+          if (TypeHelper.toInt(s['id']) == id) {
+            raw = s;
+            break;
+          }
+        }
+        if (raw == null) {
+          throw Exception('Speaker not found');
+        }
+
+        if (_allRawSessions.isEmpty) {
+          try {
+            final sessionsResponse = await _service.getSessions();
+            final body = sessionsResponse.data;
+            if (body is Map) {
+              final payload = body['data'] is Map
+                  ? Map<String, dynamic>.from(body['data'] as Map)
+                  : Map<String, dynamic>.from(body);
+              final sessionsRaw = payload['sessions'];
+              final list = sessionsRaw is Map && sessionsRaw['data'] is List
+                  ? sessionsRaw['data'] as List
+                  : (sessionsRaw as List? ?? []);
+              _allRawSessions = list
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList();
+            }
+          } catch (_) {}
+        }
+
+        final sessions = SpeakerMapper.sessionsForSpeaker(
+          allSessions: _allRawSessions,
+          speakerId: id,
+        );
+
+        final detail = SpeakerMapper.detailFromV1(raw, sessions: sessions);
+        speakerDetail.value = detail;
+        speakerSessions.assignAll(sessions);
       },
     );
   }
 
-  // ── API: add/update speaker note ──────────────────────────────────────────
   Future<bool> addOrUpdateSpeakerNote(int speakerId, String noteText) async {
-    bool success = false;
-    await handleApiClient(
-      onStateChanged: (state) {
-        // No explicit detailStatus state change needed as we refresh details below
-      },
-      handleApiCall: () async {
-        final response = await _service.addOrUpdateSpeakerNote(speakerId, noteText);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          if (raw['status'] == 'success') {
-            success = true;
-            await fetchSpeakerDetail(speakerId);
-            await fetchSpeakers();
-          }
-        }
-      },
-    );
-    return success;
+    return false;
   }
 
-  // ── API: toggle speaker bookmark ──────────────────────────────────────────
   Future<bool> toggleBookmark(int speakerId) async {
-    bool success = false;
-    await handleApiClient(
-      onStateChanged: (state) {},
-      handleApiCall: () async {
-        final response = await _service.toggleSpeakerBookmark(speakerId);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          if (raw['status'] == 'success' || raw['status'] == 1 || raw['success'] == true) {
-            success = true;
-            await fetchSpeakers();
-            if (speakerDetail.value?.id == speakerId) {
-              await fetchSpeakerDetail(speakerId);
-            }
-            if (Get.isRegistered<BookmarkController>()) {
-              Get.find<BookmarkController>().fetchBookmarks();
-            }
-          }
-        }
-      },
-    );
-    return success;
+    if (Get.isRegistered<BookmarkController>()) {
+      // Phase 2
+    }
+    return false;
   }
 }

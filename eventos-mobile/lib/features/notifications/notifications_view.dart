@@ -18,75 +18,39 @@ class NotificationsView extends StatefulWidget {
 
 class _NotificationsViewState extends State<NotificationsView> {
   final controller = Get.put(NotificationController());
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
-        controller.fetchNotifications(loadMore: true);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
 
   String _getGroupTitle(DateTime? date) {
-    if (date == null) return "Earlier";
+    if (date == null) return 'Earlier';
     final now = DateTime.now();
     final difference = now.difference(date).inDays;
-    
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return "Today";
-    } else if (difference == 1 || (difference == 0 && now.day != date.day)) {
-      return "Yesterday";
+
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
+      return 'Today';
+    } else if (difference == 1 ||
+        (difference == 0 && now.day != date.day)) {
+      return 'Yesterday';
     } else if (difference > 1 && difference < 7) {
-      return "$difference days ago";
+      return '$difference days ago';
     } else {
       return DateFormat('dd MMM yyyy').format(date);
     }
   }
 
   String _getTimeString(DateTime? date) {
-    if (date == null) return "";
+    if (date == null) return '';
     final now = DateTime.now();
     final difference = now.difference(date);
 
     if (difference.inMinutes < 60) {
       final mins = difference.inMinutes == 0 ? 1 : difference.inMinutes;
-      return "${mins}m ago";
+      return '${mins}m ago';
     } else if (difference.inHours < 24 && now.day == date.day) {
-      return "${difference.inHours}h ago";
+      return '${difference.inHours}h ago';
     } else {
       return DateFormat('hh:mm a').format(date).toLowerCase();
     }
-  }
-
-  List<TextSpan> _buildMessageSpans(String contextString, NotificationUserModel? user) {
-    final spans = <TextSpan>[];
-    
-    if (user != null && user.name.isNotEmpty && contextString.contains(user.name)) {
-      final parts = contextString.split(user.name);
-      for (int i = 0; i < parts.length; i++) {
-        if (parts[i].isNotEmpty) {
-          spans.add(TextSpan(text: parts[i]));
-        }
-        if (i < parts.length - 1) {
-          spans.add(TextSpan(
-            text: "${user.name} ",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ));
-        }
-      }
-    } else {
-      spans.add(TextSpan(text: contextString));
-    }
-    return spans;
   }
 
   @override
@@ -98,7 +62,7 @@ class _NotificationsViewState extends State<NotificationsView> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
-          "Notifications",
+          'Notifications',
           style: context.titleLarge?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -106,11 +70,13 @@ class _NotificationsViewState extends State<NotificationsView> {
         ),
         actions: [
           Obx(() {
-            if (controller.unreadCount.value == 0) return const SizedBox.shrink();
+            if (controller.unreadCount.value == 0) {
+              return const SizedBox.shrink();
+            }
             return TextButton(
               onPressed: () => controller.markAllAsRead(),
               child: Text(
-                "Mark all as read",
+                'Mark all as read',
                 style: context.bodyRegular?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
@@ -136,20 +102,16 @@ class _NotificationsViewState extends State<NotificationsView> {
     if (notifications.isEmpty) {
       return Center(
         child: Text(
-          "No notifications yet.",
+          'No notifications yet.',
           style: context.bodyRegular?.copyWith(color: context.ghost),
         ),
       );
     }
 
-    // Group by title
     final Map<String, List<NotificationItemModel>> grouped = {};
-    for (var notif in notifications) {
+    for (final notif in notifications) {
       final title = _getGroupTitle(notif.createdAt);
-      if (!grouped.containsKey(title)) {
-        grouped[title] = [];
-      }
-      grouped[title]!.add(notif);
+      grouped.putIfAbsent(title, () => []).add(notif);
     }
 
     final children = <Widget>[];
@@ -167,22 +129,25 @@ class _NotificationsViewState extends State<NotificationsView> {
         ),
       );
 
-      for (var item in items) {
+      for (final item in items) {
+        final display = item.body.isNotEmpty ? item.body : item.title;
         children.add(
           GestureDetector(
-            onTap: () {
-              if (!item.isRead) {
-                controller.markAsRead(item.id);
-              }
-              if (item.url.isNotEmpty) {
-                Get.toNamed(item.url); // Navigation fallback
-              }
-            },
+            onTap: () => controller.openNotification(item),
             child: NotificationCard(
               isUnread: !item.isRead,
               iconType: NotificationIconType.avatar,
-              avatarUrl: item.user?.profilePhotoUrl ?? '',
-              messageSpans: _buildMessageSpans(item.context, item.user),
+              avatarUrl: '',
+              messageSpans: [
+                if (item.title.isNotEmpty && item.body.isNotEmpty) ...[
+                  TextSpan(
+                    text: '${item.title} ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: item.body),
+                ] else
+                  TextSpan(text: display),
+              ],
               time: _getTimeString(item.createdAt),
             ),
           ),
@@ -190,10 +155,12 @@ class _NotificationsViewState extends State<NotificationsView> {
       }
     });
 
-    return ListView(
-      controller: _scrollController,
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-      children: children,
+    return RefreshIndicator(
+      onRefresh: () => controller.fetchNotifications(refresh: true),
+      child: ListView(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        children: children,
+      ),
     );
   }
 }

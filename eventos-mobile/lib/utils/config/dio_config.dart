@@ -5,6 +5,7 @@ import 'package:get_storage/get_storage.dart';
 
 import '../helpers/app_data_provider.dart';
 import '../helpers/local_key.dart';
+import 'app_config.dart';
 
 class DioConfig {
   DioConfig._();
@@ -14,21 +15,21 @@ class DioConfig {
   Dio? dio;
   final localDb = GetStorage();
 
-  void init() {
-    if(dio != null) return;
+  void init({bool force = false}) {
+    if (dio != null && !force) return;
 
     dio = Dio(
       BaseOptions(
-        baseUrl: "https://${AppDataProvider.obj.subdomain}.expouse.com/api/",
-        connectTimeout: Duration(seconds: 15),
-        receiveTimeout: Duration(seconds: 15),
-        sendTimeout: Duration(seconds: 15),
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 15),
         followRedirects: true,
         maxRedirects: 5,
         headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "subdomain": AppDataProvider.obj.subdomain,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Event-Subdomain': AppDataProvider.obj.subdomain,
         },
       ),
     );
@@ -36,31 +37,37 @@ class DioConfig {
     dio?.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          final excludedRoutes = <String>[
-            "validate-email-for-mobile/",
-            "auth/login-with-password/",
-            "event/user/profile/config/",
-            "event/user/profile/config/update/",
+          // Always keep event context in sync (subdomain may change after login).
+          options.headers['X-Event-Subdomain'] = AppDataProvider.obj.subdomain;
 
-
+          const publicAuthPaths = <String>[
+            'auth/login',
+            'auth/register',
+            'public/check-email',
+            'public/auth/otp',
+            'public/site',
           ];
 
-          final shouldAddToken = !excludedRoutes.any(options.path.contains);
-          if (shouldAddToken) {
+          final path = options.path;
+          final isPublicAuth = publicAuthPaths.any(path.contains);
+          if (!isPublicAuth) {
             final token = localDb.read(LocalKeyHelper.token);
             if (token != null) {
-              options.headers[HttpHeaders.authorizationHeader] = "Bearer $token";
+              options.headers[HttpHeaders.authorizationHeader] =
+                  'Bearer $token';
             }
           }
+
           return handler.next(options);
         },
-        onResponse: (response, handler) {
-          return handler.next(response);
-        },
-        onError: (error, handler) {
-          return handler.next(error);
-        },
+        onResponse: (response, handler) => handler.next(response),
+        onError: (error, handler) => handler.next(error),
       ),
     );
+  }
+
+  /// Call after subdomain changes so new requests use the updated header default.
+  void refreshEventHeaders() {
+    dio?.options.headers['X-Event-Subdomain'] = AppDataProvider.obj.subdomain;
   }
 }

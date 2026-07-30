@@ -1,15 +1,19 @@
 import 'package:expouse/features/session/session_controller.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../models/theme_config_model.dart';
+import '../../models/mappers/theme_mapper.dart';
 import '../../utils/enum/enums.dart';
+import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/theme/app_colors.dart';
+import '../delegate/delegate_controller.dart';
 import '../event_feed/event_feed_controller.dart';
+import '../exhibitors/exhibitor_controller.dart';
 import '../home/home_controller.dart';
+import '../lounge/lounge_controller.dart';
+import '../rooms/rooms_controller.dart';
+import '../notifications/push_notification_service.dart';
 import '../speaker/speaker_controller.dart';
-import '../../utils/bottom_sheets/more_bottom_sheet.dart';
-import '../../utils/helpers/bottom_sheets.dart';
 import 'theme_service.dart';
 
 class RootController extends GetxController {
@@ -35,19 +39,33 @@ class RootController extends GetxController {
     try {
       final response = await _themeService.getThemeConfiguration();
       if (response.statusCode == 200 && response.data != null) {
-        final configResponse = ThemeConfigResponse.fromJson(Map<String, dynamic>.from(response.data));
+        final body = response.data;
+        final data = body is Map && body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'] as Map)
+            : Map<String, dynamic>.from(body as Map);
+
+        final subdomain = data['subdomain']?.toString();
+        if (subdomain != null && subdomain.isNotEmpty) {
+          AppDataProvider.obj.setSubDomain = subdomain;
+        }
+        final event = data['event'];
+        if (event is Map) {
+          final uuid = event['uuid']?.toString();
+          if (uuid != null && uuid.isNotEmpty) {
+            AppDataProvider.obj.eventUuid = uuid;
+          }
+        }
+
+        final configResponse = ThemeMapper.fromSite(data);
         final theme = configResponse.theme;
-        
+
         if (theme != null) {
-          // Update global app colors
           if (theme.themeColor != null && theme.themeColor!.isNotEmpty) {
             updateAppColors(theme.themeColor!);
           }
-          
-          // Update modules (e.g. logo, chat, briefcase)
+
           themeModules.assignAll(theme.themeModules);
-          
-          // Sort active tabs by order
+
           final tabs = theme.webAppTabs.where((t) => t.status).toList();
           tabs.sort((a, b) => a.order.compareTo(b.order));
           activeTabs.assignAll(tabs);
@@ -60,8 +78,17 @@ class RootController extends GetxController {
       }
       themeStatus.value = ApiState.loaded;
       update();
+      // Cold-start notification taps land after the shell is ready.
+      PushNotificationService.instance.consumePendingOpen();
     } catch (e) {
-      themeStatus.value = ApiState.error;
+      // Fallback so reception still opens if site bootstrap fails.
+      final fallback = ThemeMapper.fromSite({});
+      activeTabs.assignAll(fallback.theme?.webAppTabs ?? []);
+      if (activeTabs.isNotEmpty) {
+        headerTitle.value = activeTabs.first.customName;
+        _activateTab(0);
+      }
+      themeStatus.value = ApiState.loaded;
       update();
     }
   }
@@ -82,26 +109,30 @@ class RootController extends GetxController {
   void _activateTab(int index) {
     if (_loadedTabs.contains(index)) return;
     if (index >= activeTabs.length) return;
-    
+
     final route = activeTabs[index].route;
-    
-    // Check which controllers to trigger based on the route
-    if (route == 'event.home') {
-      Get.put(HomeController()).fetchHomeData();
-      _loadedTabs.add(index);
-    } else if (route == 'event.feed') {
-      Get.put(EventFeedController()).fetchFeed();
-      _loadedTabs.add(index);
-    } else if (route == 'event.sessions') {
-      Get.put(SessionController()).fetchSessions();
-      _loadedTabs.add(index);
-    } else if (route == 'event.speakers') {
-      Get.put(SpeakerController()).fetchSpeakers();
-      _loadedTabs.add(index);
-    } else {
-      // Other tabs don't require pre-fetching via controller yet
-      _loadedTabs.add(index);
+
+    switch (route) {
+      case 'event.home':
+        Get.put(HomeController()).fetchHomeData();
+      case 'event.feed':
+        Get.put(EventFeedController()).fetchFeed();
+      case 'event.sessions':
+        Get.put(SessionController()).fetchSessions();
+      case 'event.speakers':
+        Get.put(SpeakerController()).fetchSpeakers();
+      case 'event.delegates':
+        Get.put(DelegateController()).fetchDelegates();
+      case 'event.exhibitors':
+        Get.put(ExhibitorController()).fetchExhibitors();
+      case 'event.lounge':
+        Get.put(LoungeController()).fetchTables();
+      case 'event.rooms':
+        Get.put(RoomsController()).fetchRooms();
+      default:
+        break;
     }
+    _loadedTabs.add(index);
   }
 
   /// Returns the loading state for a given tab index (for skeleton nav).

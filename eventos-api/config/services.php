@@ -140,4 +140,14 @@ return [
         'redirect' => env('APP_URL').'/api/v1/auth/social/linkedin/callback',
     ],
 
+    /*
+    | Firebase Cloud Messaging (push). Point at a service-account JSON from
+    | Firebase Console → Project settings → Service accounts. Absolute path
+    | or a path relative to storage/ (e.g. app/firebase-credentials.json).
+    | When unset, push rows stay queued and no FCM call is made.
+    */
+    'fcm' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
 ];

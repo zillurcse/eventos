@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Mail;
 /**
  * Renders + records + delivers notifications across channels (architecture
  * §6.7). in_app is stored for the recipient to poll; email goes out via the
- * mail transport (Mailpit in dev); push/sms are recorded as queued (driver TBD).
+ * mail transport (Mailpit in dev); push is delivered via FCM HTTP v1 when
+ * FIREBASE_CREDENTIALS is configured; sms remains queued (driver TBD).
  *
  * Delivery is the intersection of (1) the caller’s channel list — usually the
  * event Communication → Notification matrix via {@see channelsForEventAction} —
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Mail;
  */
 class NotificationService
 {
+    public function __construct(protected FcmPushService $fcm) {}
+
     /**
      * Channels enabled for an automatic trigger in Communication → Notification.
      * Admin matrix keys are web/email/sms; delivery uses in_app for web.
@@ -42,7 +45,9 @@ class NotificationService
 
         $channels = [];
         if ($web) {
+            // Mobile & desktop share the web/in_app toggle; push follows it.
             $channels[] = 'in_app';
+            $channels[] = 'push';
         }
         if ($email) {
             $channels[] = 'email';
@@ -112,6 +117,13 @@ class NotificationService
                 Mail::html('<p>'.nl2br(e((string) $body)).'</p>', fn ($m) => $m->to($data['email'])->subject($title));
                 $notification->update(['status' => 'sent', 'sent_at' => now()]);
             }
+
+            if ($channel === 'push') {
+                $userId = $this->resolveUserId($notifiableType, $notifiableId);
+                if ($userId !== null && $this->fcm->sendToUser($userId, (string) $title, $body, $data)) {
+                    $notification->update(['status' => 'sent', 'sent_at' => now()]);
+                }
+            }
         }
     }
 
@@ -172,7 +184,9 @@ class NotificationService
                 'email' => 'meetings',
                 'in_app' => 'meeting_status',
             ],
-            str_starts_with($key, 'exhibitor.message') || $key === 'exhibitor.connection_request' => [
+            $key === 'chat.message'
+                || str_starts_with($key, 'exhibitor.message')
+                || $key === 'exhibitor.connection_request' => [
                 'email' => 'messages',
                 'in_app' => 'messages',
             ],

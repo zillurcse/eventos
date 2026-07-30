@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "76348610565",
+    "project_id": "expouse-90329",
+    "storage_bucket": "expouse-90329.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:76348610565:android:REPLACE_AFTER_ADD_ANDROID_APP",
+        "android_client_info": {
+          "package_name": "com.example.expouse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_AFTER_DOWNLOAD_FROM_FIREBASE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

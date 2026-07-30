@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
 import '../../models/event_feed_model.dart';
+import '../../models/mappers/feed_mapper.dart';
 import '../../models/user.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
@@ -27,6 +28,7 @@ class EventFeedController extends GetxController {
   final RxInt currentPage = 1.obs;
   final RxBool hasNextPage = false.obs;
   final RxBool isLoadingMore = false.obs;
+  final Set<int> _commentsLoaded = {};
 
   @override
   void onInit() {
@@ -69,6 +71,14 @@ class EventFeedController extends GetxController {
   // ── Permission helpers ─────────────────────────────────────────────────────
   bool hasPermission(String permission) => permissions.contains(permission);
 
+  FeedPostModel? _findPost(int postId) {
+    final index = posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return null;
+    return posts[index];
+  }
+
+  String? _uuidFor(int postId) => _findPost(postId)?.uuid;
+
   // ── API: initial / refresh load ────────────────────────────────────────────
   Future<void> fetchFeed() async {
     await handleApiClient(
@@ -77,17 +87,17 @@ class EventFeedController extends GetxController {
         final response = await _service.getEventFeed(
           page: 1,
           filter: activeFilter.value,
-          s: searchKey.value,
+          q: searchKey.value,
         );
         if (response.data is Map) {
-          final model = EventFeedModel.fromJson(
+          final model = FeedMapper.pageFromV1(
             Map<String, dynamic>.from(response.data as Map),
           );
           posts.value = model.posts;
           currentPage.value = model.currentPage;
           hasNextPage.value = model.nextPageUrl != null;
+          _commentsLoaded.clear();
 
-          // Persist tab & permission config on first load
           if (model.functionalityConfig != null) {
             tabs.value = model.functionalityConfig!.tabs
                 .where((t) => t.status)
@@ -109,10 +119,10 @@ class EventFeedController extends GetxController {
       final response = await _service.getEventFeed(
         page: nextPage,
         filter: activeFilter.value,
-        s: searchKey.value,
+        q: searchKey.value,
       );
       if (response.data is Map) {
-        final model = EventFeedModel.fromJson(
+        final model = FeedMapper.pageFromV1(
           Map<String, dynamic>.from(response.data as Map),
         );
         posts.addAll(model.posts);
@@ -131,17 +141,26 @@ class EventFeedController extends GetxController {
     if (index == -1) return;
 
     final original = posts[index];
+    final uuid = original.uuid;
+    if (uuid.isEmpty) return;
+
     final nowLiked = !original.isLiked;
     final newLikeCount = nowLiked ? original.like + 1 : original.like - 1;
 
-    posts[index] = _copyPostWith(original, isLiked: nowLiked, like: newLikeCount);
+    posts[index] =
+        _copyPostWith(original, isLiked: nowLiked, like: newLikeCount);
     posts.refresh();
 
     try {
-      if (nowLiked) {
-        await _service.likePost(postId);
-      } else {
-        await _service.dislikePost(postId);
+      final response = await _service.toggleReaction(uuid);
+      final data = response.data;
+      if (data is Map) {
+        posts[index] = _copyPostWith(
+          posts[index],
+          isLiked: data['reacted'] as bool? ?? nowLiked,
+          like: (data['reactions'] as num?)?.toInt() ?? newLikeCount,
+        );
+        posts.refresh();
       }
     } catch (err) {
       posts[index] = original;
@@ -150,7 +169,34 @@ class EventFeedController extends GetxController {
     }
   }
 
-  // ── Comment ────────────────────────────────────────────────────────────────
+  // ── Comments ───────────────────────────────────────────────────────────────
+  /// Lazily loads comments for a post (index payload does not embed them).
+  Future<void> ensureCommentsLoaded(int postId) async {
+    if (_commentsLoaded.contains(postId)) return;
+    final index = posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return;
+    final uuid = posts[index].uuid;
+    if (uuid.isEmpty) return;
+
+    try {
+      final response = await _service.getComments(uuid);
+      final data = response.data;
+      if (data is! Map) return;
+      final list = data['data'];
+      if (list is! List) return;
+      final comments = list
+          .whereType<Map>()
+          .map((e) =>
+              FeedMapper.commentFromV1(Map<String, dynamic>.from(e)))
+          .toList();
+      posts[index] = _copyPostWith(posts[index], comments: comments);
+      posts.refresh();
+      _commentsLoaded.add(postId);
+    } catch (_) {
+      // Best-effort — comments stay empty until retry.
+    }
+  }
+
   /// Submits a comment and injects it into the post's comment list.
   /// Returns true on success so the widget can clear its input.
   Future<bool> storeComment({
@@ -158,19 +204,26 @@ class EventFeedController extends GetxController {
     required String body,
   }) async {
     if (body.trim().isEmpty) return false;
+    final uuid = _uuidFor(postId);
+    if (uuid == null || uuid.isEmpty) return false;
 
     try {
-      final response = await _service.storeComment(postId: postId, body: body);
+      final response =
+          await _service.storeComment(postUuid: uuid, body: body.trim());
 
       final index = posts.indexWhere((p) => p.id == postId);
       if (index != -1) {
         final original = posts[index];
         FeedCommentModel newComment;
 
-        if (response.data is Map &&
-            (response.data as Map).containsKey('id')) {
-          newComment = FeedCommentModel.fromJson(
-            Map<String, dynamic>.from(response.data as Map),
+        final data = response.data;
+        if (data is Map && data['data'] is Map) {
+          newComment = FeedMapper.commentFromV1(
+            Map<String, dynamic>.from(data['data'] as Map),
+          );
+        } else if (data is Map && data.containsKey('id')) {
+          newComment = FeedMapper.commentFromV1(
+            Map<String, dynamic>.from(data),
           );
         } else {
           final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
@@ -193,6 +246,7 @@ class EventFeedController extends GetxController {
             List<FeedCommentModel>.from(original.comments)..add(newComment);
         posts[index] = _copyPostWith(original, comments: updatedComments);
         posts.refresh();
+        _commentsLoaded.add(postId);
       }
       return true;
     } catch (err) {
@@ -208,11 +262,18 @@ class EventFeedController extends GetxController {
     if (index == -1) return;
 
     final original = posts[index];
+    final uuid = original.uuid;
+    if (uuid.isEmpty) return;
+
+    final option = original.options.firstWhereOrNull((o) => o.id == optionId);
+    final optionUuid = option?.uuid ?? '';
+    if (optionUuid.isEmpty) return;
 
     final optimisticOptions = original.options.map((opt) {
       if (opt.id == optionId) {
         return FeedPollOptionModel(
           id: opt.id,
+          uuid: opt.uuid,
           option: opt.option,
           votes: opt.votes + 1,
         );
@@ -230,47 +291,23 @@ class EventFeedController extends GetxController {
     posts.refresh();
 
     try {
-      await _service.votePoll(postId, optionId);
-      await refreshPollData(postId);
+      final response = await _service.votePoll(uuid, optionUuid);
+      final data = response.data;
+      if (data is Map && data['data'] is Map) {
+        final updated = FeedMapper.postFromV1(
+          Map<String, dynamic>.from(data['data'] as Map),
+        );
+        // Preserve any already-loaded comments.
+        posts[index] = _copyPostWith(
+          updated,
+          comments: original.comments,
+        );
+        posts.refresh();
+      }
     } catch (err) {
       posts[index] = original;
       posts.refresh();
       ToastMsg.showApiErrorMessage(err);
-    }
-  }
-
-  // ── Poll: refresh data ─────────────────────────────────────────────────────
-  Future<void> refreshPollData(int postId) async {
-    try {
-      final response = await _service.getPollData(postId);
-      if (response.data == null) return;
-
-      final index = posts.indexWhere((p) => p.id == postId);
-      if (index == -1) return;
-
-      final Map<String, dynamic> raw = response.data is Map
-          ? Map<String, dynamic>.from(response.data as Map)
-          : <String, dynamic>{};
-
-      List<FeedPollOptionModel>? updatedOptions;
-      if (raw['options'] is List) {
-        updatedOptions = (raw['options'] as List)
-            .map((e) => FeedPollOptionModel.fromJson(
-                Map<String, dynamic>.from(e as Map)))
-            .toList();
-      }
-
-      posts[index] = _copyPostWith(
-        posts[index],
-        totalVotes: raw['total_votes'] as int? ?? posts[index].totalVotes,
-        voteByThisUser:
-            raw['vote_by_this_user'] as bool? ?? posts[index].voteByThisUser,
-        myVote: raw['my_vote'] as int? ?? posts[index].myVote,
-        options: updatedOptions ?? posts[index].options,
-      );
-      posts.refresh();
-    } catch (_) {
-      // Best-effort — silently ignore.
     }
   }
 
@@ -287,10 +324,13 @@ class EventFeedController extends GetxController {
   }) =>
       FeedPostModel(
         id: post.id,
+        uuid: post.uuid,
         body: post.body,
         userId: post.userId,
         like: like ?? post.like,
         attach: post.attach,
+        attachUrl: post.attachUrl,
+        attachType: post.attachType,
         question: post.question,
         type: post.type,
         isLive: post.isLive,

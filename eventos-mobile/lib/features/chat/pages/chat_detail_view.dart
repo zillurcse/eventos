@@ -9,14 +9,14 @@ import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/loading_skeletons/chat_detail_skeleton.dart';
 
 class ChatDetailView extends StatefulWidget {
-  final int roomId;
-  final int partnerId;
+  final String conversationId;
+  final String partnerId;
   final String partnerName;
   final String? partnerImageUrl;
 
   const ChatDetailView({
     super.key,
-    required this.roomId,
+    required this.conversationId,
     required this.partnerId,
     required this.partnerName,
     this.partnerImageUrl,
@@ -29,26 +29,26 @@ class ChatDetailView extends StatefulWidget {
 class ChatDetailViewState extends State<ChatDetailView> {
   final controller = Get.find<ChatController>();
   final ScrollController _scrollController = ScrollController();
-
-  /// Worker returned by ever() — must be disposed to prevent listener
-  /// stack-up when navigating in and out of the same room.
   Worker? _scrollWorker;
 
   @override
   void initState() {
     super.initState();
-    controller.enterRoom(widget.roomId, widget.partnerId);
+    controller.enterRoom(
+      widget.conversationId,
+      partnerId: widget.partnerId,
+    );
     _scrollWorker = ever(controller.messages, (_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-       Future.delayed(Duration(seconds: 1), (){
-         if (_scrollController.hasClients) {
-           _scrollController.animateTo(
-             _scrollController.position.maxScrollExtent,
-             duration: const Duration(milliseconds: 500),
-             curve: Curves.easeOut,
-           );
-         }
-       });
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
       });
     });
   }
@@ -70,10 +70,10 @@ class ChatDetailViewState extends State<ChatDetailView> {
         title: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8), // Adjust radius to your preference
+              borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
-                imageUrl: widget.partnerImageUrl ?? "",
-                width: 32, // Equivalent to a CircleAvatar radius of 16
+                imageUrl: widget.partnerImageUrl ?? '',
+                width: 32,
                 height: 32,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => const SizedBox(
@@ -87,7 +87,7 @@ class ChatDetailViewState extends State<ChatDetailView> {
                 errorWidget: (context, url, error) => Container(
                   width: 32,
                   height: 32,
-                  color: Colors.grey[300], // Background color for the error state
+                  color: Colors.grey[300],
                   child: const Icon(Icons.person, size: 16),
                 ),
               ),
@@ -96,7 +96,8 @@ class ChatDetailViewState extends State<ChatDetailView> {
             Expanded(
               child: Text(
                 widget.partnerName,
-                style: context.titleLarge?.copyWith(color: context.tertiaryText),
+                style:
+                    context.titleLarge?.copyWith(color: context.tertiaryText),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -106,12 +107,16 @@ class ChatDetailViewState extends State<ChatDetailView> {
       body: Column(
         children: [
           Expanded(
-            child: Obx(() => ApiStateHandler(
-              state: controller.messageStatus.value,
-              onRetry: () => controller.fetchMessages(widget.partnerId),
-              skeleton: const ChatDetailSkeleton(),
-              loadedElement: ChatMessagesList(scrollController: _scrollController),
-            ),),
+            child: Obx(
+              () => ApiStateHandler(
+                state: controller.messageStatus.value,
+                onRetry: () =>
+                    controller.fetchMessages(widget.conversationId),
+                skeleton: const ChatDetailSkeleton(),
+                loadedElement:
+                    ChatMessagesList(scrollController: _scrollController),
+              ),
+            ),
           ),
           ChatInputBar(
             onSendMessage: (text) => controller.sendMessage(message: text),

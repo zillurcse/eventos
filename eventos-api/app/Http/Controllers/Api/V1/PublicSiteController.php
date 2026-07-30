@@ -130,9 +130,11 @@ class PublicSiteController extends Controller
             // The tab bar the organizer configured in Navigation & Menu ›
             // Web App Tabs: which sections appear, in what order, and how.
             // Feed tabs prefer Communication › Functionality when configured.
+            // Mobile App › Manage Tabs is exposed as navigation.mobile_tabs.
             'navigation' => $this->navigation(
                 $setting->navigation ?? [],
                 CommunicationCapabilities::fromSetting($setting),
+                $setting->manage_tabs,
             ),
             'subdomain' => $sub,
             'custom_domain' => data_get($setting->domain, 'custom_domain'),
@@ -191,11 +193,15 @@ class PublicSiteController extends Controller
      * no config at all: we return an empty list and the app falls back to its
      * default tab bar rather than rendering an event site with no navigation.
      *
+     * Mobile App › Manage Tabs (`event_settings.manage_tabs`) is published as
+     * `mobile_tabs` so the native app can drive its bottom nav independently
+     * of the web tab bar.
+     *
      * Where each tab actually *goes* (its route and icon) is the app's business,
      * not ours — the organizer chooses the label and the order, and the app maps
      * the key onto the page it ships. So we send keys and labels, nothing else.
      */
-    private function navigation(array $navigation, array $communication = []): array
+    private function navigation(array $navigation, array $communication = [], ?array $manageTabs = null): array
     {
         $tabs = $navigation['web_app_tabs'] ?? [];
 
@@ -209,6 +215,7 @@ class PublicSiteController extends Controller
 
         return [
             'tabs' => $this->enabledItems($tabs),
+            'mobile_tabs' => $this->enabledManageTabs($manageTabs),
             'icons' => (bool) ($tabs['icons'] ?? true),
             'background' => (bool) ($tabs['background'] ?? true),
             'alignment' => (string) ($tabs['alignment'] ?? 'left'),
@@ -219,6 +226,31 @@ class PublicSiteController extends Controller
             // Navigation & Menu › Welcome Video.
             'welcome_video' => $this->welcomeVideo($navigation['welcome_video'] ?? []),
         ];
+    }
+
+    /**
+     * Enabled Mobile App › Manage Tabs entries, in organizer order.
+     * Shape matches `tabs`: [{ key, label }, …] — disabled entries omitted.
+     *
+     * @param  list<array{key?: string, label?: string, enabled?: bool}>|null  $manageTabs
+     * @return list<array{key: string, label: string}>
+     */
+    private function enabledManageTabs(?array $manageTabs): array
+    {
+        if ($manageTabs === null || $manageTabs === []) {
+            return [];
+        }
+
+        return collect($manageTabs)
+            ->filter(fn ($item) => is_array($item)
+                && ($item['enabled'] ?? false)
+                && ! empty($item['key']))
+            ->map(fn ($item) => [
+                'key' => (string) $item['key'],
+                'label' => (string) ($item['label'] ?? $item['key']),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

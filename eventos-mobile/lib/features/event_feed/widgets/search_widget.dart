@@ -83,13 +83,13 @@ class SearchWidget extends StatelessWidget {
                 itemBuilder: (BuildContext popupContext) {
                   final options = [
                     {'key': 'all', 'label': 'All'},
-                    {'key': 'photos', 'label': 'Photos'},
+                    {'key': 'image', 'label': 'Photos'},
                     {'key': 'pdf', 'label': 'PDF'},
                     {'key': 'video', 'label': 'Video'},
-                    {'key': 'polls', 'label': 'Polls'},
+                    {'key': 'poll', 'label': 'Polls'},
                     {'key': 'offering', 'label': 'Offering'},
-                    {'key': 'looking-for', 'label': 'Looking For'},
-                    {'key': 'my_posts', 'label': 'My Posts'},
+                    {'key': 'looking_for', 'label': 'Looking For'},
+                    {'key': 'mine', 'label': 'My Posts'},
                   ];
 
                   final baseStyle = context.bodyRegular;

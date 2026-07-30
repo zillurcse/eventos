@@ -51,7 +51,8 @@ class RootHeader extends StatelessWidget {
                     height: 14.sp,
                   ),
                 ),
-                Obx(() => rootCtrl.themeModules.contains('logo')
+                Obx(() => (rootCtrl.themeModules.contains('event_logo') ||
+                        rootCtrl.themeModules.contains('logo'))
                     ? CustomImage('assets/svg/img/logo.svg', height: 26.h)
                     : const SizedBox.shrink()),
                 GestureDetector(
@@ -107,7 +108,8 @@ class RootHeader extends StatelessWidget {
                         ),
                       )
                     : const SizedBox.shrink()),
-                Obx(() => rootCtrl.themeModules.contains('notification')
+                Obx(() => (rootCtrl.themeModules.contains('notifications') ||
+                        rootCtrl.themeModules.contains('notification'))
                     ? GestureDetector(
                         onTap: () => Get.to(() => const NotificationsView()),
                         child: HeaderIcon('assets/svg/icons/bell.svg', height: 19.sp),

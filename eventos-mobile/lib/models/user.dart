@@ -118,13 +118,18 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] as String? ?? '';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final firstFromName = parts.isNotEmpty ? parts.first : '';
+    final lastFromName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
     return User(
       id: TypeHelper.toInt(json['id']),
-      name: json['name'] as String? ?? '',
+      name: name,
       email: json['email'] as String? ?? '',
       userName: json['user_name'] as String? ?? '',
-      eventId: json['event_id'] as int? ?? 0,
-      uid: json['uid'] as String? ?? '',
+      eventId: TypeHelper.toInt(json['event_id']),
+      uid: json['uid']?.toString() ?? json['id']?.toString() ?? '',
       emailVerifiedAt: json['email_verified_at'] as String? ?? '',
       accessCode: json['access_code'] as String? ?? '',
       isApkAuth: json['is_apk_auth'] as int? ?? 0,
@@ -140,8 +145,12 @@ class User {
       country: json['country'] as String? ?? '',
       industry: json['industry'] as String? ?? '',
       interests: json['interests'] as String? ?? '',
-      firstName: json['first_name'] as String? ?? '',
-      lastName: json['last_name'] as String? ?? '',
+      firstName: (json['first_name'] as String?)?.isNotEmpty == true
+          ? json['first_name'] as String
+          : firstFromName,
+      lastName: (json['last_name'] as String?)?.isNotEmpty == true
+          ? json['last_name'] as String
+          : lastFromName,
       gender: json['gender'] as String? ?? '',
       state: json['state'] as String? ?? '',
       cityTown: json['city_town'] as String? ?? '',

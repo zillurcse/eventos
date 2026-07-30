@@ -9,6 +9,7 @@ import 'package:get_storage/get_storage.dart';
 
 import '../../models/registration_item.dart';
 import '../../utils/bindings/auth_binding.dart';
+import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../../utils/helpers/local_key.dart';
 import '../../widgets/custom_checkbox.dart';
@@ -19,6 +20,7 @@ import '../../widgets/custom_radio.dart';
 import 'auth_service.dart';
 import 'auth_view.dart';
 import 'widgets/sign_up_item.dart';
+import '../notifications/push_notification_service.dart';
 
 class AuthController extends GetxController {
   final authService = AuthService();
@@ -59,21 +61,25 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Returns null if the API failed, true if email is valid, false if invalid.
+  /// Returns null if the API failed, true if the email can sign in (exists + password),
+  /// false if they should go to sign-up.
   Future<bool?> onEmailValidation({required String email}) async {
-    String? status;
+    bool? canLogin;
     await handleApiClient(
       onStateChanged: emailValidationStatus,
       handleApiCall: () async {
-        final response = await authService.emailValidationCheck(
-          agreedTc: isAgreeWithTC.value,
-          email: email,
-        );
-        status = response.data["status"];
+        final response = await authService.emailValidationCheck(email: email);
+        final data = response.data;
+        if (data is! Map) {
+          canLogin = false;
+          return;
+        }
+        final exists = data['exists'] == true;
+        final hasPassword = data['has_password'] == true;
+        canLogin = exists && hasPassword;
       },
     );
-    if (status == null) return null;
-    return status != "error";
+    return canLogin;
   }
 
   Future<void> getRegisterComponents() async {
@@ -246,12 +252,56 @@ class AuthController extends GetxController {
           email: email,
           password: password,
         );
-        await localDb.write(LocalKeyHelper.token, response.data["token"]);
-        await localDb.write(LocalKeyHelper.userInfo, response.data["user"]);
+        final data = response.data;
+        if (data is! Map) {
+          throw Exception('Unexpected login response');
+        }
+
+        final token = data['token'];
+        final user = data['user'];
+        if (token is! String || token.isEmpty) {
+          throw Exception('Login did not return a token');
+        }
+
+        await localDb.write(LocalKeyHelper.token, token);
+        if (user is Map) {
+          await localDb.write(
+            LocalKeyHelper.userInfo,
+            Map<String, dynamic>.from(user),
+          );
+        }
+
+        await _resolveEventContext();
+        await PushNotificationService.instance.registerCurrentToken();
         ToastMsg.showSuccessMessage("Logged in successfully!");
         onSuccess.call();
       },
     );
+  }
+
+  /// After login, pick the first available event (or keep AppConfig default).
+  Future<void> _resolveEventContext() async {
+    try {
+      final response = await authService.myEvents();
+      final payload = response.data;
+      final list = payload is Map ? payload['data'] : null;
+      if (list is! List || list.isEmpty) return;
+
+      final first = list.first;
+      if (first is! Map) return;
+
+      final subdomain = first['subdomain']?.toString();
+      final uuid = first['uuid']?.toString() ?? first['id']?.toString();
+
+      if (subdomain != null && subdomain.isNotEmpty) {
+        AppDataProvider.obj.setSubDomain = subdomain;
+      }
+      if (uuid != null && uuid.isNotEmpty) {
+        AppDataProvider.obj.eventUuid = uuid;
+      }
+    } catch (_) {
+      // Keep default subdomain from AppConfig; reception still works via header.
+    }
   }
 
   Future<void> registerUser({

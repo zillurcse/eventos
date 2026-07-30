@@ -16,8 +16,8 @@ class ChatRoomsList extends StatelessWidget {
         return Center(
           child: Text(
             controller.searchQuery.value.isNotEmpty
-                ? "No results for \"${controller.searchQuery.value}\""
-                : "No conversations yet",
+                ? 'No results for "${controller.searchQuery.value}"'
+                : 'No conversations yet',
             style: context.bodyRegular?.copyWith(color: context.ghost),
           ),
         );
@@ -33,16 +33,14 @@ class ChatRoomsList extends StatelessWidget {
               room: room,
               isUnread: controller.isRoomTrulyUnread(room.id),
               onTap: () {
-                if (room.partner != null) {
-                  Get.to(
-                    () => ChatDetailView(
-                      roomId: room.id,
-                      partnerId: room.partner!.id,
-                      partnerName: room.partner!.name,
-                      partnerImageUrl: room.partner!.profilePhotoUrl,
-                    ),
-                  );
-                }
+                Get.to(
+                  () => ChatDetailView(
+                    conversationId: room.id,
+                    partnerId: room.partner?.id ?? '',
+                    partnerName: room.partner?.name ?? 'Chat',
+                    partnerImageUrl: room.partner?.avatarUrl,
+                  ),
+                );
               },
             );
           },

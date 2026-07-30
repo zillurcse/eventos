@@ -12,6 +12,7 @@ import 'package:expouse/widgets/connectivity_wrapper.dart';
 import 'package:expouse/features/root/root_controller.dart';
 import 'package:expouse/utils/config/dio_config.dart';
 import 'package:expouse/widgets/loading_skeletons/theme_loading_skeleton.dart';
+import 'package:expouse/features/notifications/push_notification_service.dart';
 
 import 'features/splash/splash_view.dart';
 
@@ -19,6 +20,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
   DioConfig.obj.init();
+  await PushNotificationService.instance.init();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

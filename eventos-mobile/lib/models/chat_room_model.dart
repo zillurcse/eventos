@@ -1,63 +1,59 @@
-import 'dart:convert';
-import '../utils/helpers/type_helper.dart';
+import 'chat_person.dart';
 import 'message_model.dart';
-import 'user.dart';
 
 class ChatRoomModel {
-  final int id;
+  final String id;
+  final ChatPerson? partner;
+  final int unread;
   final MessageModel? latestMessage;
-  final User? partner;
-  final bool hasNewMessages;
 
   ChatRoomModel({
-    this.id = 0,
-    this.latestMessage,
+    this.id = '',
     this.partner,
-    this.hasNewMessages = false,
+    this.unread = 0,
+    this.latestMessage,
   });
 
-  /// The API places `has_new_messages` inside the nested `user` object as a
-  /// JSON-encoded array of room IDs, e.g. "[421]".  A room is unread when its
-  /// own `id` appears in that array.
-  factory ChatRoomModel.fromJson(Map<String, dynamic> json) {
-    final int roomId = TypeHelper.toInt(json['id']);
-    final partnerData = json['user'] ?? json['target_user'];
+  bool get hasNewMessages => unread > 0;
 
-    // Parse the has_new_messages string from the partner user object
-    bool hasUnread = false;
-    if (partnerData is Map) {
-      final raw = partnerData['has_new_messages'];
-      if (raw != null) {
-        try {
-          // It comes as a JSON string like "[421]"
-          final decoded = raw is String ? jsonDecode(raw) : raw;
-          if (decoded is List) {
-            hasUnread = decoded.any((id) => TypeHelper.toInt(id) == roomId);
-          }
-        } catch (_) {
-          // Fallback: treat any non-null non-empty value as "has unread"
-          hasUnread = raw.toString().isNotEmpty && raw.toString() != 'null' && raw.toString() != '[]';
-        }
-      }
+  factory ChatRoomModel.fromJson(Map<String, dynamic> json) {
+    MessageModel? latest;
+    final last = json['last_message'];
+    if (last is Map) {
+      latest = MessageModel(
+        id: '',
+        body: last['body']?.toString(),
+        mine: last['mine'] == true,
+        createdAt: last['created_at']?.toString() ?? '',
+        updatedAt: last['created_at'] != null
+            ? DateTime.tryParse(last['created_at'].toString())
+            : null,
+      );
     }
 
     return ChatRoomModel(
-      id: roomId,
-      latestMessage: json['latest_message'] != null
-          ? MessageModel.fromJson(json['latest_message'])
+      id: json['id']?.toString() ?? '',
+      partner: json['with'] is Map
+          ? ChatPerson.fromJson(Map<String, dynamic>.from(json['with'] as Map))
           : null,
-      partner: partnerData != null ? User.fromJson(partnerData) : null,
-      hasNewMessages: hasUnread,
+      unread: json['unread'] is int
+          ? json['unread'] as int
+          : int.tryParse('${json['unread']}') ?? 0,
+      latestMessage: latest,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'latest_message': latestMessage?.toJson(),
-      'user': partner?.toJson(),
-      'has_new_messages': hasNewMessages,
-    };
+  ChatRoomModel copyWith({
+    String? id,
+    ChatPerson? partner,
+    int? unread,
+    MessageModel? latestMessage,
+  }) {
+    return ChatRoomModel(
+      id: id ?? this.id,
+      partner: partner ?? this.partner,
+      unread: unread ?? this.unread,
+      latestMessage: latestMessage ?? this.latestMessage,
+    );
   }
 }
-

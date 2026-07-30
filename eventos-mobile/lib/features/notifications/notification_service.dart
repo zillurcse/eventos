@@ -4,23 +4,16 @@ import '../../utils/config/dio_config.dart';
 class NotificationService {
   final Dio _dio = DioConfig.obj.dio!;
 
-  /// Get all notifications with pagination.
-  Future<Response> getNotifications(int page) async {
-    return await _dio.post('mobile/notifications/get?page=$page');
+  /// V1 in-app inbox (latest 50 + unread count).
+  Future<Response> getNotifications() {
+    return _dio.get('notifications');
   }
 
-  /// Get the total count of unread notifications.
-  Future<Response> getUnreadCount() async {
-    return await _dio.post('mobile/notifications/unread-count');
+  Future<Response> markAsRead(String uuid) {
+    return _dio.patch('notifications/$uuid/read');
   }
 
-  /// Mark a single notification as read.
-  Future<Response> markAsRead(int id) async {
-    return await _dio.post('mobile/notifications/read/$id');
-  }
-
-  /// Mark all notifications as read.
-  Future<Response> markAllAsRead() async {
-    return await _dio.post('mobile/notifications/read-all');
+  Future<Response> markAllAsRead() {
+    return _dio.post('notifications/read-all');
   }
 }

@@ -2,101 +2,72 @@ import 'package:get/get.dart';
 import '../../models/notification_model.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../chat/chat_controller.dart';
+import '../chat/pages/chat_detail_view.dart';
 import 'notification_service.dart';
 
 class NotificationController extends GetxController {
   final _service = NotificationService();
 
   final dataStatus = ApiState.initial.obs;
-  final RxList<NotificationItemModel> notifications = <NotificationItemModel>[].obs;
+  final RxList<NotificationItemModel> notifications =
+      <NotificationItemModel>[].obs;
   final unreadCount = 0.obs;
-
-  int _currentPage = 1;
-  int _lastPage = 1;
-  bool _isLoadingMore = false;
 
   @override
   void onInit() {
     super.onInit();
     fetchNotifications();
-    fetchUnreadCount();
   }
 
-  Future<void> fetchNotifications({bool loadMore = false}) async {
-    if (loadMore) {
-      if (_currentPage >= _lastPage || _isLoadingMore) return;
-      _isLoadingMore = true;
-      _currentPage++;
-    } else {
-      _currentPage = 1;
-      _isLoadingMore = false;
-      notifications.clear();
-    }
-
+  Future<void> fetchNotifications({bool refresh = false}) async {
     await handleApiClient(
-      onStateChanged: (state) {
-        if (!loadMore) dataStatus(state);
-      },
+      onStateChanged: (state) => dataStatus(state),
       handleApiCall: () async {
-        final response = await _service.getNotifications(_currentPage);
+        final response = await _service.getNotifications();
         if (response.data is Map) {
-          final data = Map<String, dynamic>.from(response.data as Map);
-          final parsed = NotificationResponseModel.fromJson(data);
-          
-          _lastPage = parsed.lastPage;
+          final parsed = NotificationResponseModel.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
           unreadCount.value = parsed.unreadCount;
-          
-          if (loadMore) {
-            notifications.addAll(parsed.data);
-          } else {
-            notifications.assignAll(parsed.data);
-          }
+          notifications.assignAll(parsed.data);
         }
       },
     );
-    _isLoadingMore = false;
   }
 
   Future<void> fetchUnreadCount() async {
     try {
-      final response = await _service.getUnreadCount();
-      if (response.data != null) {
-        if (response.data is int) {
-          unreadCount.value = response.data;
-        } else if (response.data is String) {
-          unreadCount.value = int.tryParse(response.data.toString()) ?? 0;
-        }
+      final response = await _service.getNotifications();
+      if (response.data is Map) {
+        final unread = (response.data as Map)['unread'];
+        unreadCount.value =
+            unread is int ? unread : int.tryParse('$unread') ?? 0;
       }
-    } catch (e) {
-      // Ignore background errors for unread count
-    }
+    } catch (_) {}
   }
 
-  Future<void> markAsRead(int id) async {
+  Future<void> markAsRead(String id) async {
     try {
       final response = await _service.markAsRead(id);
       if (response.statusCode == 200) {
-        // Update local state
-        final index = notifications.indexWhere((element) => element.id == id);
+        final index = notifications.indexWhere((e) => e.id == id);
         if (index != -1) {
           final old = notifications[index];
-          // create a new instance with readAt filled
           notifications[index] = NotificationItemModel(
             id: old.id,
             title: old.title,
-            context: old.context,
-            type: old.type,
-            url: old.url,
+            body: old.body,
+            status: 'read',
             readAt: DateTime.now().toIso8601String(),
             createdAt: old.createdAt,
-            user: old.user,
+            templateKey: old.templateKey,
+            data: old.data,
           );
         }
         if (unreadCount.value > 0) unreadCount.value--;
       }
-    } catch (e) {
-      // handle error if needed
-    }
+    } catch (_) {}
   }
 
   Future<void> markAllAsRead() async {
@@ -104,10 +75,37 @@ class NotificationController extends GetxController {
       final response = await _service.markAllAsRead();
       if (response.statusCode == 200) {
         unreadCount.value = 0;
-        fetchNotifications(); // Refresh list to reflect read status
+        await fetchNotifications();
       }
-    } catch (e) {
-      // handle error
+    } catch (_) {}
+  }
+
+  Future<void> openNotification(NotificationItemModel item) async {
+    if (!item.isRead) {
+      await markAsRead(item.id);
+    }
+
+    final conversationId = item.conversationId;
+    if (conversationId != null &&
+        conversationId.isNotEmpty &&
+        (item.type == 'chat' ||
+            item.templateKey == 'chat.message' ||
+            item.data['type']?.toString() == 'chat')) {
+      if (!Get.isRegistered<ChatController>()) {
+        Get.put(ChatController());
+      }
+      final chat = Get.find<ChatController>();
+      await chat.fetchRooms();
+      final room =
+          chat.chatRooms.firstWhereOrNull((r) => r.id == conversationId);
+      Get.to(
+        () => ChatDetailView(
+          conversationId: conversationId,
+          partnerId: room?.partner?.id ?? '',
+          partnerName: room?.partner?.name ?? item.title,
+          partnerImageUrl: room?.partner?.avatarUrl,
+        ),
+      );
     }
   }
 }

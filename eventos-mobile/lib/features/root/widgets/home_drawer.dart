@@ -9,6 +9,7 @@ import '../../../utils/helpers/local_key.dart';
 import '../../../widgets/custom_image.dart';
 import '../../../features/auth/auth_view.dart';
 import '../../../utils/bindings/auth_binding.dart';
+import '../../../features/notifications/push_notification_service.dart';
 import '../../exhibitors/exhibitor_controller.dart';
 import '../../exhibitors/exhibitors_view.dart';
 import '../../delegate/delegate_view.dart';
@@ -199,6 +200,7 @@ class HomeDrawer extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
               child: InkWell(
                 onTap: () async {
+                  await PushNotificationService.instance.unregisterOnLogout();
                   final localDb = GetStorage();
                   await localDb.erase();
                   Get.offAll(

@@ -39,14 +39,9 @@ dependencies:
   flutter_screenutil: ^5.9.3
   fluttertoast: ^9.0.0
   dio: ^5.9.0
-  pusher_channels_flutter: ^2.6.0
+  pusher_reverb_flutter: ^0.0.8
   cached_network_image: ^3.4.1
   flutter_svg: ^2.2.4
-  # permission_handler:
-  # path_provider:
-  # url_launcher:
-  # flutter_svg:
-  # pull_to_refresh:
   get_storage: ^2.1.1
   get: ^4.7.3
   file_picker: ^11.0.2
@@ -56,6 +51,11 @@ dependencies:
   video_player: ^2.9.2
   youtube_player_flutter: ^9.1.1
   photo_view: ^0.15.0
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^19.4.0
+  permission_handler: ^12.0.1
+  livekit_client: ^2.5.3
 
 
 dev_dependencies:
@@ -68,6 +68,11 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+# livekit_client → dart_jsonwebtoken (pointycastle 4); pusher_reverb_flutter
+# → encrypt (pointycastle 3). Override so both packages can resolve together.
+dependency_overrides:
+  pointycastle: ^4.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -84,7 +89,9 @@ flutter:
   assets:
     - assets/svg/img/
     - assets/svg/icons/
+    - assets/svg/lounge/
     - assets/png/
+    - assets/png/lounge/
     - assets/gif/
 
   # An image asset can refer to one or more resolution-specific "variants", see

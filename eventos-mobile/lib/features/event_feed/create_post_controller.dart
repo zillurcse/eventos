@@ -25,7 +25,7 @@ class CreatePostController extends GetxController {
   /// Resolved attach type: 'image', 'video', or 'pdf'.
   final Rx<String?> attachType = Rx<String?>(null);
 
-  /// The actual [File] ready to be sent as multipart form data.
+  /// The actual [File] ready to be uploaded.
   final Rx<File?> attachFile = Rx<File?>(null);
 
   /// Clears any previously picked attachment.
@@ -105,6 +105,8 @@ class CreatePostController extends GetxController {
     switch (extension) {
       case 'png':
       case 'webp':
+      case 'jpg':
+      case 'jpeg':
         resolvedAttachType = 'image';
       case 'pdf':
         resolvedAttachType = 'pdf';
@@ -121,6 +123,19 @@ class CreatePostController extends GetxController {
     attachFile.value = File(filePath);
   }
 
+  String _mapUiTypeToApi(String type) {
+    return switch (type) {
+      'post' => 'text',
+      'looking-for' => 'looking_for',
+      'offering' => 'offering',
+      'poll' => 'poll',
+      'video' => 'video',
+      'pdf' => 'pdf',
+      'image' => 'image',
+      _ => 'text',
+    };
+  }
+
   // ── Submit: regular text post ──────────────────────────────────────────────
   /// Returns true on success so the caller can pop the screen.
   Future<bool> submitPost({
@@ -134,7 +149,11 @@ class CreatePostController extends GetxController {
     if (isSubmitting.value) return false;
     isSubmitting.value = true;
     try {
-      await _service.storePost(body: body, type: type);
+      await _service.createPost({
+        'type': _mapUiTypeToApi(type),
+        'body': body.trim(),
+        'visibility': 'attendees',
+      });
       ToastMsg.showSuccessMessage('Post created!');
       await _refreshFeed();
       return true;
@@ -150,9 +169,9 @@ class CreatePostController extends GetxController {
   Future<bool> submitPoll({
     required String question,
     required List<String> options,
-    required int lengthDays,
-    required int lengthHours,
-    required int lengthMinutes,
+    int lengthDays = 0,
+    int lengthHours = 0,
+    int lengthMinutes = 0,
   }) async {
     if (question.trim().isEmpty) {
       ToastMsg.showErrorMessage('Please write a poll question.');
@@ -166,13 +185,15 @@ class CreatePostController extends GetxController {
     if (isSubmitting.value) return false;
     isSubmitting.value = true;
     try {
-      await _service.storePoll(
-        question: question,
-        options: validOptions,
-        lengthDays: lengthDays,
-        lengthHours: lengthHours,
-        lengthMinutes: lengthMinutes,
-      );
+      await _service.createPost({
+        'type': 'poll',
+        'body': question.trim(),
+        'visibility': 'attendees',
+        'poll': {
+          'options': validOptions,
+          'allow_multiple': false,
+        },
+      });
       ToastMsg.showSuccessMessage('Poll created!');
       await _refreshFeed();
       return true;
@@ -184,12 +205,7 @@ class CreatePostController extends GetxController {
     }
   }
 
-  // ── Submit: post with file attachment (multipart) ──────────────────────────
-  /// Post-type mapping:
-  ///  • attachType == 'image'  → post_type = 'post'
-  ///  • attachType == 'video'  → post_type = 'video'
-  ///  • attachType == 'pdf'    → post_type = 'pdf'
-  ///
+  // ── Submit: post with file attachment (upload → create) ────────────────────
   /// Returns true on success so the caller can pop the screen.
   Future<bool> submitPostWithAttach({required String body}) async {
     final type = attachType.value;
@@ -201,21 +217,36 @@ class CreatePostController extends GetxController {
     }
     if (isSubmitting.value) return false;
 
-    // Resolve post_type: image→'post', video→'video', pdf→'pdf'
-    final postType = switch (type) {
+    final apiType = switch (type) {
       'pdf' => 'pdf',
       'video' => 'video',
-      _ => 'post',
+      _ => 'image',
     };
 
     isSubmitting.value = true;
     try {
-      await _service.storePostWithAttach(
-        body: body,
-        postType: postType,
-        attachType: type,
-        file: file,
-      );
+      final uploadRes = await _service.uploadMedia(file);
+      final uploadBody = uploadRes.data;
+      final uploadData = uploadBody is Map && uploadBody['data'] is Map
+          ? Map<String, dynamic>.from(uploadBody['data'] as Map)
+          : <String, dynamic>{};
+      final url = (uploadData['url'] ?? '').toString();
+      if (url.isEmpty) {
+        throw Exception('Upload failed — no URL returned.');
+      }
+
+      await _service.createPost({
+        'type': apiType,
+        'body': body.trim(),
+        'visibility': 'attendees',
+        'attachments': [
+          {
+            'kind': type,
+            'url': url,
+            'name': uploadData['filename'],
+          },
+        ],
+      });
       ToastMsg.showSuccessMessage('Post created!');
       clearAttach();
       await _refreshFeed();

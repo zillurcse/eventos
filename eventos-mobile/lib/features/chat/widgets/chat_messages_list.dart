@@ -13,7 +13,7 @@ class ChatMessagesList extends StatelessWidget {
     final controller = Get.find<ChatController>();
     return Obx(() {
       if (controller.messages.isEmpty) {
-        return const Center(child: Text("No messages yet. Say hello!"));
+        return const Center(child: Text('No messages yet. Say hello!'));
       }
 
       return ListView.builder(
@@ -21,10 +21,9 @@ class ChatMessagesList extends StatelessWidget {
         itemCount: controller.messages.length,
         itemBuilder: (context, index) {
           final message = controller.messages[index];
-          final isMe = message.userId == (controller.currentUser?.id ?? 0);
           return MessageBubble(
             message: message,
-            isMe: isMe,
+            isMe: message.mine,
           );
         },
       );

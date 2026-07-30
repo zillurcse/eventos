@@ -5,6 +5,7 @@ import '../../models/session_model.dart';
 import '../../models/session_track_model.dart';
 import '../../models/reception_speaker_model.dart';
 import '../../models/session_detail_response_model.dart';
+import '../../models/mappers/session_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../bookmarks/bookmark_controller.dart';
@@ -13,34 +14,36 @@ import 'session_service.dart';
 class SessionController extends GetxController {
   final _service = SessionService();
 
-  // ── States ───────────────────────────────────────────────────────────────
   final dataStatus = ApiState.initial.obs;
   final RxList<SessionDayModel> days = <SessionDayModel>[].obs;
   final activeDayIndex = 0.obs;
 
-  // Detail States
   final detailStatus = ApiState.initial.obs;
   final Rxn<SessionDetailModel> sessionDetail = Rxn<SessionDetailModel>();
   final searchQuery = "".obs;
   late final TextEditingController searchController;
 
-  // Active filter states
   final selectedTrackId = RxnInt();
   final selectedTag = RxnString();
   final selectedTimezone = RxnString();
   final selectedSpeakerId = RxnInt();
 
-  // Timezone data returned by the API
   final RxMap<String, String> timezoneData = <String, String>{
-    "event_timezone": "Asia/Muscat",
-    "current_timezone": "Asia/Dhaka",
-    "user_timezone": "Asia/Dhaka",
+    "event_timezone": "",
+    "current_timezone": "",
+    "user_timezone": "",
   }.obs;
 
-  // Master lists for dropdown options (to prevent shrinking when filtered)
   final RxList<SessionTrackModel> masterTracks = <SessionTrackModel>[].obs;
   final RxList<String> masterTags = <String>[].obs;
-  final RxList<ReceptionSpeakerModel> masterSpeakers = <ReceptionSpeakerModel>[].obs;
+  final RxList<ReceptionSpeakerModel> masterSpeakers =
+      <ReceptionSpeakerModel>[].obs;
+
+  /// Full unfiltered agenda from last successful fetch (for client filters + detail).
+  List<Map<String, dynamic>> _allRawSessions = [];
+  final Map<int, Map<String, dynamic>> _rawById = {};
+  /// Session UUIDs bookmarked by the current participant.
+  final Set<String> _bookmarkedUuids = {};
 
   @override
   void onInit() {
@@ -49,11 +52,10 @@ class SessionController extends GetxController {
     searchController.addListener(() {
       searchQuery(searchController.text);
     });
-    
-    // Server-side search debounce
+
     debounce(
       searchQuery,
-      (_) => fetchSessions(),
+      (_) => _applyFilters(),
       time: const Duration(milliseconds: 500),
     );
   }
@@ -64,16 +66,17 @@ class SessionController extends GetxController {
     super.onClose();
   }
 
-  // Convenience active day getter
   SessionDayModel? get activeDay {
     if (days.isEmpty || activeDayIndex.value >= days.length) return null;
     return days[activeDayIndex.value];
   }
 
-  // ── Getters for dropdown options ──
-  List<SessionTrackModel> get tracksList => masterTracks.isNotEmpty ? masterTracks : _extractTracks(days);
-  List<String> get tagsList => masterTags.isNotEmpty ? masterTags : _extractTags(days);
-  List<ReceptionSpeakerModel> get speakersList => masterSpeakers.isNotEmpty ? masterSpeakers : _extractSpeakers(days);
+  List<SessionTrackModel> get tracksList =>
+      masterTracks.isNotEmpty ? masterTracks : _extractTracks(days);
+  List<String> get tagsList =>
+      masterTags.isNotEmpty ? masterTags : _extractTags(days);
+  List<ReceptionSpeakerModel> get speakersList =>
+      masterSpeakers.isNotEmpty ? masterSpeakers : _extractSpeakers(days);
 
   final List<String> timezonesList = const [
     "GST",
@@ -84,7 +87,6 @@ class SessionController extends GetxController {
     "IST",
   ];
 
-  // Helper extraction methods
   List<SessionTrackModel> _extractTracks(List<SessionDayModel> dayList) {
     final seenIds = <int>{};
     final list = <SessionTrackModel>[];
@@ -104,9 +106,7 @@ class SessionController extends GetxController {
     for (final day in dayList) {
       for (final session in day.schedules) {
         for (final tag in session.tags) {
-          if (tag.isNotEmpty) {
-            set.add(tag);
-          }
+          if (tag.isNotEmpty) set.add(tag);
         }
       }
     }
@@ -129,78 +129,127 @@ class SessionController extends GetxController {
     return list;
   }
 
-  // Get filtered schedules for the active day
   List<SessionModel> get activeDaySchedules {
     final day = activeDay;
     if (day == null) return [];
-    
     return day.schedules;
   }
 
-  // ── API Call ──────────────────────────────────────────────────────────────
   Future<void> fetchSessions() async {
     await handleApiClient(
       onStateChanged: (state) => dataStatus(state),
       handleApiCall: () async {
-        String? resolvedTimezone = selectedTimezone.value;
-        if (resolvedTimezone != null) {
-          resolvedTimezone = resolvedTimezone;
-        }
+        final response = await _service.getSessions();
+        final body = response.data;
+        if (body is! Map) return;
 
-        final response = await _service.getSessions(
-          trackId: selectedTrackId.value,
-          tag: selectedTag.value,
-          timezone: resolvedTimezone,
-          speakerId: selectedSpeakerId.value,
-          s: searchQuery.value,
-        );
-        if (response.data is Map) {
-          final data = Map<String, dynamic>.from(response.data as Map);
+        final payload = body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'] as Map)
+            : Map<String, dynamic>.from(body);
 
-          if (data['timezone_data'] is Map) {
-            final tzMap = Map<String, dynamic>.from(data['timezone_data'] as Map);
-            timezoneData.assignAll(
-              tzMap.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-            );
-          }
+        _allRawSessions = () {
+          final sessionsRaw = payload['sessions'];
+          final list = sessionsRaw is Map && sessionsRaw['data'] is List
+              ? sessionsRaw['data'] as List
+              : (sessionsRaw as List? ?? []);
+          return list
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }();
 
-          if (data['days'] is List) {
-            final parsedDays = (data['days'] as List)
-                .map((e) => SessionDayModel.fromJson(Map<String, dynamic>.from(e)))
-                .toList();
-            days.assignAll(parsedDays);
+        await _loadBookmarks();
+        _stampFavoritesOnRaw();
 
-            // Populate or refresh master lists when request is unfiltered or master list is empty
-            final isUnfiltered = selectedTrackId.value == null &&
-                selectedTag.value == null &&
-                selectedTimezone.value == null &&
-                selectedSpeakerId.value == null;
+        final mapped = SessionMapper.fromV1(payload);
+        timezoneData.assignAll(mapped.timezoneData);
+        masterTracks.assignAll(mapped.tracks);
+        masterTags.assignAll(mapped.tags);
+        masterSpeakers.assignAll(mapped.speakers);
+        _rawById
+          ..clear()
+          ..addAll(mapped.rawById);
 
-            if (isUnfiltered || masterTracks.isEmpty) {
-              masterTracks.assignAll(_extractTracks(parsedDays));
-            }
-            if (isUnfiltered || masterTags.isEmpty) {
-              masterTags.assignAll(_extractTags(parsedDays));
-            }
-            if (isUnfiltered || masterSpeakers.isEmpty) {
-              masterSpeakers.assignAll(_extractSpeakers(parsedDays));
-            }
-          }
-
-          // Optionally match day_active if present
-          if (data['day_active'] is Map) {
-            final activeDayMap = Map<String, dynamic>.from(data['day_active']);
-            final activeDayId = activeDayMap['id'];
-            if (activeDayId != null) {
-              final activeIdx = days.indexWhere((d) => d.id == activeDayId);
-              if (activeIdx != -1) {
-                activeDayIndex(activeIdx);
-              }
-            }
-          }
-        }
+        _applyFilters(rebuildFromCache: true);
       },
     );
+  }
+
+  Future<void> _loadBookmarks() async {
+    try {
+      final response = await _service.getBookmarks();
+      final body = response.data;
+      if (body is! Map) return;
+      final data = body['data'] is Map
+          ? Map<String, dynamic>.from(body['data'] as Map)
+          : <String, dynamic>{};
+      final sessions = data['session'];
+      _bookmarkedUuids
+        ..clear()
+        ..addAll(
+          (sessions is List ? sessions : const [])
+              .map((e) => e.toString())
+              .where((e) => e.isNotEmpty),
+        );
+    } catch (_) {
+      // Bookmarks require auth — agenda still works without them.
+    }
+  }
+
+  void _stampFavoritesOnRaw() {
+    for (final raw in _allRawSessions) {
+      final uuid = (raw['id'] ?? '').toString();
+      raw['is_favorite'] = _bookmarkedUuids.contains(uuid);
+    }
+  }
+
+  void _applyFilters({bool rebuildFromCache = false}) {
+    if (_allRawSessions.isEmpty && !rebuildFromCache) return;
+
+    _stampFavoritesOnRaw();
+
+    final filtered = SessionMapper.filterRaw(
+      sessions: _allRawSessions,
+      trackId: selectedTrackId.value,
+      tag: selectedTag.value,
+      speakerId: selectedSpeakerId.value,
+      search: searchQuery.value,
+    );
+
+    final payload = {
+      'event': {
+        'timezone': timezoneData['event_timezone'] ?? '',
+      },
+      'tracks': masterTracks
+          .map((t) => {'id': t.id, 'name': t.title})
+          .toList(),
+      'tags': masterTags.toList(),
+      'speakers': masterSpeakers
+          .map((s) => {
+                'id': s.id,
+                'name': s.name,
+                'image_url': s.imageUrl,
+                'designation': s.designation,
+                'company': s.company,
+              })
+          .toList(),
+      'sessions': filtered,
+    };
+
+    final mapped = SessionMapper.fromV1(payload);
+    _rawById
+      ..clear()
+      ..addAll(mapped.rawById);
+    // Keep unfiltered raw ids for detail lookup.
+    for (final raw in _allRawSessions) {
+      final id = SessionMapper.sessionFromV1(raw).id;
+      _rawById.putIfAbsent(id, () => raw);
+    }
+
+    days.assignAll(mapped.days);
+    if (activeDayIndex.value >= days.length) {
+      activeDayIndex(0);
+    }
   }
 
   void setActiveDayIndex(int index) {
@@ -211,22 +260,22 @@ class SessionController extends GetxController {
 
   void selectTrack(int? trackId) {
     selectedTrackId(trackId);
-    fetchSessions();
+    _applyFilters();
   }
 
   void selectTag(String? tag) {
     selectedTag(tag);
-    fetchSessions();
+    _applyFilters();
   }
 
   void selectTimezone(String? tz) {
     selectedTimezone(tz);
-    fetchSessions();
+    // Timezone display-only for now; times already localised in mapper.
   }
 
   void selectSpeaker(int? speakerId) {
     selectedSpeakerId(speakerId);
-    fetchSessions();
+    _applyFilters();
   }
 
   void clearSearch() {
@@ -234,70 +283,102 @@ class SessionController extends GetxController {
     searchQuery("");
   }
 
-  // ── API: fetch session details ────────────────────────────────────────────
   Future<void> fetchSessionDetails(int scheduleId) async {
     sessionDetail.value = null;
     await handleApiClient(
       onStateChanged: (state) => detailStatus(state),
       handleApiCall: () async {
-        final response = await _service.getSessionDetails(scheduleId);
-        if (response.data is Map) {
-          final data = Map<String, dynamic>.from(response.data as Map);
-          final scheduleMap = data['schedule'];
-          if (scheduleMap is Map) {
-            sessionDetail.value = SessionDetailModel.fromJson(
-              Map<String, dynamic>.from(scheduleMap),
-            );
+        var raw = _rawById[scheduleId];
+        if (raw == null) {
+          for (final s in _allRawSessions) {
+            if (SessionMapper.sessionFromV1(s).id == scheduleId) {
+              raw = s;
+              break;
+            }
           }
         }
+        if (raw == null && _allRawSessions.isEmpty) {
+          final response = await _service.getSessions();
+          final body = response.data;
+          if (body is Map) {
+            final payload = body['data'] is Map
+                ? Map<String, dynamic>.from(body['data'] as Map)
+                : Map<String, dynamic>.from(body);
+            final sessionsRaw = payload['sessions'];
+            final list = sessionsRaw is Map && sessionsRaw['data'] is List
+                ? sessionsRaw['data'] as List
+                : (sessionsRaw as List? ?? []);
+            _allRawSessions = list
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+            for (final s in _allRawSessions) {
+              final model = SessionMapper.sessionFromV1(s);
+              _rawById[model.id] = s;
+              if (model.id == scheduleId) raw = s;
+            }
+          }
+        }
+        if (raw == null) {
+          throw Exception('Session not found');
+        }
+        sessionDetail.value = SessionMapper.detailFromV1(raw);
       },
     );
   }
 
-  // ── API: add/update session note ──────────────────────────────────────────
+  String? _uuidFor(int scheduleId) {
+    final raw = _rawById[scheduleId];
+    if (raw != null) {
+      final uuid = (raw['id'] ?? '').toString();
+      if (uuid.isNotEmpty) return uuid;
+    }
+    for (final s in _allRawSessions) {
+      if (SessionMapper.sessionFromV1(s).id == scheduleId) {
+        final uuid = (s['id'] ?? '').toString();
+        if (uuid.isNotEmpty) return uuid;
+      }
+    }
+    return null;
+  }
+
   Future<bool> addOrUpdateSessionNote(int scheduleId, String noteText) async {
-    bool success = false;
-    await handleApiClient(
-      onStateChanged: (state) {
-        // No explicit detailStatus state change needed as we refresh details below
-      },
-      handleApiCall: () async {
-        final response = await _service.addOrUpdateSessionNote(scheduleId, noteText);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          if (raw['status'] == 'success') {
-            success = true;
-            await fetchSessionDetails(scheduleId);
-            await fetchSessions();
-          }
-        }
-      },
-    );
-    return success;
+    final uuid = _uuidFor(scheduleId);
+    if (uuid == null || noteText.trim().isEmpty) return false;
+    try {
+      await _service.addOrUpdateSessionNote(uuid, noteText.trim());
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  // ── API: toggle session bookmark ──────────────────────────────────────────
   Future<bool> toggleBookmark(int scheduleId) async {
-    bool success = false;
-    await handleApiClient(
-      onStateChanged: (state) {},
-      handleApiCall: () async {
-        final response = await _service.toggleSessionBookmark(scheduleId);
-        if (response.data is Map) {
-          final raw = Map<String, dynamic>.from(response.data as Map);
-          if (raw['status'] == 'success' || raw['status'] == 1 || raw['success'] == true) {
-            success = true;
-            await fetchSessions();
-            if (sessionDetail.value?.id == scheduleId) {
-              await fetchSessionDetails(scheduleId);
-            }
-            if (Get.isRegistered<BookmarkController>()) {
-              Get.find<BookmarkController>().fetchBookmarks();
-            }
-          }
-        }
-      },
-    );
-    return success;
+    final uuid = _uuidFor(scheduleId);
+    if (uuid == null) return false;
+
+    final on = !_bookmarkedUuids.contains(uuid);
+    if (on) {
+      _bookmarkedUuids.add(uuid);
+    } else {
+      _bookmarkedUuids.remove(uuid);
+    }
+    _applyFilters();
+
+    try {
+      await _service.toggleSessionBookmark(uuid, on);
+      if (Get.isRegistered<BookmarkController>()) {
+        // Briefcase / bookmarks tab can refresh independently.
+      }
+      return true;
+    } catch (_) {
+      if (on) {
+        _bookmarkedUuids.remove(uuid);
+      } else {
+        _bookmarkedUuids.add(uuid);
+      }
+      _applyFilters();
+      return false;
+    }
   }
 }

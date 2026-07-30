@@ -7,6 +7,10 @@ import '../session/session_view.dart';
 import '../speaker/speaker_view.dart';
 import '../delegate/delegate_view.dart';
 import '../exhibitors/exhibitors_view.dart';
+import '../lounge/lounge_view.dart';
+import '../rooms/rooms_view.dart';
+import '../notifications/notifications_view.dart';
+import '../profile/profile_view.dart';
 import 'root_controller.dart';
 import 'widgets/root_header.dart';
 import 'widgets/nav_item.dart';
@@ -14,7 +18,6 @@ import 'widgets/home_drawer.dart';
 import 'widgets/feature_placeholder_view.dart';
 import '../home/home_view.dart';
 import '../../widgets/dialogs/exit_dialog.dart';
-import '../../models/theme_config_model.dart';
 import '../../utils/enum/enums.dart';
 
 class RootView extends StatelessWidget {
@@ -22,13 +25,28 @@ class RootView extends StatelessWidget {
 
   Widget _getPageForRoute(String route, String customName) {
     switch (route) {
-      case 'event.home': return const HomeView();
-      case 'event.feed': return const EventFeedView();
-      case 'event.sessions': return const SessionView();
-      case 'event.speakers': return const SpeakerView();
-      case 'event.delegates': return const DelegateView();
-      case 'event.exhibitors': return const ExhibitorsView();
-      default: return FeaturePlaceholderView(title: customName);
+      case 'event.home':
+        return const HomeView();
+      case 'event.feed':
+        return const EventFeedView();
+      case 'event.sessions':
+        return const SessionView();
+      case 'event.speakers':
+        return const SpeakerView();
+      case 'event.delegates':
+        return const DelegateView();
+      case 'event.exhibitors':
+        return const ExhibitorsView();
+      case 'event.lounge':
+        return const LoungeView();
+      case 'event.rooms':
+        return const RoomsView();
+      case 'event.notifications':
+        return const NotificationsView();
+      case 'event.profile':
+        return const ProfileView();
+      default:
+        return FeaturePlaceholderView(title: customName);
     }
   }
 

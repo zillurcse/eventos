@@ -20,15 +20,21 @@ class FeedPost extends StatelessWidget {
 
   PostTypes get _resolvedType {
     if (post.type == 'poll') return PostTypes.poll;
-    if (post.type == 'looking-for') return PostTypes.lookingFor;
+    if (post.type == 'looking-for' || post.type == 'looking_for') {
+      return PostTypes.lookingFor;
+    }
     if (post.type == 'offering') return PostTypes.offering;
-    if (post.type == 'pdf') return PostTypes.pdf;
-    if (post.type == 'video') return PostTypes.video;
-    if (post.type == 'post' || post.attach != null) return PostTypes.image;
-    if (post.attach != null) {
-      final ext = post.attach!.split('.').last.toLowerCase();
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) return PostTypes.image;
-      if (ext == 'pdf') return PostTypes.pdf;
+    if (post.type == 'pdf' || post.attachType == 'pdf') return PostTypes.pdf;
+    if (post.type == 'video' || post.attachType == 'video') {
+      return PostTypes.video;
+    }
+    if (post.attachUrl != null ||
+        post.attach != null ||
+        post.attachType == 'image') {
+      return PostTypes.image;
+    }
+    if (post.type == 'post' || post.type == 'text' || post.type == 'image') {
+      return PostTypes.post;
     }
     return PostTypes.post;
   }

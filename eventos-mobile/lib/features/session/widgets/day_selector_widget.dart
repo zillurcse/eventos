@@ -68,28 +68,36 @@ class DaySelectorWidget extends StatelessWidget {
                         onTap: () => controller.setActiveDayIndex(index),
                         child: Container(
                           width: 56.w,
-                          height: 46.h,
+                          height: 52.h,
                           margin: EdgeInsets.only(right: 12.w),
                           decoration: BoxDecoration(
                             color: isSelected ? context.primaryTheme : Colors.transparent,
                             borderRadius: BorderRadius.circular(8.r),
                           ),
+                          padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 2.h),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                dateLabel,
-                                style: context.buttonMediumBold?.copyWith(
-                                  color: isSelected ? context.tertiaryText : context.heading,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  dateLabel,
+                                  maxLines: 1,
+                                  style: context.buttonMediumBold?.copyWith(
+                                    color: isSelected ? context.tertiaryText : context.heading,
+                                  ),
                                 ),
                               ),
                               if (dayName.isNotEmpty) ...[
-                                SizedBox(height: 4.h),
+                                SizedBox(height: 2.h),
                                 Text(
                                   dayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: context.specialCaption2?.copyWith(
                                     color: isSelected ? context.tertiaryText : context.caption,
-                                    fontSize: 12.sp,
+                                    fontSize: 11.sp,
                                   ),
                                 ),
                               ],
@@ -177,7 +185,7 @@ class DaySelectorWidget extends StatelessWidget {
                 },
                 child: Container(
                   width: 54.w,
-                  height: 46.h,
+                  height: 52.h,
                   margin: EdgeInsets.only(right: 16.w),
                   decoration: BoxDecoration(
                     color: context.primaryTheme,

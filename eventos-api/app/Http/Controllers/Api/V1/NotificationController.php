@@ -31,6 +31,8 @@ class NotificationController extends Controller
                 'title' => $n->title,
                 'body' => $n->body,
                 'status' => $n->status,
+                'template_key' => $n->template_key,
+                'data' => $n->data ?? [],
                 'read_at' => $n->read_at?->toIso8601String(),
                 'created_at' => $n->created_at?->toIso8601String(),
             ])->values(),

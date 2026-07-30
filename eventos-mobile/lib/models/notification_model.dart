@@ -1,102 +1,75 @@
 class NotificationResponseModel {
-  final int currentPage;
   final int unreadCount;
-  final int lastPage;
   final List<NotificationItemModel> data;
 
   NotificationResponseModel({
-    this.currentPage = 1,
     this.unreadCount = 0,
-    this.lastPage = 1,
     this.data = const [],
   });
 
   factory NotificationResponseModel.fromJson(Map<String, dynamic> json) {
-    int unreadCount = json['unread_count'] is int ? json['unread_count'] : 0;
-    
-    int currentPage = 1;
-    int lastPage = 1;
-    List<NotificationItemModel> data = [];
+    final unread = json['unread'] is int
+        ? json['unread'] as int
+        : int.tryParse('${json['unread']}') ?? 0;
 
-    if (json['notifications'] is Map) {
-      final notifs = json['notifications'] as Map<String, dynamic>;
-      currentPage = notifs['current_page'] is int ? notifs['current_page'] : 1;
-      lastPage = notifs['last_page'] is int ? notifs['last_page'] : 1;
-      
-      if (notifs['data'] is List) {
-        data = (notifs['data'] as List)
-            .map((e) => NotificationItemModel.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-      }
-    } else {
-      currentPage = json['current_page'] is int ? json['current_page'] : 1;
-    }
+    final raw = json['data'];
+    final items = raw is List
+        ? raw
+            .whereType<Map>()
+            .map((e) =>
+                NotificationItemModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <NotificationItemModel>[];
 
-    return NotificationResponseModel(
-      currentPage: currentPage,
-      unreadCount: unreadCount,
-      lastPage: lastPage,
-      data: data,
-    );
+    return NotificationResponseModel(unreadCount: unread, data: items);
   }
 }
 
 class NotificationItemModel {
-  final int id;
+  final String id;
   final String title;
-  final String context;
-  final String type;
-  final String url;
+  final String body;
+  final String status;
   final String? readAt;
   final DateTime? createdAt;
-  final NotificationUserModel? user;
+  final String? templateKey;
+  final Map<String, dynamic> data;
 
   NotificationItemModel({
     required this.id,
     required this.title,
-    required this.context,
-    required this.type,
-    required this.url,
+    this.body = '',
+    this.status = '',
     this.readAt,
     this.createdAt,
-    this.user,
+    this.templateKey,
+    this.data = const {},
   });
+
+  /// Legacy alias used by the notifications list UI.
+  String get context => body.isNotEmpty ? body : title;
 
   factory NotificationItemModel.fromJson(Map<String, dynamic> json) {
     return NotificationItemModel(
-      id: json['id'] is int ? json['id'] : 0,
+      id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
-      context: json['context']?.toString() ?? '',
-      type: json['type']?.toString() ?? '',
-      url: json['url']?.toString() ?? '',
+      body: json['body']?.toString() ?? json['context']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
       readAt: json['read_at']?.toString(),
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
-      user: json['user'] is Map ? NotificationUserModel.fromJson(Map<String, dynamic>.from(json['user'])) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+      templateKey: json['template_key']?.toString(),
+      data: json['data'] is Map
+          ? Map<String, dynamic>.from(json['data'] as Map)
+          : const {},
     );
   }
 
-  bool get isRead => readAt != null && readAt!.isNotEmpty;
-}
+  bool get isRead =>
+      (readAt != null && readAt!.isNotEmpty) || status == 'read';
 
-class NotificationUserModel {
-  final int id;
-  final String name;
-  final String? designation;
-  final String profilePhotoUrl;
-
-  NotificationUserModel({
-    required this.id,
-    required this.name,
-    this.designation,
-    required this.profilePhotoUrl,
-  });
-
-  factory NotificationUserModel.fromJson(Map<String, dynamic> json) {
-    return NotificationUserModel(
-      id: json['id'] is int ? json['id'] : 0,
-      name: json['name']?.toString() ?? '',
-      designation: json['designation']?.toString(),
-      profilePhotoUrl: json['profile_photo_url']?.toString() ?? '',
-    );
-  }
+  String? get conversationId => data['conversation_id']?.toString();
+  String? get eventUuid => data['event_uuid']?.toString();
+  String get type => data['type']?.toString() ?? templateKey ?? '';
 }

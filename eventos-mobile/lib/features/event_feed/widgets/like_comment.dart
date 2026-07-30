@@ -17,7 +17,11 @@ class LikeComment extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = Get.find<EventFeedController>();
 
-    return Padding(
+    return Obx(() {
+      final post =
+          ctrl.posts.firstWhereOrNull((p) => p.id == this.post.id) ?? this.post;
+
+      return Padding(
       padding: EdgeInsets.only(top: 12.h),
       child: Row(
         children: [
@@ -82,5 +86,6 @@ class LikeComment extends StatelessWidget {
         ],
       ),
     );
+    });
   }
 }
