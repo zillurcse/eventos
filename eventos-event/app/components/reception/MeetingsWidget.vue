@@ -45,7 +45,7 @@ defineEmits<{ join: [] }>()
 </template>
 
 <style scoped>
-.mw { background: #fff; border-radius: 16px; padding: 16px 16px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.mw { background: var(--brand-content-bg, #fff); border-radius: 16px; padding: 16px 16px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
 .mw-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .mw-head h2 { margin: 0; font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #334155; }
 .viewall { display: inline-flex; align-items: center; gap: 2px; font-size: .74rem; font-weight: 600; color: var(--brand-primary); }

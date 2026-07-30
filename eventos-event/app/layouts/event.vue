@@ -33,6 +33,6 @@ const delegates = useDelegatesStore()
 </template>
 
 <style scoped>
-.event-shell { min-height: 100vh; background: #F7F7FB; }
+.event-shell { min-height: 100vh; background: var(--brand-page-bg, #F7F7FB); color: var(--brand-body-text, #212529); }
 .event-main { max-width: 1440px; margin: 0 auto; padding: 30px 18px 56px; }
 </style>

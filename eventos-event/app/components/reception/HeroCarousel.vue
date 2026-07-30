@@ -80,7 +80,7 @@ const next = () => swiperRef.value?.slideNext()
   background: rgba(255,255,255,.9); color: #334155; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 8px rgba(15,23,42,.12);
 }
-.hero-nav:hover { background: #fff; }
+.hero-nav:hover { background: var(--brand-content-bg, #fff); }
 .hero-nav svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .hero-nav.left { left: 8%; }
 .hero-nav.right { right: 8%; }
@@ -236,8 +236,8 @@ const modules = [Navigation, Autoplay]
   pointer-events: none;
 }
 
-/* navigation */
-
+/* Keep below the sticky EventHeader (z-index 40) so arrows never paint
+   over the section tabs while the hero scrolls underneath. */
 .nav {
   position: absolute;
   top: 50%;
@@ -246,47 +246,42 @@ const modules = [Navigation, Autoplay]
   height: 32px;
   border: none;
   border-radius: 8px;
-  background: #F0EEFD;
+  background: var(--brand-content-bg, #F0EEFD);
   cursor: pointer;
-  font-size: 28px;
-  font-weight: 600;
   color: var(--brand-primary);
-  z-index: 50;
+  z-index: 2;
   transition: .25s;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .08);
 }
 
 .nav:hover {
   transform: translateY(-50%) scale(1.05);
 }
 
+/* Sit just inside the active (centered) slide edges — slides-per-view is 1.6,
+   so each peek is (100% - 100%/1.6) / 2 ≈ 18.75% of the track. */
 .prev {
-  left: 17%;
+  left: calc((100% - 100% / 1.6) / 2 + 10px);
 }
 
 .next {
-  right: 17%;
+  right: calc((100% - 100% / 1.6) / 2 + 10px);
 }
 
-@media (max-width:1024px){
-
-  .hero-slider{
-    padding:0 0px;
+@media (max-width: 1024px) {
+  :deep(.swiper-slide img) {
+    height: 220px;
   }
 
-  :deep(.swiper-slide img){
-      height:220px;
+  .prev {
+    left: 12px;
   }
 
-  .prev{
-      left:20px;
+  .next {
+    right: 12px;
   }
-
-  .next{
-      right:20px;
-  }
-
 }
 </style>

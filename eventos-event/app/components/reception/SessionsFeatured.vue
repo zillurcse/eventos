@@ -230,7 +230,7 @@ function calendarLink(s: ReceptionSession): string | null {
 
 .scard {
   position: relative;
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border: 1px solid #E8E8EE;
   border-radius: 12px;
   padding: 16px;

@@ -113,7 +113,7 @@ const ICON: Record<string, string> = {
 
 <style scoped>
 .about-card {
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border-radius: 12px;
   padding: 24px;
   border: 1px solid #E8E8EE

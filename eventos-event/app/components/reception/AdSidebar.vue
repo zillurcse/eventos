@@ -39,7 +39,7 @@ const cards = computed<Card[]>(() =>
   display: block;
   border-radius: 12px;
   overflow: hidden;
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
 }
 
 .ad img {

@@ -136,7 +136,7 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 }
 
 .state {
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border: 1px solid #e5e6ec;
   border-radius: 16px;
   padding: 44px 0;

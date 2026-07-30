@@ -67,7 +67,7 @@ const visible = computed(() => props.limit ? props.speakers.slice(0, props.limit
 }
 
 .spk {
-  background: #fff;
+  background: var(--brand-content-bg, #fff);
   border: 1px solid #eef0f3;
   border-radius: 16px;
   overflow: hidden;
