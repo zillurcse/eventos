@@ -135,4 +135,18 @@ class PublicAndAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('message', 'Logged out.');
     }
+
+    public function test_my_events_requires_authentication(): void
+    {
+        $this->getJson('/api/v1/auth/my-events')->assertUnauthorized();
+    }
+
+    public function test_my_events_returns_a_list_for_the_signed_in_user(): void
+    {
+        $this->actingAsOrganizer();
+
+        $this->getJson('/api/v1/auth/my-events')
+            ->assertOk()
+            ->assertJsonStructure(['data']);
+    }
 }
