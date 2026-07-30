@@ -7,12 +7,15 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Contact;
-use App\Models\Membership;
+use App\Models\Event;
 use App\Models\ExhibitorMember;
+use App\Models\Membership;
+use App\Models\Participation;
 use App\Models\User;
 use App\Services\Tenancy\OrganizationProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -75,6 +78,85 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($this->withIdentity($request->user())),
+        ]);
+    }
+
+    /**
+     * GET /auth/my-events — published events this login can open in the mobile
+     * / event app. Used after email sign-in: one event → go straight home;
+     * several → let them pick (event id + subdomain for X-Event-Subdomain).
+     *
+     * Sources: attendee/speaker participations via their contact(s), plus any
+     * exhibitor/sponsor booth memberships. Identity-plane reads use pgsql_admin
+     * (no tenant chosen yet).
+     */
+    public function myEvents(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $byId = collect();
+
+        $contactIds = Contact::on('pgsql_admin')
+            ->where('user_id', $user->id)
+            ->pluck('id');
+
+        if ($contactIds->isNotEmpty()) {
+            $participations = Participation::on('pgsql_admin')
+                ->with(['event.settings'])
+                ->whereIn('contact_id', $contactIds)
+                ->whereNull('deleted_at')
+                ->get();
+
+            foreach ($participations as $participation) {
+                $this->pushAccessibleEvent($byId, $participation->event, $participation->role);
+            }
+
+            $exhibitorMemberships = ExhibitorMember::on('pgsql_admin')
+                ->with(['exhibitor.event.settings'])
+                ->whereIn('contact_id', $contactIds)
+                ->get();
+
+            foreach ($exhibitorMemberships as $membership) {
+                $role = $membership->exhibitor?->type === 'sponsor' ? 'sponsor' : 'exhibitor';
+                $this->pushAccessibleEvent($byId, $membership->exhibitor?->event, $role);
+            }
+        }
+
+        $events = $byId->values()->sortBy(fn (array $row) => mb_strtolower($row['name']))->values();
+
+        return response()->json(['data' => $events]);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $byId
+     */
+    protected function pushAccessibleEvent(Collection $byId, ?Event $event, ?string $role): void
+    {
+        if (! $event || $event->status !== 'published' || $event->trashed()) {
+            return;
+        }
+
+        $subdomain = data_get($event->settings?->domain, 'subdomain');
+        $subdomain = is_string($subdomain) ? strtolower(trim($subdomain)) : '';
+        if ($subdomain === '') {
+            return;
+        }
+
+        $existing = $byId->get($event->id);
+        $roles = $existing['roles'] ?? [];
+        if (is_string($role) && $role !== '' && ! in_array($role, $roles, true)) {
+            $roles[] = $role;
+        }
+
+        $byId->put($event->id, [
+            'id' => $event->id,
+            'uuid' => $event->uuid,
+            'name' => $event->name,
+            'slug' => $event->slug,
+            'subdomain' => $subdomain,
+            'logo_url' => data_get($event->settings?->branding, 'logo_url'),
+            'starts_at' => $event->starts_at?->toIso8601String(),
+            'ends_at' => $event->ends_at?->toIso8601String(),
+            'roles' => array_values($roles),
         ]);
     }
 
