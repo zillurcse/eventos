@@ -48,4 +48,21 @@ const cards = computed<Card[]>(() =>
   height: auto;
   object-fit: cover;
 }
+
+:global(html[data-theme="minimal"]) .side-ads { gap: 10px; }
+:global(html[data-theme="minimal"]) .ad {
+  border-radius: var(--theme-radius, 8px);
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+:global(html[data-theme="modern"]) .side-ads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+:global(html[data-theme="modern"]) .ad {
+  border-radius: var(--theme-radius, 18px);
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+  overflow: hidden;
+}
 </style>

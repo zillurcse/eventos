@@ -71,4 +71,53 @@ defineEmits<{ join: [] }>()
 .cmeta small { color: #16a34a; font-size: .74rem; font-weight: 600; }
 .join { flex: 0 0 auto; border: none; border-radius: 9px; padding: 8px 14px; background: var(--brand-primary); color: #fff; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
 .join:disabled { opacity: .6; cursor: default; }
+
+:global(html[data-theme="minimal"]) .mw {
+  border-radius: var(--theme-radius, 8px);
+  padding: 14px;
+  box-shadow: none;
+  border: 1px solid var(--line, #e2e8f0);
+}
+:global(html[data-theme="minimal"]) .mw-head { margin-bottom: 10px; }
+:global(html[data-theme="minimal"]) .mw-head h2 {
+  font-size: .78rem;
+  letter-spacing: .3px;
+}
+:global(html[data-theme="minimal"]) .ic {
+  width: 34px;
+  height: 34px;
+}
+:global(html[data-theme="minimal"]) .counter strong {
+  font-size: 1.1rem;
+}
+:global(html[data-theme="minimal"]) .join {
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+:global(html[data-theme="modern"]) .mw {
+  border-radius: var(--theme-radius, 18px);
+  padding: 22px;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+  height: 100%;
+}
+:global(html[data-theme="modern"]) .mw-head { margin-bottom: 18px; }
+:global(html[data-theme="modern"]) .mw-head h2 {
+  font-size: .95rem;
+  letter-spacing: .2px;
+  text-transform: none;
+  font-weight: 700;
+}
+:global(html[data-theme="modern"]) .ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+:global(html[data-theme="modern"]) .counter strong {
+  font-size: 1.45rem;
+}
+:global(html[data-theme="modern"]) .join {
+  border-radius: 12px;
+  padding: 10px 18px;
+}
 </style>

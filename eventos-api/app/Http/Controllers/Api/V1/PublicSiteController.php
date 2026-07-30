@@ -101,6 +101,7 @@ class PublicSiteController extends Controller
                 'logo_url' => $branding['logo_url'] ?? null,
                 'primary' => $theme['primary'] ?? ($branding['colors']['primary_button'] ?? '#6352e7'),
                 'accent' => $theme['accent'] ?? '#22d3ee',
+                'appearance' => $this->publicAppearance($branding),
                 'colors' => $this->publicBrandingColors($branding, $theme),
                 'banners' => $this->publicBanners($branding),
                 'login' => [
@@ -1035,6 +1036,19 @@ class PublicSiteController extends Controller
             ->filter(fn ($f) => count($f['headings']) > 0)
             ->values()
             ->all();
+    }
+
+    /**
+     * Admin › Branding › Appearance. Whitelist only — unknown/missing values
+     * fall back to `advanced` (the current eventos-event reception UI).
+     */
+    protected function publicAppearance(array $branding): string
+    {
+        $value = strtolower((string) ($branding['appearance'] ?? 'advanced'));
+
+        return in_array($value, ['minimal', 'modern', 'advanced'], true)
+            ? $value
+            : 'advanced';
     }
 
     /**

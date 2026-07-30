@@ -546,4 +546,29 @@ const badge = (n: number) => (n > 99 ? '99+' : n)
     display: none;
   }
 }
+
+:global(html[data-theme="minimal"]) .event-header {
+  box-shadow: none;
+}
+:global(html[data-theme="minimal"]) .avatar {
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: .8rem;
+}
+
+:global(html[data-theme="modern"]) .event-header {
+  box-shadow: 0 4px 20px rgba(15, 23, 42, .04);
+  border-bottom-color: transparent;
+}
+:global(html[data-theme="modern"]) .avatar {
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+}
+:global(html[data-theme="modern"]) .menu {
+  border-radius: 16px;
+  border: none;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+}
 </style>

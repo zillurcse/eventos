@@ -33,7 +33,7 @@ const colors       = reactive<BrandingColors>({
   page_bg:        '#F7F7FB',
   content_bg:     '#FFFFFF',
 })
-const appearance   = ref('minimal')
+const appearance   = ref('advanced')
 const logoUrl      = ref<string | null>(null)
 const banners      = ref<BannerItem[]>([])
 const eventBanners = ref<BannerItem[]>([])
@@ -59,7 +59,7 @@ async function load() {
   const b = s.data.branding || {}
   logoUrl.value        = b.logo_url ?? null
   Object.assign(colors, b.colors || {}, { primary_button: s.data.theme?.primary || b.colors?.primary_button || '#6452E7' })
-  appearance.value     = b.appearance || 'minimal'
+  appearance.value     = b.appearance || 'advanced'
   banners.value        = normalizeBanners(b.banners)
   eventBanners.value   = normalizeBanners(b.event_banners)
   emailHeaderUrl.value = b.email_header_url ?? null

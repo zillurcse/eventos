@@ -99,24 +99,28 @@ import type { Swiper as SwiperInstance } from 'swiper'
 
 import 'swiper/css'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   banners: string[]
-}>()
+  /** `minimal` = full-bleed; `modern` = soft tall slides with gentle peek. */
+  variant?: 'advanced' | 'minimal' | 'modern'
+}>(), { variant: 'advanced' })
 
+const isMinimal = computed(() => props.variant === 'minimal')
+const isModern = computed(() => props.variant === 'modern')
 const count = computed(() => props.banners.length)
 const loop = computed(() => count.value > 1)
 
 const loopSlides = computed(() => {
-  const MIN = 6
+  // Minimal only needs real slides; peek layouts need padding for loop math.
+  if (isMinimal.value) return props.banners
 
+  const MIN = 6
   if (props.banners.length >= MIN) return props.banners
 
   const arr: string[] = []
-
   while (arr.length < MIN) {
     arr.push(...props.banners)
   }
-
   return arr
 })
 
@@ -130,18 +134,36 @@ const prev = () => swiper.value?.slidePrev()
 const next = () => swiper.value?.slideNext()
 
 const modules = [Navigation, Autoplay]
+
+const slidesPerView = computed(() => {
+  if (isMinimal.value) return 1
+  if (isModern.value) return 1.25
+  return 1.6
+})
+const spaceBetween = computed(() => {
+  if (isMinimal.value) return 0
+  if (isModern.value) return 20
+  return 12
+})
+const centered = computed(() => !isMinimal.value)
 </script>
 
 <template>
-  <div class="hero-slider">
+  <div
+    class="hero-slider"
+    :class="{
+      'hero-slider--minimal': isMinimal,
+      'hero-slider--modern': isModern,
+    }"
+  >
     <Swiper
       class="hero-swiper"
       :modules="modules"
-      :slides-per-view="1.6"
-      :centered-slides="true"
-      :space-between="12"
+      :slides-per-view="slidesPerView"
+      :centered-slides="centered"
+      :space-between="spaceBetween"
       :loop="loop"
-      :speed="700"
+      :speed="isMinimal ? 500 : isModern ? 650 : 700"
       :autoplay="
         count > 1
           ? {
@@ -192,9 +214,6 @@ const modules = [Navigation, Autoplay]
   padding: 0 0px;
 }
 
-/* IMPORTANT */
-
-
 :deep(.swiper-wrapper) {
   align-items: center;
 }
@@ -224,8 +243,6 @@ const modules = [Navigation, Autoplay]
   border-radius: 18px;
   overflow: hidden;
 }
-
-/* fade side slides */
 
 :deep(.swiper-slide:not(.swiper-slide-active))::after {
   content: "";
@@ -271,9 +288,83 @@ const modules = [Navigation, Autoplay]
   right: calc((100% - 100% / 1.6) / 2 + 10px);
 }
 
+/* Minimal — one full-width banner, no peek / scale theatre. */
+.hero-slider--minimal :deep(.swiper-slide) {
+  transform: none;
+  opacity: 1;
+}
+.hero-slider--minimal :deep(.swiper-slide-active),
+.hero-slider--minimal :deep(.swiper-slide-prev),
+.hero-slider--minimal :deep(.swiper-slide-next) {
+  transform: none;
+  opacity: 1;
+}
+.hero-slider--minimal :deep(.swiper-slide:not(.swiper-slide-active))::after {
+  display: none;
+}
+.hero-slider--minimal :deep(.swiper-slide img) {
+  height: 200px;
+  border-radius: var(--theme-radius, 8px);
+}
+.hero-slider--minimal .prev { left: 10px; }
+.hero-slider--minimal .next { right: 10px; }
+.hero-slider--minimal .nav {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  box-shadow: none;
+  border: 1px solid var(--line, #e2e8f0);
+  background: var(--brand-content-bg, #fff);
+}
+
+/* Modern — taller soft slides, gentle scale, roomy peeks. */
+.hero-slider--modern :deep(.swiper-slide) {
+  transform: scale(.94);
+  opacity: .55;
+}
+.hero-slider--modern :deep(.swiper-slide-active) {
+  transform: scale(1);
+  opacity: 1;
+}
+.hero-slider--modern :deep(.swiper-slide-prev),
+.hero-slider--modern :deep(.swiper-slide-next) {
+  transform: scale(.96);
+  opacity: .75;
+}
+.hero-slider--modern :deep(.swiper-slide img) {
+  height: 280px;
+  border-radius: var(--theme-radius, 20px);
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+}
+.hero-slider--modern :deep(.swiper-slide:not(.swiper-slide-active))::after {
+  border-radius: var(--theme-radius, 20px);
+  background: rgba(255,255,255,.28);
+}
+.hero-slider--modern .nav {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  box-shadow: var(--theme-shadow, 0 8px 28px rgba(15, 23, 42, 0.06));
+  background: rgba(255,255,255,.95);
+}
+.hero-slider--modern .prev {
+  left: calc((100% - 100% / 1.25) / 2 + 14px);
+}
+.hero-slider--modern .next {
+  right: calc((100% - 100% / 1.25) / 2 + 14px);
+}
+
 @media (max-width: 1024px) {
   :deep(.swiper-slide img) {
     height: 220px;
+  }
+
+  .hero-slider--minimal :deep(.swiper-slide img) {
+    height: 160px;
+  }
+
+  .hero-slider--modern :deep(.swiper-slide img) {
+    height: 200px;
   }
 
   .prev {
@@ -283,5 +374,13 @@ const modules = [Navigation, Autoplay]
   .next {
     right: 12px;
   }
+
+  .hero-slider--modern .prev,
+  .hero-slider--modern .next {
+    left: auto;
+    right: auto;
+  }
+  .hero-slider--modern .prev { left: 12px; }
+  .hero-slider--modern .next { right: 12px; }
 }
 </style>
