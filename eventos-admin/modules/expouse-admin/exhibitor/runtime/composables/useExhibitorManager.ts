@@ -17,6 +17,7 @@ import {
   productMeta,
   exhibitorError,
   isActive,
+  detectLocaleFromIp,
   type Draft,
   type Exhibitor,
   type ExhibitorMember,
@@ -181,6 +182,19 @@ export function useExhibitorManager(eventId: string) {
     for (const c of collections) { c.set([]); c.reset() }
     entitlements.value = mergeFeatures(null)
     drawerMode.value = 'add'
+    // Prefill phone code + country from network IP (add form only).
+    void applyGeoDefaults()
+  }
+
+  async function applyGeoDefaults() {
+    const locale = await detectLocaleFromIp()
+    if (!locale || drawerMode.value !== 'add') return
+    // Only fill while the organizer hasn't touched these fields yet.
+    if (draft.phone_code === '+880' && !draft.phone) {
+      draft.phone_code = locale.phone_code
+      draft.contact.phone_code = locale.phone_code
+    }
+    if (!draft.country) draft.country = locale.country
   }
 
   // The record currently open in the full-page edit screen. Drives the top-bar
@@ -214,11 +228,28 @@ export function useExhibitorManager(eventId: string) {
     entitlements.value = resolveEntitlements(exhibitor, packages.value)
   }
 
-  // Name + package are required; an admin email is optional but, if given, valid.
+  // Name, package, type, admin email, and full contact details are required to create.
+  const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+  const contactOk = computed(() => {
+    const c = draft.contact
+    return !!c.full_name.trim()
+      && !!c.position.trim()
+      && !!c.company_name.trim()
+      && !!c.phone.trim()
+      && emailOk(c.email)
+  })
   const canCreate = computed(() =>
     !!draft.name.trim()
     && !!draft.package_id
-    && (!draft.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())))
+    && !!draft.type
+    && emailOk(draft.email)
+    && contactOk.value)
+  // Edit save: same required fields (admin email is locked after create).
+  const canSave = computed(() =>
+    !!draft.name.trim()
+    && !!draft.package_id
+    && !!draft.type
+    && contactOk.value)
 
   /**
    * Load one exhibitor by uuid into the draft + sub-lists for the full-page
@@ -452,7 +483,7 @@ export function useExhibitorManager(eventId: string) {
     // list + meta
     eventId, exhibitors, packages, filters,
     // drawer / editing
-    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, current,
+    drawerMode, editingId, activeTab, saving, error, draft, spotlightUploading, tagInput, canCreate, canSave, current,
     init, load, loadMeta, openAdd, loadForEdit, create, update, remove, toggleStatus,
     pickSpotlight, addTag, removeTag, addCta, addCtaVideo, removeCtaVideo,
     // table (search / filters / paging / row menu)

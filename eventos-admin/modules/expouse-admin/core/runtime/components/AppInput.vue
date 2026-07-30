@@ -19,13 +19,18 @@ function onInput(e: Event) {
   const val = props.type === 'number' ? target.valueAsNumber : target.value
   emit('update:modelValue', val)
 }
+
+/** Red left bar only while required and still empty. */
+const showRequiredMark = computed(() => {
+  if (!props.required || props.error) return false
+  const v = props.modelValue
+  return v == null || v === '' || (typeof v === 'number' && Number.isNaN(v))
+})
 </script>
 
 <template>
   <div>
-    <label v-if="label" class="block mb-1.5">
-      {{ label }}<span v-if="required" class="text-[#dc2626] ml-0.5">*</span>
-    </label>
+    <label v-if="label" class="block mb-1.5">{{ label }}</label>
     <div class="relative">
       <span v-if="$slots.prefix" class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
         <slot name="prefix" />
@@ -35,10 +40,12 @@ function onInput(e: Event) {
         :value="modelValue ?? ''"
         :placeholder="placeholder"
         :disabled="disabled"
+        :required="required"
         v-bind="$attrs"
         class="m-0 h-12"
         :class="[
           error ? '!border-[#dc2626] focus:!border-[#dc2626] focus:![box-shadow:0_0_0_3px_#fee2e2]' : '',
+          showRequiredMark ? '!border-l-[3px] !border-l-[#e11d48]' : '',
           $slots.prefix ? 'pl-9' : '',
           $slots.suffix || type === 'date' || type === 'datetime-local' ? 'pr-9' : '',
         ]"

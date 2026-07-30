@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppPhoneInput from '../../../../../core/runtime/components/AppPhoneInput.vue'
+
 // Full-page "Basic Details" panel for the exhibitor editor. Same context/draft
 // as the add drawer's Details tab, laid out as a wide two-column form to match
 // the design reference.
@@ -6,7 +8,7 @@ const {
   eventId, draft, packages,
   spotlightUploading, pickSpotlight,
   tagInput, addTag, removeTag,
-  error, saving, update,
+  error, saving, update, canSave,
 } = useExhibitorContext()
 
 const listPath = computed(() => `/org/events/${eventId}/showcase/exhibitors`)
@@ -55,22 +57,18 @@ async function save() {
 
     <!-- Core fields -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-      <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter Exhibitor Name" />
-      <AppSelect v-model="draft.package_id" label="Package" placeholder="Select Package" :options="packageOptions" />
+      <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter Exhibitor Name" required />
+      <AppSelect v-model="draft.package_id" label="Package" placeholder="Select Package" :options="packageOptions" required />
 
       <AppInput v-model="draft.email" type="email" label="Exhibitor Email" disabled placeholder="—" hint="The admin login email can't be changed after creation." />
-      <div>
-        <label class="block mb-1.5">Mobile No</label>
-        <div class="flex items-center rounded-lg overflow-hidden max-h-12 border border-[#d7dae1] bg-white focus-within:border-brand">
-          <select v-model="draft.phone_code" style="border:0;box-shadow:none;margin:0;border-radius:0;background:#f7f8fa;width:auto;padding:11px 8px;border-right:1px solid #d7dae1;cursor:pointer;">
-            <option v-for="p in PHONE_CODES" :key="p.code" :value="p.code">{{ p.flag }} {{ p.code }}</option>
-          </select>
-          <input v-model="draft.phone" type="tel" placeholder="Enter Mobile No" style="border:0;box-shadow:none;margin:0;border-radius:0;flex:1;outline:none;padding:11px 13px;">
-        </div>
-      </div>
+      <AppPhoneInput
+        v-model:phone-code="draft.phone_code"
+        v-model:phone="draft.phone"
+        label="Mobile No"
+      />
 
       <AppSelect v-model="draft.stall_no" label="Stall No" placeholder="Select Stall No" :options="STALL_OPTIONS" />
-      <AppSelect v-model="draft.type" label="Type" placeholder="Select Type" :options="TYPE_OPTIONS" />
+      <AppSelect v-model="draft.type" label="Type" placeholder="Select Type" :options="TYPE_OPTIONS" required />
     </div>
 
     <!-- About -->
@@ -110,7 +108,7 @@ async function save() {
         <AppInput v-model="draft.street" label="Street" placeholder="Enter Street" />
         <AppInput v-model="draft.address_line1" label="Address Line 1" placeholder="Enter Address Line 1" />
         <AppInput v-model="draft.address_line2" label="Address Line 2" placeholder="Enter Address Line 2" />
-        <AppSelect v-model="draft.country" label="Country" placeholder="Select Country" :options="COUNTRIES" />
+        <AppSelect v-model="draft.country" label="Country" placeholder="Select Country" :options="COUNTRIES" searchable />
         <AppInput v-model="draft.state" label="State" placeholder="Enter State" />
         <AppInput v-model="draft.city" label="City" placeholder="Enter City" />
         <AppInput v-model="draft.zip" label="Zip" placeholder="Enter Zip" />
@@ -238,20 +236,17 @@ async function save() {
     <div class="border-t border-line mt-7 pt-5">
       <h3 class="text-base font-bold text-ink m-0 mb-4">Contact details <span class="muted font-normal text-[.85rem]">(For internal use only)</span></h3>
       <div class="flex flex-col gap-4">
-        <AppInput v-model="draft.contact.full_name" label="Full Name" placeholder="Enter Full Name" />
+        <AppInput v-model="draft.contact.full_name" label="Full Name" placeholder="Enter Full Name" required />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-          <AppInput v-model="draft.contact.position" label="Position" placeholder="Enter Position" />
-          <AppInput v-model="draft.contact.company_name" label="Company name" placeholder="Enter Company name" />
-          <AppInput v-model="draft.contact.email" type="email" label="Email" placeholder="Enter Email" />
-          <div>
-            <label class="block mb-1.5">Mobile No</label>
-            <div class="flex items-center rounded-lg overflow-hidden max-h-12 border border-[#d7dae1] bg-white focus-within:border-brand">
-              <select v-model="draft.contact.phone_code" style="border:0;box-shadow:none;margin:0;border-radius:0;background:#f7f8fa;width:auto;padding:11px 8px;border-right:1px solid #d7dae1;cursor:pointer;">
-                <option v-for="p in PHONE_CODES" :key="p.code" :value="p.code">{{ p.flag }} {{ p.code }}</option>
-              </select>
-              <input v-model="draft.contact.phone" type="tel" placeholder="Enter Mobile No" style="border:0;box-shadow:none;margin:0;border-radius:0;flex:1;outline:none;padding:11px 13px;">
-            </div>
-          </div>
+          <AppInput v-model="draft.contact.position" label="Position" placeholder="Enter Position" required />
+          <AppInput v-model="draft.contact.company_name" label="Company name" placeholder="Enter Company name" required />
+          <AppInput v-model="draft.contact.email" type="email" label="Email" placeholder="Enter Email" required />
+          <AppPhoneInput
+            v-model:phone-code="draft.contact.phone_code"
+            v-model:phone="draft.contact.phone"
+            label="Mobile No"
+            required
+          />
         </div>
       </div>
     </div>
@@ -260,7 +255,7 @@ async function save() {
 
     <!-- Save / Cancel -->
     <div class="flex items-center gap-3 border-t border-line mt-7 pt-5">
-      <button class="btn" :disabled="saving || !draft.name.trim()" @click="save">
+      <button class="btn" :disabled="saving || !canSave" @click="save">
         {{ saving ? 'Saving…' : 'Save' }}
       </button>
       <NuxtLink :to="listPath" class="btn ghost no-underline">Cancel</NuxtLink>

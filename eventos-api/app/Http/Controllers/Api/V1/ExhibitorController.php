@@ -65,11 +65,18 @@ class ExhibitorController extends Controller
 
         $data = $request->validate([
             'event' => ['required', 'string'],
-            'type' => ['nullable', 'in:exhibitor,sponsor'],
+            'type' => ['required', 'in:exhibitor,sponsor'],
             'name' => ['required', 'string', 'max:180'],
-            'email' => ['nullable', 'email'],   // optional: exhibitor-admin login email (no email → no login provisioned)
+            'email' => ['required', 'email'],   // exhibitor-admin login email (access code emailed on create)
             'package_id' => ['required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['nullable', 'integer'],
+            'contact' => ['required', 'array'],
+            'contact.full_name' => ['required', 'string', 'max:180'],
+            'contact.position' => ['required', 'string', 'max:180'],
+            'contact.company_name' => ['required', 'string', 'max:180'],
+            'contact.email' => ['required', 'email'],
+            'contact.phone' => ['required', 'string', 'max:40'],
+            'contact.phone_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         $event = Event::where('uuid', $data['event'])->firstOrFail();
@@ -112,11 +119,18 @@ class ExhibitorController extends Controller
         $this->nullifyEmpty($request, ['type', 'package_id', 'logo_file_id']);
 
         $request->validate([
-            'name' => ['sometimes', 'string', 'max:180'],
-            'type' => ['sometimes', 'in:exhibitor,sponsor'],
-            'package_id' => ['sometimes', 'nullable', 'integer', 'exists:exhibitor_packages,id'],
+            'name' => ['sometimes', 'required', 'string', 'max:180'],
+            'type' => ['sometimes', 'required', 'in:exhibitor,sponsor'],
+            'package_id' => ['sometimes', 'required', 'integer', 'exists:exhibitor_packages,id'],
             'logo_file_id' => ['sometimes', 'nullable', 'integer'],
             'status' => ['sometimes', 'in:draft,active,suspended'],
+            'contact' => ['sometimes', 'array'],
+            'contact.full_name' => ['required_with:contact', 'string', 'max:180'],
+            'contact.position' => ['required_with:contact', 'string', 'max:180'],
+            'contact.company_name' => ['required_with:contact', 'string', 'max:180'],
+            'contact.email' => ['required_with:contact', 'email'],
+            'contact.phone' => ['required_with:contact', 'string', 'max:40'],
+            'contact.phone_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         // Real columns — only those actually present in the request.

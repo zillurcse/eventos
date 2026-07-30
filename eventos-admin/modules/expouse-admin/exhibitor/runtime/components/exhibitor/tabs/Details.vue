@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import AppPhoneInput from '../../../../../core/runtime/components/AppPhoneInput.vue'
+
 const {
   eventId, draft, packages, editingId,
   spotlightUploading, pickSpotlight,
   tagInput, addTag, removeTag,
-  error, saving, create, update, remove, drawerMode, canCreate,
+  error, saving, create, update, remove, drawerMode, canCreate, canSave,
 } = useExhibitorContext()
 
 // AddDrawer renders this tab inside <Drawer>, which has its own sticky footer
@@ -63,7 +65,7 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
     </div>
 
     <div class="flex flex-col gap-3">
-      <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter the exhibitor Name" />
+      <AppInput v-model="draft.name" label="Exhibitor Name" placeholder="Enter the exhibitor Name" required />
 
       <AppInput
         v-model="draft.email"
@@ -71,7 +73,8 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
         label="Exhibitor Email"
         :placeholder="isAdd ? 'Enter the exhibitor email' : '—'"
         :disabled="!isAdd"
-        :hint="isAdd ? 'Optional: a 6-digit access code is emailed so they can sign in.' : `The admin login email can't be changed after creation.`"
+        :required="isAdd"
+        :hint="isAdd ? 'A 6-digit access code is emailed so they can sign in.' : `The admin login email can't be changed after creation.`"
       />
 
       <AppSelect
@@ -79,21 +82,21 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
         label="Package"
         placeholder="Select Package"
         :options="packageOptions"
+        required
       />
     </div>
 
-    <label class="mt-3 block">Mobile No</label>
-    <div class="flex items-center rounded-lg overflow-hidden border border-[#d7dae1] my-1.5 bg-white focus-within:border-brand">
-      <select v-model="draft.phone_code" style="border:0;box-shadow:none;margin:0;border-radius:0;background:#f7f8fa;width:auto;padding:10px 8px;border-right:1px solid #d7dae1;cursor:pointer;">
-        <option v-for="p in PHONE_CODES" :key="p.code" :value="p.code">{{ p.flag }} {{ p.code }}</option>
-      </select>
-      <input v-model="draft.phone" type="tel" placeholder="Enter a phone number" style="border:0;box-shadow:none;margin:0;border-radius:0;flex:1;outline:none;">
-    </div>
+    <AppPhoneInput
+      v-model:phone-code="draft.phone_code"
+      v-model:phone="draft.phone"
+      label="Mobile No"
+      class="mt-3"
+    />
 
     <div class="grid grid-cols-2 gap-3">
       <AppSelect v-model="draft.stall_no" label="Stall No" placeholder="Select Stall No" :options="STALL_OPTIONS" />
 
-      <AppSelect v-model="draft.type" label="Type" placeholder="Select Type" :options="TYPE_OPTIONS" />
+      <AppSelect v-model="draft.type" label="Type" placeholder="Select Type" :options="TYPE_OPTIONS" required />
     </div>
 
     <!-- About (rich text) -->
@@ -116,7 +119,13 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.07 0l1.93-1.93a5 5 0 00-7.07-7.07L10.5 5.43M14 11a5 5 0 00-7.07 0L5 12.93a5 5 0 007.07 7.07l1.43-1.43"/></svg>
         </button>
       </div>
-      <div ref="aboutRef" contenteditable="true" class="min-h-30 p-3 text-[.93rem] text-ink outline-none" @input="onAboutInput" />
+      <div
+        ref="aboutRef"
+        contenteditable="true"
+        class="about-area min-h-30 p-3 text-[.93rem] text-ink outline-none"
+        data-ph="Let's write an awesome story!"
+        @input="onAboutInput"
+      />
     </div>
     <!-- <AppInput v-model="draft.venue" label="Venue" placeholder="Enter Venue" /> -->
 
@@ -151,7 +160,7 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
         <AppInput v-model="draft.address_line2" label="Address Line 2" placeholder="Enter Address Line 2" />
       </div>
       <div class="grid grid-cols-2 gap-3">
-        <AppSelect v-model="draft.country" label="Country" placeholder="Select Country" :options="COUNTRIES" />
+        <AppSelect v-model="draft.country" label="Country" placeholder="Select Country" :options="COUNTRIES" searchable />
         <AppInput v-model="draft.state" label="State" placeholder="Enter State" />
       </div>
       <div class="grid grid-cols-2 gap-3">
@@ -285,22 +294,22 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
     </div>
 
     <div class="flex flex-col gap-3">
-      <AppInput v-model="draft.contact.full_name" label="Full Name" placeholder="Enter Full Name" />
+      <AppInput v-model="draft.contact.full_name" label="Full Name" placeholder="Enter Full Name" required />
 
-      <AppInput v-model="draft.contact.position" label="Position" placeholder="Enter Position" />
+      <AppInput v-model="draft.contact.position" label="Position" placeholder="Enter Position" required />
 
-      <AppInput v-model="draft.contact.company_name" label="Company name" placeholder="Enter Company name" />
+      <AppInput v-model="draft.contact.company_name" label="Company name" placeholder="Enter Company name" required />
 
-      <AppInput v-model="draft.contact.email" type="email" label="Email" placeholder="Enter Email" />
+      <AppInput v-model="draft.contact.email" type="email" label="Email" placeholder="Enter Email" required />
     </div>
 
-    <label class="mt-3 block">Mobile No</label>
-    <div class="flex items-center rounded-lg overflow-hidden border border-[#d7dae1] my-1.5 bg-white focus-within:border-brand">
-      <select v-model="draft.contact.phone_code" style="border:0;box-shadow:none;margin:0;border-radius:0;background:#f7f8fa;width:auto;padding:10px 8px;border-right:1px solid #d7dae1;cursor:pointer;">
-        <option v-for="p in PHONE_CODES" :key="p.code" :value="p.code">{{ p.flag }} {{ p.code }}</option>
-      </select>
-      <input v-model="draft.contact.phone" type="tel" placeholder="Enter a phone number" style="border:0;box-shadow:none;margin:0;border-radius:0;flex:1;outline:none;">
-    </div>
+    <AppPhoneInput
+      v-model:phone-code="draft.contact.phone_code"
+      v-model:phone="draft.contact.phone"
+      label="Mobile No"
+      class="mt-3"
+      required
+    />
 
     <p v-if="error" class="error mt-2">{{ error }}</p>
 
@@ -316,7 +325,7 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
       <button
         v-else
         class="btn"
-        :disabled="saving || !draft.name.trim()"
+        :disabled="saving || !canSave"
         @click="update"
       >
         {{ saving ? 'UPDATING…' : 'UPDATE' }}
@@ -325,3 +334,11 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
     </div>
   </div>
 </template>
+
+<style scoped>
+.about-area:empty::before {
+  content: attr(data-ph);
+  color: var(--faint);
+  font-style: italic;
+}
+</style>

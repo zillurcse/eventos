@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { activeTab, drawerMode, draft, canCreate, saving, create, update } = useExhibitorContext()
+const { activeTab, drawerMode, draft, canCreate, canSave, saving, create, update } = useExhibitorContext()
 
 const isAdd = computed(() => drawerMode.value === 'add')
 </script>
@@ -43,7 +43,7 @@ const isAdd = computed(() => drawerMode.value === 'add')
         <button
           v-else
           class="btn"
-          :disabled="saving || !draft.name.trim()"
+          :disabled="saving || !canSave"
           @click="update"
         >
           {{ saving ? 'UPDATING…' : 'UPDATE' }}
