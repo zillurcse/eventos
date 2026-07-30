@@ -22,7 +22,7 @@ html:not([data-theme]) {
   --theme-shadow: none;
 }
 
-/* Minimal — flatter, tighter (layout variants land in Phase 2). */
+/* Minimal — flatter, tighter. */
 html[data-theme="minimal"] {
   --theme-radius: 8px;
   --theme-radius-sm: 6px;
@@ -30,9 +30,9 @@ html[data-theme="minimal"] {
   --theme-shadow: none;
 }
 
-/* Modern — softer surfaces (layout variants land in Phase 3). */
+/* Modern — soft elevated surfaces, roomy spacing. */
 html[data-theme="modern"] {
-  --theme-radius: 18px;
+  --theme-radius: 20px;
   --theme-radius-sm: 12px;
   --theme-gap: 28px;
   --theme-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);

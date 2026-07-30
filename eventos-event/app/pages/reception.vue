@@ -122,7 +122,7 @@ onMounted(async () => {
         <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" type="exhibitor" :partners="data.exhibitors" :limit="3" />
         <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" type="sponsor" :partners="data.sponsors" :limit="3" />
         <ReceptionSpeakersFeatured v-if="data.speakers.length" :speakers="data.speakers" :limit="4" />
-        <ReceptionAdSidebar v-if="data.ads.sidebar.length" :ads="data.ads.sidebar" class="modern-ads" />
+        <ReceptionAdSidebar v-if="data.ads.sidebar.length" :ads="data.ads.sidebar" />
       </div>
     </template>
 
@@ -167,7 +167,6 @@ onMounted(async () => {
   align-items: stretch;
 }
 .modern-stack { display: flex; flex-direction: column; gap: 24px; }
-.modern-ads { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
 
 .loading { padding: 60px 0; text-align: center; color: #64748b; }
 

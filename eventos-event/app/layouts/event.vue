@@ -41,4 +41,9 @@ const delegates = useDelegatesStore()
   max-width: 880px;
   padding: 18px 14px 40px;
 }
+
+.event-shell[data-appearance="modern"] .event-main {
+  max-width: 1280px;
+  padding: 36px 24px 64px;
+}
 </style>

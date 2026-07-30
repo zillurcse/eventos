@@ -3,7 +3,6 @@ import type { SiteAppearance } from '~/stores/site'
 /**
  * Branding › Appearance for the current event.
  * Use when branching layout/chrome by theme (Minimal / Modern / Advanced).
- * Until theme-specific layouts ship, all three render the Advanced UI.
  */
 export function useAppearance() {
   const site = useSiteStore()
