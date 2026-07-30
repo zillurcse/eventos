@@ -8,10 +8,10 @@ import '../../features/auth/screens/signup_screen.dart';
 import '../../features/bootstrap/event_provider.dart';
 import '../../features/bootstrap/onboarding_provider.dart';
 import '../../features/bootstrap/screens/event_picker_screen.dart';
-import '../../features/bootstrap/screens/home_screen.dart';
 import '../../features/bootstrap/screens/onboarding_screen.dart';
 import '../../features/bootstrap/screens/splash_screen.dart';
 import '../../features/bootstrap/splash_hold_provider.dart';
+import '../../features/reception/screens/reception_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -78,7 +78,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const ReceptionScreen(),
       ),
     ],
   );
