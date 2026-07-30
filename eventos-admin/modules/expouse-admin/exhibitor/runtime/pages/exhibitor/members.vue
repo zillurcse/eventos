@@ -267,7 +267,7 @@ onMounted(load)
           <span class="muted text-[.8rem]">Per member</span>
         </div>
 
-        <select v-model.number="selectedId" class="w-full py-2.5 px-3 rounded-[11px] border border-[#cbd5e1] mb-4 text-[.9rem]">
+        <select v-model.number="selectedId" class="w-full py-2.5 px-3 rounded-lg border border-[#cbd5e1] mb-4 text-[.9rem]">
           <option :value="null">Select member…</option>
           <option v-for="m in selectableMembers" :key="m.id" :value="m.id">{{ m.contact?.name || m.contact?.email }}</option>
         </select>

@@ -252,7 +252,7 @@ const packageOptions = computed(() => packages.value.map(pkg => ({ value: pkg.id
     </div>
 
     <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
-      <span class="px-3 py-2.5 text-[.82rem] font-semibold text-muted bg-[#f7f8fa] border-r border-line whitespace-nowrap shrink-0">https://wa.me/</span>
+      <span class="px-3 py-2.5 text-[.82rem] font-semibold text-muted bg-[#f7f8fa] border-r border-line whitespace-nowrap shrink-0 h-12 flex items-center justify-center">https://wa.me/</span>
       <input v-model="draft.social.whatsapp" placeholder="Enter WhatsApp number" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none">

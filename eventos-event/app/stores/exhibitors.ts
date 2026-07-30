@@ -65,11 +65,22 @@ export interface ExhibitorProject {
   image_url: string | null
 }
 
+export interface ExhibitorCtaVideo {
+  platform: string
+  url: string
+  caption: string
+}
+
+/** Text / image / video CTA built in the exhibitor admin's CTA editor. */
 export interface ExhibitorCta {
   id?: string
-  type: string
-  label: string
-  value: string
+  type: 'text' | 'image' | 'video'
+  title: string
+  description: string
+  button_label: string
+  button_link: string
+  image_url: string
+  videos: ExhibitorCtaVideo[]
 }
 
 /** Full booth profile for the details page (GET /public/exhibitors/{id}). */

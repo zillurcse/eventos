@@ -972,10 +972,7 @@ class PublicSiteController extends Controller
                 'position' => $contact['position'] ?? null,
                 'company_name' => $contact['company_name'] ?? null,
             ],
-            'cta' => array_values(array_filter(
-                (array) ($profile['cta'] ?? []),
-                fn ($c) => is_array($c) && (($c['label'] ?? '') !== '' || ($c['value'] ?? '') !== ''),
-            )),
+            'cta' => $this->formatExhibitorCtas((array) ($profile['cta'] ?? [])),
             'location' => [
                 'address' => $address ?: null,
                 'url' => $profile['location_url'] ?? null,
@@ -996,6 +993,78 @@ class PublicSiteController extends Controller
                 'image_url' => ($p->meta['image_url'] ?? null) ?: $this->fileUrl($p->meta['image_file_id'] ?? null),
             ])->values(),
         ]);
+    }
+
+    /**
+     * Normalise a booth's CTA entries for the public details page. The admin
+     * builder (Exhibitor › Details › CTA) writes the current text/image/video
+     * shape (title, description, button_label, button_link, image_url,
+     * videos[]); older rows may still carry the legacy TEXT/LINK/BUTTON shape
+     * (label/value), which is mapped onto the same fields so both render.
+     * Entries with no actual content in either shape are dropped.
+     *
+     * @param  array<int, mixed>  $raw
+     * @return list<array<string, mixed>>
+     */
+    protected function formatExhibitorCtas(array $raw): array
+    {
+        return array_values(array_filter(array_map(function ($c) {
+            if (! is_array($c)) {
+                return null;
+            }
+
+            // Current builder shape already uses these keys directly.
+            $type = in_array($c['type'] ?? null, ['text', 'image', 'video'], true) ? $c['type'] : 'text';
+            $title = (string) ($c['title'] ?? '');
+            $description = (string) ($c['description'] ?? '');
+            $buttonLabel = (string) ($c['button_label'] ?? '');
+            $buttonLink = (string) ($c['button_link'] ?? '');
+            $imageUrl = (string) ($c['image_url'] ?? '');
+
+            // Legacy rows (pre-rebuild) used TEXT/LINK/BUTTON + label/value —
+            // fold them onto the same fields so old data still renders.
+            $legacyType = strtoupper((string) ($c['type'] ?? ''));
+            $label = (string) ($c['label'] ?? '');
+            $value = (string) ($c['value'] ?? '');
+            if ($legacyType === 'TEXT') {
+                $description = $description ?: $value;
+                $title = $title ?: $label;
+            } elseif ($legacyType === 'LINK') {
+                $buttonLabel = $buttonLabel ?: ($label ?: 'Learn More');
+                $buttonLink = $buttonLink ?: $value;
+            } elseif ($legacyType === 'BUTTON') {
+                $buttonLabel = $buttonLabel ?: $label;
+                $buttonLink = $buttonLink ?: $value;
+            }
+
+            $videos = array_values(array_filter(array_map(function ($v) {
+                if (! is_array($v) || (($v['url'] ?? '') === '')) {
+                    return null;
+                }
+
+                return [
+                    'platform' => $v['platform'] ?? 'Youtube',
+                    'url' => $v['url'],
+                    'caption' => $v['caption'] ?? '',
+                ];
+            }, (array) ($c['videos'] ?? []))));
+
+            $item = [
+                'id' => $c['id'] ?? null,
+                'type' => $type,
+                'title' => $title,
+                'description' => $description,
+                'button_label' => $buttonLabel,
+                'button_link' => $buttonLink,
+                'image_url' => $imageUrl,
+                'videos' => $videos,
+            ];
+
+            $hasContent = $title !== '' || $description !== '' || $buttonLabel !== ''
+                || $buttonLink !== '' || $imageUrl !== '' || count($videos) > 0;
+
+            return $hasContent ? $item : null;
+        }, $raw)));
     }
 
     /**

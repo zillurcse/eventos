@@ -111,8 +111,6 @@ const mapEmbedSrc = computed(() => {
   return addr ? `https://maps.google.com/maps?q=${encodeURIComponent(addr)}&output=embed` : null
 })
 
-// A CTA "read more" toggle for long rich text.
-const ctaExpanded = ref(false)
 function ctaHref(v: string) {
   return /^https?:\/\//i.test(v) ? v : `https://${v}`
 }
@@ -120,6 +118,56 @@ function ctaHref(v: string) {
 // Inline video playback for the "Videos" section (built from the spotlight —
 // the API doesn't yet expose a dedicated video gallery for booths).
 const videoPlaying = ref(false)
+
+// ── Right rail ──
+// Driven by the booth's CTA entries (Exhibitor admin › Details › CTA): a
+// "text" CTA becomes the promo card, "image" CTAs become the image cards,
+// "video" CTAs become the video card. Booths with no CTA of a given type
+// fall back to the about copy / project & product shots / spotlight video
+// shown in the main column, so the rail is never empty.
+const railTextCta = computed(() => ex.value?.cta.find(c => c.type === 'text' && c.description))
+const railTextExpanded = ref(false)
+const railText = computed(() => {
+  const c = railTextCta.value
+  if (c) return { html: c.description, buttonLabel: c.button_label, buttonLink: c.button_link }
+  if (ex.value?.about) return { html: ex.value.about, buttonLabel: '', buttonLink: '' }
+  return null
+})
+
+const railImageCtas = computed(() => ex.value?.cta.filter(c => c.type === 'image' && c.image_url) || [])
+const railImages = computed(() => {
+  if (railImageCtas.value.length) {
+    return railImageCtas.value.map(c => ({ src: c.image_url, href: c.button_link || null }))
+  }
+  return [...ex.value?.projects || [], ...ex.value?.products || []]
+    .map(p => p.image_url)
+    .filter((u): u is string => !!u)
+    .slice(0, 2)
+    .map(src => ({ src, href: null as string | null }))
+})
+
+// YouTube exposes a real preview frame at a predictable thumbnail URL — no API
+// call needed. Other platforms (Vimeo/Facebook/Other) have no such public,
+// key-less thumbnail endpoint, so those fall back to a plain dark placeholder
+// rather than the exhibitor's logo (which isn't a video preview at all).
+function youtubeThumb(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/)
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
+}
+
+const railVideo = computed(() => {
+  const c = ex.value?.cta.find(c => c.type === 'video' && c.videos.length)
+  const v = c?.videos[0]
+  if (v) return { url: v.url, external: true, thumb: v.platform?.toLowerCase() === 'youtube' ? youtubeThumb(v.url) : null }
+  if (ex.value?.spotlight.type === 'video' && ex.value.spotlight.url) return { url: ex.value.spotlight.url, external: false, thumb: null }
+  return null
+})
+const railVideoPlaying = ref(false)
+
+const contactSec = ref<HTMLElement | null>(null)
+function scrollToContact() {
+  contactSec.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 // Member cards show a bookmark affordance in the reference design, but
 // members have no stable id in the API today, so this is a display-only,
@@ -138,7 +186,8 @@ function toggleMemberSaved(i: number) {
       <NuxtLink to="/exhibitors" class="link">Back to exhibitors</NuxtLink>
     </div>
 
-    <div v-else class="panel">
+    <div v-else class="layout">
+    <div class="panel">
       <header class="panel-head">
         <h1>Exhibitor Info</h1>
         <button class="x" type="button" aria-label="Close" @click="router.back()">
@@ -154,18 +203,19 @@ function toggleMemberSaved(i: number) {
 
       <div class="idrow">
         <div class="logo"><AppImage :src="ex.logo_url" :alt="ex.name" /></div>
+        <div class="idinfo">
+          <h2 class="title">{{ ex.name }}</h2>
+          <p class="submeta">
+            <span v-if="ex.booth">Stall : {{ ex.booth }}</span>
+            <span>Type : {{ ex.type === 'sponsor' ? 'Sponsor' : 'Exhibitor' }}</span>
+          </p>
+        </div>
         <div class="stars" :title="ex.can_rate ? 'Rate this exhibitor' : ''">
-          <svg v-for="n in 5" :key="n" viewBox="0 0 24 24">
+          <svg v-for="n in 5" :key="n" :class="{ on: n <= 3 }" viewBox="0 0 24 24">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z" />
           </svg>
         </div>
       </div>
-
-      <h2 class="title">{{ ex.name }}</h2>
-      <p class="submeta">
-        <span v-if="ex.booth">Stall : {{ ex.booth }}</span>
-        <span>Type : {{ ex.type === 'sponsor' ? 'Sponsor' : 'Exhibitor' }}</span>
-      </p>
 
       <div class="actionsrow">
         <button class="sq" type="button" :class="{ on: bookmarked }" :title="bookmarked ? 'Saved' : 'Save'"
@@ -196,7 +246,7 @@ function toggleMemberSaved(i: number) {
         <div class="rich" v-html="ex.about" />
       </section>
 
-      <section v-if="ex.contact.phone || ex.contact.email" class="sec">
+      <section v-if="ex.contact.phone || ex.contact.email" ref="contactSec" class="sec">
         <h3>Get in Touch</h3>
         <a v-if="ex.contact.phone" :href="`tel:${ex.contact.phone}`" class="touch">
           <svg viewBox="0 0 24 24">
@@ -220,23 +270,7 @@ function toggleMemberSaved(i: number) {
             <svg viewBox="0 0 24 24"><path :d="globePath" /></svg>
           </a>
         </div>
-        <button class="sharedetails" type="button" @click="openShareDetails">Share your details with us</button>
       </div>
-
-      <section v-if="ex.cta.length" class="sec">
-        <h3>More</h3>
-        <template v-for="(c, i) in ex.cta" :key="i">
-          <div v-if="c.type === 'TEXT' || (!c.type && c.value)" class="cta-text" :class="{ clamp: !ctaExpanded }">
-            {{ c.value || c.label }}
-          </div>
-          <a v-else-if="c.type === 'LINK'" :href="ctaHref(c.value)" target="_blank" rel="noopener" class="cta-link">{{ c.label || c.value }}</a>
-          <a v-else-if="c.type === 'BUTTON'" :href="ctaHref(c.value)" target="_blank" rel="noopener" class="cta-btn">{{ c.label || 'Button' }}</a>
-        </template>
-        <button v-if="ex.cta.some(c => (c.type === 'TEXT' || !c.type) && (c.value || '').length > 140)"
-          class="readmore" type="button" @click="ctaExpanded = !ctaExpanded">
-          {{ ctaExpanded ? '– READ LESS' : '+ READ MORE' }}
-        </button>
-      </section>
 
       <hr class="rule">
 
@@ -321,13 +355,72 @@ function toggleMemberSaved(i: number) {
         </div>
       </section>
     </div>
+
+    <aside class="rail">
+      <button class="rail-share" type="button" @click="openShareDetails">
+        Share your details with us
+        <svg viewBox="0 0 24 24">
+          <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+          <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+        </svg>
+      </button>
+
+      <div v-if="railText" class="rail-card">
+        <div class="rail-about" :class="{ clamp: !railTextExpanded }" v-html="railText.html" />
+        <button class="rail-readmore" type="button" @click="railTextExpanded = !railTextExpanded">
+          {{ railTextExpanded ? 'Read Less' : 'Read More' }}
+        </button>
+        <a v-if="railText.buttonLink" class="rail-moreinfo" :href="ctaHref(railText.buttonLink)" target="_blank" rel="noopener">
+          {{ railText.buttonLabel || 'Get More Info' }}
+        </a>
+        <button v-else class="rail-moreinfo" type="button" @click="scrollToContact">
+          {{ railText.buttonLabel || 'Get More Info' }}
+        </button>
+      </div>
+
+      <div v-for="(img, i) in railImages" :key="i" class="rail-media">
+        <component :is="img.href ? 'a' : 'div'" :href="img.href ? ctaHref(img.href) : undefined"
+          :target="img.href ? '_blank' : undefined" :rel="img.href ? 'noopener' : undefined">
+          <img :src="img.src" :alt="ex.name">
+        </component>
+      </div>
+
+      <div v-if="railVideo" class="rail-media rail-video" @click="railVideo.external ? undefined : (railVideoPlaying = true)">
+        <a v-if="railVideo.external" :href="ctaHref(railVideo.url)" target="_blank" rel="noopener" class="rail-video-link">
+          <img v-if="railVideo.thumb" :src="railVideo.thumb" :alt="ex.name" class="rail-video-thumb">
+          <div v-else class="rail-video-thumb-fallback" />
+          <span class="rail-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span>
+        </a>
+        <template v-else>
+          <video v-if="railVideoPlaying" :src="railVideo.url" controls autoplay playsinline />
+          <template v-else>
+            <div class="rail-video-thumb-fallback" />
+            <span class="rail-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span>
+          </template>
+        </template>
+      </div>
+    </aside>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .page {
-  max-width: 800px;
+  max-width: 1180px;
   margin: 0 auto;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .state {
@@ -395,8 +488,8 @@ function toggleMemberSaved(i: number) {
 
 .banner {
   margin: 0 24px;
-  height: 300px;
-  border-radius: 14px;
+  height: 260px;
+  border-radius: 12px;
   overflow: hidden;
   background: #0f172a;
 }
@@ -416,15 +509,15 @@ function toggleMemberSaved(i: number) {
 
 .idrow {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 20px 24px 0;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 24px 18px;
 }
 
 .logo {
-  width: 88px;
-  height: 88px;
-  border-radius: 14px;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
   overflow: hidden;
   background: color-mix(in srgb, var(--brand-primary) 12%, #fff);
   flex: 0 0 auto;
@@ -436,32 +529,46 @@ function toggleMemberSaved(i: number) {
   object-fit: cover;
 }
 
+.idinfo {
+  flex: 1;
+  min-width: 0;
+}
+
 .stars {
   display: flex;
-  gap: 4px;
-  padding-top: 6px;
+  gap: 6px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding-top: 4px;
 }
 
 .stars svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   fill: none;
   stroke: var(--brand-primary);
   stroke-width: 1.6;
   stroke-linejoin: round;
 }
 
+.stars svg.on {
+  fill: var(--brand-primary);
+}
+
 .title {
-  margin: 18px 24px 4px;
-  font-size: 1.4rem;
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.2;
   font-weight: 800;
   color: #1e293b;
 }
 
 .submeta {
-  margin: 0 24px 18px;
+  margin: 0;
   display: flex;
   gap: 16px;
+  line-height: 1.2;
+
   font-size: .88rem;
   color: #64748b;
 }
@@ -476,7 +583,7 @@ function toggleMemberSaved(i: number) {
 .sq,
 .pill {
   border: 1px solid var(--brand-primary);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   color: var(--brand-primary);
   font: inherit;
@@ -486,6 +593,7 @@ function toggleMemberSaved(i: number) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  max-height: 40px;
   transition: background .15s;
 }
 
@@ -636,56 +744,6 @@ function toggleMemberSaved(i: number) {
 
 .sharedetails:hover {
   background: color-mix(in srgb, var(--brand-primary) 20%, #fff);
-}
-
-/* CTA */
-.cta-text {
-  color: #475569;
-  font-size: .9rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.cta-text.clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.cta-link {
-  display: inline-block;
-  margin-top: 8px;
-  color: var(--brand-primary);
-  font-weight: 600;
-  font-size: .9rem;
-}
-
-.cta-btn {
-  display: block;
-  margin-top: 12px;
-  text-align: center;
-  background: var(--brand-primary);
-  color: #fff;
-  border-radius: 10px;
-  padding: 12px;
-  font-weight: 700;
-  font-size: .9rem;
-  text-decoration: none;
-}
-
-.readmore {
-  display: block;
-  margin-top: 10px;
-  border: none;
-  background: none;
-  color: var(--brand-primary);
-  font: inherit;
-  font-size: .82rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
 }
 
 /* Videos / Projects / Products */
@@ -978,5 +1036,171 @@ function toggleMemberSaved(i: number) {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* ── Right rail ── */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 92px;
+}
+
+.rail-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  border-radius: 8px;
+  max-height: 48px;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.rail-share:hover {
+  background: color-mix(in srgb, var(--brand-primary) 18%, #fff);
+}
+
+.rail-share svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rail-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #E8E8EE
+}
+
+.rail-about {
+  color: #475569;
+  font-size: .95rem;
+  line-height: 1.65;
+}
+
+.rail-about :deep(p) {
+  margin: 0 0 8px;
+}
+
+.rail-about.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rail-readmore {
+  display: block;
+  margin-top: 4px;
+  border: none;
+  background: none;
+  color: var(--brand-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 0;
+}
+
+.rail-moreinfo {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--brand-primary);
+  border-radius: 8px;
+  padding: 6px 15px;
+  max-height: 40px;
+  background: #fff;
+  color: var(--brand-primary);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.rail-moreinfo:hover {
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+}
+
+.rail-media {
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  background: #0f172a;
+}
+
+.rail-media img,
+.rail-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rail-media > a,
+.rail-media > div {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rail-video {
+  position: relative;
+  cursor: pointer;
+}
+
+.rail-video-link {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rail-video-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+}
+
+.rail-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-play svg {
+  width: 40px;
+  height: 40px;
+  fill: #fff;
+  background: #000000B2;
+  border-radius: 50%;
+  padding: 11px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .rail {
+    position: static;
+  }
 }
 </style>

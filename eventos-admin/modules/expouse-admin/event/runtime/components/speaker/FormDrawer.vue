@@ -215,13 +215,13 @@ function save() {
 
     <div class="mb-6">
       <FormField label="Presentation File" hint="DOC, PPT, PDF | 5MB (Maximum)">
-        <div v-if="draft.presentation_file" class="flex items-center justify-between gap-2 border border-line rounded-[11px] px-3 py-2.5">
+        <div v-if="draft.presentation_file" class="flex items-center justify-between gap-2 border border-line rounded-lg px-3 py-2.5">
           <a :href="draft.presentation_file" target="_blank" class="text-brand text-[.85rem] truncate">
             {{ draft.presentation_file_name || 'View file' }}
           </a>
           <button type="button" class="bg-transparent border-0 cursor-pointer text-[#dc2626] text-[.85rem]" @click="clearPresentationFile">Remove</button>
         </div>
-        <label v-else class="flex items-center border border-line rounded-[11px] overflow-hidden cursor-pointer hover:border-brand">
+        <label v-else class="flex items-center border border-line rounded-lg overflow-hidden cursor-pointer hover:border-brand">
           <span class="px-3.5 py-2.5 bg-[#f2f1fb] text-brand font-[650] text-[.82rem] shrink-0">Choose File</span>
           <span class="px-3 text-muted text-[.85rem] truncate">{{ presUploading ? 'Uploading…' : 'No File Chosen' }}</span>
           <input type="file" class="hidden" accept=".pdf,.ppt,.pptx,.doc,.docx" @change="onPresentationFile">

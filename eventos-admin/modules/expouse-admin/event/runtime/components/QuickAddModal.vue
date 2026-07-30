@@ -111,11 +111,11 @@ async function save() {
       <!-- Footer -->
       <div class="flex items-center justify-end gap-2.5 p-5 pt-0">
         <button
-          class="px-4 py-2.5 rounded-[11px] text-[.85rem] font-semibold text-ink bg-white border border-line hover:bg-[#f5f6f8] cursor-pointer"
+          class="px-4 py-2.5 rounded-lg text-[.85rem] font-semibold text-ink bg-white border border-line hover:bg-[#f5f6f8] cursor-pointer"
           @click="emit('close')"
         >Cancel</button>
         <button
-          class="px-5 py-2.5 rounded-[11px] text-[.85rem] font-semibold text-white bg-brand hover:bg-brand-dark cursor-pointer transition-opacity"
+          class="px-5 py-2.5 rounded-lg text-[.85rem] font-semibold text-white bg-brand hover:bg-brand-dark cursor-pointer transition-opacity"
           :class="canSave ? '' : 'opacity-50 pointer-events-none'"
           @click="save"
         >{{ saving ? 'Adding…' : 'Add' }}</button>

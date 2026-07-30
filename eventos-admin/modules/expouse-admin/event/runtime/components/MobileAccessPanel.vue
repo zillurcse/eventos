@@ -89,7 +89,7 @@ watch(() => props.username, v => { localUsername.value = v })
         <!-- Access code (read-only + copy) -->
         <div>
           <label class="block mb-1.5">Access Code</label>
-          <div class="flex items-center gap-2.5 px-3.25 py-2.5 bg-[#f8f9fb] border border-line rounded-[11px] min-w-0">
+          <div class="flex items-center gap-2.5 px-3.25 py-2.5 bg-[#f8f9fb] border border-line rounded-lg min-w-0">
             <span class="flex-1 text-[.9rem] text-ink font-mono tracking-widest truncate select-all">{{ accessCode }}</span>
             <button
               class="shrink-0 w-7 h-7 rounded-lg grid place-items-center cursor-pointer transition-colors"

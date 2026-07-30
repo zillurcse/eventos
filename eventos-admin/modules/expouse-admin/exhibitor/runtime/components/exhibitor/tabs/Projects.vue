@@ -112,7 +112,7 @@ const columns = [
           v-model="projectForm.description"
           rows="5"
           placeholder="Enter Project Details"
-          class="w-full bg-white border border-[#d7dae1] rounded-[11px] px-[13px] py-2.5 text-[.92rem] text-ink outline-none focus:border-brand resize-y"
+          class="w-full bg-white border border-[#d7dae1] rounded-lg px-[13px] py-2.5 text-[.92rem] text-ink outline-none focus:border-brand resize-y"
         />
       </div>
 
@@ -131,7 +131,7 @@ const columns = [
       <!-- Attachment -->
       <div class="mt-4">
         <label class="block mb-1.5">Attachment</label>
-        <div class="flex items-center gap-3 border border-[#d7dae1] rounded-[11px] px-2 py-2 bg-white">
+        <div class="flex items-center gap-3 border border-[#d7dae1] rounded-lg px-2 py-2 bg-white">
           <label class="btn sm ghost cursor-pointer m-0 shrink-0">
             {{ uploadingAttachment ? 'Uploading…' : 'Choose File' }}
             <input type="file" class="hidden" @change="onAttachment">
