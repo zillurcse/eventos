@@ -60,7 +60,7 @@ function confirm() {
       <button
         v-for="icon in filtered" :key="icon.key"
         type="button"
-        class="aspect-square rounded-[11px] border flex items-center justify-center bg-white cursor-pointer"
+        class="aspect-square rounded-lg border flex items-center justify-center bg-white cursor-pointer"
         :class="picked === icon.key ? 'border-brand border-2 text-brand' : 'border-line text-muted hover:border-[#c7cad3]'"
         :title="icon.label"
         @click="picked = icon.key"

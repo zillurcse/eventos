@@ -424,8 +424,8 @@ const filtered = computed<Exhibitor[]>(() => {
 
 .filter-card {
   background: #fff;
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 28px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
 }
 
@@ -433,14 +433,14 @@ const filtered = computed<Exhibitor[]>(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
 
 .fc-head h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.7rem;
   font-weight: 800;
-  color: #1e293b;
+  color: #3f3f46;
 }
 
 .fc-actions {
@@ -454,7 +454,7 @@ const filtered = computed<Exhibitor[]>(() => {
   background: none;
   color: var(--brand-primary);
   font: inherit;
-  font-size: .85rem;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
   padding: 0;
@@ -497,73 +497,73 @@ const filtered = computed<Exhibitor[]>(() => {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   border-radius: 100px;
-  padding: 5px 12px;
+  padding: 10px 20px;
   font: inherit;
-  font-size: 12px;
+  font-size: 1rem;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .chip.active {
-  background: color-mix(in srgb, var(--brand-primary) 12%, #fff);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 28%, #fff);
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  border: none;
   color: var(--brand-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chip.active svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.2;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .fsection {
-  padding-top: 14px;
+  padding-top: 22px;
   border-top: 1px solid #eef0f3;
 }
 
 .fsection + .fsection { margin-top: 0; }
 
 .fsection h3 {
-  margin: 0 0 10px;
-  font-size: .78rem;
-  font-weight: 700;
-  color: #94a3b8;
-  letter-spacing: .03em;
-  text-transform: uppercase;
+  margin: 0 0 18px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #52525b;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .cb {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 0;
+  gap: 14px;
+  padding: 10px 0;
   cursor: pointer;
-  font-size: .88rem;
-  color: #334155;
+  font-size: 1.05rem;
+  color: #3f3f46;
 }
 
 .cb input { position: absolute; opacity: 0; width: 0; height: 0; }
 
 .box {
   flex: 0 0 auto;
-  width: 19px;
-  height: 19px;
-  border-radius: 5px;
-  border: 1.5px solid #cbd5e1;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 2px solid #d4d4d8;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -571,8 +571,8 @@ const filtered = computed<Exhibitor[]>(() => {
 }
 
 .box svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: #fff;
   stroke-width: 3;

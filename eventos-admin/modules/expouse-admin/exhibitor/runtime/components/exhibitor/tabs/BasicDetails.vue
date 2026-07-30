@@ -165,7 +165,7 @@ async function save() {
     <!-- Social Links -->
     <div class="border-t border-line mt-7 pt-5">
       <h3 class="text-base font-bold text-ink m-0 mb-4">Social Links</h3>
-      <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+      <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <input v-model="draft.social.facebook" placeholder="Facebook URL" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="22" viewBox="0 0 13 22" fill="none">
@@ -174,7 +174,7 @@ async function save() {
       </div>
     </div>
 
-    <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+    <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <input v-model="draft.social.linkedin" placeholder="LinkedIn URL" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -185,7 +185,7 @@ async function save() {
       </div>
     </div>
 
-    <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+    <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <input v-model="draft.social.twitter" placeholder="Twitter URL" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
@@ -194,7 +194,7 @@ async function save() {
       </div>
     </div>
 
-    <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+    <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <input v-model="draft.social.instagram" placeholder="Instagram URL" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -205,7 +205,7 @@ async function save() {
       </div>
     </div>
 
-    <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+    <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <span class="px-3 py-2.5 text-[.82rem] font-semibold text-muted bg-[#f7f8fa] border-r border-line whitespace-nowrap shrink-0">https://wa.me/</span>
       <input v-model="draft.social.whatsapp" placeholder="Enter WhatsApp number" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
@@ -215,7 +215,7 @@ async function save() {
       </div>
     </div>
 
-    <div class="flex items-center border border-line rounded-[11px] overflow-hidden my-2 bg-white">
+    <div class="flex items-center border border-line rounded-lg overflow-hidden my-2 bg-white">
       <input v-model="draft.social.youtube" placeholder="YouTube URL" style="border:0;box-shadow:none;margin:0;flex:1;border-radius:0;outline:none;">
       <div class="w-10 h-10 flex items-center justify-center shrink-0 m-1 rounded-lg bg-[#F7F7FB]">
         <svg xmlns="http://www.w3.org/2000/svg" width="21" height="15" viewBox="0 0 21 15" fill="none">

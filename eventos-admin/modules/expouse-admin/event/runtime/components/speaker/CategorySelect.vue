@@ -83,7 +83,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     </button>
 
     <!-- Panel (in-flow so it is never clipped by the drawer's scroll area) -->
-    <div v-if="open" class="mt-2 bg-white border border-[#d7dae1] rounded-[11px] p-3">
+    <div v-if="open" class="mt-2 bg-white border border-[#d7dae1] rounded-lg p-3">
       <!-- Add row -->
       <div class="flex items-center gap-2 border border-[#e3e3ee] rounded-lg px-2.5 py-2 mb-1 max-h-12">
         <input
