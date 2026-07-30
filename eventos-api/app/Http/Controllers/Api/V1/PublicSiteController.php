@@ -926,11 +926,15 @@ class PublicSiteController extends Controller
             'tier_rank' => (int) $e->tier_rank,
             'is_featured' => (bool) ($profile['is_featured'] ?? false),
             'logo_url' => $logo ? Storage::disk($logo->disk)->url($logo->path) : ($profile['logo_url'] ?? null),
+            // The admin builder saves these nested under profile_data.social
+            // (Exhibitor › Details tab), not as flat top-level profile keys.
             'social' => array_filter([
-                'linkedin' => $profile['linkedin'] ?? null,
-                'twitter' => $profile['twitter'] ?? null,
-                'facebook' => $profile['facebook'] ?? null,
-                'instagram' => $profile['instagram'] ?? null,
+                'facebook' => $profile['social']['facebook'] ?? null,
+                'instagram' => $profile['social']['instagram'] ?? null,
+                'whatsapp' => $profile['social']['whatsapp'] ?? null,
+                'twitter' => $profile['social']['twitter'] ?? null,
+                'linkedin' => $profile['social']['linkedin'] ?? null,
+                'youtube' => $profile['social']['youtube'] ?? null,
             ]),
             'products' => $e->products->map(fn ($p) => [
                 'id' => $p->id,
