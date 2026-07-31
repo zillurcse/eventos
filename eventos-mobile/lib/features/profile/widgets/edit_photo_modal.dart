@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../utils/config/app_config.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../widgets/custom_image.dart';
 import '../profile_controller.dart';
 
 class EditPhotoModal extends StatefulWidget {
@@ -27,9 +29,12 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
     }
   }
 
+  String get _existingPhotoUrl => AppConfig.resolveMediaUrl(
+        _controller.profileData.value?.profilePhotoUrl,
+      );
+
   @override
   Widget build(BuildContext context) {
-    final profile = _controller.profileData.value;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
       decoration: BoxDecoration(
@@ -44,7 +49,6 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Top Pill
             Container(
               width: 40.w,
               height: 4.h,
@@ -54,8 +58,6 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
               ),
             ),
             SizedBox(height: 16.h),
-            
-            // Title
             Text(
               "Edit Photo",
               style: context.titleLarge?.copyWith(
@@ -64,8 +66,6 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
               ),
             ),
             SizedBox(height: 24.h),
-
-            // Mockup Crop Area
             ClipRRect(
               borderRadius: BorderRadius.circular(8.r),
               child: Stack(
@@ -78,19 +78,18 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
                           height: 300.h,
                           fit: BoxFit.cover,
                         )
-                      : Image.network(
-                          profile?.profilePhotoUrl ?? 'https://i.pravatar.cc/500?img=11',
+                      : CustomImage(
+                          _existingPhotoUrl,
                           width: double.infinity,
                           height: 300.h,
                           fit: BoxFit.cover,
+                          avatar: true,
                         ),
-                  // Darken overlay
                   Container(
                     width: double.infinity,
                     height: 300.h,
                     color: Colors.white.withValues(alpha: 0.3),
                   ),
-                  // Circular cutout
                   Container(
                     width: 200.w,
                     height: 200.w,
@@ -103,13 +102,13 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
                       scale: _zoomValue,
                       child: _selectedImage != null
                           ? Image.file(_selectedImage!, fit: BoxFit.cover)
-                          : Image.network(
-                              profile?.profilePhotoUrl ?? 'https://i.pravatar.cc/500?img=11',
+                          : CustomImage(
+                              _existingPhotoUrl,
                               fit: BoxFit.cover,
+                              avatar: true,
                             ),
                     ),
                   ),
-                  // Pick image button
                   Positioned(
                     bottom: 16.h,
                     child: GestureDetector(
@@ -132,8 +131,6 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
               ),
             ),
             SizedBox(height: 24.h),
-
-            // Slider & Rotate Row
             Row(
               children: [
                 Expanded(
@@ -166,8 +163,6 @@ class _EditPhotoModalState extends State<EditPhotoModal> {
               ],
             ),
             SizedBox(height: 24.h),
-
-            // Action Buttons
             Row(
               children: [
                 Expanded(

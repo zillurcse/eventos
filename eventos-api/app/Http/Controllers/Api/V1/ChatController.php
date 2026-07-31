@@ -234,6 +234,11 @@ class ChatController extends Controller
 
         abort_if(trim((string) ($data['body'] ?? '')) === '' && ! $attachments, 422, 'Write something or attach a file.');
 
+        // Notify only for a brand-new conversation (first message ever between
+        // these two users). Later messages stay live via Reverb without push /
+        // in-app spam.
+        $isFirstMessage = ! ChatMessage::where('conversation_id', $thread->id)->exists();
+
         $message = ChatMessage::create([
             'event_id' => $thread->event_id,
             'conversation_id' => $thread->id,
@@ -258,28 +263,30 @@ class ChatController extends Controller
             );
         }
 
-        $eventModel = Event::find($thread->event_id);
-        $senderName = $sender
-            ? (trim(($sender->contact?->first_name ?? '').' '.($sender->contact?->last_name ?? '')) ?: 'Someone')
-            : 'Someone';
-        $preview = self::previewLabel($message);
+        if ($isFirstMessage) {
+            $eventModel = Event::find($thread->event_id);
+            $senderName = $sender
+                ? (trim(($sender->contact?->first_name ?? '').' '.($sender->contact?->last_name ?? '')) ?: 'Someone')
+                : 'Someone';
+            $preview = self::previewLabel($message);
 
-        $notifications->notify(
-            'participation',
-            $recipientId,
-            $sender?->organization_id ?? $eventModel?->organization_id,
-            (int) $thread->event_id,
-            'chat.message',
-            [
-                'title' => $senderName,
-                'body' => $preview !== '' ? $preview : 'New message',
-                'type' => 'chat',
-                'conversation_id' => $thread->uuid,
-                'event_uuid' => $eventModel?->uuid,
-                'sender_name' => $senderName,
-            ],
-            ['in_app', 'push'],
-        );
+            $notifications->notify(
+                'participation',
+                $recipientId,
+                $sender?->organization_id ?? $eventModel?->organization_id,
+                (int) $thread->event_id,
+                'chat.message',
+                [
+                    'title' => $senderName,
+                    'body' => $preview !== '' ? $preview : 'New message',
+                    'type' => 'chat',
+                    'conversation_id' => $thread->uuid,
+                    'event_uuid' => $eventModel?->uuid,
+                    'sender_name' => $senderName,
+                ],
+                ['in_app', 'push'],
+            );
+        }
 
         return response()->json(['data' => $this->message($message, $me)], 201);
     }

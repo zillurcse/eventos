@@ -42,11 +42,28 @@ class OngoingSessions extends StatelessWidget {
               ),
             ),
             SizedBox(height: 12.h),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.only(left: 16.sp, right: 16.sp),
-              child: IntrinsicHeight(
+            if (sessions.length == 1)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                child: SessionCard(
+                  session: sessions.first,
+                  isOnGoing: true,
+                  fullWidth: true,
+                  title: sessions.first.title,
+                  startTime: sessions.first.startTime,
+                  endTime: sessions.first.endTime,
+                  dayLabel: sessions.first.day.title,
+                  logoUrl: sessions.first.logoUrl,
+                  speakerImageUrls:
+                      sessions.first.speakers.map((sp) => sp.imageUrl).toList(),
+                ),
+              )
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 16.sp, right: 16.sp),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: sessions.map((s) {
                     return Padding(
                       padding: EdgeInsets.only(right: 12.sp),
@@ -58,13 +75,13 @@ class OngoingSessions extends StatelessWidget {
                         endTime: s.endTime,
                         dayLabel: s.day.title,
                         logoUrl: s.logoUrl,
-                        speakerImageUrls: s.speakers.map((sp) => sp.imageUrl).toList(),
+                        speakerImageUrls:
+                            s.speakers.map((sp) => sp.imageUrl).toList(),
                       ),
                     );
                   }).toList(),
                 ),
               ),
-            ),
             SizedBox(height: 12.h),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),

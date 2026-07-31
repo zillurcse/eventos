@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../../../models/session_detail_response_model.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../session_phase.dart';
 
 class SessionHeaderDetails extends StatelessWidget {
   final SessionDetailModel detail;
@@ -30,31 +31,24 @@ class SessionHeaderDetails extends StatelessWidget {
     return dateStr;
   }
 
-  String _formatTime(String timeStr) {
-    if (timeStr.isEmpty) return '';
-    try {
-      final parts = timeStr.split(':');
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-        final dt = DateTime(2026, 1, 1, hour, minute);
-        return DateFormat('h:mm a').format(dt);
-      }
-    } catch (_) {}
-    return timeStr;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dateFormatted = _formatDate(detail.day.date.isNotEmpty ? detail.day.date : detail.day.title);
-    final startTimeFormatted = _formatTime(detail.startTime);
-    final endTimeFormatted = _formatTime(detail.endTime);
+    final dateSource = detail.startsAt ??
+        (detail.day.date.isNotEmpty ? detail.day.date : detail.day.title);
+    final dateFormatted = _formatDate(dateSource);
+    final startTimeFormatted = detail.startTime;
+    final endTimeFormatted = detail.endTime;
     final timeRange = (startTimeFormatted.isNotEmpty && endTimeFormatted.isNotEmpty)
         ? '$startTimeFormatted - $endTimeFormatted'
         : '';
     final dateAndTimeText = [dateFormatted, timeRange]
         .where((element) => element.isNotEmpty)
         .join(' | ');
+    final isLiveNow = SessionPhaseHelper.isLiveNow(
+      status: detail.status,
+      startsAt: detail.startsAt,
+      endsAt: detail.endsAt,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -62,7 +56,7 @@ class SessionHeaderDetails extends StatelessWidget {
         // Badges
         Row(
           children: [
-            if (detail.isStream) ...[
+            if (isLiveNow) ...[
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(

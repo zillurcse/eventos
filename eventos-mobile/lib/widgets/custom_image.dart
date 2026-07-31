@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../utils/config/app_config.dart';
 import '../utils/enum/enums.dart';
 
 class CustomImage extends StatelessWidget {
@@ -34,9 +35,14 @@ class CustomImage extends StatelessWidget {
     this.borderRadius,
   });
 
+  String get _resolvedSrc => AppConfig.resolveMediaUrl(src);
+
   ImageSource get _source {
-    if (src.endsWith('.svg')) return ImageSource.svg;
-    if (src.startsWith('http://') || src.startsWith('https://')) return ImageSource.network;
+    final s = _resolvedSrc;
+    if (s.endsWith('.svg')) return ImageSource.svg;
+    if (s.startsWith('http://') || s.startsWith('https://')) {
+      return ImageSource.network;
+    }
     return ImageSource.asset;
   }
 
@@ -45,10 +51,17 @@ class CustomImage extends StatelessWidget {
   ColorFilter? get _colorFilter =>
       color != null ? ColorFilter.mode(color!, BlendMode.srcIn) : null;
 
+  /// Decode at display size × DPR to avoid keeping full-res bitmaps in memory.
+  /// Skips non-finite sizes (e.g. [double.infinity] used for layout stretch).
+  int? _cachePx(double? logical, double dpr) {
+    if (logical == null || !logical.isFinite || logical <= 0) return null;
+    return (logical * dpr).round().clamp(1, 4096);
+  }
+
   Widget _buildSvg() {
     if (_isNetwork) {
       return SvgPicture.network(
-        src,
+        _resolvedSrc,
         height: height,
         width: width,
         fit: fit,
@@ -57,7 +70,7 @@ class CustomImage extends StatelessWidget {
       );
     }
     return SvgPicture.asset(
-      src,
+      _resolvedSrc,
       height: height,
       width: width,
       fit: fit,
@@ -65,26 +78,30 @@ class CustomImage extends StatelessWidget {
     );
   }
 
-  Widget _buildAsset() => Image.asset(
-    src,
-    height: height,
-    width: width,
-    fit: fit,
-    color: color,
-    errorBuilder: (_, __, ___) => _buildError(),
-  );
+  Widget _buildAsset(double dpr) => Image.asset(
+        _resolvedSrc,
+        height: height,
+        width: width,
+        fit: fit,
+        color: color,
+        cacheWidth: _cachePx(width, dpr),
+        cacheHeight: _cachePx(height, dpr),
+        errorBuilder: (_, __, ___) => _buildError(),
+      );
 
-  Widget _buildNetwork() => CachedNetworkImage(
-    imageUrl: src,
-    height: height,
-    width: width,
-    fit: fit,
-    httpHeaders: httpHeaders,
-    color: color,
-    colorBlendMode: color != null ? BlendMode.srcIn : null,
-    progressIndicatorBuilder: (_, __, ___) => _buildPlaceholder(),
-    errorWidget: (_, __, ___) => _buildError(),
-  );
+  Widget _buildNetwork(double dpr) => CachedNetworkImage(
+        imageUrl: _resolvedSrc,
+        height: height,
+        width: width,
+        fit: fit,
+        httpHeaders: httpHeaders,
+        color: color,
+        colorBlendMode: color != null ? BlendMode.srcIn : null,
+        memCacheWidth: _cachePx(width, dpr),
+        memCacheHeight: _cachePx(height, dpr),
+        progressIndicatorBuilder: (_, __, ___) => _buildPlaceholder(),
+        errorWidget: (_, __, ___) => _buildError(),
+      );
 
   Widget _buildPlaceholder() =>
       placeholder ??
@@ -137,12 +154,13 @@ class CustomImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (src.trim().isEmpty) return _applyClip(_buildError());
+    if (_resolvedSrc.trim().isEmpty) return _applyClip(_buildError());
 
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     final Widget image = switch (_source) {
       ImageSource.svg => _buildSvg(),
-      ImageSource.asset => _buildAsset(),
-      ImageSource.network => _buildNetwork(),
+      ImageSource.asset => _buildAsset(dpr),
+      ImageSource.network => _buildNetwork(dpr),
     };
 
     return _applyClip(image);

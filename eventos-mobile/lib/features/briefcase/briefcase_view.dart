@@ -150,8 +150,8 @@ class _BriefcaseViewState extends State<BriefcaseView>
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 4.h),
-                Text(
-                  "PDF FILE",
+                  Text(
+                  file.kind.toUpperCase() == 'PDF' ? 'PDF FILE' : '${file.kind.toUpperCase()} FILE',
                   style: context.specialCaption2?.copyWith(
                     color: context.caption,
                     fontSize: 10.sp,

@@ -46,23 +46,22 @@ class FeaturedSessions extends StatelessWidget {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.only(left: 16.sp, right: 16.sp),
-              child: IntrinsicHeight(
-                child: Row(
-                  children: sessions.map((s) {
-                    return Padding(
-                      padding: EdgeInsets.only(right: 12.sp),
-                      child: SessionCard(
-                        session: s,
-                        title: s.title,
-                        startTime: s.startTime,
-                        endTime: s.endTime,
-                        dayLabel: s.day.title,
-                        logoUrl: s.logoUrl,
-                        speakerImageUrls: s.speakers.map((sp) => sp.imageUrl).toList(),
-                      ),
-                    );
-                  }).toList(),
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: sessions.map((s) {
+                  return Padding(
+                    padding: EdgeInsets.only(right: 12.sp),
+                    child: SessionCard(
+                      session: s,
+                      title: s.title,
+                      startTime: s.startTime,
+                      endTime: s.endTime,
+                      dayLabel: s.day.title,
+                      logoUrl: s.logoUrl,
+                      speakerImageUrls: s.speakers.map((sp) => sp.imageUrl).toList(),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
             SizedBox(height: 12.h),

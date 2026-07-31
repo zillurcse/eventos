@@ -155,14 +155,6 @@ class LoungeCozyCard extends StatelessWidget {
       );
     }
 
-    Widget plant() => Image.asset(
-          'assets/png/lounge/seat-plant.png',
-          width: 36.w,
-          height: 36.w,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
-        );
-
     Widget centerpiece() {
       final url = table.imageUrl ?? '';
       return Container(
@@ -197,19 +189,12 @@ class LoungeCozyCard extends StatelessWidget {
     if (_isPair) {
       return SizedBox(
         height: 220.h,
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Positioned(top: 0, left: 8.w, child: plant()),
-            Positioned(bottom: 0, right: 8.w, child: plant()),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                unit(0),
-                centerpiece(),
-                unit(1, rotate: 180),
-              ],
-            ),
+            unit(0),
+            centerpiece(),
+            unit(1, rotate: 180),
           ],
         ),
       );
@@ -218,26 +203,19 @@ class LoungeCozyCard extends StatelessWidget {
     if (_isDiamond) {
       return SizedBox(
         height: 240.h,
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Positioned(top: 0, left: 4.w, child: plant()),
-            Positioned(bottom: 0, right: 4.w, child: plant()),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            if (table.capacity >= 1) unit(0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                if (table.capacity >= 1) unit(0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    if (table.capacity >= 2) unit(1, rotate: -90),
-                    centerpiece(),
-                    if (table.capacity >= 3) unit(2, rotate: 90),
-                  ],
-                ),
-                if (table.capacity >= 4) unit(3, rotate: 180),
+                if (table.capacity >= 2) unit(1, rotate: -90),
+                centerpiece(),
+                if (table.capacity >= 3) unit(2, rotate: 90),
               ],
             ),
+            if (table.capacity >= 4) unit(3, rotate: 180),
           ],
         ),
       );

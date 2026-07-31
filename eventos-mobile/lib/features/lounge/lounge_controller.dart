@@ -139,7 +139,11 @@ class LoungeController extends GetxController {
   }
 
   Future<void> joinTable(LoungeTable table, {int? seat}) async {
-    if (joiningId.value.isNotEmpty || table.full) return;
+    if (joiningId.value.isNotEmpty) return;
+    if (table.full) {
+      ToastMsg.showErrorMessage('This table is full. Try another one.');
+      return;
+    }
 
     final cam = await Permission.camera.request();
     final mic = await Permission.microphone.request();

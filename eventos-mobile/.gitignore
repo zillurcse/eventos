@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets / signing — never commit
+*.jks
+*.keystore
+key.properties
+.env
+.env.*
+**/google-services.json.bak
+**/GoogleService-Info.plist.bak
+
+# Dart obfuscation / symbolication maps (store securely off-repo)
+*.symbols
+app.*.map.json
+**/mapping.txt

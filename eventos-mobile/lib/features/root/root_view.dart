@@ -9,6 +9,9 @@ import '../delegate/delegate_view.dart';
 import '../exhibitors/exhibitors_view.dart';
 import '../lounge/lounge_view.dart';
 import '../rooms/rooms_view.dart';
+import '../contests/contests_view.dart';
+import '../meetings/meetings_view.dart';
+import '../badges/badges_view.dart';
 import '../notifications/notifications_view.dart';
 import '../profile/profile_view.dart';
 import 'root_controller.dart';
@@ -20,8 +23,18 @@ import '../home/home_view.dart';
 import '../../widgets/dialogs/exit_dialog.dart';
 import '../../utils/enum/enums.dart';
 
-class RootView extends StatelessWidget {
+class RootView extends StatefulWidget {
   const RootView({super.key});
+
+  @override
+  State<RootView> createState() => _RootViewState();
+}
+
+class _RootViewState extends State<RootView> {
+  /// Only instantiate tab pages after the user visits them so polling,
+  /// fetches, and heavy widgets (lounge/rooms/profile) stay idle.
+  final Map<int, Widget> _pageCache = {};
+  int _tabsSignature = 0;
 
   Widget _getPageForRoute(String route, String customName) {
     switch (route) {
@@ -41,12 +54,35 @@ class RootView extends StatelessWidget {
         return const LoungeView();
       case 'event.rooms':
         return const RoomsView();
+      case 'event.contests':
+        return const ContestsView();
+      case 'event.meetings':
+        return const MeetingsView();
+      case 'event.badges':
+        return const BadgesView();
       case 'event.notifications':
         return const NotificationsView();
       case 'event.profile':
         return const ProfileView();
       default:
         return FeaturePlaceholderView(title: customName);
+    }
+  }
+
+  void _ensurePage(RootController controller, int index) {
+    if (_pageCache.containsKey(index)) return;
+    if (index < 0 || index >= controller.activeTabs.length) return;
+    final tab = controller.activeTabs[index];
+    _pageCache[index] = _getPageForRoute(tab.route, tab.customName);
+  }
+
+  void _syncCacheWithTabs(RootController controller) {
+    final signature = Object.hashAll(
+      controller.activeTabs.map((t) => '${t.route}:${t.customName}'),
+    );
+    if (signature != _tabsSignature) {
+      _tabsSignature = signature;
+      _pageCache.clear();
     }
   }
 
@@ -63,7 +99,7 @@ class RootView extends StatelessWidget {
           navigator.pop();
         } else {
           if (controller.selectedIndex.value != 0) {
-            controller.changeIndex(0); // Better to return home
+            controller.changeIndex(0);
           } else {
             final shouldExit = await showExitDialog(context);
             if (shouldExit == true) {
@@ -87,32 +123,39 @@ class RootView extends StatelessWidget {
                   return const Center(child: Text('No active modules found.'));
                 }
 
-                final pages = controller.activeTabs
-                    .map((tab) => _getPageForRoute(tab.route, tab.customName))
-                    .toList();
-                
+                _syncCacheWithTabs(controller);
+                final index = controller.selectedIndex.value;
+                _ensurePage(controller, index);
+
                 return IndexedStack(
-                  index: controller.selectedIndex.value,
-                  children: pages,
+                  index: index,
+                  children: List.generate(
+                    controller.activeTabs.length,
+                    (i) => _pageCache[i] ?? const SizedBox.shrink(),
+                  ),
                 );
               }),
             ),
           ],
         ),
         bottomNavigationBar: Obx(() {
-          if (controller.themeStatus.value == ApiState.loading || controller.activeTabs.isEmpty) {
+          if (controller.themeStatus.value == ApiState.loading ||
+              controller.activeTabs.isEmpty) {
             return const SizedBox.shrink();
           }
 
           final tabs = controller.activeTabs;
           final showMore = tabs.length > 4;
           final bottomNavTabs = showMore ? tabs.sublist(0, 4) : tabs;
-          
-          final navItems = bottomNavTabs.map((tab) => (
-            title: tab.customName,
-            icon: 'assets/svg/icons/${tab.icon}', 
-            // the icon field is like 'reception.svg', we can prepend 'assets/svg/icons/'
-          )).toList();
+
+          final navItems = bottomNavTabs
+              .map(
+                (tab) => (
+                  title: tab.customName,
+                  icon: 'assets/svg/icons/${tab.icon}',
+                ),
+              )
+              .toList();
 
           if (showMore) {
             navItems.add((title: 'More', icon: 'assets/svg/icons/more.svg'));

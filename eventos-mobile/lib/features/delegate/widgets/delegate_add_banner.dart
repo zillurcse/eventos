@@ -13,10 +13,8 @@ class DelegateAddBanner extends StatelessWidget {
     final controller = Get.find<DelegateController>();
 
     return Obx(() {
-      final featuredAd = controller.featuredAd;
-      final imageUrl = featuredAd?.firstImageUrl ?? '';
-
-      if (featuredAd == null || !featuredAd.isActive || imageUrl.isEmpty) {
+      final url = controller.adImageUrl.value;
+      if (url.isEmpty) {
         return const SliverToBoxAdapter(child: SizedBox.shrink());
       }
 
@@ -24,7 +22,7 @@ class DelegateAddBanner extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
           child: CustomImage(
-            imageUrl,
+            url,
             fit: BoxFit.cover,
             height: 60.sp,
             width: double.infinity,

@@ -7,11 +7,14 @@ import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get_storage/get_storage.dart';
 
+import '../../models/my_event.dart';
 import '../../models/registration_item.dart';
 import '../../utils/bindings/auth_binding.dart';
 import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../../utils/helpers/input_validators.dart';
 import '../../utils/helpers/local_key.dart';
+import '../../utils/helpers/secure_auth_storage.dart';
 import '../../widgets/custom_checkbox.dart';
 import '../../widgets/custom_date.dart';
 import '../../widgets/custom_dropdown.dart';
@@ -25,6 +28,7 @@ import '../notifications/push_notification_service.dart';
 class AuthController extends GetxController {
   final authService = AuthService();
   final localDb = GetStorage();
+  final _secureAuth = SecureAuthStorage.instance;
 
   final emailValidationStatus = ApiState.initial.obs;
   final signUpStatus = ApiState.initial.obs;
@@ -32,6 +36,13 @@ class AuthController extends GetxController {
   final loginWithCodeStatus = ApiState.initial.obs;
   final getComponentStatus = ApiState.initial.obs;
   final registerUserStatus = ApiState.initial.obs;
+  final myEventsStatus = ApiState.initial.obs;
+
+  /// Events available after login / for switch-event. Cleared on apply.
+  final RxList<MyEvent> availableEvents = <MyEvent>[].obs;
+
+  /// True when login succeeded but the user must pick among multiple events.
+  bool needsEventSelection = false;
 
   final RxBool agreeWithTcEmail = false.obs;
   final RxBool agreeWithTcPass = false.obs;
@@ -116,9 +127,10 @@ class AuthController extends GetxController {
                 controller: givenInputs[item.databaseConstantColumn],
                 hint: "Enter ${item.fieldLabel}",
                 maxLines: item.fieldType == "text_area_element" ? 6 : 1,
-                validator: (value) => (value == null || value.isEmpty)
-                    ? "Field should not be empty"
-                    : null,
+                validator: (value) => InputValidators.requiredField(
+                  value,
+                  label: item.fieldLabel,
+                ),
               ),
             ),
           );
@@ -263,7 +275,7 @@ class AuthController extends GetxController {
           throw Exception('Login did not return a token');
         }
 
-        await localDb.write(LocalKeyHelper.token, token);
+        await _secureAuth.saveToken(token);
         if (user is Map) {
           await localDb.write(
             LocalKeyHelper.userInfo,
@@ -279,29 +291,60 @@ class AuthController extends GetxController {
     );
   }
 
-  /// After login, pick the first available event (or keep AppConfig default).
+  /// After login: 1 event → auto-select; several → set [needsEventSelection].
   Future<void> _resolveEventContext() async {
+    needsEventSelection = false;
+    availableEvents.clear();
     try {
-      final response = await authService.myEvents();
-      final payload = response.data;
-      final list = payload is Map ? payload['data'] : null;
-      if (list is! List || list.isEmpty) return;
+      final events = await _fetchMyEvents();
+      if (events.isEmpty) return;
 
-      final first = list.first;
-      if (first is! Map) return;
-
-      final subdomain = first['subdomain']?.toString();
-      final uuid = first['uuid']?.toString() ?? first['id']?.toString();
-
-      if (subdomain != null && subdomain.isNotEmpty) {
-        AppDataProvider.obj.setSubDomain = subdomain;
+      if (events.length == 1) {
+        applySelectedEvent(events.first);
+        return;
       }
-      if (uuid != null && uuid.isNotEmpty) {
-        AppDataProvider.obj.eventUuid = uuid;
-      }
+
+      availableEvents.assignAll(events);
+      needsEventSelection = true;
     } catch (_) {
       // Keep default subdomain from AppConfig; reception still works via header.
     }
+  }
+
+  /// Loads events for the Switch Event screen (drawer).
+  Future<List<MyEvent>> loadMyEvents() async {
+    List<MyEvent> events = [];
+    await handleApiClient(
+      onStateChanged: myEventsStatus.call,
+      handleApiCall: () async {
+        events = await _fetchMyEvents();
+        availableEvents.assignAll(events);
+      },
+    );
+    return events;
+  }
+
+  Future<List<MyEvent>> _fetchMyEvents() async {
+    final response = await authService.myEvents();
+    final payload = response.data;
+    final list = payload is Map ? payload['data'] : null;
+    if (list is! List) return [];
+
+    return list
+        .whereType<Map>()
+        .map((e) => MyEvent.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.subdomain.isNotEmpty)
+        .toList();
+  }
+
+  void applySelectedEvent(MyEvent event) {
+    if (event.subdomain.isNotEmpty) {
+      AppDataProvider.obj.setSubDomain = event.subdomain;
+    }
+    if (event.uuid.isNotEmpty) {
+      AppDataProvider.obj.eventUuid = event.uuid;
+    }
+    needsEventSelection = false;
   }
 
   Future<void> registerUser({
@@ -315,5 +358,14 @@ class AuthController extends GetxController {
         ToastMsg.showSuccessMessage("${response.data["message"]}");
       },
     );
+  }
+
+  @override
+  void onClose() {
+    for (final c in givenInputs.values) {
+      c.dispose();
+    }
+    givenInputs.clear();
+    super.onClose();
   }
 }

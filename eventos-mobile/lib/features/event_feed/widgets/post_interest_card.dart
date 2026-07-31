@@ -34,6 +34,7 @@ class PostInterestCard extends StatelessWidget {
             height: 80.w,
             radius: 12.r,
             fit: BoxFit.cover,
+            avatar: true,
           ),
           SizedBox(height: 14.h),
           Text(title, style: context.h2, textAlign: TextAlign.center),

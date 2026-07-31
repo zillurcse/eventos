@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 
-import '../../../models/user.dart';
 import '../../../utils/extension/theme_ext.dart';
-import '../../../utils/helpers/local_key.dart';
 import '../../../widgets/custom_image.dart';
+import '../../root/root_controller.dart';
 import '../home_controller.dart';
 
 class GreetingUser extends StatelessWidget {
@@ -21,13 +19,8 @@ class GreetingUser extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
-    final user = rawUser is Map
-        ? User.fromJson(Map<String, dynamic>.from(rawUser))
-        : null;
-
-    // Also pull the event title from the controller for the welcome sub-line
     final ctrl = Get.find<HomeController>();
+    final rootCtrl = Get.find<RootController>();
 
     return SliverToBoxAdapter(
       child: Container(
@@ -35,21 +28,25 @@ class GreetingUser extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(16.sp, 16.sp, 16.sp, 20.sp),
         child: Obx(() {
           final eventTitle = ctrl.event.title;
+          final photo = rootCtrl.profilePhotoUrl.value;
+          final displayName = rootCtrl.userName.value;
+          final firstName = displayName.split(RegExp(r'\s+')).first;
           return Row(
             children: [
               CustomImage(
-                user?.profilePhotoUrl ?? '',
+                photo,
                 radius: 12.r,
                 height: 48.sp,
                 width: 48.sp,
+                avatar: true,
               ),
               SizedBox(width: 12.w),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user != null
-                        ? 'Hello ${user.firstName.isNotEmpty ? user.firstName : user.name} 👋🏻'
+                    displayName.isNotEmpty
+                        ? 'Hello $firstName 👋🏻'
                         : 'Hello 👋🏻',
                     style: context.h5?.copyWith(color: context.heading),
                   ),

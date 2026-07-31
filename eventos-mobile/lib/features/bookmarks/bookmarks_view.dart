@@ -21,12 +21,18 @@ class BookmarksView extends StatefulWidget {
 
 class _BookmarksViewState extends State<BookmarksView> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final bookmarkCtrl = Get.put(BookmarkController());
+  late final BookmarkController bookmarkCtrl;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    bookmarkCtrl = Get.isRegistered<BookmarkController>()
+        ? Get.find<BookmarkController>()
+        : Get.put(BookmarkController());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      bookmarkCtrl.fetchBookmarks();
+    });
   }
 
   @override

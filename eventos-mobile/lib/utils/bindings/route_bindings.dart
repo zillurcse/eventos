@@ -14,8 +14,10 @@ import '../../features/speaker/speaker_controller.dart';
 import '../../features/exhibitors/exhibitor_controller.dart';
 import '../../features/lounge/lounge_controller.dart';
 import '../../features/rooms/rooms_controller.dart';
+import '../../features/meetings/meetings_controller.dart';
 import '../../features/session/session_controller.dart';
 import '../../features/briefcase/briefcase_controller.dart';
+import '../../features/bookmarks/bookmark_controller.dart';
 import '../../features/leaderboard/leaderboard_controller.dart';
 
 class RootBinding implements Bindings {
@@ -32,9 +34,11 @@ class RootBinding implements Bindings {
     Get.lazyPut<ExhibitorController>(() => ExhibitorController(), fenix: true);
     Get.lazyPut<SessionController>(() => SessionController(), fenix: true);
     Get.lazyPut<BriefcaseController>(() => BriefcaseController(), fenix: true);
+    Get.lazyPut<BookmarkController>(() => BookmarkController(), fenix: true);
     Get.lazyPut<LeaderboardController>(() => LeaderboardController(), fenix: true);
     Get.lazyPut<LoungeController>(() => LoungeController(), fenix: true);
     Get.lazyPut<RoomsController>(() => RoomsController(), fenix: true);
+    Get.lazyPut<MeetingsController>(() => MeetingsController(), fenix: true);
   }
 }
 

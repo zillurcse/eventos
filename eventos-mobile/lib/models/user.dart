@@ -118,7 +118,12 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    final name = json['name'] as String? ?? '';
+    final firstNameRaw = json['first_name'] as String? ?? '';
+    final lastNameRaw = json['last_name'] as String? ?? '';
+    var name = json['name'] as String? ?? '';
+    if (name.trim().isEmpty) {
+      name = '$firstNameRaw $lastNameRaw'.trim();
+    }
     final parts = name.trim().split(RegExp(r'\s+'));
     final firstFromName = parts.isNotEmpty ? parts.first : '';
     final lastFromName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
@@ -145,12 +150,8 @@ class User {
       country: json['country'] as String? ?? '',
       industry: json['industry'] as String? ?? '',
       interests: json['interests'] as String? ?? '',
-      firstName: (json['first_name'] as String?)?.isNotEmpty == true
-          ? json['first_name'] as String
-          : firstFromName,
-      lastName: (json['last_name'] as String?)?.isNotEmpty == true
-          ? json['last_name'] as String
-          : lastFromName,
+      firstName: firstNameRaw.isNotEmpty ? firstNameRaw : firstFromName,
+      lastName: lastNameRaw.isNotEmpty ? lastNameRaw : lastFromName,
       gender: json['gender'] as String? ?? '',
       state: json['state'] as String? ?? '',
       cityTown: json['city_town'] as String? ?? '',
@@ -183,8 +184,15 @@ class User {
       eventLimit: json['event_limit'] as int? ?? 0,
       expireDate: json['expire_date'] as String? ?? '',
       packageInfo: json['package_info'] as String? ?? '',
-      profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
+      profilePhotoUrl: _photoUrl(json),
     );
+  }
+
+  /// V1 APIs use `avatar_url`; older mobile payloads used `profile_photo_url`.
+  static String _photoUrl(Map<String, dynamic> json) {
+    final legacy = json['profile_photo_url']?.toString() ?? '';
+    if (legacy.isNotEmpty) return legacy;
+    return json['avatar_url']?.toString() ?? '';
   }
 
   Map<String, dynamic> toJson() {

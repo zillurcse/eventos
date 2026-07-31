@@ -74,20 +74,29 @@ class _LeaderboardViewState extends State<LeaderboardView> {
           builder: (context) {
             final entries = leaderboardController.leaderboard;
 
-            // Find current user in the entries
             LeaderboardEntryModel? myEntry;
-            if (currentUser != null) {
-              for (var entry in entries) {
-                if (entry.userName.trim().toLowerCase() == currentUser.name.trim().toLowerCase()) {
+            for (final entry in entries) {
+              if (entry.isMe) {
+                myEntry = entry;
+                break;
+              }
+            }
+            if (myEntry == null && currentUser != null) {
+              for (final entry in entries) {
+                if (entry.userName.trim().toLowerCase() ==
+                    currentUser.name.trim().toLowerCase()) {
                   myEntry = entry;
                   break;
                 }
               }
             }
 
-            final myRank = myEntry?.rank ?? 25;
-            final myPoints = myEntry != null ? "${myEntry.points}pt" : "1240pt";
-            final attendeeText = entries.isNotEmpty ? "${entries.length} attendees" : "550 attendees";
+            final myRank = myEntry?.rank ?? 0;
+            final points = myEntry?.points ?? leaderboardController.myPoints.value;
+            final myPoints = points > 0 ? "${points}pt" : "0pt";
+            final attendeeText = entries.isNotEmpty
+                ? "${entries.length} attendees"
+                : "0 attendees";
 
             return ListView.builder(
               padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -287,7 +296,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "$myRank",
+                myRank > 0 ? "$myRank" : "—",
                 style: context.titleLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

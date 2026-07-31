@@ -287,9 +287,13 @@ class ReceptionMapper {
 
     return SessionModel(
       id: TypeHelper.toInt(json['id']),
+      uuid: (json['id'] ?? '').toString(),
       title: json['title']?.toString() ?? '',
       startTime: _formatClock(startsAt),
       endTime: _formatClock(endsAt),
+      startsAt: startsAt.isEmpty ? null : startsAt,
+      endsAt: endsAt.isEmpty ? null : endsAt,
+      status: json['status']?.toString(),
       logoUrl: json['logo_url']?.toString() ?? '',
       day: SessionDayModel(title: dayLabel, date: dayLabel),
       speakers: speakers,

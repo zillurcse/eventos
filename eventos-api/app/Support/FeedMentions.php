@@ -41,9 +41,9 @@ class FeedMentions
             $out[] = [
                 'id' => $p->uuid,
                 'name' => $name,
-                'avatar_url' => $p->profile_data['image_url']
-                    ?? $p->profile_data['avatar_url']
-                    ?? null,
+                'avatar_url' => $p->profile_data['avatar_url']
+                    ?? $p->profile_data['image_url']
+                    ?? ($p->meta['avatar_url'] ?? null),
             ];
         }
 

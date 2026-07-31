@@ -1,4 +1,3 @@
-import 'package:expouse/features/root/root_view.dart';
 import 'package:expouse/utils/helpers/toast_msg.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -8,9 +7,9 @@ import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
 
-import '../../../utils/bindings/route_bindings.dart';
 import '../../../utils/extension/size_ext.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/helpers/open_event_app.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_image.dart';
 import '../../../widgets/custom_input.dart';
@@ -19,6 +18,7 @@ import '../../../widgets/state_handler/api_state_handler.dart';
 import '../auth_controller.dart';
 import '../widgets/header_widget.dart';
 import '../widgets/permission_widget.dart';
+import 'select_event_view.dart';
 
 class LoginView extends StatefulWidget {
   final String email;
@@ -43,6 +43,14 @@ class LoginViewState extends State<LoginView> {
       email.text = widget.email;
     });
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    email.dispose();
+    pass.dispose();
+    code.dispose();
+    super.dispose();
   }
 
   @override
@@ -201,7 +209,15 @@ class LoginViewState extends State<LoginView> {
       email: email.text,
       password: pass.text,
       onSuccess: () {
-        Get.to(() => RootView(), binding: RootBinding());
+        if (controller.needsEventSelection) {
+          Get.offAll(
+            () => SelectEventView(
+              events: controller.availableEvents.toList(),
+            ),
+          );
+        } else {
+          openEventApp();
+        }
       },
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -8,6 +10,7 @@ import '../custom_image.dart';
 import '../image_group.dart';
 import '../../models/session_model.dart';
 import '../../features/session/session_controller.dart';
+import '../../features/session/session_phase.dart';
 import '../../features/briefcase/briefcase_controller.dart';
 import '../../utils/bottom_sheets/add_note_bottom_sheet.dart';
 import '../../utils/helpers/bottom_sheets.dart';
@@ -15,6 +18,8 @@ import '../../utils/helpers/bottom_sheets.dart';
 class SessionCard extends StatelessWidget {
   final SessionModel? session;
   final bool isOnGoing;
+  /// When true, card spans the available width (single-session layout).
+  final bool fullWidth;
   final String title;
   final String startTime;
   final String endTime;
@@ -26,6 +31,7 @@ class SessionCard extends StatelessWidget {
     super.key,
     this.session,
     this.isOnGoing = false,
+    this.fullWidth = false,
     this.title = '',
     this.startTime = '',
     this.endTime = '',
@@ -44,8 +50,8 @@ class SessionCard extends StatelessWidget {
         : 'Session Title';
 
     return Container(
-      width: context.width * .8,
-      margin: EdgeInsets.only(right: 16.w),
+      width: fullWidth ? double.infinity : context.width * .8,
+      margin: fullWidth ? EdgeInsets.zero : EdgeInsets.only(right: 16.w),
       decoration: BoxDecoration(
         color: context.tertiaryText,
         borderRadius: BorderRadius.circular(12.r),
@@ -145,19 +151,13 @@ class SessionCard extends StatelessWidget {
                         CustomImage(
                           logoUrl,
                           width: context.width,
-                          height: context.height * .16,
+                          height: context.height * (fullWidth ? .22 : .16),
                           fit: BoxFit.cover,
                         ),
                         if (isOnGoing)
-                          LinearProgressIndicator(
-                            value: .6,
-                            backgroundColor: context.primaryFocused,
-                            color: context.primaryTheme,
-                            borderRadius: BorderRadius.only(
-                              topRight: Radius.circular(100.r),
-                              bottomRight: Radius.circular(100.r),
-                            ),
-                            minHeight: 6.h,
+                          _SessionLiveProgressBar(
+                            startsAt: session?.startsAt,
+                            endsAt: session?.endsAt,
                           ),
                       ],
                     ),
@@ -194,13 +194,13 @@ class SessionCard extends StatelessWidget {
                   ],
                   if (isOnGoing)
                     Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Divider(),
                         SizedBox(height: 12.sp),
                         Button.roundedText(
                           text: "Join Now",
-                          width: context.width * .4,
+                          width: fullWidth ? double.infinity : context.width * .4,
                           style: context.buttonMediumBold
                               ?.copyWith(color: context.tertiaryText),
                           onTap: () {},
@@ -231,22 +231,75 @@ class SessionCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (isOnGoing) ...[
-              const Spacer(),
-              LinearProgressIndicator(
-                value: .6,
-                backgroundColor: context.primaryFocused,
-                color: context.primaryTheme,
-                borderRadius: BorderRadius.only(
-                  topRight: Radius.circular(100.r),
-                  bottomRight: Radius.circular(100.r),
-                ),
-                minHeight: 6.h,
-              ),
-            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Live session progress under the cover image, driven by start/end times.
+class _SessionLiveProgressBar extends StatefulWidget {
+  final String? startsAt;
+  final String? endsAt;
+
+  const _SessionLiveProgressBar({
+    required this.startsAt,
+    required this.endsAt,
+  });
+
+  @override
+  State<_SessionLiveProgressBar> createState() =>
+      _SessionLiveProgressBarState();
+}
+
+class _SessionLiveProgressBarState extends State<_SessionLiveProgressBar> {
+  Timer? _timer;
+  double _value = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _tick());
+  }
+
+  @override
+  void didUpdateWidget(covariant _SessionLiveProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.startsAt != widget.startsAt ||
+        oldWidget.endsAt != widget.endsAt) {
+      _tick();
+    }
+  }
+
+  void _tick() {
+    final next = SessionPhaseHelper.progress(
+      startsAt: widget.startsAt,
+      endsAt: widget.endsAt,
+    );
+    if (!mounted) return;
+    setState(() => _value = next);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _value.isFinite ? _value.clamp(0.0, 1.0) : 0.0;
+    return LinearProgressIndicator(
+      value: value,
+      backgroundColor: context.primaryFocused,
+      color: context.primaryTheme,
+      borderRadius: BorderRadius.only(
+        topRight: Radius.circular(100.r),
+        bottomRight: Radius.circular(100.r),
+      ),
+      minHeight: 6.h,
     );
   }
 }

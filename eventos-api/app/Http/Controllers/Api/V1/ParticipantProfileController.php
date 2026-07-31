@@ -271,7 +271,14 @@ class ParticipantProfileController extends Controller
     private function profile(Participation $participation): array
     {
         $profile = $participation->profile_data ?? [];
+        $meta = $participation->meta ?? [];
         $contact = $participation->contact;
+
+        // Same precedence as ParticipantResource / attendee directory so seeded
+        // demo avatars (meta.avatar_url) and speaker image_url both surface here.
+        $avatar = $profile['avatar_url']
+            ?? ($profile['image_url']
+            ?? ($meta['avatar_url'] ?? null));
 
         return [
             'name' => $contact?->fullName(),
@@ -281,7 +288,7 @@ class ParticipantProfileController extends Controller
             'job_title' => $profile['job_title'] ?? ($profile['designation'] ?? ''),
             'company' => $profile['company'] ?? '',
             'bio' => $profile['bio'] ?? '',
-            'avatar_url' => $profile['avatar_url'] ?? ($profile['image_url'] ?? null),
+            'avatar_url' => ($avatar !== null && $avatar !== '') ? $avatar : null,
             'avatar_file_id' => $profile['avatar_file_id'] ?? null,
             'phone' => $profile['phone'] ?? '',
             'gender' => $profile['gender'] ?? '',

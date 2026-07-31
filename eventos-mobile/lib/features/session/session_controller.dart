@@ -8,7 +8,9 @@ import '../../models/session_detail_response_model.dart';
 import '../../models/mappers/session_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../../utils/helpers/type_helper.dart';
 import '../bookmarks/bookmark_controller.dart';
+import 'session_phase.dart';
 import 'session_service.dart';
 
 class SessionController extends GetxController {
@@ -20,6 +22,9 @@ class SessionController extends GetxController {
 
   final detailStatus = ApiState.initial.obs;
   final Rxn<SessionDetailModel> sessionDetail = Rxn<SessionDetailModel>();
+  final sessionRating = 0.obs;
+  final ratingSaving = false.obs;
+
   final searchQuery = "".obs;
   late final TextEditingController searchController;
 
@@ -27,6 +32,7 @@ class SessionController extends GetxController {
   final selectedTag = RxnString();
   final selectedTimezone = RxnString();
   final selectedSpeakerId = RxnInt();
+  final savedOnly = false.obs;
 
   final RxMap<String, String> timezoneData = <String, String>{
     "event_timezone": "",
@@ -44,6 +50,8 @@ class SessionController extends GetxController {
   final Map<int, Map<String, dynamic>> _rawById = {};
   /// Session UUIDs bookmarked by the current participant.
   final Set<String> _bookmarkedUuids = {};
+  /// Bumped whenever bookmarks change so Obx widgets rebuild.
+  final bookmarkRevision = 0.obs;
 
   @override
   void onInit() {
@@ -77,6 +85,40 @@ class SessionController extends GetxController {
       masterTags.isNotEmpty ? masterTags : _extractTags(days);
   List<ReceptionSpeakerModel> get speakersList =>
       masterSpeakers.isNotEmpty ? masterSpeakers : _extractSpeakers(days);
+
+  int get bookmarkedSessionCount {
+    bookmarkRevision.value;
+    return _bookmarkedUuids.length;
+  }
+
+  bool isBookmarked(String uuid) {
+    bookmarkRevision.value;
+    return _bookmarkedUuids.contains(uuid);
+  }
+
+  bool isBookmarkedById(int scheduleId) {
+    bookmarkRevision.value;
+    final uuid = _uuidFor(scheduleId);
+    return uuid != null && _bookmarkedUuids.contains(uuid);
+  }
+
+  /// LIVE sessions from the full agenda (pre/post-roll + status), not home reception.
+  List<SessionModel> get liveSessions {
+    final now = DateTime.now();
+    final result = <SessionModel>[];
+    for (final raw in _allRawSessions) {
+      final model = SessionMapper.sessionFromV1(raw);
+      if (SessionPhaseHelper.isLiveNow(
+        status: model.status,
+        startsAt: model.startsAt,
+        endsAt: model.endsAt,
+        now: now,
+      )) {
+        result.add(model);
+      }
+    }
+    return result;
+  }
 
   final List<String> timezonesList = const [
     "GST",
@@ -191,6 +233,7 @@ class SessionController extends GetxController {
               .map((e) => e.toString())
               .where((e) => e.isNotEmpty),
         );
+      bookmarkRevision.value++;
     } catch (_) {
       // Bookmarks require auth — agenda still works without them.
     }
@@ -214,11 +257,15 @@ class SessionController extends GetxController {
       tag: selectedTag.value,
       speakerId: selectedSpeakerId.value,
       search: searchQuery.value,
+      savedOnly: savedOnly.value,
+      bookmarkedUuids: _bookmarkedUuids,
     );
 
     final payload = {
       'event': {
         'timezone': timezoneData['event_timezone'] ?? '',
+        'starts_at': timezoneData['event_starts_at'] ?? '',
+        'ends_at': timezoneData['event_ends_at'] ?? '',
       },
       'tracks': masterTracks
           .map((t) => {'id': t.id, 'name': t.title})
@@ -240,16 +287,26 @@ class SessionController extends GetxController {
     _rawById
       ..clear()
       ..addAll(mapped.rawById);
-    // Keep unfiltered raw ids for detail lookup.
     for (final raw in _allRawSessions) {
       final id = SessionMapper.sessionFromV1(raw).id;
       _rawById.putIfAbsent(id, () => raw);
     }
 
     days.assignAll(mapped.days);
-    if (activeDayIndex.value >= days.length) {
-      activeDayIndex(0);
+    // Default to today when in range; otherwise the first day (matches web).
+    if (rebuildFromCache || activeDayIndex.value >= days.length) {
+      activeDayIndex(_indexOfTodayOrFirst());
     }
+  }
+
+  /// Prefer today's date in the strip; fall back to the first day.
+  int _indexOfTodayOrFirst() {
+    if (days.isEmpty) return 0;
+    final now = DateTime.now();
+    final todayKey =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final idx = days.indexWhere((d) => d.date == todayKey);
+    return idx >= 0 ? idx : 0;
   }
 
   void setActiveDayIndex(int index) {
@@ -270,11 +327,15 @@ class SessionController extends GetxController {
 
   void selectTimezone(String? tz) {
     selectedTimezone(tz);
-    // Timezone display-only for now; times already localised in mapper.
   }
 
   void selectSpeaker(int? speakerId) {
     selectedSpeakerId(speakerId);
+    _applyFilters();
+  }
+
+  void toggleSavedOnly() {
+    savedOnly(!savedOnly.value);
     _applyFilters();
   }
 
@@ -285,6 +346,7 @@ class SessionController extends GetxController {
 
   Future<void> fetchSessionDetails(int scheduleId) async {
     sessionDetail.value = null;
+    sessionRating.value = 0;
     await handleApiClient(
       onStateChanged: (state) => detailStatus(state),
       handleApiCall: () async {
@@ -322,9 +384,55 @@ class SessionController extends GetxController {
         if (raw == null) {
           throw Exception('Session not found');
         }
-        sessionDetail.value = SessionMapper.detailFromV1(raw);
+        final detail = SessionMapper.detailFromV1(raw);
+        sessionDetail.value = detail;
+        if (detail.isAllowedToRate && detail.uuid.isNotEmpty) {
+          await _loadRating(detail.uuid);
+        }
       },
     );
+  }
+
+  Future<void> _loadRating(String sessionUuid) async {
+    try {
+      final response = await _service.getSessionRating(sessionUuid);
+      final body = response.data;
+      if (body is! Map) return;
+      final data = body['data'] is Map
+          ? Map<String, dynamic>.from(body['data'] as Map)
+          : body;
+      sessionRating.value = TypeHelper.toInt(data['score']);
+    } catch (_) {
+      sessionRating.value = 0;
+    }
+  }
+
+  Future<void> submitRating(int score) async {
+    final detail = sessionDetail.value;
+    if (detail == null || !detail.isAllowedToRate || detail.uuid.isEmpty) {
+      return;
+    }
+    if (score < 1 || score > 5) return;
+    final previous = sessionRating.value;
+    sessionRating.value = score;
+    ratingSaving.value = true;
+    try {
+      await _service.submitSessionRating(detail.uuid, score);
+    } catch (_) {
+      sessionRating.value = previous;
+    } finally {
+      ratingSaving.value = false;
+    }
+  }
+
+  String? calendarUrlFor(SessionDetailModel detail) {
+    final url = SessionMapper.googleCalendarUrl(
+      title: detail.title,
+      startsAt: detail.startsAt,
+      endsAt: detail.endsAt,
+      description: detail.description,
+    );
+    return url.isEmpty ? null : url;
   }
 
   String? _uuidFor(int scheduleId) {
@@ -363,12 +471,27 @@ class SessionController extends GetxController {
     } else {
       _bookmarkedUuids.remove(uuid);
     }
+    bookmarkRevision.value++;
     _applyFilters();
+    // Refresh detail favorite state if open.
+    final detail = sessionDetail.value;
+    if (detail != null && detail.id == scheduleId) {
+      sessionDetail.refresh();
+    }
 
     try {
       await _service.toggleSessionBookmark(uuid, on);
       if (Get.isRegistered<BookmarkController>()) {
-        // Briefcase / bookmarks tab can refresh independently.
+        final session = days
+            .expand((d) => d.schedules)
+            .toList()
+            .firstWhereOrNull((s) => s.id == scheduleId);
+        Get.find<BookmarkController>().syncLocal(
+          type: 'session',
+          uuid: uuid,
+          on: on,
+          session: session,
+        );
       }
       return true;
     } catch (_) {
@@ -377,6 +500,7 @@ class SessionController extends GetxController {
       } else {
         _bookmarkedUuids.add(uuid);
       }
+      bookmarkRevision.value++;
       _applyFilters();
       return false;
     }

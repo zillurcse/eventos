@@ -85,6 +85,7 @@ class _CommentCardState extends State<CommentCard> {
                 height: 40.sp,
                 width: 40.sp,
                 radius: 8.r,
+                avatar: true,
               ),
               SizedBox(width: 8.w),
               Expanded(

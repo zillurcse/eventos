@@ -11,17 +11,18 @@ interface Tab { key: string, label: string, enabled: boolean }
 
 // The catalogue of tabs the mobile app can surface in its bottom navigation.
 const DEFAULT_TABS: Tab[] = [
-  { key: 'home', label: 'Home', enabled: true },
-  { key: 'feed', label: 'Feed', enabled: true },
-  { key: 'agenda', label: 'Agenda', enabled: true },
+  { key: 'reception', label: 'Reception', enabled: true },
+  { key: 'feed', label: 'Event Feed', enabled: true },
+  { key: 'sessions', label: 'Sessions', enabled: true },
   { key: 'speakers', label: 'Speakers', enabled: true },
+  { key: 'delegates', label: 'Delegates', enabled: true },
   { key: 'exhibitors', label: 'Exhibitors', enabled: true },
-  { key: 'attendees', label: 'Attendees', enabled: true },
-  { key: 'floor_plan', label: 'Floor Plan', enabled: false },
-  { key: 'lounge', label: 'Lounge', enabled: false },
-  { key: 'my_badge', label: 'My Badge', enabled: true },
-  { key: 'notifications', label: 'Notifications', enabled: true },
-  { key: 'profile', label: 'Profile', enabled: true },
+  { key: 'meetings', label: 'Meetings', enabled: true },
+  { key: 'lounge', label: 'Lounge', enabled: true },
+  { key: 'rooms', label: 'Rooms', enabled: true },
+  { key: 'contests', label: 'Contests', enabled: true },
+  { key: 'expolens', label: 'ExpoLens', enabled: true },
+  { key: 'my_badges', label: 'My Badges', enabled: true },
 ]
 
 const tabs = ref<Tab[]>([])

@@ -18,6 +18,7 @@ import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/helpers/local_key.dart';
 import '../../utils/helpers/toast_msg.dart';
 import 'chat_service.dart';
+import 'pages/chat_detail_view.dart';
 
 class ChatController extends GetxController {
   final chatService = ChatService();
@@ -58,9 +59,13 @@ class ChatController extends GetxController {
   void onInit() {
     super.onInit();
     _loadCurrentUser();
-    fetchRooms();
-    initPusher();
-    _startGlobalPoll();
+    // Defer socket + polling so shell first frame isn't blocked by chat I/O.
+    Future.microtask(() {
+      if (isClosed) return;
+      fetchRooms();
+      initPusher();
+      _startGlobalPoll();
+    });
   }
 
   void _loadCurrentUser() {
@@ -506,6 +511,57 @@ class ChatController extends GetxController {
       conversationId,
       partnerId: partnerId ?? room?.partner?.id,
     );
+  }
+
+  /// Find-or-create a 1:1 thread with [participantUuid] and open the detail view.
+  Future<void> startChatWith(
+    String participantUuid, {
+    String? name,
+    String? imageUrl,
+  }) async {
+    if (participantUuid.isEmpty) return;
+    try {
+      final res = await chatService.openConversation(participantUuid);
+      final payload = res.data;
+      if (payload is! Map) {
+        ToastMsg.showErrorMessage('Could not start chat.');
+        return;
+      }
+      final data = payload['data'] is Map
+          ? Map<String, dynamic>.from(payload['data'] as Map)
+          : Map<String, dynamic>.from(payload);
+      final conversationId = data['id']?.toString() ?? '';
+      if (conversationId.isEmpty) {
+        ToastMsg.showErrorMessage('Could not start chat.');
+        return;
+      }
+
+      final partner = data['with'] is Map
+          ? ChatPerson.fromJson(Map<String, dynamic>.from(data['with'] as Map))
+          : null;
+
+      if (!chatRooms.any((r) => r.id == conversationId)) {
+        chatRooms.insert(
+          0,
+          ChatRoomModel(
+            id: conversationId,
+            partner: partner,
+            unread: 0,
+          ),
+        );
+      }
+
+      Get.to(
+        () => ChatDetailView(
+          conversationId: conversationId,
+          partnerId: partner?.id ?? participantUuid,
+          partnerName: name ?? partner?.name ?? 'Chat',
+          partnerImageUrl: imageUrl ?? partner?.avatarUrl,
+        ),
+      );
+    } catch (e) {
+      ToastMsg.showApiErrorMessage(e);
+    }
   }
 
   @override

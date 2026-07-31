@@ -10,6 +10,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../utils/helpers/local_key.dart';
+import '../../utils/helpers/secure_auth_storage.dart';
 import '../chat/chat_controller.dart';
 import '../chat/pages/chat_detail_view.dart';
 import 'device_token_service.dart';
@@ -92,8 +93,7 @@ class PushNotificationService {
 
     _ready = true;
 
-    final authToken = _storage.read(LocalKeyHelper.token);
-    if (authToken != null) {
+    if (SecureAuthStorage.instance.hasToken) {
       await registerCurrentToken();
     }
   }
@@ -127,8 +127,7 @@ class PushNotificationService {
   }
 
   Future<void> _registerToken(String token) async {
-    final auth = _storage.read(LocalKeyHelper.token);
-    if (auth == null) return;
+    if (!SecureAuthStorage.instance.hasToken) return;
     final platform = Platform.isIOS ? 'ios' : 'android';
     try {
       await _tokenApi.register(platform: platform, token: token);

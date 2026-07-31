@@ -1,37 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../models/session_detail_response_model.dart';
 import '../../../utils/extension/theme_ext.dart';
-import '../session_controller.dart';
+import '../session_phase.dart';
+import 'session_player.dart';
 
 class SessionStickyStreamButton extends StatelessWidget {
   final SessionDetailModel detail;
 
   const SessionStickyStreamButton({super.key, required this.detail});
 
-  Future<void> _openStream(BuildContext context, String? streamUrl) async {
-    final ctrl = Get.find<SessionController>();
-    if (streamUrl == null || streamUrl.isEmpty) {
-      Get.snackbar(
-        'Stream Info',
-        'Stream link is not available yet.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: ctrl.days.isEmpty ? Colors.black : context.primaryTheme.withValues(alpha: 0.8),
-        colorText: Colors.white,
-      );
-      return;
+  String? _label(SessionPhase phase) {
+    if (phase == SessionPhase.upcoming) {
+      return 'Starts soon';
     }
-    final uri = Uri.tryParse(streamUrl);
-    if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (phase == SessionPhase.ended) {
+      if (detail.onDemandRecordingLink != null &&
+          detail.onDemandRecordingLink!.isNotEmpty) {
+        return 'Watch Recording';
+      }
+      return null;
     }
+    if (!detail.isStream) return null;
+    final host = detail.whoWillHost ?? '';
+    if (host == 'youtube') return 'Watch Live';
+    if (host == 'zoom') return 'Join Zoom';
+    if (host == 'meet') return 'Join Meet';
+    if (host == 'jitsi') return 'Join Jitsi';
+    return 'Join Now';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!detail.isStream) return const SizedBox.shrink();
+    final phase = SessionPhaseHelper.resolve(
+      status: detail.status,
+      startsAt: detail.startsAt,
+      endsAt: detail.endsAt,
+    );
+    final label = _label(phase);
+    if (label == null) return const SizedBox.shrink();
+
+    final enabled = phase != SessionPhase.upcoming ||
+        (detail.streamLink != null && detail.streamLink!.isNotEmpty);
 
     return SafeArea(
       top: false,
@@ -43,16 +53,17 @@ class SessionStickyStreamButton extends StatelessWidget {
           border: Border(top: BorderSide(color: context.strokeLight, width: 1.h)),
         ),
         child: ElevatedButton(
-          onPressed: () => _openStream(context, detail.streamLink),
+          onPressed: enabled ? () => openSessionStream(detail) : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: context.primaryTheme,
+            disabledBackgroundColor: context.primaryTheme.withValues(alpha: 0.4),
             padding: EdgeInsets.symmetric(vertical: 14.h),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8.r),
             ),
           ),
           child: Text(
-            'Join Now',
+            label,
             style: context.buttonMediumBold?.copyWith(color: Colors.white),
           ),
         ),

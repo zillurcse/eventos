@@ -1,5 +1,5 @@
 import 'package:expouse/features/auth/auth_controller.dart';
-import 'package:expouse/utils/extension/string_ext.dart';
+import 'package:expouse/utils/helpers/input_validators.dart';
 import 'package:expouse/widgets/headers/auth_header.dart';
 import 'package:expouse/widgets/state_handler/api_state_handler.dart';
 import 'package:flutter/gestures.dart';
@@ -54,16 +54,7 @@ class SignUpViewState extends State<SignUpView> {
           controller: controller.givenInputs["email"],
           hint: widget.email,
           isEditable: false,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return "Field Should not be empty";
-            } else {
-              if (!value.isValidEmail()) {
-                return "Email is not valid";
-              }
-            }
-            return null;
-          },
+          validator: InputValidators.email,
         ),
       ),
       SignUpItem(
@@ -73,12 +64,7 @@ class SignUpViewState extends State<SignUpView> {
           controller: controller.givenInputs["password"],
           hint: "Enter Password",
           obscureText: true,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return "Field Should not be empty";
-            }
-            return null;
-          },
+          validator: InputValidators.password,
         ),
       ),
       SignUpItem(
@@ -88,16 +74,10 @@ class SignUpViewState extends State<SignUpView> {
           controller: controller.givenInputs["confirm_password"],
           hint: "Enter Confirm Password",
           obscureText: true,
-          validator: (value) {
-            final password = controller.givenInputs["password"]?.text;
-            if (value == null || value.isEmpty) {
-              return "Field Should not be empty";
-            }
-            if (value.trim() != password?.trim()) {
-              return "Passwords do not match";
-            }
-            return null;
-          },
+          validator: (value) => InputValidators.confirmPassword(
+            value,
+            controller.givenInputs["password"]?.text,
+          ),
         ),
       ),
     ]);

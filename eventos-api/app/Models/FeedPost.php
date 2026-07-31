@@ -77,7 +77,7 @@ class FeedPost extends Model
     /**
      * Display projection for a feed author (post or comment). Authors are
      * polymorphic: a participation (attendee) or a user (organizer). Attendee
-     * avatars come from participation.profile_data.image_url.
+     * avatars come from profile_data.avatar_url / image_url (or meta.avatar_url).
      *
      * @return array{name: string, avatar: string|null, role: string}
      */
@@ -106,10 +106,15 @@ class FeedPost extends Model
         }
 
         $name = trim(($p->contact->first_name ?? '').' '.($p->contact->last_name ?? ''));
+        $profile = is_array($p->profile_data) ? $p->profile_data : [];
+        $meta = is_array($p->meta) ? $p->meta : [];
 
         return [
             'name' => $name ?: 'Attendee',
-            'avatar' => $p->profile_data['image_url'] ?? null,
+            // Prefer avatar_url (mobile profile uploads); fall back to legacy image_url / meta.
+            'avatar' => $profile['avatar_url']
+                ?? ($profile['image_url']
+                ?? ($meta['avatar_url'] ?? null)),
             'role' => 'attendee',
         ];
     }

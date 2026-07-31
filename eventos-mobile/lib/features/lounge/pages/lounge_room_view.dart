@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../models/lounge_model.dart';
+import '../../../utils/config/app_config.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../utils/theme/app_colors.dart';
 
@@ -107,7 +108,10 @@ class _LoungeRoomViewState extends State<LoungeRoomView> {
 
   Future<void> _connect() async {
     try {
-      await _room.connect(widget.config.url, widget.config.token);
+      // API often returns ws://localhost:7880 — unreachable from a phone /
+      // emulator. Rewrite loopback to the same host used for the API.
+      final url = AppConfig.resolveLiveKitUrl(widget.config.url);
+      await _room.connect(url, widget.config.token);
       final local = _room.localParticipant;
       if (local != null) {
         _upsertTile(local, isLocal: true);

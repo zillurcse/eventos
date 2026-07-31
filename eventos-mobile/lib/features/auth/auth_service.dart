@@ -26,6 +26,19 @@ class AuthService {
     );
   }
 
+  /// GET /auth/me — validate the stored Sanctum token + refresh user profile.
+  ///
+  /// Pass [skipAuthLogout] so a stale token during splash restore does not
+  /// race with [SessionManager.logout] navigation.
+  Future<Response> me({bool skipAuthLogout = false}) async {
+    return await dio.get(
+      'auth/me',
+      options: Options(
+        extra: {if (skipAuthLogout) 'skipAuthLogout': true},
+      ),
+    );
+  }
+
   /// GET /auth/my-events — events this login can open (sets subdomain).
   Future<Response> myEvents() async {
     return await dio.get('auth/my-events');

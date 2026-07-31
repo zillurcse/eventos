@@ -25,6 +25,10 @@ class ChatConfig {
     _onEvent = onEvent;
 
     try {
+      if (AppConfig.reverbKey.isEmpty || AppConfig.reverbHost.isEmpty) {
+        onConnectionChange(false);
+        return;
+      }
       final client = ReverbClient.instance(
         host: AppConfig.reverbHost,
         port: AppConfig.reverbPort,

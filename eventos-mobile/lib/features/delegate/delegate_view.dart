@@ -1,4 +1,3 @@
-import 'package:expouse/utils/extension/theme_ext.dart';
 import 'package:expouse/widgets/loading_skeletons/delegate_list_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,7 +5,6 @@ import 'package:get/get.dart';
 import '../../widgets/state_handler/api_state_handler.dart';
 import 'delegate_controller.dart';
 import 'widgets/delegate_add_banner.dart';
-import 'widgets/delegate_content_ad_banner.dart';
 import 'widgets/delegate_search_filter_widget.dart';
 import 'widgets/delegate_list.dart';
 
@@ -40,7 +38,6 @@ class _DelegateViewState extends State<DelegateView> {
           loadedElement: const CustomScrollView(
             slivers: [
               DelegateAddBanner(),
-              DelegateContentAdBanner(),
               DelegateSearchFilterWidget(),
               DelegateList(),
             ],

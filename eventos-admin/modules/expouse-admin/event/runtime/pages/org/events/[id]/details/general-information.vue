@@ -180,10 +180,11 @@ onMounted(load)
           <AppSelect
             v-model="form.timezone"
             label="Time Zone"
+            placeholder="Select Time Zone"
+            :options="zones"
+            searchable
             required
-          >
-            <option v-for="z in zones" :key="z" :value="z">{{ z }}</option>
-          </AppSelect>
+          />
         </div>
 
         <div class="grid grid-cols-2 gap-3">

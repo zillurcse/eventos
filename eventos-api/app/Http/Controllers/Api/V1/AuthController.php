@@ -101,7 +101,7 @@ class AuthController extends Controller
 
         if ($contactIds->isNotEmpty()) {
             $participations = Participation::on('pgsql_admin')
-                ->with(['event.settings'])
+                ->with(['event.settings', 'event.organization'])
                 ->whereIn('contact_id', $contactIds)
                 ->whereNull('deleted_at')
                 ->get();
@@ -111,7 +111,7 @@ class AuthController extends Controller
             }
 
             $exhibitorMemberships = ExhibitorMember::on('pgsql_admin')
-                ->with(['exhibitor.event.settings'])
+                ->with(['exhibitor.event.settings', 'exhibitor.event.organization'])
                 ->whereIn('contact_id', $contactIds)
                 ->get();
 
@@ -153,6 +153,7 @@ class AuthController extends Controller
             'name' => $event->name,
             'slug' => $event->slug,
             'subdomain' => $subdomain,
+            'organization_name' => $event->organization?->name,
             'logo_url' => data_get($event->settings?->branding, 'logo_url'),
             'starts_at' => $event->starts_at?->toIso8601String(),
             'ends_at' => $event->ends_at?->toIso8601String(),

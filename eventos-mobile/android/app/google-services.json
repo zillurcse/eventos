@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:76348610565:android:REPLACE_AFTER_ADD_ANDROID_APP",
+        "mobilesdk_app_id": "1:76348610565:android:9ff968aaa05c1aaa1ce46c",
         "android_client_info": {
           "package_name": "com.example.expouse"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "REPLACE_AFTER_DOWNLOAD_FROM_FIREBASE"
+          "current_key": "AIzaSyD910EMRyY8GdPmWtHWHKWz1a12_V1P-aw"
         }
       ],
       "services": {

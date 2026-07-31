@@ -40,6 +40,7 @@ class PersonalDetailsTab extends StatelessWidget {
                     width: 100.w,
                     height: 100.w,
                     fit: BoxFit.cover,
+                    avatar: true,
                   ),
                 ),
                 Positioned(
@@ -103,7 +104,12 @@ class PersonalDetailsTab extends StatelessWidget {
               context: context,
               hint: "Select Gender",
               value: controller.selectedGender.value,
-              items: ["Male", "Female", "Other"],
+              items: const [
+                "Male",
+                "Female",
+                "Non-binary",
+                "Prefer not to say",
+              ],
               onChanged: (val) => controller.selectedGender.value = val,
             )),
           ),
@@ -130,18 +136,25 @@ class PersonalDetailsTab extends StatelessWidget {
           _buildLabeledField(
             context: context,
             label: "Country",
-            child: Obx(() => _buildDropdown(
-              context: context,
-              hint: "Select Country",
-              value: controller.selectedCountry.value,
-              items: controller.availableCountries,
-              onChanged: (val) => controller.updateCountry(val),
-            )),
+            child: Obx(() {
+              // Depend on geoReady so options appear after JSON load.
+              final ready = controller.geoReady.value;
+              return _buildDropdown(
+                context: context,
+                hint: ready ? "Select Country" : "Loading countries…",
+                value: controller.selectedCountry.value,
+                items: controller.availableCountries,
+                onChanged: ready
+                    ? (val) => controller.updateCountry(val)
+                    : null,
+              );
+            }),
           ),
           _buildLabeledField(
             context: context,
             label: "State",
             child: Obx(() {
+              final _ = controller.geoReady.value;
               final states = controller.availableStates;
               String? currentValue = controller.selectedState.value;
               if (currentValue != null && !states.contains(currentValue)) {
@@ -257,8 +270,15 @@ class PersonalDetailsTab extends StatelessWidget {
     List<String> items = const [],
     Function(String?)? onChanged,
   }) {
+    // Empty / unknown API values must not be passed to DropdownButton —
+    // Flutter asserts the value is either null or exactly one of [items].
+    final effectiveValue =
+        (value != null && value.isNotEmpty && items.contains(value))
+            ? value
+            : null;
+
     return DropdownButtonFormField<String>(
-      value: value,
+      value: effectiveValue,
       dropdownColor: Colors.white,
       decoration: InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -278,7 +298,17 @@ class PersonalDetailsTab extends StatelessWidget {
         hint,
         style: context.bodyRegular?.copyWith(color: context.ghost),
       ),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: context.bodyRegular?.copyWith(color: context.heading)))).toList(),
+      items: items
+          .map(
+            (e) => DropdownMenuItem(
+              value: e,
+              child: Text(
+                e,
+                style: context.bodyRegular?.copyWith(color: context.heading),
+              ),
+            ),
+          )
+          .toList(),
       onChanged: onChanged,
     );
   }

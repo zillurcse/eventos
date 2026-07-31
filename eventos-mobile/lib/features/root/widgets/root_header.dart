@@ -22,7 +22,8 @@ class RootHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rootCtrl = Get.find<RootController>();
-    final chatCtrl = Get.find<ChatController>();
+    // Do NOT Get.find<ChatController>() here — that eagerly starts Pusher +
+    // room polling for every shell paint. Resolve only when chat is enabled.
 
     final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
     final user = rawUser is Map
@@ -59,11 +60,16 @@ class RootHeader extends StatelessWidget {
                   onTap: () {
                     Get.to(()=> ProfileView());
                   },
-                  child: CustomImage(
-                    user?.profilePhotoUrl ?? "",
-                    radius: 8.r,
-                    height: 28.sp,
-                    width: 28.sp,
+                  child: Obx(
+                    () => CustomImage(
+                      rootCtrl.profilePhotoUrl.value.isNotEmpty
+                          ? rootCtrl.profilePhotoUrl.value
+                          : (user?.profilePhotoUrl ?? ''),
+                      radius: 8.r,
+                      height: 28.sp,
+                      width: 28.sp,
+                      avatar: true,
+                    ),
                   ),
                 ),
               ],
@@ -119,6 +125,8 @@ class RootHeader extends StatelessWidget {
                   if (!rootCtrl.themeModules.contains('chat')) {
                     return const SizedBox.shrink();
                   }
+                  // Lazy: first access creates ChatController after chat is enabled.
+                  final chatCtrl = Get.find<ChatController>();
                   return GestureDetector(
                     onTap: () => Get.to(() => const ChatView()),
                     child: Container(

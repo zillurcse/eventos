@@ -26,25 +26,26 @@ class _HomeViewState extends State<HomeView> {
   final controller = Get.find<HomeController>();
   final scrollController = ScrollController();
 
-
   @override
-  void initState() {
-    super.initState();
+  void dispose() {
+    scrollController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Obx only tracks dataStatus — section widgets own their own Obx scopes.
     return Obx(
-          () => ApiStateHandler(
+      () => ApiStateHandler(
         state: controller.dataStatus.value,
         onRetry: controller.fetchHomeData,
         skeleton: const AppSkeleton(),
         loadedElement: CustomScrollView(
           controller: scrollController,
-          slivers: [
+          slivers: const [
             GreetingUser(),
             EventInfo(),
-            VideoCard.sliver(youtubeVideoUrl: controller.welcomeVideo.videoUrl),
+            _HomeWelcomeVideo(),
             OngoingSessions(),
             FeaturedSessions(),
             FeaturedSpeakers(),
@@ -60,3 +61,16 @@ class _HomeViewState extends State<HomeView> {
   }
 }
 
+class _HomeWelcomeVideo extends StatelessWidget {
+  const _HomeWelcomeVideo();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.find<HomeController>();
+    return Obx(
+      () => VideoCard.sliver(
+        youtubeVideoUrl: controller.welcomeVideo.videoUrl,
+      ),
+    );
+  }
+}

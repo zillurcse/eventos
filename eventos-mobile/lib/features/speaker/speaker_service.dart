@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
 
 import '../../utils/config/dio_config.dart';
+import '../../utils/helpers/app_data_provider.dart';
 
 class SpeakerService {
   final Dio _dio = DioConfig.obj.dio!;
+
+  String? get _eventUuid => AppDataProvider.obj.eventUuid;
 
   /// GET /public/speakers
   Future<Response> getSpeakers() async {
@@ -15,19 +18,35 @@ class SpeakerService {
     return await _dio.get('public/sessions');
   }
 
-  Future<Response> addOrUpdateSpeakerNote(int id, String note) async {
-    return Response(
-      requestOptions: RequestOptions(path: 'notes/speaker/$id'),
-      statusCode: 501,
-      data: {'status': 'error', 'message': 'Notes not available yet'},
+  /// POST /events/{uuid}/notes — create or update a speaker note.
+  Future<Response> addOrUpdateSpeakerNote(String targetUuid, String note) async {
+    final uuid = _eventUuid;
+    if (uuid == null || uuid.isEmpty) {
+      throw StateError('Event UUID is not set');
+    }
+    return await _dio.post(
+      'events/$uuid/notes',
+      data: {
+        'type': 'speaker',
+        'target_id': targetUuid,
+        'text': note,
+      },
     );
   }
 
-  Future<Response> toggleSpeakerBookmark(int id) async {
-    return Response(
-      requestOptions: RequestOptions(path: 'bookmarks/speaker/$id'),
-      statusCode: 501,
-      data: {'status': 'error', 'message': 'Bookmarks not available yet'},
+  /// POST /events/{uuid}/bookmarks — toggle speaker bookmark.
+  Future<Response> toggleSpeakerBookmark(String speakerUuid, bool on) async {
+    final uuid = _eventUuid;
+    if (uuid == null || uuid.isEmpty) {
+      throw StateError('Event UUID is not set');
+    }
+    return await _dio.post(
+      'events/$uuid/bookmarks',
+      data: {
+        'type': 'speaker',
+        'id': speakerUuid,
+        'on': on,
+      },
     );
   }
 }

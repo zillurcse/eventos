@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../models/session_model.dart';
+import '../../../../models/mappers/session_mapper.dart';
 import '../../../../widgets/custom_image.dart';
 import '../../../../utils/extension/theme_ext.dart';
 import '../pages/session_details.dart';
@@ -30,25 +32,11 @@ class SessionDayItem extends StatelessWidget {
     return dateStr;
   }
 
-  String _formatTime(String timeStr) {
-    if (timeStr.isEmpty) return '';
-    try {
-      final parts = timeStr.split(':');
-      if (parts.length >= 2) {
-        final hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-        final dt = DateTime(2026, 1, 1, hour, minute);
-        return DateFormat('h:mm a').format(dt);
-      }
-    } catch (_) {}
-    return timeStr;
-  }
-
   @override
   Widget build(BuildContext context) {
     final dateFormatted = _formatDate(session.day.date.isNotEmpty ? session.day.date : session.day.title);
-    final startTimeFormatted = _formatTime(session.startTime);
-    final endTimeFormatted = _formatTime(session.endTime);
+    final startTimeFormatted = session.startTime;
+    final endTimeFormatted = session.endTime;
     final timeRange = (startTimeFormatted.isNotEmpty && endTimeFormatted.isNotEmpty)
         ? '$startTimeFormatted - $endTimeFormatted'
         : '';
@@ -107,8 +95,17 @@ class SessionDayItem extends StatelessWidget {
                 SizedBox(width: 8.w),
                 // Icon Buttons
                 GestureDetector(
-                  onTap: () {
-                    // Logic to show calendar details / sheet
+                  onTap: () async {
+                    final url = SessionMapper.googleCalendarUrl(
+                      title: session.title,
+                      startsAt: session.startsAt,
+                      endsAt: session.endsAt,
+                    );
+                    if (url.isEmpty) return;
+                    final uri = Uri.tryParse(url);
+                    if (uri != null) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
                   },
                   child: CustomImage(
                     "assets/svg/icons/schedule.svg",

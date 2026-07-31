@@ -114,25 +114,36 @@ class _NotificationsViewState extends State<NotificationsView> {
       grouped.putIfAbsent(title, () => []).add(notif);
     }
 
-    final children = <Widget>[];
+    // Flatten to (header | item) rows for ListView.builder.
+    final rows = <Object>[];
     grouped.forEach((title, items) {
-      children.add(
-        Padding(
-          padding: EdgeInsets.only(top: 16.h, bottom: 12.h),
-          child: Text(
-            title,
-            style: context.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: context.heading,
-            ),
-          ),
-        ),
-      );
+      rows.add(title);
+      rows.addAll(items);
+    });
 
-      for (final item in items) {
-        final display = item.body.isNotEmpty ? item.body : item.title;
-        children.add(
-          GestureDetector(
+    return RefreshIndicator(
+      onRefresh: () => controller.fetchNotifications(refresh: true),
+      child: ListView.builder(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        itemCount: rows.length,
+        itemBuilder: (context, index) {
+          final row = rows[index];
+          if (row is String) {
+            return Padding(
+              padding: EdgeInsets.only(top: 16.h, bottom: 12.h),
+              child: Text(
+                row,
+                style: context.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: context.heading,
+                ),
+              ),
+            );
+          }
+
+          final item = row as NotificationItemModel;
+          final display = item.body.isNotEmpty ? item.body : item.title;
+          return GestureDetector(
             onTap: () => controller.openNotification(item),
             child: NotificationCard(
               isUnread: !item.isRead,
@@ -150,16 +161,8 @@ class _NotificationsViewState extends State<NotificationsView> {
               ],
               time: _getTimeString(item.createdAt),
             ),
-          ),
-        );
-      }
-    });
-
-    return RefreshIndicator(
-      onRefresh: () => controller.fetchNotifications(refresh: true),
-      child: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-        children: children,
+          );
+        },
       ),
     );
   }

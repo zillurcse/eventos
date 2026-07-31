@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 
-import '../../../models/user.dart';
-import '../../../utils/extension/theme_ext.dart';
-import '../../../utils/helpers/local_key.dart';
-import '../../../widgets/custom_image.dart';
-import '../../../features/auth/auth_view.dart';
 import '../../../utils/bindings/auth_binding.dart';
-import '../../../features/notifications/push_notification_service.dart';
-import '../../exhibitors/exhibitor_controller.dart';
-import '../../exhibitors/exhibitors_view.dart';
-import '../../delegate/delegate_view.dart';
+import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/helpers/session_manager.dart';
+import '../../../widgets/custom_image.dart';
+import '../../../features/auth/pages/select_event_view.dart';
 import '../../profile/profile_view.dart';
 import '../root_controller.dart';
-import '../../leaderboard/leaderboard_view.dart';
 
 class HomeDrawer extends StatelessWidget {
   const HomeDrawer({super.key});
@@ -23,10 +16,6 @@ class HomeDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rootCtrl = Get.find<RootController>();
-    final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
-    final user = rawUser is Map
-        ? User.fromJson(Map<String, dynamic>.from(rawUser))
-        : null;
 
     return Drawer(
       backgroundColor: context.tertiaryText,
@@ -39,7 +28,7 @@ class HomeDrawer extends StatelessWidget {
           // ── Header Section ──
           GestureDetector(
             onTap: () {
-              Get.to(()=> ProfileView());
+              Get.to(() => ProfileView());
             },
             child: Container(
               color: context.primaryFocused,
@@ -64,133 +53,86 @@ class HomeDrawer extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 8.h),
-                  Row(
-                    children: [
-                      CustomImage(
-                        user?.profilePhotoUrl ?? "",
-                        radius: 12.r,
-                        height: 48.sp,
-                        width: 48.sp,
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.name ?? "",
-                              style: context.titleRegular?.copyWith(
-                                color: context.heading,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            SizedBox(height: 2.h),
-                            Text(
-                              user?.email ?? "",
-                              style: context.bodyLarge?.copyWith(
-                                color: context.caption,
-                                fontSize: 12.sp,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                  Obx(
+                    () => Row(
+                      children: [
+                        CustomImage(
+                          rootCtrl.profilePhotoUrl.value,
+                          radius: 12.r,
+                          height: 48.sp,
+                          width: 48.sp,
+                          avatar: true,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                rootCtrl.userName.value,
+                                style: context.titleRegular?.copyWith(
+                                  color: context.heading,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                rootCtrl.userEmail.value,
+                                style: context.bodyLarge?.copyWith(
+                                  color: context.caption,
+                                  fontSize: 12.sp,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ),
 
-          // ── Navigation List ──
+          // ── Navigation List (from Manage Tabs) ──
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 16.h),
-              children: [
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/home.svg",
-                  title: "Home",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    rootCtrl.changeIndex(0);
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/feed.svg",
-                  title: "Feed",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    rootCtrl.changeIndex(1);
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/session.svg",
-                  title: "Sessions",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    rootCtrl.changeIndex(2);
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/speaker.svg",
-                  title: "Speakers",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    rootCtrl.changeIndex(3);
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/exhibitors.svg",
-                  title: "Exhibitors",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    final exhibitorCtrl = Get.find<ExhibitorController>();
-                    exhibitorCtrl.selectedType.value = null;
-                    exhibitorCtrl.fetchExhibitors();
-                    Get.to(() => const ExhibitorsView());
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/badges.svg",
-                  title: "Sponsors",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    final exhibitorCtrl = Get.find<ExhibitorController>();
-                    exhibitorCtrl.selectedType.value = 'sponsor';
-                    exhibitorCtrl.fetchExhibitors();
-                    Get.to(() => const ExhibitorsView());
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/delegates.svg",
-                  title: "Delegates",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    Get.to(() => const DelegateView());
-                  },
-                ),
-                _buildDrawerItem(
-                  context: context,
-                  iconPath: "assets/svg/icons/trophy.svg",
-                  title: "Leaderboard",
-                  onTap: () {
-                    Scaffold.of(context).closeDrawer();
-                    Get.to(() => const LeaderboardView());
-                  },
-                ),
-              ],
-            ),
+            child: Obx(() {
+              final tabs = rootCtrl.activeTabs;
+              return ListView(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 16.h),
+                children: [
+                  ...tabs.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final tab = entry.value;
+                    return _buildDrawerItem(
+                      context: context,
+                      iconPath: 'assets/svg/icons/${tab.icon}',
+                      title: tab.customName,
+                      onTap: () {
+                        Scaffold.of(context).closeDrawer();
+                        rootCtrl.changeIndex(index);
+                      },
+                    );
+                  }),
+                  _buildDrawerItem(
+                    context: context,
+                    iconPath: 'assets/svg/icons/calender.svg',
+                    title: 'Switch event',
+                    onTap: () {
+                      Scaffold.of(context).closeDrawer();
+                      Get.to(
+                        () => const SelectEventView(isSwitching: true),
+                        binding: AuthBinding(),
+                      );
+                    },
+                  ),
+                ],
+              );
+            }),
           ),
 
           // ── Footer: Log out Button ──
@@ -200,13 +142,7 @@ class HomeDrawer extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
               child: InkWell(
                 onTap: () async {
-                  await PushNotificationService.instance.unregisterOnLogout();
-                  final localDb = GetStorage();
-                  await localDb.erase();
-                  Get.offAll(
-                    () => const AuthView(),
-                    binding: AuthBinding(),
-                  );
+                  await SessionManager.logout();
                 },
                 borderRadius: BorderRadius.circular(8.r),
                 child: Container(

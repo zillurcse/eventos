@@ -5,9 +5,13 @@ import 'session_sponsor_model.dart';
 
 class SessionModel {
   final int id;
+  final String uuid;
   final String title;
   final String startTime;
   final String endTime;
+  final String? startsAt;
+  final String? endsAt;
+  final String? status;
   final String logoUrl;
   final SessionDayModel day;
   final List<ReceptionSpeakerModel> speakers;
@@ -19,9 +23,13 @@ class SessionModel {
 
   const SessionModel({
     this.id = 0,
+    this.uuid = '',
     this.title = '',
     this.startTime = '',
     this.endTime = '',
+    this.startsAt,
+    this.endsAt,
+    this.status,
     this.logoUrl = '',
     this.day = const SessionDayModel(),
     this.speakers = const [],
@@ -35,9 +43,13 @@ class SessionModel {
   factory SessionModel.fromJson(Map<String, dynamic> json) {
     return SessionModel(
       id: TypeHelper.toInt(json['id']),
+      uuid: (json['uuid'] ?? json['id'] ?? '').toString(),
       title: json['title'] as String? ?? '',
       startTime: json['start_time'] as String? ?? '',
       endTime: json['end_time'] as String? ?? '',
+      startsAt: json['starts_at']?.toString(),
+      endsAt: json['ends_at']?.toString(),
+      status: json['status']?.toString(),
       logoUrl: json['logo_url'] as String? ?? '',
       day: json['day'] is Map
           ? SessionDayModel.fromJson(Map<String, dynamic>.from(json['day']))
@@ -48,9 +60,7 @@ class SessionModel {
       sponsors: (json['sponsors'] as List? ?? [])
           .map((e) => SessionSponsorModel.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
-      tags: (json['tags'] as List? ?? [])
-          .map((e) => e.toString())
-          .toList(),
+      tags: (json['tags'] as List? ?? []).map((e) => e.toString()).toList(),
       sessionPlace: json['session_place'] as String? ?? '',
       isFavorite: TypeHelper.toBool(json['is_favorite']),
       inMySchedule: TypeHelper.toBool(json['in_my_schedule']),

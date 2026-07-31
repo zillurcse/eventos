@@ -1,29 +1,46 @@
 import 'package:dio/dio.dart';
+
 import '../../utils/config/dio_config.dart';
+import '../../utils/helpers/app_data_provider.dart';
 
 class DelegateService {
   final Dio _dio = DioConfig.obj.dio!;
 
-  /// Fetch the delegates list for the current event.
-  /// Token is automatically injected by DioConfig's interceptor.
-  Future<Response> getDelegates({String? s, String? sortBy}) async {
-    final Map<String, dynamic> data = {};
-    if (s != null && s.trim().isNotEmpty) data['s'] = s.trim();
-    if (sortBy != null && sortBy.trim().isNotEmpty) data['sort_by'] = sortBy.trim();
+  String get _eventUuid {
+    final uuid = AppDataProvider.obj.eventUuid;
+    if (uuid == null || uuid.isEmpty) {
+      throw StateError('No event context — eventUuid missing');
+    }
+    return uuid;
+  }
 
-    return await _dio.post(
-      'mobile/event/delegates',
-      data: data.isEmpty ? null : data,
+  String get _base => 'events/$_eventUuid';
+
+  /// GET /events/{uuid}/delegates
+  Future<Response> getDelegates({
+    String? q,
+    String? sort,
+    int page = 1,
+    int perPage = 60,
+  }) {
+    return _dio.get(
+      '$_base/delegates',
+      queryParameters: {
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        if (sort != null && sort.trim().isNotEmpty) 'sort': sort.trim(),
+        'page': page,
+        'per_page': perPage,
+      },
     );
   }
 
-  /// Fetch full detail for a single delegate by [id].
-  Future<Response> getDelegateDetail(int id) async {
-    return await _dio.post('mobile/event/delegates/$id');
+  /// GET /events/{uuid}/delegates/{delegateUuid}
+  Future<Response> getDelegateDetail(String delegateUuid) {
+    return _dio.get('$_base/delegates/$delegateUuid');
   }
 
-  /// Like/Unlike (bookmark/unbookmark) a delegate by [id].
-  Future<Response> toggleDelegateBookmark(int id) async {
-    return await _dio.post('mobile/delegates/$id/like');
+  /// GET /public/ads?page=delegates
+  Future<Response> getAds() {
+    return _dio.get('public/ads', queryParameters: {'page': 'delegates'});
   }
 }

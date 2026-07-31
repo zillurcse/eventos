@@ -29,6 +29,7 @@ class _CommentRowState extends State<CommentRow> {
             height: 34.sp,
             width: 34.sp,
             isCircle: true,
+            avatar: true,
           ),
           SizedBox(width: 8.w),
           Expanded(

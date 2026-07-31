@@ -1,5 +1,7 @@
 import 'package:html/parser.dart';
 
+import '../helpers/input_validators.dart';
+
 extension StringExt on String {
   String htmlToPlainText() {
     final document = parse(this);
@@ -7,14 +9,10 @@ extension StringExt on String {
   }
 
   bool isValidEmail() {
-    final emailRegex = RegExp(
-      r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
-    );
-
-    return emailRegex.hasMatch(this);
+    return InputValidators.email(this) == null;
   }
 
   bool isNumeric() {
-    return true;
+    return RegExp(r'^\d+$').hasMatch(this);
   }
 }

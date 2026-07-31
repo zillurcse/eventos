@@ -97,9 +97,20 @@ class ExhibitorController extends GetxController {
   }
 
   Future<bool> toggleBookmark(int exhibitorId) async {
-    if (Get.isRegistered<BookmarkController>()) {
-      // Phase 2
-    }
-    return false;
+    final exhibitor = exhibitors.firstWhereOrNull((e) => e.id == exhibitorId);
+    final uuid = exhibitor?.slug;
+    if (uuid == null || uuid.isEmpty) return false;
+    if (!Get.isRegistered<BookmarkController>()) return false;
+    return Get.find<BookmarkController>().toggle(
+      type: 'exhibitor',
+      uuid: uuid,
+      exhibitor: exhibitor,
+    );
+  }
+
+  @override
+  void onClose() {
+    searchController.dispose();
+    super.onClose();
   }
 }

@@ -112,28 +112,41 @@ class ProfileModel {
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    final interestsRaw = json['interests'];
+    String? interests;
+    if (interestsRaw is List) {
+      interests = interestsRaw.map((e) => e.toString()).where((e) => e.isNotEmpty).join(', ');
+    } else if (interestsRaw != null) {
+      interests = interestsRaw.toString();
+    }
+
+    final photo = (json['profile_photo_url']?.toString().isNotEmpty == true)
+        ? json['profile_photo_url'].toString()
+        : json['avatar_url']?.toString();
+
     return ProfileModel(
       id: TypeHelper.toInt(json['id']),
       firstName: json['first_name'] as String?,
       lastName: json['last_name'] as String?,
       name: json['name'] as String?,
       email: json['email'] as String?,
-      designation: json['designation'] as String?,
+      designation: (json['job_title'] ?? json['designation']) as String?,
       company: json['company'] as String?,
-      about: json['about'] as String?,
-      mobileNumber: json['mobile_number'] as String?,
+      about: (json['bio'] ?? json['about']) as String?,
+      mobileNumber: (json['phone'] ?? json['mobile_number']) as String?,
       address: json['address'] as String?,
       country: json['country'] as String?,
       state: json['state'] as String?,
-      cityTown: json['city_town'] as String?,
+      cityTown: (json['city'] ?? json['city_town']) as String?,
       industry: json['industry'] as String?,
-      interests: json['interests'] as String?,
+      interests: interests,
       gender: json['gender'] as String?,
       website: json['website'] as String?,
       timezone: json['timezone'] as String?,
-      profilePhotoUrl: json['profile_photo_url'] as String?,
+      profilePhotoUrl: photo,
       role: json['role'] as String?,
-      isOnboarded: TypeHelper.toBool(json['is_onborded']),
+      isOnboarded: TypeHelper.toBool(json['is_onborded']) ||
+          (json['onboarded_at'] != null && json['onboarded_at'].toString().isNotEmpty),
       profileData: json['profile_data'] != null
           ? ProfileData.fromJson(Map<String, dynamic>.from(json['profile_data']))
           : null,

@@ -4,17 +4,19 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../widgets/cards/session_card.dart';
-import '../../home/home_controller.dart';
+import '../session_controller.dart';
 
 class LiveSessions extends StatelessWidget {
   const LiveSessions({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final homeCtrl = Get.find<HomeController>();
+    final sessionCtrl = Get.find<SessionController>();
 
     return Obx(() {
-      final sessions = homeCtrl.currentSessions;
+      // Touch days so Obx rebuilds when agenda refreshes / filters change.
+      final _ = sessionCtrl.days.length;
+      final sessions = sessionCtrl.liveSessions;
       if (sessions.isEmpty) {
         return const SliverToBoxAdapter(child: SizedBox.shrink());
       }
@@ -50,11 +52,28 @@ class LiveSessions extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 12.h),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.only(left: 16.sp, right: 16.sp),
-                child: IntrinsicHeight(
+              if (sessions.length == 1)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: SessionCard(
+                    session: sessions.first,
+                    isOnGoing: true,
+                    fullWidth: true,
+                    title: sessions.first.title,
+                    startTime: sessions.first.startTime,
+                    endTime: sessions.first.endTime,
+                    dayLabel: sessions.first.day.title,
+                    logoUrl: sessions.first.logoUrl,
+                    speakerImageUrls:
+                        sessions.first.speakers.map((sp) => sp.imageUrl).toList(),
+                  ),
+                )
+              else
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.only(left: 16.sp, right: 16.sp),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: sessions.map((s) {
                       return Padding(
                         padding: EdgeInsets.only(right: 12.sp),
@@ -66,13 +85,13 @@ class LiveSessions extends StatelessWidget {
                           endTime: s.endTime,
                           dayLabel: s.day.title,
                           logoUrl: s.logoUrl,
-                          speakerImageUrls: s.speakers.map((sp) => sp.imageUrl).toList(),
+                          speakerImageUrls:
+                              s.speakers.map((sp) => sp.imageUrl).toList(),
                         ),
                       );
                     }).toList(),
                   ),
                 ),
-              ),
             ],
           ),
         ),

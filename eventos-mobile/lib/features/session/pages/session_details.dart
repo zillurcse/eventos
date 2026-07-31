@@ -14,7 +14,9 @@ import '../widgets/session_about_section.dart';
 import '../widgets/session_speakers_section.dart';
 import '../widgets/session_sponsors_section.dart';
 import '../widgets/session_files_section.dart';
+import '../widgets/session_player.dart';
 import '../widgets/session_sticky_stream_button.dart';
+import '../widgets/engagement/session_engagement_panel.dart';
 
 class SessionDetails extends StatefulWidget {
   final int scheduleId;
@@ -49,12 +51,15 @@ class _SessionDetailsState extends State<SessionDetails> {
         actions: [
           Obx(() {
             final detail = ctrl.sessionDetail.value;
-            if (detail == null) return const SizedBox.shrink();
+            if (detail == null || !detail.isAllowedToRate) {
+              return const SizedBox.shrink();
+            }
             return Padding(
               padding: EdgeInsets.only(right: 16.w),
               child: RatingStars(
-                initialRating: 3,
+                rating: ctrl.sessionRating.value,
                 allowedToRate: detail.isAllowedToRate,
+                onRate: ctrl.submitRating,
               ),
             );
           }),
@@ -81,9 +86,11 @@ class _SessionDetailsState extends State<SessionDetails> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SessionCoverImage(detail: detail),
+                SessionPlayer(detail: detail),
                 Container(
                   color: context.tertiaryText,
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -98,6 +105,7 @@ class _SessionDetailsState extends State<SessionDetails> {
                 SessionSpeakersSection(detail: detail),
                 SessionSponsorsSection(detail: detail),
                 SessionFilesSection(detail: detail),
+                SessionEngagementPanel(detail: detail),
               ],
             ),
           ),
@@ -108,41 +116,29 @@ class _SessionDetailsState extends State<SessionDetails> {
   }
 }
 
-// ── Rating Stars Component ──
-class RatingStars extends StatefulWidget {
-  final int initialRating;
+class RatingStars extends StatelessWidget {
+  final int rating;
   final bool allowedToRate;
-  const RatingStars({super.key, this.initialRating = 3, this.allowedToRate = true});
+  final ValueChanged<int>? onRate;
 
-  @override
-  State<RatingStars> createState() => _RatingStarsState();
-}
-
-class _RatingStarsState extends State<RatingStars> {
-  late int _rating;
-
-  @override
-  void initState() {
-    super.initState();
-    _rating = widget.initialRating;
-  }
+  const RatingStars({
+    super.key,
+    this.rating = 0,
+    this.allowedToRate = true,
+    this.onRate,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
+        final star = index + 1;
         return GestureDetector(
-          onTap: widget.allowedToRate
-              ? () {
-                  setState(() {
-                    _rating = index + 1;
-                  });
-                }
-              : null,
+          onTap: allowedToRate && onRate != null ? () => onRate!(star) : null,
           child: Icon(
-            index < _rating ? Icons.star : Icons.star_border,
-            color: index < _rating ? Colors.amber : Colors.grey,
+            index < rating ? Icons.star : Icons.star_border,
+            color: index < rating ? Colors.amber : Colors.grey,
             size: 20.sp,
           ),
         );

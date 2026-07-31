@@ -74,6 +74,43 @@ class SessionFiltersWidget extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 12.h),
           child: Row(
             children: [
+              // Saved only chip
+              GestureDetector(
+                onTap: controller.toggleSavedOnly,
+                child: Container(
+                  margin: EdgeInsets.only(right: 8.w),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  height: 38.h,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: controller.savedOnly.value
+                        ? context.primaryTheme.withValues(alpha: 0.12)
+                        : context.backgroundColor,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: controller.savedOnly.value
+                          ? context.primaryTheme
+                          : context.strokeLight,
+                      width: 1.r,
+                    ),
+                  ),
+                  child: Text(
+                    controller.bookmarkedSessionCount > 0
+                        ? 'Saved only (${controller.bookmarkedSessionCount})'
+                        : 'Saved only',
+                    style: context.bodyRegular?.copyWith(
+                      color: controller.savedOnly.value
+                          ? context.primaryTheme
+                          : context.caption,
+                      fontSize: 13.sp,
+                      fontWeight: controller.savedOnly.value
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+
               // Tracks filter dropdown
               _buildFilterDropdown<int>(
                 context: context,

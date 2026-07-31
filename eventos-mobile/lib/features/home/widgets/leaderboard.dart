@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
+import '../../../models/leaderboard_entry_model.dart';
 import '../../../models/user.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../utils/helpers/local_key.dart';
@@ -11,6 +12,7 @@ import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_image.dart';
 import '../home_controller.dart';
 import '../../leaderboard/leaderboard_view.dart';
+import '../../root/root_controller.dart';
 
 class Leaderboard extends StatelessWidget {
   const Leaderboard({super.key});
@@ -28,23 +30,55 @@ class Leaderboard extends StatelessWidget {
     }
   }
 
+  /// Podium order: 2nd, 1st (highlighted), 3rd — only slots that exist.
+  List<LeaderboardEntryModel> _podium(List<LeaderboardEntryModel> entries) {
+    final byRank = <int, LeaderboardEntryModel>{};
+    for (final e in entries) {
+      byRank.putIfAbsent(e.rank, () => e);
+    }
+    final ordered = [2, 1, 3]
+        .where(byRank.containsKey)
+        .map((r) => byRank[r]!)
+        .toList();
+    if (ordered.isNotEmpty) return ordered;
+    return entries.take(3).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = Get.find<HomeController>();
+    final rootCtrl = Get.find<RootController>();
     final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
     final currentUser = rawUser is Map
         ? User.fromJson(Map<String, dynamic>.from(rawUser))
         : null;
 
     return Obx(() {
-      final entries = ctrl.leaderboard;
-      // Need at least 3 entries with ranks 1, 2, 3 present to render the podium.
-      if (entries.length < 3) return const SliverToBoxAdapter(child: SizedBox.shrink());
-      final hasAllRanks = [1, 2, 3].every((r) => entries.any((e) => e.rank == r));
-      if (!hasAllRanks) return const SliverToBoxAdapter(child: SizedBox.shrink());
+      // Respect Navigation › Modules › Leaderboard when the organizer turned it off.
+      final moduleOn = rootCtrl.themeModules.isEmpty ||
+          rootCtrl.themeModules.contains('leaderboard');
+      if (!moduleOn) {
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
+      }
 
-      // Show top 3 in the podium cards; rank is set during parse
-      final top3 = entries.take(3).toList();
+      final entries = ctrl.leaderboard;
+      // Need at least one ranked participant; also respect gamification toggle.
+      if (!ctrl.leaderboardEnabled.value || entries.isEmpty) {
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
+      }
+
+      final podium = _podium(entries);
+
+      LeaderboardEntryModel? myEntry;
+      for (final entry in entries) {
+        if (entry.isMe) {
+          myEntry = entry;
+          break;
+        }
+      }
+
+      final myRank = myEntry?.rank ?? 0;
+      final myPoints = myEntry?.points ?? ctrl.myPoints.value;
 
       return SliverToBoxAdapter(
         child: Column(
@@ -56,11 +90,7 @@ class Leaderboard extends StatelessWidget {
             ),
             SizedBox(height: 12.h),
             Column(
-              children: [
-                top3.firstWhere((e) => e.rank == 2),
-                top3.firstWhere((e) => e.rank == 1),
-                top3.firstWhere((e) => e.rank == 3),
-              ].map((entry) {
+              children: podium.map((entry) {
                 return LeaderboardCard(
                   name: entry.userName,
                   points: '${entry.points}pt',
@@ -71,7 +101,6 @@ class Leaderboard extends StatelessWidget {
               }).toList(),
             ),
             SizedBox(height: 12.h),
-            // Current user's own row
             if (currentUser != null)
               Container(
                 margin: EdgeInsets.symmetric(horizontal: 16.sp),
@@ -111,13 +140,13 @@ class Leaderboard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          "#${entries.length}+",
+                          myRank > 0 ? "#$myRank" : "—",
                           style: context.buttonSmallBold
                               ?.copyWith(color: context.tertiaryText),
                         ),
                         SizedBox(height: 2.h),
                         Text(
-                          "—",
+                          myPoints > 0 ? "${myPoints}pt" : "0pt",
                           style: context.bodyRegular
                               ?.copyWith(color: context.tertiaryText),
                         ),
