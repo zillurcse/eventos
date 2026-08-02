@@ -1,7 +1,7 @@
 # EventOS — Production Deployment Guide (VPS + cPanel/WHM)
 
 Target: a VPS you administer yourself (root SSH), with cPanel/WHM installed for DNS, mail, and AutoSSL.
-Base domain **expouse.com**, admin app on **admin.expouse.com**, every event on **`<subdomain>.expouse.com`**.
+Base domain **expouse.com**, admin app on **dashboard.expouse.com**, every event on **`<subdomain>.expouse.com`**.
 
 This guide mirrors the repo's existing `docker-compose.yml` almost exactly, adapted for production, and uses
 cPanel only for what it's good at (DNS, SSL certs, static file hosting) — not for running PHP/Node processes.
@@ -12,13 +12,13 @@ cPanel only for what it's good at (DNS, SSL certs, static file hosting) — not 
 
 | Domain | What serves it | How |
 |---|---|---|
-| `admin.expouse.com` | `eventos-admin` (Nuxt SPA, `ssr:false`) | **Static files**, built once with `nuxt generate`, hosted directly by cPanel as a normal subdomain |
+| `dashboard.expouse.com` | `eventos-admin` (Nuxt SPA, `ssr:false`) | **Static files**, built once with `nuxt generate`, hosted directly by cPanel as a normal subdomain |
 | `*.expouse.com` | `eventos-event` (Nuxt SPA, `ssr:false`) | **Static files**, same build, hosted as a cPanel **wildcard** subdomain (the app reads the hostname client-side to pick the event) |
 | `api.expouse.com` | `eventos-api` (Laravel) | Docker container (php-fpm + nginx), bound to `127.0.0.1:8080`; cPanel's Apache reverse-proxies to it and terminates TLS |
 | `api.expouse.com` (WebSocket) | Reverb | Docker container on `127.0.0.1:8081`; same Apache vhost proxies the `/app` and `/apps` paths with `mod_proxy_wstunnel` |
 | `cdn.expouse.com` | MinIO (S3-compatible object storage) | Docker container on `127.0.0.1:9000`; Apache reverse-proxies plain HTTP, used for uploaded images/documents |
 | `livekit.expouse.com` *(optional — breakout-room video)* | LiveKit SFU | Docker container; signaling proxied like Reverb, but the RTC **media** (UDP 50000-50100) is opened directly on the firewall — Apache can't proxy UDP |
-| `expouse.com` / `www.expouse.com` | whatever marketing page you want later | not required for the app itself; simplest is a redirect to `admin.expouse.com` for now |
+| `expouse.com` / `www.expouse.com` | whatever marketing page you want later | not required for the app itself; simplest is a redirect to `dashboard.expouse.com` for now |
 
 Why static hosting for the two Nuxt apps: both already have `ssr: false` in `nuxt.config.ts`, so
 `nuxt generate` prerenders them to plain HTML/CSS/JS. No Node process needs to run in production for
@@ -46,7 +46,7 @@ Add these **A records**, all pointing at the VPS's public IP (call it `VPS_IP`):
 
 | Name | Type | Value |
 |---|---|---|
-| `admin.expouse.com` | A | `VPS_IP` |
+| `dashboard.expouse.com` | A | `VPS_IP` |
 | `*.expouse.com` | A | `VPS_IP` |
 | `api.expouse.com` | A | `VPS_IP` |
 | `cdn.expouse.com` | A | `VPS_IP` |
@@ -59,7 +59,7 @@ to (see `eventos-api/config/eventos.php` → `domain.cname_target`) — it's par
 custom-domain feature, not something new to build.
 
 DNS can take a few minutes to a few hours to propagate — kick this off first, verify with
-`dig admin.expouse.com` before moving on.
+`dig dashboard.expouse.com` before moving on.
 
 ---
 
@@ -418,7 +418,7 @@ docker run --rm -v "$PWD/eventos-event:/app" -w /app node:20-alpine \
 Now create the cPanel subdomains and copy the builds in:
 
 1. **WHM/cPanel → Domains → Create A New Domain**
-   - Domain: `admin.expouse.com` → note the document root it creates (e.g. `/home/<user>/admin.expouse.com`)
+   - Domain: `dashboard.expouse.com` → note the document root it creates (e.g. `/home/<user>/dashboard.expouse.com`)
    - Domain: `expouse.com` with subdomain `*` (wildcard) → note its document root
      (cPanel supports wildcard subdomains; if the UI doesn't offer `*` directly, WHM → *Domains* →
      *Create a New Domain* lets you type `*.expouse.com` as the subdomain name)
@@ -426,12 +426,12 @@ Now create the cPanel subdomains and copy the builds in:
 2. Copy the builds into those document roots:
 
 ```bash
-rsync -a --delete eventos-admin/.output/public/ /home/<user>/admin.expouse.com/
+rsync -a --delete eventos-admin/.output/public/ /home/<user>/dashboard.expouse.com/
 rsync -a --delete eventos-event/.output/public/  /home/<user>/expouse.com/  # or wherever the wildcard's doc root is
 ```
 
 3. **cPanel → SSL/TLS Status → Run AutoSSL** (or wait for the next automatic run) to issue Let's Encrypt
-   certs for `admin.expouse.com` and the wildcard `*.expouse.com`. Wildcard certs via AutoSSL require
+   certs for `dashboard.expouse.com` and the wildcard `*.expouse.com`. Wildcard certs via AutoSSL require
    the `*.expouse.com` DNS record to already resolve (§2) — AutoSSL uses DNS or HTTP validation
    depending on your cPanel version's ACME setup.
 
@@ -530,14 +530,14 @@ Smoke test:
 curl -s https://api.expouse.com/api/v1/health
 # → should return a healthy JSON response (see eventos-api/app/Http/Controllers/HealthController.php)
 
-curl -sI https://admin.expouse.com | head -5
+curl -sI https://dashboard.expouse.com | head -5
 curl -sI https://cdn.expouse.com
 
 # create a test event with subdomain "demo" via the admin app, then:
 curl -sI https://demo.expouse.com
 ```
 
-Also open `https://admin.expouse.com` in a browser, log in, and confirm:
+Also open `https://dashboard.expouse.com` in a browser, log in, and confirm:
 - API calls succeed (check the Network tab — 401s mean auth is fine but check for CORS/mixed-content errors)
 - Uploading an image (e.g. event logo) works and the resulting URL is `https://cdn.expouse.com/...`
 - If you set up LiveKit: join a breakout room / lounge table and confirm video connects (this is the
