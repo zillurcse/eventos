@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
-import { eventIdentityHeaders, useEventIdentity } from '~/composables/useEventSubdomain'
 import { useSiteStore } from '~/stores/site'
 import type { ReceptionAd } from './reception'
 
@@ -201,18 +200,8 @@ export const useDelegatesStore = defineStore('delegates', {
 
     async fetchAds() {
       if (this.adsLoaded) return
-      const identity = useEventIdentity()
-      const id = identity.subdomain || identity.host
-      if (!id) return
       try {
-        const { public: { apiBase } } = useRuntimeConfig()
-        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
-          query: { page: 'delegates' },
-          headers: eventIdentityHeaders(),
-        })
-        this.ads = res.data.strip
-      } catch {
-        // Ads are decorative — fail silently, the directory still works without them.
+        this.ads = (await fetchPageAds('delegates')).strip
       } finally {
         this.adsLoaded = true
       }

@@ -3,7 +3,7 @@ import type { ReceptionAd } from '~/stores/reception'
 
 const props = defineProps<{ ads: ReceptionAd[] }>()
 
-interface Banner { key: string, src: string, href: string | null, alt: string }
+interface Banner { key: string, adId: ReceptionAd['id'], src: string, href: string | null, alt: string }
 
 const banners = computed<Banner[]>(() =>
   props.ads.flatMap(ad =>
@@ -11,12 +11,26 @@ const banners = computed<Banner[]>(() =>
       .filter(img => (img.is_active ?? true) && (img.image_url || img.url))
       .map((img, i) => ({
         key: `${ad.id}-${i}`,
+        adId: ad.id,
         src: (img.image_url || img.url) as string,
         href: (img.redirect_url as string) || null,
         alt: ad.title,
       })),
   ),
 )
+
+// Count one impression per ad the first time this strip renders it, and a click
+// when the viewer follows one — this is what powers the admin Ad Insights.
+const seen = new Set<ReceptionAd['id']>()
+function recordImpressions() {
+  for (const ad of props.ads) {
+    if (seen.has(ad.id)) continue
+    seen.add(ad.id)
+    trackAd(ad.id, 'impression')
+  }
+}
+onMounted(recordImpressions)
+watch(() => props.ads.map(a => a.id).join(','), recordImpressions)
 </script>
 
 <template>
@@ -29,6 +43,7 @@ const banners = computed<Banner[]>(() =>
       :href="b.href || undefined"
       :target="b.href ? '_blank' : undefined"
       rel="noopener"
+      @click="b.href && trackAd(b.adId, 'click')"
     >
       <img :src="b.src" :alt="b.alt" />
     </component>

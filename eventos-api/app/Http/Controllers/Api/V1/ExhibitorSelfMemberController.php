@@ -65,8 +65,9 @@ class ExhibitorSelfMemberController extends Controller
             ['exhibitor_id' => $exhibitor->id, 'contact_id' => $contact->id],
         );
         $member->fill(['is_lead_capturer' => $data['is_lead_capturer'] ?? false]);
-        // role is privileged (not $fillable) — validated to admin/staff upstream.
-        $member->forceFill(['role' => $data['role'] ?? 'staff'])->save();
+        // role/status are privileged (not $fillable) — role is validated to
+        // admin/staff upstream. Re-inviting a deactivated teammate reinstates them.
+        $member->forceFill(['role' => $data['role'] ?? 'staff', 'status' => 'active'])->save();
 
         return response()->json(['data' => new ExhibitorMemberResource($member->load('contact'))], 201);
     }
@@ -74,7 +75,11 @@ class ExhibitorSelfMemberController extends Controller
     /** Permissions a staff member can be granted (the team ACL). */
     public const MODULES = ['scan_badges', 'view_all_leads', 'edit_lead_notes', 'export_leads', 'manage_team'];
 
-    /** Update a member's role + per-module access (ACL). Admins get everything. */
+    /**
+     * Update a member's role, booth access + per-module access (ACL). Admins get
+     * everything. status=inactive keeps the row (lead history stays attributed)
+     * but locks the teammate out of the booth — see ResolveExhibitorAdmin.
+     */
     public function update(Request $request, int $member): JsonResponse
     {
         $m = ExhibitorMember::with('contact')
@@ -84,6 +89,7 @@ class ExhibitorSelfMemberController extends Controller
 
         $data = $request->validate([
             'role' => ['sometimes', Rule::in(['admin', 'staff'])],
+            'status' => ['sometimes', Rule::in(['active', 'inactive'])],
             'is_lead_capturer' => ['sometimes', 'boolean'],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['boolean'],
@@ -92,6 +98,10 @@ class ExhibitorSelfMemberController extends Controller
         $update = [];
         if (array_key_exists('role', $data)) {
             $update['role'] = $data['role'];
+        }
+        if (array_key_exists('status', $data)) {
+            $this->guardDeactivation($request, $m, $data['status']);
+            $update['status'] = $data['status'];
         }
         if (array_key_exists('is_lead_capturer', $data)) {
             $update['is_lead_capturer'] = $data['is_lead_capturer'];
@@ -108,6 +118,36 @@ class ExhibitorSelfMemberController extends Controller
         $m->forceFill($update)->save();
 
         return response()->json(['data' => new ExhibitorMemberResource($m->fresh('contact'))]);
+    }
+
+    /**
+     * Two ways deactivation could lock everyone out of the booth: switching
+     * yourself off, or switching off the last admin left to switch anyone back on.
+     */
+    protected function guardDeactivation(Request $request, ExhibitorMember $m, string $status): void
+    {
+        if ($status !== 'inactive' || $m->status === 'inactive') {
+            return;
+        }
+
+        abort_if(
+            (int) $m->id === (int) $request->attributes->get('exhibitor_member_id'),
+            422,
+            'You cannot deactivate your own access.',
+        );
+
+        $otherActiveAdmin = ExhibitorMember::query()
+            ->where('exhibitor_id', $m->exhibitor_id)
+            ->whereKeyNot($m->id)
+            ->where('role', 'admin')
+            ->active()
+            ->exists();
+
+        abort_if(
+            $m->role === 'admin' && ! $otherActiveAdmin,
+            422,
+            'The booth needs at least one active admin.',
+        );
     }
 
     public function destroy(Request $request, int $member): JsonResponse

@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
-import { eventIdentityHeaders, useEventIdentity } from '~/composables/useEventSubdomain'
 import type { JoinConfig } from '~/stores/rooms'
 import { useSiteStore } from '~/stores/site'
 import type { ReceptionAd } from '~/stores/reception'
@@ -216,18 +215,8 @@ export const useMeetingsStore = defineStore('meetings', {
     /** The organizer's "main ads" strip targeted at the Meetings page. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const identity = useEventIdentity()
-      const id = identity.subdomain || identity.host
-      if (!id) return
       try {
-        const { public: { apiBase } } = useRuntimeConfig()
-        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
-          query: { page: 'meetings' },
-          headers: eventIdentityHeaders(),
-        })
-        this.ads = res.data.strip
-      } catch {
-        // Ads are decorative — the page works fine without them.
+        this.ads = (await fetchPageAds('meetings')).strip
       } finally {
         this.adsLoaded = true
       }

@@ -90,7 +90,7 @@ interface SitePayload {
     onboarding: boolean
     methods: string[]
   }
-  seo: { meta_title: string | null, meta_description: string | null, favicon_url: string | null }
+  seo: { meta_title: string | null, meta_description: string | null, og_image_url: string | null, favicon_url: string | null }
   navigation: SiteNavigation
   subdomain: string
   registration_form_uuid: string | null

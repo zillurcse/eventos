@@ -159,18 +159,8 @@ export const useFeedStore = defineStore('feed', {
      *  Feed page) — shown in place of a banner slider at the top of the feed. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const identity = useEventIdentity()
-      const id = identity.subdomain || identity.host
-      if (!id) return
       try {
-        const { public: { apiBase } } = useRuntimeConfig()
-        const res = await $fetch<{ data: { strip: FeedAd[], sidebar: FeedAd[] } }>(`${apiBase}/public/ads`, {
-          query: { page: 'feed' },
-          headers: eventIdentityHeaders(),
-        })
-        this.ads = res.data.strip
-      } catch {
-        // Ads are decorative — fail silently, the feed still works without them.
+        this.ads = (await fetchPageAds('feed')).strip
       } finally {
         this.adsLoaded = true
       }

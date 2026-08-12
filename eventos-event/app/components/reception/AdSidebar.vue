@@ -3,7 +3,7 @@ import type { ReceptionAd } from '~/stores/reception'
 
 const props = defineProps<{ ads: ReceptionAd[] }>()
 
-interface Card { key: string, src: string, href: string | null, alt: string }
+interface Card { key: string, adId: ReceptionAd['id'], src: string, href: string | null, alt: string }
 
 const cards = computed<Card[]>(() =>
   props.ads.flatMap(ad =>
@@ -11,18 +11,31 @@ const cards = computed<Card[]>(() =>
       .filter(img => (img.is_active ?? true) && (img.image_url || img.url))
       .map((img, i) => ({
         key: `${ad.id}-${i}`,
+        adId: ad.id,
         src: (img.image_url || img.url) as string,
         href: (img.redirect_url as string) || null,
         alt: ad.title,
       })),
   ),
 )
+
+// One impression per ad on first render, a click when followed — feeds Insights.
+const seen = new Set<ReceptionAd['id']>()
+function recordImpressions() {
+  for (const ad of props.ads) {
+    if (seen.has(ad.id)) continue
+    seen.add(ad.id)
+    trackAd(ad.id, 'impression')
+  }
+}
+onMounted(recordImpressions)
+watch(() => props.ads.map(a => a.id).join(','), recordImpressions)
 </script>
 
 <template>
   <div v-if="cards.length" class="side-ads">
     <component :is="c.href ? 'a' : 'div'" v-for="c in cards" :key="c.key" class="ad" :href="c.href || undefined"
-      :target="c.href ? '_blank' : undefined" rel="noopener">
+      :target="c.href ? '_blank' : undefined" rel="noopener" @click="c.href && trackAd(c.adId, 'click')">
       <img :src="c.src" :alt="c.alt" />
     </component>
   </div>

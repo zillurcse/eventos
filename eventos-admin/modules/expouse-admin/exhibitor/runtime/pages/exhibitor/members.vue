@@ -50,6 +50,7 @@ async function load() {
 // ── Stats ──
 const adminCount = computed(() => members.value.filter(m => m.role === 'admin').length)
 const staffCount = computed(() => members.value.filter(m => m.role !== 'admin').length)
+const inactiveCount = computed(() => members.value.filter(m => m.status === 'inactive').length)
 
 // ── Table (search + client pagination) ──
 const filtered = computed(() => {
@@ -92,6 +93,20 @@ async function add() {
     adding.value = false
   }
 }
+
+/** Booth access switch — an inactive member keeps their leads but cannot open the booth. */
+async function setStatus(m: any, status: 'active' | 'inactive') {
+  actionsFor.value = null
+  try {
+    const res = await api<any>(`/exhibitor/members/${m.id}`, { method: 'PATCH', body: { status } })
+    const i = members.value.findIndex((x: any) => x.id === m.id)
+    if (i >= 0) members.value[i] = res.data
+    toast.success(status === 'active' ? 'Member activated' : 'Member deactivated')
+  } catch (e: any) {
+    toast.error(e?.data?.message || 'Could not change the member status.')
+  }
+}
+
 async function remove(m: any) {
   actionsFor.value = null
   if (!confirm(`Remove ${m.contact?.email}?`)) return
@@ -166,7 +181,9 @@ onMounted(load)
       <div class="card">
         <div class="muted text-[.86rem]">Team members</div>
         <div class="text-[1.9rem] font-bold text-ink leading-tight mt-1">{{ members.length }}</div>
-        <div class="muted text-[.82rem] mt-1">{{ adminCount }} admin, {{ staffCount }} staff</div>
+        <div class="muted text-[.82rem] mt-1">
+          {{ adminCount }} admin, {{ staffCount }} staff<span v-if="inactiveCount"> · {{ inactiveCount }} inactive</span>
+        </div>
       </div>
       <div class="card">
         <div class="muted text-[.86rem]">Active now</div>
@@ -190,7 +207,7 @@ onMounted(load)
 
         <table>
           <thead>
-            <tr><th>Members</th><th>Role</th><th>Conversion rate</th><th class="text-right">Actions</th></tr>
+            <tr><th>Members</th><th>Role</th><th>Status</th><th>Conversion rate</th><th class="text-right">Actions</th></tr>
           </thead>
           <tbody>
             <template v-for="m in paged" :key="m.id">
@@ -205,6 +222,9 @@ onMounted(load)
                   </div>
                 </td>
                 <td><span class="badge capitalize">{{ m.role }}</span></td>
+                <td>
+                  <span class="badge capitalize" :class="m.status === 'inactive' ? 'disabled' : 'active'">{{ m.status || 'active' }}</span>
+                </td>
                 <td class="muted">View only</td>
                 <td class="text-right">
                   <div class="relative inline-block" @click.stop>
@@ -213,13 +233,15 @@ onMounted(load)
                     </button>
                     <div v-if="actionsFor === m.id" class="absolute right-0 top-full mt-1 bg-white border border-line rounded-xl shadow-lg z-20 min-w-40 overflow-hidden">
                       <button v-if="m.contact?.can_login" class="w-full text-left px-4 py-2.5 text-[.86rem] hover:bg-[#f7f8fa]" @click="openReset(m)">Reset password</button>
+                      <button v-if="!isSelf(m) && m.status === 'inactive'" class="w-full text-left px-4 py-2.5 text-[.86rem] hover:bg-[#f7f8fa]" @click="setStatus(m, 'active')">Activate</button>
+                      <button v-else-if="!isSelf(m)" class="w-full text-left px-4 py-2.5 text-[.86rem] hover:bg-[#f7f8fa]" @click="setStatus(m, 'inactive')">Deactivate</button>
                       <button v-if="!isSelf(m)" class="w-full text-left px-4 py-2.5 text-[.86rem] text-[#dc2626] hover:bg-[#fef2f2]" @click="remove(m)">Remove</button>
                     </div>
                   </div>
                 </td>
               </tr>
               <tr v-if="pwFor === m.id">
-                <td colspan="4">
+                <td colspan="5">
                   <div class="flex gap-2 items-center py-1">
                     <input v-model="pwValue" type="password" placeholder="New password (min 8)" class="max-w-[260px]">
                     <button class="btn sm" :disabled="pwValue.length < 8" @click="savePassword(m)">Save password</button>

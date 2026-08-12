@@ -113,6 +113,7 @@ class AuthController extends Controller
             $exhibitorMemberships = ExhibitorMember::on('pgsql_admin')
                 ->with(['exhibitor.event.settings', 'exhibitor.event.organization'])
                 ->whereIn('contact_id', $contactIds)
+                ->active()
                 ->get();
 
             foreach ($exhibitorMemberships as $membership) {
@@ -351,6 +352,9 @@ class AuthController extends Controller
             // entitlements when the booth has no Permissions overrides yet.
             ->with(['exhibitor.organization', 'exhibitor.event', 'exhibitor.package'])
             ->whereIn('contact_id', $contactIds)
+            // Deactivated members drop the `exhibitor` persona, so the SPA never
+            // offers a booth the API would then refuse.
+            ->active()
             ->get();
 
         return $user

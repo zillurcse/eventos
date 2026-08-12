@@ -81,18 +81,8 @@ export const useRoomsStore = defineStore('rooms', {
     /** The organizer's "main ads" strip targeted at the Rooms page. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const identity = useEventIdentity()
-      const id = identity.subdomain || identity.host
-      if (!id) return
       try {
-        const { public: { apiBase } } = useRuntimeConfig()
-        const res = await $fetch<{ data: { strip: ReceptionAd[], sidebar: ReceptionAd[] } }>(`${apiBase}/public/ads`, {
-          query: { page: 'rooms' },
-          headers: eventIdentityHeaders(),
-        })
-        this.ads = res.data?.strip ?? []
-      } catch {
-        // Ads are decorative — the page works fine without them.
+        this.ads = (await fetchPageAds('rooms')).strip
       } finally {
         this.adsLoaded = true
       }

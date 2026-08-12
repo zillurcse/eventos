@@ -39,9 +39,15 @@ class ResolveExhibitorAdmin
             $query->where('exhibitor_id', $exhibitorId);
         }
 
-        $member = $query->first();
+        // A deactivated teammate keeps their row (leads and assignments stay
+        // attributed to them) but cannot open the booth until an exhibitor admin
+        // switches them back on.
+        $member = (clone $query)->active()->first();
 
-        abort_unless($member, 403, 'You are not an exhibitor team member.');
+        if (! $member) {
+            abort_if($query->exists(), 403, 'Your access to this booth has been deactivated.');
+            abort(403, 'You are not an exhibitor team member.');
+        }
 
         $exhibitor = Exhibitor::on('pgsql_admin')->findOrFail($member->exhibitor_id);
 

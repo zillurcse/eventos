@@ -136,6 +136,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/public/exhibitors', [PublicSiteController::class, 'exhibitors']);
     Route::get('/public/exhibitors/{uuid}', [PublicSiteController::class, 'exhibitor']);
     Route::get('/public/ads', [PublicSiteController::class, 'ads']);
+    // Attendee-app impression/click tracking (feeds the Insights dashboard).
+    // Public + lightly throttled: a browsing attendee fires a handful per page.
+    Route::post('/public/ads/{ad}/track', [PublicSiteController::class, 'trackAd'])
+        ->whereNumber('ad')->middleware('throttle:120,1');
     Route::get('/public/rooms', [PublicSiteController::class, 'rooms']);
     Route::get('/public/sessions/{uuid}/zoom-signature', [PublicSiteController::class, 'zoomSignature']);
     // Unauthenticated write endpoints — per-IP throttle. 20/min/IP tolerates a

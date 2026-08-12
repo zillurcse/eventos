@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SessionResource;
 use App\Models\BreakoutRoom;
+use App\Models\Contact;
 use App\Models\Event;
 use App\Models\EventAd;
 use App\Models\EventSetting;
@@ -123,8 +124,14 @@ class PublicSiteController extends Controller
                 'methods' => $login['methods'] ?? [],
             ],
             'seo' => [
-                'meta_title' => $seo['meta_title'] ?? null,
-                'meta_description' => $seo['meta_description'] ?? null,
+                // The admin SEO page (Settings › SEO) saves `title`/`description`,
+                // older data used `meta_*` — read either so both flow through.
+                // These + og_image_url/favicon feed the crawler meta tags the
+                // event SPA injects server-side (server/plugins/event-og.ts), so
+                // WhatsApp/Facebook/etc. see the event's card, not Nuxt's default.
+                'meta_title' => $seo['meta_title'] ?? $seo['title'] ?? null,
+                'meta_description' => $seo['meta_description'] ?? $seo['description'] ?? null,
+                'og_image_url' => $seo['og_image_url'] ?? ($cover ? Storage::disk($cover->disk)->url($cover->path) : null),
                 'favicon_url' => $seo['favicon_url'] ?? null,
             ],
             // The tab bar the organizer configured in Navigation & Menu ›
@@ -440,7 +447,7 @@ class PublicSiteController extends Controller
             ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', $now))
             ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', $now))
             ->get()
-            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, 'reception', $ad->placement));
+            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, 'reception'));
 
         $formatAd = fn (EventAd $ad) => [
             'id' => $ad->uuid ?? $ad->id,
@@ -487,8 +494,14 @@ class PublicSiteController extends Controller
 
     /**
      * GET /api/v1/public/ads?page=feed — active ads targeted at a given app
-     * page (organizer sets this in AD Managements › targeted pages). Same
-     * strip (main/featured) + sidebar (content) split as reception()'s ads.
+     * page (organizer sets this in AD Managements › targeted pages) AND at the
+     * signed-in visitor's role/group (targeted groups). Same strip
+     * (main/featured) + sidebar (content) split as reception()'s ads.
+     *
+     * Role targeting resolves the (optional) bearer token to the visitor's
+     * participation in this event; a guest matches only ads with no group
+     * restriction. Each image is enriched with a resolved `redirect_url` and
+     * the numeric ad `id` is returned so the SPA can record impressions/clicks.
      */
     public function ads(Request $request): JsonResponse
     {
@@ -500,6 +513,7 @@ class PublicSiteController extends Controller
 
         [$event] = $resolved;
         $page = $request->string('page', 'feed')->toString();
+        $groups = $this->visitorGroups($request, $event);
         $now = now();
 
         $ads = EventAd::on('pgsql_admin')
@@ -508,21 +522,75 @@ class PublicSiteController extends Controller
             ->where(fn ($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', $now))
             ->where(fn ($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', $now))
             ->get()
-            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, $page, $ad->placement));
-
-        $formatAd = fn (EventAd $ad) => [
-            'id' => $ad->uuid ?? $ad->id,
-            'title' => $ad->title,
-            'placement' => $ad->placement,
-            'images' => $ad->images ?? [],
-        ];
+            ->filter(fn (EventAd $ad) => $this->adTargetsPage($ad->targeted_pages, $page)
+                && $this->adTargetsGroups($ad->targeted_groups, $groups));
 
         return response()->json([
             'data' => [
-                'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($formatAd)->values(),
-                'sidebar' => $ads->where('placement', 'content')->map($formatAd)->values(),
+                'strip' => $ads->whereIn('placement', ['main', 'featured'])->map($this->formatPublicAd(...))->values(),
+                'sidebar' => $ads->where('placement', 'content')->map($this->formatPublicAd(...))->values(),
             ],
         ]);
+    }
+
+    /**
+     * POST /api/v1/public/ads/{ad}/track — record an impression or click from
+     * the attendee app. Public (no organizer perm): the event SPA fires these
+     * as ads are shown/clicked. Scoped to the ad's own event so a token can't
+     * inflate another event's counters.
+     */
+    public function trackAd(Request $request, int $ad): JsonResponse
+    {
+        $data = $request->validate(['type' => ['required', 'in:impression,click']]);
+
+        $resolved = $this->resolvePublishedEvent($request);
+        if ($resolved === null) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        [$event] = $resolved;
+
+        $model = EventAd::on('pgsql_admin')
+            ->where('event_id', $event->id)
+            ->find($ad);
+
+        if ($model === null) {
+            return response()->json(['message' => 'Ad not found.'], 404);
+        }
+
+        $model->increment($data['type'] === 'click' ? 'clicks' : 'impressions');
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /** Shape one ad for the SPA: numeric id + images with a resolved redirect_url. */
+    private function formatPublicAd(EventAd $ad): array
+    {
+        $images = collect($ad->images ?? [])->map(function (array $img) {
+            $img['redirect_url'] = $this->adRedirectUrl($img);
+
+            return $img;
+        })->values()->all();
+
+        return [
+            'id' => $ad->id,
+            'title' => $ad->title,
+            'placement' => $ad->placement,
+            'images' => $images,
+        ];
+    }
+
+    /** Resolve a per-image redirect into a URL the SPA can follow (external only). */
+    private function adRedirectUrl(array $img): ?string
+    {
+        $type = $img['redirect_type'] ?? 'none';
+        $target = $img['redirect_target_id'] ?? null;
+
+        if ($type === 'url' && is_string($target) && $target !== '') {
+            return $target;
+        }
+
+        return null;
     }
 
     /**
@@ -536,14 +604,8 @@ class PublicSiteController extends Controller
     ];
 
     /** Empty targeted_pages = all pages; otherwise the page must be listed. */
-    private function adTargetsPage(mixed $pages, string $page, ?string $placement = null): bool
+    private function adTargetsPage(mixed $pages, string $page): bool
     {
-        // Event Main Ad is defined as site-wide — show on every strip page
-        // even when an older "Select All" omitted a page added later.
-        if ($placement === 'main') {
-            return true;
-        }
-
         if (! is_array($pages) || $pages === []) {
             return true;
         }
@@ -558,6 +620,61 @@ class PublicSiteController extends Controller
         $legacy = array_values(array_diff(self::AD_STRIP_PAGES, [$page]));
 
         return $legacy !== [] && array_diff($legacy, $pages) === [];
+    }
+
+    /**
+     * Empty targeted_groups = every audience; otherwise the visitor must belong
+     * to one of the listed groups. A guest (no participation) belongs to no
+     * group and so only sees unrestricted ads.
+     */
+    private function adTargetsGroups(mixed $groups, array $visitorGroups): bool
+    {
+        if (! is_array($groups) || $groups === []) {
+            return true;
+        }
+
+        return array_intersect($groups, $visitorGroups) !== [];
+    }
+
+    /**
+     * The targeting-group keys (attendees | vip | speakers | exhibitors |
+     * sponsors | organizers) the signed-in visitor belongs to in this event,
+     * resolved from the optional bearer token. Guests get an empty set.
+     */
+    private function visitorGroups(Request $request, Event $event): array
+    {
+        $user = $request->user() ?: auth('sanctum')->user();
+        if ($user === null) {
+            return [];
+        }
+
+        $contactIds = Contact::on('pgsql_admin')->where('user_id', $user->id)->pluck('id');
+        if ($contactIds->isEmpty()) {
+            return [];
+        }
+
+        $participation = Participation::on('pgsql_admin')
+            ->where('event_id', $event->id)
+            ->whereIn('contact_id', $contactIds)
+            ->first();
+
+        if ($participation === null) {
+            return [];
+        }
+
+        $groups = match ($participation->role) {
+            'speaker' => ['speakers'],
+            'exhibitor' => ['exhibitors'],
+            'sponsor' => ['sponsors'],
+            'organizer', 'host', 'staff' => ['organizers'],
+            default => ['attendees'],
+        };
+
+        if (($participation->profile_data['is_vip'] ?? false)) {
+            $groups[] = 'vip';
+        }
+
+        return $groups;
     }
 
     /**

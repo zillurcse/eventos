@@ -12,6 +12,7 @@ class ExhibitorMemberResource extends JsonResource
         return [
             'id' => $this->id,
             'role' => $this->role,
+            'status' => $this->status,                  // active | inactive (booth access)
             'is_lead_capturer' => (bool) $this->is_lead_capturer,
             'permissions' => (object) ($this->permissions ?? []),
             'contact' => $this->whenLoaded('contact', fn () => [

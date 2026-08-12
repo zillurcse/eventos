@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,11 +11,17 @@ class ExhibitorMember extends Model
 {
     use SoftDeletes;
 
-    // role and permissions are privilege columns (booth ACL) — set via forceFill
-    // only at the member-management write sites.
+    // role, status and permissions are privilege columns (booth ACL) — set via
+    // forceFill only at the member-management write sites.
     protected $fillable = [
         'exhibitor_id', 'contact_id', 'participation_id', 'is_lead_capturer',
     ];
+
+    /** Members who may currently open the booth (deactivated ones keep their row). */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
 
     public function exhibitor(): BelongsTo
     {

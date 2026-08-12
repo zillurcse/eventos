@@ -10,6 +10,10 @@ const meetingsStore = useMeetingsStore()
 
 const data = computed(() => reception.data)
 
+// Ads come from the role-aware /public/ads endpoint (Targeted Groups + resolved
+// redirect URLs), not the cached reception payload, so they match the visitor.
+const pageAds = ref<{ strip: any[], sidebar: any[] }>({ strip: [], sidebar: [] })
+
 // Ticks so a session's live/upcoming/ended phase, and a meeting's join
 // window, stay accurate (derived from real start/end times) without a page
 // refresh.
@@ -75,6 +79,7 @@ const meetingsProps = computed(() => ({
 }))
 
 onMounted(async () => {
+  fetchPageAds('reception').then((a) => { pageAds.value = a })
   await Promise.all([
     reception.loaded ? Promise.resolve() : reception.fetchReception(),
     meetingsStore.loaded ? Promise.resolve() : meetingsStore.fetchMeetings(),
@@ -98,14 +103,14 @@ onMounted(async () => {
     <template v-if="isMinimal">
       <ReceptionHeroCarousel v-if="data.banners.length" :banners="data.banners" variant="minimal" />
       <ReceptionAboutCard :about="data.about" />
-      <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" />
+      <ReceptionAdStrip v-if="pageAds.strip.length" :ads="pageAds.strip" />
       <ReceptionMeetingsWidget v-bind="meetingsProps" @join="joinCurrentMeeting" />
       <ReceptionSessionsFeatured v-if="liveSessions.length" title="Live Sessions" :sessions="liveSessions" :limit="3" />
       <ReceptionSessionsFeatured v-if="featuredSessions.length" title="Featured Sessions" :sessions="featuredSessions" :limit="3" />
       <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" type="exhibitor" :partners="data.exhibitors" :limit="3" />
       <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" type="sponsor" :partners="data.sponsors" :limit="3" />
       <ReceptionSpeakersFeatured v-if="data.speakers.length" :speakers="data.speakers" :limit="4" />
-      <ReceptionAdSidebar v-if="data.ads.sidebar.length" :ads="data.ads.sidebar" />
+      <ReceptionAdSidebar v-if="pageAds.sidebar.length" :ads="pageAds.sidebar" />
     </template>
 
     <!-- ── Modern: soft hero, about+meetings row, then full-width stack ─ -->
@@ -115,14 +120,14 @@ onMounted(async () => {
         <ReceptionAboutCard :about="data.about" />
         <ReceptionMeetingsWidget v-bind="meetingsProps" @join="joinCurrentMeeting" />
       </div>
-      <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" />
+      <ReceptionAdStrip v-if="pageAds.strip.length" :ads="pageAds.strip" />
       <div class="modern-stack">
         <ReceptionSessionsFeatured v-if="liveSessions.length" title="Live Sessions" :sessions="liveSessions" :limit="3" />
         <ReceptionSessionsFeatured v-if="featuredSessions.length" title="Featured Sessions" :sessions="featuredSessions" :limit="3" />
         <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" type="exhibitor" :partners="data.exhibitors" :limit="3" />
         <ReceptionPartnersFeatured v-if="data.sponsors.length" title="Sponsors" type="sponsor" :partners="data.sponsors" :limit="3" />
         <ReceptionSpeakersFeatured v-if="data.speakers.length" :speakers="data.speakers" :limit="4" />
-        <ReceptionAdSidebar v-if="data.ads.sidebar.length" :ads="data.ads.sidebar" />
+        <ReceptionAdSidebar v-if="pageAds.sidebar.length" :ads="pageAds.sidebar" />
       </div>
     </template>
 
@@ -131,7 +136,7 @@ onMounted(async () => {
       <div class="main">
         <ReceptionHeroCarousel v-if="data.banners.length" :banners="data.banners" />
         <ReceptionAboutCard :about="data.about" />
-        <ReceptionAdStrip v-if="data.ads.strip.length" :ads="data.ads.strip" />
+        <ReceptionAdStrip v-if="pageAds.strip.length" :ads="pageAds.strip" />
         <ReceptionSessionsFeatured v-if="liveSessions.length" title="Live Sessions" :sessions="liveSessions" :limit="3" />
         <ReceptionSessionsFeatured v-if="featuredSessions.length" title="Featured Sessions" :sessions="featuredSessions" :limit="3" />
         <ReceptionPartnersFeatured v-if="data.exhibitors.length" title="Exhibitors" type="exhibitor" :partners="data.exhibitors" :limit="3" />
@@ -141,7 +146,7 @@ onMounted(async () => {
 
       <aside class="rail">
         <ReceptionMeetingsWidget v-bind="meetingsProps" @join="joinCurrentMeeting" />
-        <ReceptionAdSidebar v-if="data.ads.sidebar.length" :ads="data.ads.sidebar" />
+        <ReceptionAdSidebar v-if="pageAds.sidebar.length" :ads="pageAds.sidebar" />
       </aside>
     </div>
 

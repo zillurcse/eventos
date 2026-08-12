@@ -131,18 +131,8 @@ export const useSessionsStore = defineStore('sessions', {
      *  Sessions page) — shown as a banner above the day tabs. */
     async fetchAds() {
       if (this.adsLoaded) return
-      const identity = useEventIdentity()
-      const id = identity.subdomain || identity.host
-      if (!id) return
       try {
-        const { public: { apiBase } } = useRuntimeConfig()
-        const res = await $fetch<{ data: { strip: SessionsAd[], sidebar: SessionsAd[] } }>(`${apiBase}/public/ads`, {
-          query: { page: 'sessions' },
-          headers: eventIdentityHeaders(),
-        })
-        this.ads = res.data.strip
-      } catch {
-        // Ads are decorative — fail silently, the page still works without them.
+        this.ads = (await fetchPageAds('sessions')).strip
       } finally {
         this.adsLoaded = true
       }

@@ -35,6 +35,12 @@ export default defineNuxtConfig({
     // MinIO from inside its own container. Empty in prod, where the stored
     // URL is already a real public bucket/CDN address the proxy can hit directly.
     minioInternalBase: '',
+    // Server-only: where the crawler-meta plugin (server/plugins/event-og.ts)
+    // reaches the API server-to-server. In the Docker stack public.apiBase is a
+    // browser address (localhost:<port>) that doesn't resolve inside this
+    // container, so point this at the internal service (e.g. http://nginx/api/v1).
+    // Empty → fall back to public.apiBase (fine when that's already reachable).
+    apiInternalBase: '',
     public: {
       apiBase: 'http://localhost:8088/api/v1',
       // Platform apex for subdomain → event resolution (see useEventSubdomain).

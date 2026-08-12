@@ -78,6 +78,7 @@ class ResolveParticipant
         $member = ExhibitorMember::on('pgsql_admin')
             ->whereIn('exhibitor_id', $exhibitorIds)
             ->whereIn('contact_id', $contactIds)
+            ->active()
             ->first();
 
         if (! $member) {

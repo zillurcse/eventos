@@ -281,6 +281,10 @@ services:
       # Lets server/api/image-proxy reach MinIO from inside this container —
       # the public localhost:9000 URL stored on profiles only resolves in the browser.
       NUXT_MINIO_INTERNAL_BASE: "http://minio:9000"
+      # Lets server/plugins/event-og.ts fetch /public/site server-to-server for
+      # crawler meta — the public localhost:<port> API base only resolves in the
+      # browser; inside the stack the API is the nginx service on port 80.
+      NUXT_API_INTERNAL_BASE: "http://nginx/api/v1"
 
 volumes:
   pgdata:
