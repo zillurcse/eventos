@@ -10,8 +10,10 @@ import '../event_feed_controller.dart';
 
 class LikeComment extends StatelessWidget {
   final FeedPostModel post;
+  /// When true, hide the like control (Looking for / Offering use Interested).
+  final bool hideLike;
 
-  const LikeComment({super.key, required this.post});
+  const LikeComment({super.key, required this.post, this.hideLike = false});
 
   @override
   Widget build(BuildContext context) {
@@ -25,59 +27,66 @@ class LikeComment extends StatelessWidget {
       padding: EdgeInsets.only(top: 12.h),
       child: Row(
         children: [
-          // ── Like ───────────────────────────────────────────────────────────────
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ctrl.toggleLike(post.id);
-            },
-            child: Row(
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: child,
-                  ),
-                  child: CustomImage(
-                    "assets/svg/icons/love.svg",
-                    key: ValueKey(post.isLiked),
-                    color: post.isLiked ? Colors.red : context.ghost,
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    "${post.like} ${post.like == 1 ? 'Like' : 'Likes'}",
-                    key: ValueKey(post.like),
-                    style: context.titleRegular?.copyWith(
-                      color: post.isLiked ? Colors.red : context.caption,
+          if (!hideLike) ...[
+            // ── Like ───────────────────────────────────────────────────────────────
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ctrl.toggleLike(post.id);
+              },
+              child: Row(
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: child,
+                    ),
+                    child: CustomImage(
+                      "assets/svg/icons/love.svg",
+                      key: ValueKey(post.isLiked),
+                      color: post.isLiked ? Colors.red : context.ghost,
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(width: 8.w),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Text(
+                      "${post.like} ${post.like == 1 ? 'Like' : 'Likes'}",
+                      key: ValueKey(post.like),
+                      style: context.titleRegular?.copyWith(
+                        color: post.isLiked ? Colors.red : context.caption,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          SizedBox(width: 24.w),
+            SizedBox(width: 24.w),
+          ],
 
           // ── Comment ────────────────────────────────────────────────────────────
           GestureDetector(
             onTap: () {
-              // Comment input is already visible in CommentCard below
+              HapticFeedback.lightImpact();
+              ctrl.toggleComments(post.id);
             },
             child: Row(
               children: [
                 CustomImage(
                   "assets/svg/icons/chat.svg",
-                  color: context.primaryTheme,
+                  color: post.commentOpen
+                      ? context.primaryTheme
+                      : context.ghost,
                 ),
                 SizedBox(width: 8.w),
                 Text(
-                  "${post.comments.length} ${post.comments.length == 1 ? 'Comment' : 'Comments'}",
+                  "${post.commentCount} ${post.commentCount == 1 ? 'Comment' : 'Comments'}",
                   style: context.titleRegular?.copyWith(
-                    color: context.caption,
+                    color: post.commentOpen
+                        ? context.primaryTheme
+                        : context.caption,
                   ),
                 ),
               ],

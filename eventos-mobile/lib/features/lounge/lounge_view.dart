@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../widgets/state_handler/api_state_handler.dart';
+import '../../../widgets/loading_skeletons/lounge_list_skeleton.dart';
 import 'lounge_controller.dart';
 import 'widgets/lounge_header_controls.dart';
 import 'widgets/lounge_tables_list.dart';
@@ -40,11 +41,18 @@ class _LoungeViewState extends State<LoungeView> {
         () => ApiStateHandler(
           state: controller.dataStatus.value,
           onRetry: controller.fetchTables,
-          loadedElement: const CustomScrollView(
-            slivers: [
-              LoungeHeaderControls(),
-              LoungeTablesList(),
-            ],
+          skeleton: const LoungeListSkeleton(),
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchTables,
+            child: const CustomScrollView(
+              slivers: [
+                LoungeHeaderControls(),
+                LoungeTablesList(),
+              ],
+            ),
           ),
         ),
       ),

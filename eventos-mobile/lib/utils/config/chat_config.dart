@@ -42,7 +42,7 @@ class ChatConfig {
       _initialized = true;
       onConnectionChange(true);
     } catch (_) {
-      // Reverb failure is non-fatal — REST + light poll still work.
+      // Reverb failure is non-fatal - REST + light poll still work.
       onConnectionChange(false);
     }
   }

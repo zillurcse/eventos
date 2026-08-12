@@ -18,7 +18,7 @@ import 'device_token_service.dart';
 /// Top-level background handler (must be a top-level or static function).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // No UI work here — OS tray already shows notification payload.
+  // No UI work here - OS tray already shows notification payload.
 }
 
 /// FCM + local notifications. Safe when Firebase is not configured yet:

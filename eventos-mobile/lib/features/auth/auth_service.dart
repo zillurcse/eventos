@@ -5,7 +5,7 @@ import '../../utils/config/dio_config.dart';
 class AuthService {
   final dio = DioConfig.obj.dio!;
 
-  /// POST /public/check-email — does this person already have a login?
+  /// POST /public/check-email - does this person already have a login?
   Future<Response> emailValidationCheck({
     required String email,
   }) async {
@@ -15,7 +15,7 @@ class AuthService {
     );
   }
 
-  /// POST /auth/login — email + password → Sanctum token.
+  /// POST /auth/login - email + password → Sanctum token.
   Future<Response> loginWithPass({
     required String email,
     required String password,
@@ -26,7 +26,7 @@ class AuthService {
     );
   }
 
-  /// GET /auth/me — validate the stored Sanctum token + refresh user profile.
+  /// GET /auth/me - validate the stored Sanctum token + refresh user profile.
   ///
   /// Pass [skipAuthLogout] so a stale token during splash restore does not
   /// race with [SessionManager.logout] navigation.
@@ -39,7 +39,7 @@ class AuthService {
     );
   }
 
-  /// GET /auth/my-events — events this login can open (sets subdomain).
+  /// GET /auth/my-events - events this login can open (sets subdomain).
   Future<Response> myEvents() async {
     return await dio.get('auth/my-events');
   }

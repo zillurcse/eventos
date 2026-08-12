@@ -44,11 +44,11 @@ class AuthController extends GetxController {
   /// True when login succeeded but the user must pick among multiple events.
   bool needsEventSelection = false;
 
-  final RxBool agreeWithTcEmail = false.obs;
-  final RxBool agreeWithTcPass = false.obs;
-  final RxBool agreeWithTcCode = false.obs;
+  final RxBool agreeWithTcEmail = true.obs;
+  final RxBool agreeWithTcPass = true.obs;
+  final RxBool agreeWithTcCode = true.obs;
 
-  RxBool isAgreeWithTC = false.obs;
+  RxBool isAgreeWithTC = true.obs;
   Rx<AuthFlow> authFlow = AuthFlow.registerWithForm.obs;
 
   RxList<SignUpItem> signUpItems = <SignUpItem>[].obs;

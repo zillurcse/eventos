@@ -9,6 +9,7 @@ import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../../utils/helpers/toast_msg.dart';
 import '../../utils/helpers/type_helper.dart';
+import '../../utils/service/engagement_service.dart';
 import '../bookmarks/bookmark_controller.dart';
 import '../chat/chat_controller.dart';
 import '../meetings/meetings_controller.dart';
@@ -193,7 +194,7 @@ class DelegateController extends GetxController {
           favoritedIds: _currentFavoritedUuids(),
         );
 
-        // Ads are optional — don't fail the directory if they error.
+        // Ads are optional - don't fail the directory if they error.
         _fetchAds();
       },
     );
@@ -243,6 +244,13 @@ class DelegateController extends GetxController {
         delegateDetail.value = DelegateMapper.detailFromV1(
           Map<String, dynamic>.from(data),
           isFavorite: isFavorite,
+        );
+        final eng = EngagementService.instance;
+        eng.track(
+          actionType: 'network.profile_viewed',
+          objectType: 'participation',
+          objectUuid: uuid,
+          idempotencyKey: eng.onceKey('network.profile_viewed', uuid),
         );
       },
     );

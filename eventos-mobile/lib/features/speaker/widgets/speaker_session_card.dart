@@ -132,11 +132,10 @@ class _SpeakerSessionCardState extends State<SpeakerSessionCard> {
                       onTap: () {
                         _bookmarkCtrl.toggleSessionBookmark(session);
                       },
-                      child: CustomImage(
-                        isBookmarked ? "assets/svg/icons/bookmark_fill.svg" : "assets/svg/icons/bookmark.svg",
-                        height: 20.sp,
-                        width: 20.sp,
-                        color: isBookmarked ? context.primaryTheme : context.primaryTheme.withValues(alpha: 0.5),
+                      child: Icon(
+                        isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                        color: context.primaryTheme,
+                        size: 26.sp,
                       ),
                     );
                   }),
@@ -167,21 +166,13 @@ class _SpeakerSessionCardState extends State<SpeakerSessionCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    decoration: widget.hasBorder
-                        ? BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.r),
-                            border: Border.all(color: context.primaryTheme, width: 2.sp),
-                          )
-                        : null,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.r),
-                      child: CustomImage(
-                        "https://cdn.pixabay.com/photo/2016/11/21/06/53/beautiful-natural-image-1844362_640.jpg",
-                        width: double.infinity,
-                        height: 120.h,
-                        fit: BoxFit.cover,
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: CustomImage(
+                      session.logoUrl,
+                      width: double.infinity,
+                      height: 120.h,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   SizedBox(height: 16.h),

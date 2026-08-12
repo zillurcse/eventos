@@ -35,7 +35,11 @@ class CustomImage extends StatelessWidget {
     this.borderRadius,
   });
 
-  String get _resolvedSrc => AppConfig.resolveMediaUrl(src);
+  String get _resolvedSrc {
+    // Bundled assets must not go through CDN/storage URL rewriting.
+    if (src.startsWith('assets/')) return src;
+    return AppConfig.resolveMediaUrl(src);
+  }
 
   ImageSource get _source {
     final s = _resolvedSrc;

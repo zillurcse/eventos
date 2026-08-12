@@ -4,27 +4,27 @@ import 'package:intl/intl.dart';
 
 import '../../../models/event_feed_model.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/helpers/text_direction_helper.dart';
 import '../../../widgets/custom_image.dart';
 
-class CommentRow extends StatefulWidget {
+class CommentRow extends StatelessWidget {
   final FeedCommentModel comment;
-  const CommentRow({super.key, required this.comment});
+  final VoidCallback? onReply;
 
-  @override
-  State<CommentRow> createState() => _CommentRowState();
-}
-
-class _CommentRowState extends State<CommentRow> {
+  const CommentRow({super.key, required this.comment, this.onReply});
 
   @override
   Widget build(BuildContext context) {
+    final bodyDir = TextDirectionHelper.directionOf(comment.body);
+    final bodyAlign = TextDirectionHelper.alignOf(comment.body);
+
     return Padding(
       padding: EdgeInsets.only(top: 10.h),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CustomImage(
-            widget.comment.user.profilePhotoUrl,
+            comment.user.profilePhotoUrl,
             fit: BoxFit.cover,
             height: 34.sp,
             width: 34.sp,
@@ -50,27 +50,55 @@ class _CommentRowState extends State<CommentRow> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.comment.user.name,
+                        comment.user.name,
                         style: context.specialCaption1?.copyWith(
                           color: context.heading,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      Text(
+                        DateFormat("hh:mm a dd MMM, yy")
+                            .format(comment.diff.toLocal()),
+                        style: context.specialCaption2
+                            ?.copyWith(color: context.ghost),
+                      ),
                       SizedBox(height: 3.h),
                       Text(
-                        widget.comment.body,
-                        style: context.specialCaption1?.copyWith(color: context.body),
+                        comment.body,
+                        textDirection: bodyDir,
+                        textAlign: bodyAlign,
+                        style: context.specialCaption1
+                            ?.copyWith(color: context.body),
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.only(top: 4.h, left: 4.w),
-                  child: Text(
-                    DateFormat("hh:mm a dd MMM, yy").format(widget.comment.diff),
-                    style: context.specialCaption2?.copyWith(color: context.ghost),
+                if (onReply != null)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4.h, left: 4.w),
+                    child: GestureDetector(
+                      onTap: onReply,
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.reply_rounded,
+                            size: 16.sp,
+                            color: context.caption,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            'Reply',
+                            style: context.specialCaption2?.copyWith(
+                              color: context.caption,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),

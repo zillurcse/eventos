@@ -9,6 +9,7 @@ import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_image.dart';
 import '../meeting_time_utils.dart';
 import '../meetings_controller.dart';
+import '../../../widgets/shimmer_box.dart';
 
 class MeetingCard extends StatelessWidget {
   final Meeting meeting;
@@ -322,12 +323,74 @@ class MeetingCardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(bottom: 14.h),
-      height: 200.h,
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: strokeLight),
       ),
-      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ShimmerBox(width: 60.w, height: 22.h, topRadius: 6.r),
+              SizedBox(width: 10.w),
+              ShimmerBox(width: 120.w, height: 16.h, topRadius: 4.r),
+            ],
+          ),
+          SizedBox(height: 14.h),
+          Divider(height: 1, color: strokeLight),
+          SizedBox(height: 14.h),
+          ShimmerBox(width: double.infinity, height: 20.h, topRadius: 4.r),
+          SizedBox(height: 6.h),
+          ShimmerBox(width: 200.w, height: 16.h, topRadius: 4.r),
+          SizedBox(height: 14.h),
+          ShimmerBox(width: 100.w, height: 12.h, topRadius: 4.r),
+          SizedBox(height: 10.h),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.r),
+                child: ShimmerBox(width: 40.sp, height: 40.sp, topRadius: 8.r),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 150.w, height: 16.h, topRadius: 4.r),
+                    SizedBox(height: 4.h),
+                    ShimmerBox(width: 100.w, height: 12.h, topRadius: 4.r),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14.h),
+          Divider(height: 1, color: strokeLight),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              ShimmerBox(width: 18.sp, height: 18.sp, topRadius: 9.r),
+              SizedBox(width: 6.w),
+              ShimmerBox(width: 150.w, height: 14.h, topRadius: 4.r),
+            ],
+          ),
+          SizedBox(height: 14.h),
+          Row(
+            children: [
+              Expanded(
+                child: ShimmerBox(width: double.infinity, height: 40.h, topRadius: 10.r),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: ShimmerBox(width: double.infinity, height: 40.h, topRadius: 10.r),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -18,7 +18,7 @@ class SpeakerService {
     return await _dio.get('public/sessions');
   }
 
-  /// POST /events/{uuid}/notes — create or update a speaker note.
+  /// POST /events/{uuid}/notes - create or update a speaker note.
   Future<Response> addOrUpdateSpeakerNote(String targetUuid, String note) async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {
@@ -34,7 +34,7 @@ class SpeakerService {
     );
   }
 
-  /// POST /events/{uuid}/bookmarks — toggle speaker bookmark.
+  /// POST /events/{uuid}/bookmarks - toggle speaker bookmark.
   Future<Response> toggleSpeakerBookmark(String speakerUuid, bool on) async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {

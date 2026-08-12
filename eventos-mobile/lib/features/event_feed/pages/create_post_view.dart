@@ -15,6 +15,7 @@ import '../widgets/post_avatar.dart';
 import '../widgets/post_body_text_field.dart';
 import '../widgets/post_date_time_field.dart';
 import '../widgets/post_poll_option_field.dart';
+import '../widgets/video_thumb_picker_sheet.dart';
 import 'widgets/post_type.dart';
 
 class CreatePostView extends StatefulWidget {
@@ -30,7 +31,7 @@ class CreatePostView extends StatefulWidget {
 class _CreatePostViewState extends State<CreatePostView> {
   final ctrl = Get.find<CreatePostController>();
 
-  // ── View-local state only — nothing shared with controller ────────────────
+  // ── View-local state only - nothing shared with controller ────────────────
   late final Rx<PostTypes> _selectedType;
   late final RxInt _selectedChipIndex;
 
@@ -64,6 +65,32 @@ class _CreatePostViewState extends State<CreatePostView> {
     // in the chip list, e.g. when opened by tapping the text area directly)
     _selectedChipIndex =
         _chips.indexWhere((c) => c['type'] == initial).obs;
+
+    if (initial == PostTypes.video) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pickVideoWithThumb();
+      });
+    } else if (initial == PostTypes.image) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ctrl.pickImageFile();
+      });
+    } else if (initial == PostTypes.pdf) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ctrl.pickPdfFile();
+      });
+    }
+  }
+
+  Future<void> _pickVideoWithThumb() async {
+    _selectedType.value = PostTypes.video;
+    ctrl.clearAttach();
+    await ctrl.pickVideoFile();
+    if (!mounted) return;
+    final path = ctrl.attachFilePath.value;
+    if (path != null && ctrl.attachType.value == 'video') {
+      final poster = await showVideoThumbPicker(context: context, videoPath: path);
+      if (poster != null) ctrl.setPoster(poster);
+    }
   }
 
   @override
@@ -82,7 +109,7 @@ class _CreatePostViewState extends State<CreatePostView> {
     return null;
   }
 
-  void _onChipTap(int index) {
+  void _onChipTap(int index) async {
     final type = _chips[index]['type'] as PostTypes;
 
     // If the chip is already selected, ignore the tap to avoid deselecting it.
@@ -97,16 +124,14 @@ class _CreatePostViewState extends State<CreatePostView> {
       ctrl.pickImageFile();
     } else if (type == PostTypes.video) {
       // video attachment → post_type = 'video'
-      _selectedType.value = PostTypes.video;
-      ctrl.clearAttach();
-      ctrl.pickVideoFile();
+      await _pickVideoWithThumb();
     } else if (type == PostTypes.pdf) {
       // pdf attachment → post_type = 'pdf'
       _selectedType.value = PostTypes.pdf;
       ctrl.clearAttach();
       ctrl.pickPdfFile();
     } else {
-      // Poll / offering / looking-for — standard create-post UI.
+      // Poll / offering / looking-for - standard create-post UI.
       ctrl.clearAttach();
       _selectedType.value = type;
     }
@@ -118,7 +143,7 @@ class _CreatePostViewState extends State<CreatePostView> {
 
     // ── Media / PDF post ────────────────────────────────────────────────────
     // If the controller has a pending attachment (from pickAttachFile()),
-    // route straight to submitPostWithAttach — regardless of selected UI type.
+    // route straight to submitPostWithAttach - regardless of selected UI type.
     if (ctrl.attachFile.value != null) {
       final ok = await ctrl.submitPostWithAttach(body: _bodyCtrl.text);
       if (ok && mounted) Get.back();
@@ -498,6 +523,7 @@ class _CreatePostViewState extends State<CreatePostView> {
           Obx(() {
             final filePath = ctrl.attachFilePath.value;
             final type    = ctrl.attachType.value;
+            final poster  = ctrl.posterFile.value;
             if (filePath == null || type == null) return const SizedBox.shrink();
 
             return Padding(
@@ -532,6 +558,16 @@ class _CreatePostViewState extends State<CreatePostView> {
                                 size: 22.sp,
                               ),
                             )
+                          : type == 'video' && poster != null
+                              ? Image.file(
+                                  poster,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => Icon(
+                                    Icons.videocam_outlined,
+                                    color: context.primaryTheme,
+                                    size: 22.sp,
+                                  ),
+                                )
                           : Icon(
                               type == 'pdf'
                                   ? Icons.picture_as_pdf_outlined
@@ -548,7 +584,7 @@ class _CreatePostViewState extends State<CreatePostView> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            filePath.split('/').last,
+                            filePath.split(RegExp(r'[\\/]')).last,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: context.specialCaption1?.copyWith(
@@ -557,7 +593,9 @@ class _CreatePostViewState extends State<CreatePostView> {
                             ),
                           ),
                           Text(
-                            type.toUpperCase(),
+                            type == 'video' && poster != null
+                                ? 'VIDEO · thumbnail set'
+                                : type.toUpperCase(),
                             style: context.specialCaption2?.copyWith(
                               color: context.primaryTheme,
                             ),
@@ -565,6 +603,26 @@ class _CreatePostViewState extends State<CreatePostView> {
                         ],
                       ),
                     ),
+                    if (type == 'video')
+                      GestureDetector(
+                        onTap: () async {
+                          final path = ctrl.attachFilePath.value;
+                          if (path == null) return;
+                          final next = await showVideoThumbPicker(
+                            context: context,
+                            videoPath: path,
+                          );
+                          if (next != null) ctrl.setPoster(next);
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6.w),
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 18.sp,
+                            color: context.primaryTheme,
+                          ),
+                        ),
+                      ),
                     // Clear button
                     GestureDetector(
                       onTap: () {

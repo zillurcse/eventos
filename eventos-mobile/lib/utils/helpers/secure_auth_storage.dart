@@ -66,7 +66,7 @@ class SecureAuthStorage {
       _cachedToken = legacy;
       try {
         await _secure.write(key: _tokenKey, value: legacy);
-        // Successfully in secure storage — drop plaintext copy.
+        // Successfully in secure storage - drop plaintext copy.
         await box.remove(LocalKeyHelper.token);
       } catch (e) {
         // Keep GetStorage copy so the session still persists.
@@ -93,7 +93,7 @@ class SecureAuthStorage {
 
     final box = GetStorage();
     if (secureOk) {
-      // Prefer Keystore/Keychain only — remove any plaintext leftover.
+      // Prefer Keystore/Keychain only - remove any plaintext leftover.
       try {
         await box.remove(LocalKeyHelper.token);
       } catch (_) {}

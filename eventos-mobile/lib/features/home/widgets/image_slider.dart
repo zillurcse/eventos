@@ -8,13 +8,14 @@ class ImageSlider extends StatelessWidget {
   final double height;
   final List<String> imageUrls;
   final double? width;
-
+  final void Function(int index)? onTap;
 
   const ImageSlider({
     super.key,
     required this.height,
     this.imageUrls = const [],
     this.width,
+    this.onTap,
   });
 
   static const _placeholder =
@@ -31,15 +32,21 @@ class ImageSlider extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: urls.length,
         itemBuilder: (context, index) {
+          final image = CustomImage(
+            urls[index],
+            width: width?.sp ?? (context.width * .75).sp,
+            height: height.sp,
+            radius: 8.r,
+            fit: BoxFit.cover,
+          );
           return Padding(
             padding: EdgeInsets.only(right: 16.w),
-            child: CustomImage(
-              urls[index],
-              width: width?.sp ?? (context.width * .75).sp,
-              height: height.sp,
-              radius: 8.r,
-              fit: BoxFit.cover,
-            ),
+            child: onTap == null
+                ? image
+                : GestureDetector(
+                    onTap: () => onTap!(index),
+                    child: image,
+                  ),
           );
         },
       ),

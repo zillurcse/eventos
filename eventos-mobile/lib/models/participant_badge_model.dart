@@ -1,6 +1,6 @@
 /// One badge pass for the signed-in attendee at the current event.
 ///
-/// Mirrors `GET /events/{uuid}/my/badges` — one entry per participation, not
+/// Mirrors `GET /events/{uuid}/my/badges` - one entry per participation, not
 /// per person (speaker + exhibitor team = two passes).
 class ParticipantBadge {
   final String participationId;

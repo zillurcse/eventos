@@ -28,16 +28,24 @@ class CreatePostController extends GetxController {
   /// The actual [File] ready to be uploaded.
   final Rx<File?> attachFile = Rx<File?>(null);
 
+  /// Optional cover image for video posts (frame or custom upload).
+  final Rx<File?> posterFile = Rx<File?>(null);
+
   /// Clears any previously picked attachment.
   void clearAttach() {
     attachFilePath.value = null;
     attachType.value = null;
     attachFile.value = null;
+    posterFile.value = null;
+  }
+
+  void setPoster(File? file) {
+    posterFile.value = file;
   }
 
   // ── File pickers ───────────────────────────────────────────────────────────
 
-  /// Pick an image (.jpg / .jpeg / .png / .webp) — max 5 MB.
+  /// Pick an image (.jpg / .jpeg / .png / .webp) - max 5 MB.
   Future<void> pickImageFile() async {
     try {
       final result = await FilePicker.pickFiles(
@@ -53,7 +61,7 @@ class CreatePostController extends GetxController {
     } catch (_) {}
   }
 
-  /// Pick a PDF — max 10 MB.
+  /// Pick a PDF - max 10 MB.
   Future<void> pickPdfFile() async {
     try {
       final result = await FilePicker.pickFiles(
@@ -69,7 +77,7 @@ class CreatePostController extends GetxController {
     } catch (_) {}
   }
 
-  /// Pick a video (.mp4 / .mov / .webm) — max 50 MB.
+  /// Pick a video (.mp4 / .mov / .webm) - max 50 MB.
   Future<void> pickVideoFile() async {
     try {
       final result = await FilePicker.pickFiles(
@@ -121,6 +129,8 @@ class CreatePostController extends GetxController {
     attachFilePath.value = filePath;
     attachType.value = resolvedAttachType;
     attachFile.value = File(filePath);
+    // Fresh media pick - drop any previous video poster.
+    posterFile.value = null;
   }
 
   String _mapUiTypeToApi(String type) {
@@ -232,20 +242,33 @@ class CreatePostController extends GetxController {
           : <String, dynamic>{};
       final url = (uploadData['url'] ?? '').toString();
       if (url.isEmpty) {
-        throw Exception('Upload failed — no URL returned.');
+        throw Exception('Upload failed - no URL returned.');
       }
+
+      String? posterUrl;
+      final poster = posterFile.value;
+      if (type == 'video' && poster != null) {
+        final posterRes = await _service.uploadMedia(poster);
+        final posterBody = posterRes.data;
+        final posterData = posterBody is Map && posterBody['data'] is Map
+            ? Map<String, dynamic>.from(posterBody['data'] as Map)
+            : <String, dynamic>{};
+        final pUrl = (posterData['url'] ?? '').toString();
+        if (pUrl.isNotEmpty) posterUrl = pUrl;
+      }
+
+      final attachment = <String, dynamic>{
+        'kind': type,
+        'url': url,
+        'name': uploadData['filename'],
+      };
+      if (posterUrl != null) attachment['poster'] = posterUrl;
 
       await _service.createPost({
         'type': apiType,
         'body': body.trim(),
         'visibility': 'attendees',
-        'attachments': [
-          {
-            'kind': type,
-            'url': url,
-            'name': uploadData['filename'],
-          },
-        ],
+        'attachments': [attachment],
       });
       ToastMsg.showSuccessMessage('Post created!');
       clearAttach();
@@ -265,7 +288,7 @@ class CreatePostController extends GetxController {
     try {
       await Get.find<EventFeedController>().fetchFeed();
     } catch (_) {
-      // Feed controller may not be registered yet in tests — ignore.
+      // Feed controller may not be registered yet in tests - ignore.
     }
   }
 }

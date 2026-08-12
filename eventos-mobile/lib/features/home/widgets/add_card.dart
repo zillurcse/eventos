@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../home_controller.dart';
 import 'image_slider.dart';
 
-/// Community banner slider. Vanishes when the API returns no banners.
+/// Reception sidebar ads (after featured speakers). Strip ads are not shown here.
 class AddCard extends StatelessWidget {
   const AddCard({super.key});
 
@@ -15,7 +16,9 @@ class AddCard extends StatelessWidget {
 
     return SliverToBoxAdapter(
       child: Obx(() {
-        final banners = ctrl.addData.images;
+        final banners = ctrl.addData.sidebar
+            .where((b) => b.imageUrl.isNotEmpty && b.status)
+            .toList();
         if (banners.isEmpty) return const SizedBox.shrink();
 
         return Column(
@@ -24,6 +27,14 @@ class AddCard extends StatelessWidget {
               height: MediaQuery.sizeOf(context).height * .18,
               width: MediaQuery.sizeOf(context).width - 32.sp,
               imageUrls: banners.map((b) => b.imageUrl).toList(),
+              onTap: (index) async {
+                if (index < 0 || index >= banners.length) return;
+                final link = banners[index].url.trim();
+                if (link.isEmpty) return;
+                final uri = Uri.tryParse(link);
+                if (uri == null) return;
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
             ),
             SizedBox(height: 16.h),
           ],

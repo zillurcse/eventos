@@ -98,50 +98,56 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                 ? "${entries.length} attendees"
                 : "0 attendees";
 
-            return ListView.builder(
-              padding: EdgeInsets.symmetric(vertical: 16.h),
-              itemCount: entries.length + 1, // +1 for the "You" card after rank 3
-              itemBuilder: (context, index) {
-                // Determine item to display
-                if (index < 3) {
-                  // Top 3 positions
-                  if (index >= entries.length) return const SizedBox.shrink();
-                  final entry = entries[index];
-                  final isSecond = entry.rank == 2;
+            return RefreshIndicator(
+              elevation: 0.5,
+              color: Theme.of(context).colorScheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              onRefresh: leaderboardController.fetchLeaderboard,
+              child: ListView.builder(
+                padding: EdgeInsets.symmetric(vertical: 16.h),
+                itemCount: entries.length + 1, // +1 for the "You" card after rank 3
+                itemBuilder: (context, index) {
+                  // Determine item to display
+                  if (index < 3) {
+                    // Top 3 positions
+                    if (index >= entries.length) return const SizedBox.shrink();
+                    final entry = entries[index];
+                    final isSecond = entry.rank == 2;
 
-                  return _buildRankCard(
-                    entry: entry,
-                    isSecondPlace: isSecond,
-                  );
-                } else if (index == 3) {
-                  // "You" Card
-                  if (currentUser == null) return const SizedBox.shrink();
-                  return Column(
-                    children: [
-                      _buildCurrentUserCard(
-                        currentUser: currentUser,
-                        myRank: myRank,
-                        myPoints: myPoints,
-                        attendeeText: attendeeText,
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                        child: Divider(
-                          color: context.strokeLight,
-                          thickness: 1.sp,
+                    return _buildRankCard(
+                      entry: entry,
+                      isSecondPlace: isSecond,
+                    );
+                  } else if (index == 3) {
+                    // "You" Card
+                    if (currentUser == null) return const SizedBox.shrink();
+                    return Column(
+                      children: [
+                        _buildCurrentUserCard(
+                          currentUser: currentUser,
+                          myRank: myRank,
+                          myPoints: myPoints,
+                          attendeeText: attendeeText,
                         ),
-                      ),
-                    ],
-                  );
-                } else {
-                  // Rank 4+ positions
-                  final listIndex = index - 1; // subtract 1 for the "You" card
-                  if (listIndex >= entries.length) return const SizedBox.shrink();
-                  final entry = entries[listIndex];
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          child: Divider(
+                            color: context.strokeLight,
+                            thickness: 1.sp,
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    // Rank 4+ positions
+                    final listIndex = index - 1; // subtract 1 for the "You" card
+                    if (listIndex >= entries.length) return const SizedBox.shrink();
+                    final entry = entries[listIndex];
 
-                  return _buildStandardCard(entry: entry);
-                }
-              },
+                    return _buildStandardCard(entry: entry);
+                  }
+                },
+              ),
             );
           },
         ),
@@ -156,7 +162,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
     final rankIconPath = _rankIcon(entry.rank);
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 3.h),
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -296,7 +302,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                myRank > 0 ? "$myRank" : "—",
+                myRank > 0 ? "$myRank" : "-",
                 style: context.titleLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -321,7 +327,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
     required LeaderboardEntryModel entry,
   }) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 3.h),
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
         color: Colors.white,

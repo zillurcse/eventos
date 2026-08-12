@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../models/exhibitor_model.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/service/engagement_service.dart';
 import '../../../widgets/loading_skeletons/exhibitor_details_skeleton.dart';
 import '../../../widgets/shared_social_links_section.dart';
 import '../../../widgets/state_handler/api_state_handler.dart';
@@ -32,14 +33,34 @@ class ExhibitorDetails extends StatefulWidget {
 
 class _ExhibitorDetailsState extends State<ExhibitorDetails> {
   late final ExhibitorController ctrl;
+  DateTime? _enteredAt;
 
   @override
   void initState() {
     super.initState();
     ctrl = Get.find<ExhibitorController>();
+    _enteredAt = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ctrl.fetchExhibitorDetail(widget.exhibitor.slug);
     });
+  }
+
+  @override
+  void dispose() {
+    final entered = _enteredAt;
+    if (entered != null) {
+      final detail = ctrl.exhibitorDetail.value ?? widget.exhibitor;
+      final isSponsor =
+          detail.exhibitorType.toLowerCase().contains('sponsor');
+      EngagementService.instance.track(
+        actionType: 'booth.left',
+        objectType: isSponsor ? 'sponsor' : 'exhibitor',
+        objectUuid: detail.slug.isNotEmpty ? detail.slug : widget.exhibitor.slug,
+        durationMs: DateTime.now().difference(entered).inMilliseconds,
+        metadata: {'name': detail.name},
+      );
+    }
+    super.dispose();
   }
 
   @override

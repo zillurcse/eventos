@@ -12,18 +12,45 @@ class SplashView extends StatefulWidget {
 }
 
 class SplashViewState extends State<SplashView> {
-
   @override
   void initState() {
     super.initState();
-    AppDataProvider.obj.initialRoute();
+    AppDataProvider.obj.restoreCachedBranding();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    if (mounted) setState(() {});
+    await AppDataProvider.obj.loadPlatformBranding();
+    if (mounted) setState(() {});
+    await AppDataProvider.obj.initialRoute();
   }
 
   @override
   Widget build(BuildContext context) {
+    final brand = AppDataProvider.obj.mobileBranding?.brand;
+    final splashUrl = brand?.splashUrl;
+    final iconUrl = brand?.iconUrl;
+
     return Scaffold(
       backgroundColor: context.primaryTheme,
-      body: Center(child: CustomImage("assets/svg/img/logo.svg", height: 50.h)),
+      body: splashUrl != null && splashUrl.isNotEmpty
+          ? SizedBox.expand(
+              child: CustomImage(
+                splashUrl,
+                fit: BoxFit.cover,
+                height: double.infinity,
+                width: double.infinity,
+              ),
+            )
+          : Center(
+              child: CustomImage(
+                (iconUrl != null && iconUrl.isNotEmpty)
+                    ? iconUrl
+                    : 'assets/svg/img/logo.svg',
+                height: 50.h,
+              ),
+            ),
     );
   }
 }

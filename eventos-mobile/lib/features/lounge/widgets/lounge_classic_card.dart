@@ -11,7 +11,7 @@ import '../../../widgets/custom_image.dart';
 import '../lounge_controller.dart';
 import 'lounge_seat_helper.dart';
 
-/// Classic Lounge card — center image with dashed seat circles around it.
+/// Classic Lounge card - center image with dashed seat circles around it.
 class LoungeClassicCard extends StatelessWidget {
   final LoungeTable table;
 

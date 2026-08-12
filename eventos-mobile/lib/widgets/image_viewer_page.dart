@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 
 /// Full-screen zoomable image viewer.
-/// Accepts either a remote [url] or a local [filePath] — pass exactly one.
+/// Accepts either a remote [url] or a local [filePath] - pass exactly one.
 class ImageViewerPage extends StatelessWidget {
   final String? url;
   final String? filePath;

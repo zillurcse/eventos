@@ -24,7 +24,7 @@ class BriefcaseFileModel {
       };
 
   factory BriefcaseFileModel.fromJson(Map<String, dynamic> json) {
-    // V1: { id, title, url, kind } — legacy also had file/name/created_at.
+    // V1: { id, title, url, kind } - legacy also had file/name/created_at.
     final fileUrl = json['url']?.toString() ?? json['file']?.toString() ?? '';
     final fileName = json['title']?.toString() ??
         json['name']?.toString() ??

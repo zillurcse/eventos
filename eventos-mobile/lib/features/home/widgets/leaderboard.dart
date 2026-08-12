@@ -30,7 +30,7 @@ class Leaderboard extends StatelessWidget {
     }
   }
 
-  /// Podium order: 2nd, 1st (highlighted), 3rd — only slots that exist.
+  /// Podium order: 2nd, 1st (highlighted), 3rd - only slots that exist.
   List<LeaderboardEntryModel> _podium(List<LeaderboardEntryModel> entries) {
     final byRank = <int, LeaderboardEntryModel>{};
     for (final e in entries) {
@@ -140,7 +140,7 @@ class Leaderboard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          myRank > 0 ? "#$myRank" : "—",
+                          myRank > 0 ? "#$myRank" : "-",
                           style: context.buttonSmallBold
                               ?.copyWith(color: context.tertiaryText),
                         ),

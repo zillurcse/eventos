@@ -270,7 +270,7 @@ class PersonalDetailsTab extends StatelessWidget {
     List<String> items = const [],
     Function(String?)? onChanged,
   }) {
-    // Empty / unknown API values must not be passed to DropdownButton —
+    // Empty / unknown API values must not be passed to DropdownButton -
     // Flutter asserts the value is either null or exactly one of [items].
     final effectiveValue =
         (value != null && value.isNotEmpty && items.contains(value))

@@ -17,6 +17,7 @@ import '../../utils/config/chat_config.dart';
 import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/helpers/local_key.dart';
 import '../../utils/helpers/toast_msg.dart';
+import '../../utils/service/engagement_service.dart';
 import 'chat_service.dart';
 import 'pages/chat_detail_view.dart';
 
@@ -27,6 +28,10 @@ class ChatController extends GetxController {
   User? currentUser;
   String? meParticipationUuid;
   ChatPerson? myProfile;
+
+  /// Partner for the open thread - used for message avatars.
+  final currentPartnerName = ''.obs;
+  final currentPartnerAvatarUrl = RxnString();
 
   RxList<ChatRoomModel> chatRooms = <ChatRoomModel>[].obs;
   RxList<MessageModel> messages = <MessageModel>[].obs;
@@ -43,7 +48,7 @@ class ChatController extends GetxController {
   Timer? _globalPollTimer;
   bool _socketConnected = false;
 
-  /// Conversation currently open — used to suppress FCM banners.
+  /// Conversation currently open - used to suppress FCM banners.
   String? get openConversationId =>
       currentConversationId.value.isEmpty ? null : currentConversationId.value;
 
@@ -116,10 +121,22 @@ class ChatController extends GetxController {
   }
 
   // ── Room entry / exit ─────────────────────────────────────────────────────
-  void enterRoom(String conversationId, {String? partnerId}) {
+  void enterRoom(
+    String conversationId, {
+    String? partnerId,
+    String? partnerName,
+    String? partnerImageUrl,
+  }) {
     _pollTimer?.cancel();
     currentConversationId.value = conversationId;
     messages.clear();
+
+    final room = chatRooms.firstWhereOrNull((r) => r.id == conversationId);
+    currentPartnerName.value =
+        partnerName ?? room?.partner?.name ?? 'Chat';
+    currentPartnerAvatarUrl.value =
+        partnerImageUrl ?? room?.partner?.avatarUrl;
+
     fetchMessages(conversationId);
     markRoomAsRead(conversationId);
 
@@ -134,6 +151,8 @@ class ChatController extends GetxController {
     _pollTimer?.cancel();
     _pollTimer = null;
     currentConversationId.value = '';
+    currentPartnerName.value = '';
+    currentPartnerAvatarUrl.value = null;
   }
 
   Future<void> markRoomAsRead(String conversationId) async {
@@ -297,20 +316,7 @@ class ChatController extends GetxController {
       );
 
       if (currentConversationId.value == conversationId) {
-        final exists = messages.any((m) =>
-            (m.id == newMessage.id && newMessage.id.isNotEmpty) ||
-            (m.isOptimistic &&
-                m.body == newMessage.body &&
-                m.mine == newMessage.mine));
-        if (!exists) {
-          messages.add(newMessage);
-        } else {
-          final idx = messages.indexWhere((m) =>
-              m.isOptimistic &&
-              m.body == newMessage.body &&
-              m.mine == newMessage.mine);
-          if (idx != -1) messages[idx] = newMessage;
-        }
+        _upsertIncomingMessage(newMessage);
         if (!mine) markRoomAsRead(conversationId);
       } else if (!mine) {
         final idx = chatRooms.indexWhere((r) => r.id == conversationId);
@@ -323,6 +329,48 @@ class ChatController extends GetxController {
         }
       }
     } catch (_) {}
+  }
+
+  /// Merge a live/API message into the open thread without creating duplicates.
+  /// Prefer server id; fall back to replacing a pending optimistic bubble.
+  void _upsertIncomingMessage(MessageModel incoming) {
+    if (incoming.id.isNotEmpty) {
+      final byId = messages.indexWhere((m) => m.id == incoming.id);
+      if (byId != -1) {
+        messages[byId] = incoming;
+        return;
+      }
+    }
+
+    if (incoming.mine) {
+      final body = (incoming.body ?? '').trim();
+      final byBody = messages.indexWhere((m) =>
+          m.isOptimistic &&
+          m.mine &&
+          (m.body ?? '').trim() == body);
+      if (byBody != -1) {
+        messages[byBody] = incoming;
+        return;
+      }
+      final anyOpt = messages.indexWhere((m) => m.isOptimistic && m.mine);
+      if (anyOpt != -1) {
+        messages[anyOpt] = incoming;
+        return;
+      }
+    }
+
+    messages.add(incoming);
+  }
+
+  /// Apply the REST send response: drop the temp row and keep a single server row.
+  void _applySentMessage(MessageModel server, String tempId) {
+    messages.removeWhere((m) => m.id == tempId);
+    final byId = messages.indexWhere((m) => m.id == server.id);
+    if (byId != -1) {
+      messages[byId] = server;
+    } else {
+      messages.add(server);
+    }
   }
 
   void _touchInboxPreview(
@@ -394,12 +442,7 @@ class ChatController extends GetxController {
           final server = MessageModel.fromJson(
             Map<String, dynamic>.from(payload['data'] as Map),
           );
-          final idx = messages.indexWhere((m) => m.id == tempId);
-          if (idx != -1) {
-            messages[idx] = server;
-          } else if (!messages.any((m) => m.id == server.id)) {
-            messages.add(server);
-          }
+          _applySentMessage(server, tempId);
           _touchInboxPreview(
             conversationId,
             server.body?.isNotEmpty == true
@@ -411,6 +454,11 @@ class ChatController extends GetxController {
                         : '📎 File'),
             true,
             server.createdAt,
+          );
+          EngagementService.instance.track(
+            actionType: 'chat.replied',
+            objectType: 'conversation',
+            objectUuid: conversationId,
           );
         }
       },
@@ -510,6 +558,8 @@ class ChatController extends GetxController {
     enterRoom(
       conversationId,
       partnerId: partnerId ?? room?.partner?.id,
+      partnerName: partnerName ?? room?.partner?.name,
+      partnerImageUrl: partnerImageUrl ?? room?.partner?.avatarUrl,
     );
   }
 
@@ -548,6 +598,13 @@ class ChatController extends GetxController {
             partner: partner,
             unread: 0,
           ),
+        );
+        EngagementService.instance.track(
+          actionType: 'chat.started',
+          objectType: 'conversation',
+          objectUuid: conversationId,
+          idempotencyKey: 'chat.started:$conversationId',
+          metadata: {'participant': participantUuid},
         );
       }
 

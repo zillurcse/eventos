@@ -250,7 +250,7 @@ class _ContestDetailsBody extends StatelessWidget {
     if (contest.isUpcoming) {
       return 'Entries open when the contest starts.';
     }
-    return 'No entries yet — be the first.';
+    return 'No entries yet - be the first.';
   }
 
   Widget _pill(BuildContext context, String text, {bool highlight = false}) {

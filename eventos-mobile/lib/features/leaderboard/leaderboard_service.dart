@@ -9,12 +9,12 @@ class LeaderboardService {
   String get _eventUuid {
     final uuid = AppDataProvider.obj.eventUuid;
     if (uuid == null || uuid.isEmpty) {
-      throw StateError('No event context — eventUuid missing');
+      throw StateError('No event context - eventUuid missing');
     }
     return uuid;
   }
 
-  /// GET /events/{uuid}/my/gamification — top 20 + caller's points.
+  /// GET /events/{uuid}/my/gamification - top 20 + caller's points.
   Future<Response> getLeaderboard() async {
     return await _dio.get('events/$_eventUuid/my/gamification');
   }

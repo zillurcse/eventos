@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../utils/enum/enums.dart';
 import '../../../widgets/custom_image.dart';
 import '../../../widgets/state_handler/api_state_handler.dart';
+import '../../../widgets/loading_skeletons/contest_list_skeleton.dart';
 import '../home/home_controller.dart';
 import '../session/widgets/ad_banner.dart';
 import 'contests_controller.dart';
@@ -43,15 +44,22 @@ class _ContestsViewState extends State<ContestsView> {
         () => ApiStateHandler(
           state: controller.dataStatus.value,
           onRetry: controller.fetchContests,
-          loadedElement: CustomScrollView(
-            slivers: [
-              _ContestsAdBanner(url: controller.adImageUrl.value),
-              if (controller.adImageUrl.value.isEmpty &&
-                  Get.isRegistered<HomeController>())
-                const AdBanner(),
-              const ContestsPhaseFilter(),
-              const ContestsList(),
-            ],
+          skeleton: const ContestListSkeleton(),
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchContests,
+            child: CustomScrollView(
+              slivers: [
+                _ContestsAdBanner(url: controller.adImageUrl.value),
+                if (controller.adImageUrl.value.isEmpty &&
+                    Get.isRegistered<HomeController>())
+                  const AdBanner(),
+                const ContestsPhaseFilter(),
+                const ContestsList(),
+              ],
+            ),
           ),
         ),
       ),

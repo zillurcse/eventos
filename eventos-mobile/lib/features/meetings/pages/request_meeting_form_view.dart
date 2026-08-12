@@ -18,31 +18,26 @@ class RequestMeetingFormView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
+      appBar: AppBar(
+        backgroundColor: context.primaryTheme,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, size: 18.sp, color: Colors.white),
+          onPressed: () => Get.back(),
+        ),
+        title: Text(
+          'Request a Meeting',
+          style: context.h2?.copyWith(
+            fontWeight: FontWeight.w800,
+            fontSize: 18.sp,
+            color: Colors.white,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(8.w, 4.h, 8.w, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, size: 18.sp),
-                    onPressed: () => Get.back(),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Request a Meeting',
-                      textAlign: TextAlign.center,
-                      style: context.h2?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18.sp,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 48.w),
-                ],
-              ),
-            ),
             Expanded(
               child: Obx(() {
                 final partner = controller.selectedPartner.value;

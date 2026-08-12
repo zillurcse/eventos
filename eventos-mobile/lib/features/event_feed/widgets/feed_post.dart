@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../models/event_feed_model.dart';
 import '../../../utils/enum/enums.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/helpers/text_direction_helper.dart';
 import 'comment_card.dart';
 import 'like_comment.dart';
 import 'post_header.dart';
@@ -80,20 +81,32 @@ class FeedPost extends StatelessWidget {
           if (post.body != null && post.body!.isNotEmpty && type != PostTypes.lookingFor && type != PostTypes.offering)
             Padding(
               padding: EdgeInsets.only(top: 10.h),
-              child: Text(post.body!, style: context.bodyRegular),
+              child: Text(
+                post.body!,
+                textDirection: TextDirectionHelper.directionOf(post.body),
+                textAlign: TextDirectionHelper.alignOf(post.body),
+                style: context.bodyRegular,
+              ),
             ),
           if (type == PostTypes.poll && post.question != null)
             Padding(
               padding: EdgeInsets.only(top: 6.h),
-              child: Text(post.question!,
-                  style: context.bodyRegular),
+              child: Text(
+                post.question!,
+                textDirection: TextDirectionHelper.directionOf(post.question),
+                textAlign: TextDirectionHelper.alignOf(post.question),
+                style: context.bodyRegular,
+              ),
             ),
           if (content != null)
             Padding(
-              padding: EdgeInsets.only(top: 12.h),
+              padding: EdgeInsets.only(top: 8.h),
               child: content,
             ),
-          LikeComment(post: post),
+          LikeComment(
+            post: post,
+            hideLike: type == PostTypes.lookingFor || type == PostTypes.offering,
+          ),
           CommentCard(post: post),
         ],
       ),

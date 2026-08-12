@@ -1,4 +1,5 @@
 import 'package:expouse/features/auth/auth_controller.dart';
+import '../../../widgets/app_webview_page.dart';
 import 'package:expouse/features/auth/widgets/permission_widget.dart';
 import 'package:expouse/features/auth/widgets/social_login_items.dart';
 import 'package:expouse/utils/extension/string_ext.dart';
@@ -92,7 +93,17 @@ class FooterWidget extends StatelessWidget {
 
         Spacer(),
 
-        Center(child: CustomImage("assets/png/logo-primary.png", height: 24.h)),
+        Center(
+          child: GestureDetector(
+            onTap: () {
+              Get.to(() => const AppWebviewPage(
+                title: 'Expouse',
+                url: 'https://expouse.com/',
+              ));
+            },
+            child: CustomImage("assets/png/logo-primary.png", height: 24.h),
+          ),
+        ),
 
         SizedBox(height: context.width / 8),
       ],

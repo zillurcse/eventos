@@ -29,6 +29,8 @@ class EventFeedController extends GetxController {
   final RxBool hasNextPage = false.obs;
   final RxBool isLoadingMore = false.obs;
   final Set<int> _commentsLoaded = {};
+  /// Post UUIDs reported this session - hide Report after success.
+  final reportedPostUuids = <String>{}.obs;
 
   @override
   void onInit() {
@@ -146,13 +148,17 @@ class EventFeedController extends GetxController {
 
     final nowLiked = !original.isLiked;
     final newLikeCount = nowLiked ? original.like + 1 : original.like - 1;
+    final t = original.type;
+    final reactionType = (t == 'looking_for' || t == 'looking-for' || t == 'offering')
+        ? 'interested'
+        : 'like';
 
     posts[index] =
         _copyPostWith(original, isLiked: nowLiked, like: newLikeCount);
     posts.refresh();
 
     try {
-      final response = await _service.toggleReaction(uuid);
+      final response = await _service.toggleReaction(uuid, type: reactionType);
       final data = response.data;
       if (data is Map) {
         posts[index] = _copyPostWith(
@@ -193,23 +199,37 @@ class EventFeedController extends GetxController {
       posts.refresh();
       _commentsLoaded.add(postId);
     } catch (_) {
-      // Best-effort — comments stay empty until retry.
+      // Best-effort - comments stay empty until retry.
     }
   }
 
-  /// Submits a comment and injects it into the post's comment list.
+  /// Opens/closes the comment composer for a post and loads comments on open.
+  void toggleComments(int postId) {
+    final index = posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return;
+    final next = !posts[index].commentOpen;
+    posts[index] = _copyPostWith(posts[index], commentOpen: next);
+    posts.refresh();
+    if (next) ensureCommentsLoaded(postId);
+  }
+
+  /// Submits a comment (or reply) and injects it into the post's comment list.
   /// Returns true on success so the widget can clear its input.
   Future<bool> storeComment({
     required int postId,
     required String body,
+    int? parentId,
   }) async {
     if (body.trim().isEmpty) return false;
     final uuid = _uuidFor(postId);
     if (uuid == null || uuid.isEmpty) return false;
 
     try {
-      final response =
-          await _service.storeComment(postUuid: uuid, body: body.trim());
+      final response = await _service.storeComment(
+        postUuid: uuid,
+        body: body.trim(),
+        parentId: parentId,
+      );
 
       final index = posts.indexWhere((p) => p.id == postId);
       if (index != -1) {
@@ -232,6 +252,7 @@ class EventFeedController extends GetxController {
               : null;
           newComment = FeedCommentModel(
             id: DateTime.now().millisecondsSinceEpoch,
+            parentId: parentId,
             body: body,
             user: FeedUserModel(
               id: currentUser?.id ?? 0,
@@ -244,7 +265,12 @@ class EventFeedController extends GetxController {
 
         final updatedComments =
             List<FeedCommentModel>.from(original.comments)..add(newComment);
-        posts[index] = _copyPostWith(original, comments: updatedComments);
+        posts[index] = _copyPostWith(
+          original,
+          comments: updatedComments,
+          commentOpen: true,
+          commentCount: original.commentCount + 1,
+        );
         posts.refresh();
         _commentsLoaded.add(postId);
       }
@@ -311,16 +337,48 @@ class EventFeedController extends GetxController {
     }
   }
 
+  // ── Report ─────────────────────────────────────────────────────────────────
+  bool canReport(FeedPostModel post) =>
+      !post.isMine &&
+      post.status == 'published' &&
+      post.uuid.isNotEmpty &&
+      !post.reportedByMe &&
+      !reportedPostUuids.contains(post.uuid);
+
+  /// Flags a post for organizer review. [reason] is inappropriate|irrelevant|spam.
+  Future<bool> reportPost(int postId, String reason) async {
+    final index = posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return false;
+    final original = posts[index];
+    final uuid = original.uuid;
+    if (uuid.isEmpty || original.reportedByMe) return false;
+    try {
+      await _service.reportPost(uuid, reason);
+      reportedPostUuids.add(uuid);
+      reportedPostUuids.refresh();
+      posts[index] = _copyPostWith(original, reportedByMe: true);
+      posts.refresh();
+      ToastMsg.showSuccessMessage('Thanks - we received your report.');
+      return true;
+    } catch (err) {
+      ToastMsg.showApiErrorMessage(err);
+      return false;
+    }
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
   FeedPostModel _copyPostWith(
     FeedPostModel post, {
     bool? isLiked,
     int? like,
     List<FeedCommentModel>? comments,
+    bool? commentOpen,
+    int? commentCount,
     bool? voteByThisUser,
     int? myVote,
     int? totalVotes,
     List<FeedPollOptionModel>? options,
+    bool? reportedByMe,
   }) =>
       FeedPostModel(
         id: post.id,
@@ -331,6 +389,7 @@ class EventFeedController extends GetxController {
         attach: post.attach,
         attachUrl: post.attachUrl,
         attachType: post.attachType,
+        attachPoster: post.attachPoster,
         question: post.question,
         type: post.type,
         isLive: post.isLive,
@@ -344,7 +403,11 @@ class EventFeedController extends GetxController {
         createdAtDate: post.createdAtDate,
         isLiked: isLiked ?? post.isLiked,
         comments: comments ?? post.comments,
-        commentOpen: post.commentOpen,
+        commentOpen: commentOpen ?? post.commentOpen,
+        commentCount: commentCount ??
+            (comments != null ? comments.length : post.commentCount),
+        isMine: post.isMine,
+        reportedByMe: reportedByMe ?? post.reportedByMe,
         totalVotes: totalVotes ?? post.totalVotes,
         voteByThisUser: voteByThisUser ?? post.voteByThisUser,
         myVote: myVote ?? post.myVote,

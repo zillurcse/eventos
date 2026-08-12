@@ -38,16 +38,24 @@ class BookmarkController extends GetxController {
     'exhibitor': {},
   };
 
+  /// Bumped whenever saved bookmarks change so Obx widgets rebuild.
+  final revision = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
     fetchBookmarks();
   }
 
-  bool isOn(String type, String uuid) => _saved[type]?.contains(uuid) ?? false;
+  bool isOn(String type, String uuid) {
+    revision.value;
+    return _saved[type]?.contains(uuid) ?? false;
+  }
 
-  bool isOnHashed(String type, int hashedId) =>
-      _hashToUuid[type]?.containsKey(hashedId) ?? false;
+  bool isOnHashed(String type, int hashedId) {
+    revision.value;
+    return _hashToUuid[type]?.containsKey(hashedId) ?? false;
+  }
 
   String? uuidFor(String type, int hashedId) => _hashToUuid[type]?[hashedId];
 
@@ -80,6 +88,7 @@ class BookmarkController extends GetxController {
           _hydrateExhibitors(),
           _hydrateDelegates(),
         ]);
+        revision.value++;
       },
     );
   }
@@ -257,6 +266,7 @@ class BookmarkController extends GetxController {
       bookmarkedExhibitors.removeWhere((e) => e.id == hashed);
       bookmarkedDelegates.removeWhere((d) => d.id == hashed);
     }
+    revision.value++;
   }
 
   void toggleSpeakerBookmark(SpeakerItemModel speaker) {
@@ -268,13 +278,26 @@ class BookmarkController extends GetxController {
     toggle(type: 'speaker', uuid: uuid, speaker: speaker);
   }
 
-  void toggleSessionBookmark(SessionModel session) {
-    final uuid = uuidFor('session', session.id);
-    if (uuid == null) {
+  Future<bool> toggleSessionBookmark(SessionModel session) async {
+    final uuid = session.uuid.isNotEmpty
+        ? session.uuid
+        : uuidFor('session', session.id);
+    if (uuid == null || uuid.isEmpty) {
       bookmarkedSessions.removeWhere((s) => s.id == session.id);
-      return;
+      return false;
     }
-    toggle(type: 'session', uuid: uuid, session: session);
+    final wasBookmarked = isOn('session', uuid);
+    final success = await toggle(type: 'session', uuid: uuid, session: session);
+    if (success) {
+      ToastMsg.showSuccessMessage(
+        wasBookmarked
+            ? 'Removed from your bookmarks.'
+            : 'Added to your bookmarks.',
+      );
+    } else {
+      ToastMsg.showErrorMessage('Could not update your bookmark.');
+    }
+    return success;
   }
 
   void toggleExhibitorBookmark(ExhibitorModel exhibitor) {

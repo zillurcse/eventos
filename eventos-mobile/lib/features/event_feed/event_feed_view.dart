@@ -47,12 +47,18 @@ class _EventFeedViewState extends State<EventFeedView> {
         }
         return false;
       },
-      child: const CustomScrollView(
-        slivers: [
-          SearchWidget(),
-          CreatePostWidget(),
-          FeedPostsList(),
-        ],
+      child: RefreshIndicator(
+        elevation: 0.5,
+        color: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        onRefresh: ctrl.fetchFeed,
+        child: const CustomScrollView(
+          slivers: [
+            SearchWidget(),
+            CreatePostWidget(),
+            FeedPostsList(),
+          ],
+        ),
       ),
     );
   }

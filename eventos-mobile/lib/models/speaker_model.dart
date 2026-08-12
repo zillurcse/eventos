@@ -1,4 +1,4 @@
-// Re-exports — all speaker model classes now live in their own files.
+// Re-exports - all speaker model classes now live in their own files.
 // Importing this file still works as before for backwards compatibility.
 export 'speaker_ad_image_model.dart';
 export 'speaker_ad_model.dart';

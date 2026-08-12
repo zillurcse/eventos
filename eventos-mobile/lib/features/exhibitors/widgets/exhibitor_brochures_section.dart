@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
+import 'package:expouse/utils/config/app_config.dart';
+import 'package:expouse/utils/service/engagement_service.dart';
 import '../../../models/exhibitor_model.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/custom_image.dart';
@@ -12,12 +14,31 @@ class ExhibitorBrochuresSection extends StatelessWidget {
 
   const ExhibitorBrochuresSection({super.key, required this.exhibitor});
 
-  Future<void> _openFile(String fileUrl) async {
+  Future<void> _openFile(String fileUrl, {String? title, int? docId}) async {
     if (fileUrl.isEmpty) return;
-    final url = fileUrl.startsWith('http') ? fileUrl : 'https://admin.expouse.com/storage/$fileUrl';
+    final url = AppConfig.resolveAssetUrl(fileUrl);
     final uri = Uri.tryParse(url);
     if (uri != null) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final isSponsor =
+          exhibitor.exhibitorType.toLowerCase().contains('sponsor');
+      final eng = EngagementService.instance;
+      eng.track(
+        actionType:
+            isSponsor ? 'sponsor.brochure_downloaded' : 'booth.brochure_downloaded',
+        objectType: 'document',
+        objectId: docId,
+        objectUuid: exhibitor.slug,
+        idempotencyKey: eng.onceKey(
+          'brochure_downloaded',
+          '${exhibitor.slug}:${docId ?? fileUrl}',
+        ),
+        metadata: {
+          'title': title,
+          'url': fileUrl,
+          'exhibitor_uuid': exhibitor.slug,
+        },
+      );
     }
   }
 
@@ -136,7 +157,11 @@ class ExhibitorBrochuresSection extends StatelessWidget {
                   ),
                   SizedBox(width: 4.w),
                   GestureDetector(
-                    onTap: () => _openFile(url),
+                    onTap: () => _openFile(
+                      url,
+                      title: name,
+                      docId: _getDocId(item),
+                    ),
                     child: Container(
                       padding: EdgeInsets.all(8.sp),
                       child: Icon(
@@ -182,5 +207,15 @@ class ExhibitorBrochuresSection extends StatelessWidget {
           '';
     }
     return '';
+  }
+
+  int? _getDocId(dynamic item) {
+    if (item is Map) {
+      final id = item['id'];
+      if (id is int) return id;
+      if (id is num) return id.toInt();
+      return int.tryParse(id?.toString() ?? '');
+    }
+    return null;
   }
 }

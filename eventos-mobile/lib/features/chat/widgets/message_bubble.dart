@@ -12,53 +12,70 @@ import 'message_pdf_link.dart';
 class MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe;
+  final String? avatarUrl;
+  final String senderName;
 
-  const MessageBubble({super.key, required this.message, required this.isMe});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    required this.isMe,
+    this.avatarUrl,
+    this.senderName = '',
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+    final hasBody = message.body != null && message.body!.isNotEmpty;
+    final hasImage =
+        message.attach != null && message.attachType == 'image';
+    final hasVideo =
+        message.attach != null && message.attachType == 'video';
+    final hasPdf = message.attach != null && message.attachType == 'pdf';
+    final isMediaBubble = hasImage || hasVideo;
+
+    final bubbleRadius = BorderRadius.only(
+      topLeft: const Radius.circular(12).r,
+      topRight: const Radius.circular(12).r,
+      bottomLeft: Radius.circular(isMe ? 12 : 0).r,
+      bottomRight: Radius.circular(isMe ? 0 : 12).r,
+    );
+
+    final bubble = Flexible(
       child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.all(12.sp),
+            padding: isMediaBubble ? EdgeInsets.zero : EdgeInsets.all(12.sp),
             decoration: BoxDecoration(
               color: isMe ? context.primaryFocused : context.tertiaryText,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(12).r,
-                topRight: const Radius.circular(12).r,
-                bottomLeft: Radius.circular(isMe ? 12 : 0).r,
-                bottomRight: Radius.circular(isMe ? 0 : 12).r,
-              ),
+              borderRadius: bubbleRadius,
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (message.attach != null && message.attachType == 'image')
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: GestureDetector(
-                      onTap: () => _openImage(context, message.previewUrl!),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: _buildImage(message.previewUrl!),
-                      ),
-                    ),
+                if (hasImage)
+                  GestureDetector(
+                    onTap: () => _openImage(context, message.previewUrl!),
+                    child: _buildImage(message.previewUrl!),
                   ),
-                if (message.attach != null && message.attachType == 'video')
+                if (hasVideo)
+                  MessageVideoThumbnail(
+                      url: message.previewUrl!, isMe: isMe),
+                if (hasPdf)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: MessageVideoThumbnail(url: message.previewUrl!, isMe: isMe),
-                    ),
+                    padding: EdgeInsets.all(12.sp),
+                    child: MessagePdfLink(
+                        url: message.previewUrl!, isMe: isMe),
                   ),
-                if (message.attach != null && message.attachType == 'pdf')
-                  MessagePdfLink(url: message.previewUrl!, isMe: isMe),
-                if (message.body != null && message.body!.isNotEmpty)
-                  Text(message.body!, style: context.bodyLarge),
+                if (hasBody)
+                  Padding(
+                    padding: isMediaBubble
+                        ? EdgeInsets.fromLTRB(12.sp, 8.sp, 12.sp, 12.sp)
+                        : EdgeInsets.zero,
+                    child: Text(message.body!, style: context.bodyLarge),
+                  ),
               ],
             ),
           ),
@@ -72,22 +89,41 @@ class MessageBubble extends StatelessWidget {
         ],
       ),
     );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h, horizontal: 8.w),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe) ...[
+            _SenderAvatar(url: avatarUrl, name: senderName),
+            SizedBox(width: 8.w),
+          ],
+          bubble,
+          if (isMe) ...[
+            SizedBox(width: 8.w),
+            _SenderAvatar(url: avatarUrl, name: senderName),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildImage(String src) {
     final isLocal = src.startsWith('/') || src.startsWith('file://');
+    final width = 280.w;
     if (isLocal) {
-      return SizedBox(
-        height: 180.h,
-        width: 280.w,
-        child: Image.file(
-          File(src),
-          fit: BoxFit.cover,
-          errorBuilder: (context, err, stack) => Icon(Icons.broken_image, size: 60.sp),
-        ),
+      return Image.file(
+        File(src),
+        width: width,
+        fit: BoxFit.fitWidth,
+        errorBuilder: (context, err, stack) =>
+            Icon(Icons.broken_image, size: 60.sp),
       );
     }
-    return CustomImage(src, height: 180.h, width: 280.w, fit: BoxFit.cover);
+    return CustomImage(src, width: width, fit: BoxFit.fitWidth);
   }
 
   void _openImage(BuildContext context, String src) {
@@ -109,5 +145,46 @@ class MessageBubble extends StatelessWidget {
     } catch (_) {
       return dateStr;
     }
+  }
+}
+
+class _SenderAvatar extends StatelessWidget {
+  final String? url;
+  final String name;
+
+  const _SenderAvatar({this.url, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+    final hasUrl = url != null && url!.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16.r),
+      child: SizedBox(
+        width: 28.sp,
+        height: 28.sp,
+        child: hasUrl
+            ? CustomImage(
+                url!,
+                width: 28.sp,
+                height: 28.sp,
+                fit: BoxFit.cover,
+              )
+            : ColoredBox(
+                color: context.primaryTheme,
+                child: Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 }

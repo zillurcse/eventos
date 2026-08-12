@@ -220,7 +220,7 @@ class ContestDetailsController extends GetxController {
         bodyController.clear();
         draftAttachments.clear();
         composerMessage.value = entry.status == 'pending'
-            ? 'Submitted — the organizer will review it before it appears.'
+            ? 'Submitted - the organizer will review it before it appears.'
             : 'Your entry is in. Good luck!';
       }
     } on DioException catch (e) {

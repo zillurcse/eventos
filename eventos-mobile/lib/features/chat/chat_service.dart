@@ -8,7 +8,7 @@ class ChatService {
   String get _eventUuid {
     final uuid = AppDataProvider.obj.eventUuid;
     if (uuid == null || uuid.isEmpty) {
-      throw StateError('No event context — eventUuid missing');
+      throw StateError('No event context - eventUuid missing');
     }
     return uuid;
   }
@@ -61,10 +61,14 @@ class ChatService {
 
   /// Upload a chat attachment → MinIO URL (collection: chat).
   Future<Response> uploadAttachment(FormData formData) {
+    // Never set Content-Type to a bare `multipart/form-data` - Dio must add the boundary.
     return dio.post(
       'events/$_eventUuid/uploads',
       data: formData,
-      options: Options(contentType: 'multipart/form-data'),
+      options: Options(
+        sendTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 5),
+      ),
     );
   }
 }

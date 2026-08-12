@@ -31,16 +31,6 @@ class OngoingSessions extends StatelessWidget {
                 style: context.h3,
               ),
             ),
-            SizedBox(height: 2.h),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: Text(
-                sessions.first.day.date.isNotEmpty
-                    ? sessions.first.day.date
-                    : sessions.first.day.title,
-                style: context.specialCaption1?.copyWith(color: context.caption),
-              ),
-            ),
             SizedBox(height: 12.h),
             if (sessions.length == 1)
               Padding(

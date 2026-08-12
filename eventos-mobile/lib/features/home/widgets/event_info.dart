@@ -42,13 +42,15 @@ class EventInfo extends StatelessWidget {
           child: Column(
             children: [
               Padding(
-                padding: EdgeInsets.all(16.sp),
+                padding: EdgeInsets.only(
+                  left: 16.sp, right: 16.sp, top: 16.sp, bottom: 4.sp,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: 12.h,
                   children: [
                     Text(
-                      event.title.isNotEmpty ? event.title : '—',
+                      event.title.isNotEmpty ? event.title : '-',
                       maxLines: 2,
                       style: context.h5?.copyWith(color: context.heading),
                     ),
@@ -96,7 +98,7 @@ class EventInfo extends StatelessWidget {
                           seeDetails.value
                               ? rawDesc
                               : rawDesc.length > 180
-                              ? rawDesc.substring(0, 180)
+                              ? "${rawDesc.substring(0, 180)} ..."
                               : rawDesc,
                           style: context.bodyRegular,
                         ),
@@ -127,7 +129,7 @@ class EventInfo extends StatelessWidget {
                 height: MediaQuery.sizeOf(context).height * .16,
                 imageUrls: banners.map((b) => b.imageUrl).toList(),
               ),
-              SizedBox(height: 12.h),
+              SizedBox(height: 6.h),
               if (rawDesc.length > 180)
                 Obx(
                   () => GestureDetector(

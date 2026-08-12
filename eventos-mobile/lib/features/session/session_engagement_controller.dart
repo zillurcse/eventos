@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../models/session_engagement_models.dart';
+import '../../utils/service/engagement_service.dart';
 import 'session_service.dart';
 
 enum SessionEngagementTab { chat, qa, polls, attendees }
@@ -196,6 +197,11 @@ class SessionEngagementController extends GetxController {
       await _service.askQuestion(sessionUuid, body);
       qaInput.clear();
       await _loadQuestions();
+      EngagementService.instance.track(
+        actionType: 'session.question_asked',
+        objectType: 'session',
+        objectUuid: sessionUuid,
+      );
     } catch (_) {
       Get.snackbar('Q&A', 'Could not submit question.',
           snackPosition: SnackPosition.BOTTOM);
@@ -222,6 +228,14 @@ class SessionEngagementController extends GetxController {
         await _loadPolls();
       }
       _absorbMeta(_metaOf(res.data));
+      EngagementService.instance.track(
+        actionType: 'session.poll_participated',
+        objectType: 'poll',
+        objectId: pollId,
+        objectUuid: sessionUuid,
+        idempotencyKey:
+            EngagementService.instance.onceKey('session.poll_participated', '$sessionUuid:$pollId'),
+      );
     } catch (_) {
       Get.snackbar('Polls', 'Could not submit vote.',
           snackPosition: SnackPosition.BOTTOM);

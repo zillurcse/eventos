@@ -75,83 +75,78 @@ class MeetingsToolbar extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 10.w),
-                PopupMenuButton<String>(
-                  onSelected: controller.setSortType,
-                  offset: Offset(0, 45.h),
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
+                Theme(
+                  data: Theme.of(context).copyWith(
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
                   ),
-                  itemBuilder: (_) {
-                    final options = [
-                      {'key': 'newest', 'label': 'Newest first'},
-                      {'key': 'oldest', 'label': 'Oldest first'},
-                      {'key': 'name', 'label': 'By name'},
-                    ];
-                    return options.map((opt) {
-                      return PopupMenuItem<String>(
-                        value: opt['key'],
-                        child: Obx(() {
-                          final selected =
-                              controller.sortType.value == opt['key'];
-                          return Text(
-                            opt['label']!,
-                            style: context.bodyRegular?.copyWith(
-                              color: selected
-                                  ? context.primaryTheme
-                                  : context.body,
-                              fontWeight: selected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                          );
-                        }),
-                      );
-                    }).toList();
-                  },
-                  child: Container(
-                    height: 40.h,
-                    width: 40.w,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: context.stroke),
+                  child: PopupMenuButton<String>(
+                    onSelected: controller.setSortType,
+                    offset: Offset(0, 50.h),
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
-                    child: Icon(
-                      Icons.swap_vert,
-                      size: 20.sp,
-                      color: context.primaryTheme,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10.w),
-                GestureDetector(
-                  onTap: () => _showFilterSheet(context, controller),
-                  child: Obx(() {
-                    final active = controller.selectedStatuses.isNotEmpty ||
-                        controller.selectedDirection.value != 'all';
-                    return Container(
+                    itemBuilder: (_) {
+                      final options = [
+                        {'key': 'newest', 'label': 'Newest first'},
+                        {'key': 'oldest', 'label': 'Oldest first'},
+                        {'key': 'name', 'label': 'By name'},
+                      ];
+                      return options.map((opt) {
+                        return PopupMenuItem<String>(
+                          value: opt['key'],
+                          child: Obx(() {
+                            final selected =
+                                controller.sortType.value == opt['key'];
+                            return Text(
+                              opt['label']!,
+                              style: context.bodyRegular?.copyWith(
+                                color: selected
+                                    ? context.primaryTheme
+                                    : context.body,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            );
+                          }),
+                        );
+                      }).toList();
+                    },
+                    child: Container(
                       height: 40.h,
-                      width: 40.w,
+                      width: 40.h,
                       decoration: BoxDecoration(
-                        color: active
-                            ? context.primaryFocused
-                            : Colors.white,
+                        color: context.primaryFocused,
                         borderRadius: BorderRadius.circular(8.r),
-                        border: Border.all(
-                          color: active
-                              ? context.primaryTheme
-                              : context.stroke,
-                        ),
                       ),
                       child: Center(
                         child: CustomImage(
-                          'assets/svg/icons/filter.svg',
+                          "assets/svg/icons/sorting.svg",
                           color: context.primaryTheme,
                         ),
                       ),
-                    );
-                  }),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                GestureDetector(
+                  onTap: () => _showFilterSheet(context, controller),
+                  child: Container(
+                    height: 40.h,
+                    width: 40.h,
+                    decoration: BoxDecoration(
+                      color: context.primaryFocused,
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Center(
+                      child: CustomImage(
+                        'assets/svg/icons/filter.svg',
+                        color: context.primaryTheme,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -174,6 +169,10 @@ class MeetingsToolbar extends StatelessWidget {
                           value: controller.showPast.value,
                           onChanged: controller.setShowPast,
                           activeTrackColor: context.primaryTheme,
+                          inactiveTrackColor: context.ghost,
+                          inactiveThumbColor: Colors.white,
+                          trackOutlineColor:
+                              WidgetStateProperty.all(Colors.transparent),
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
                         ),

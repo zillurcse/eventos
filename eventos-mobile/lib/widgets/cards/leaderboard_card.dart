@@ -22,7 +22,8 @@ class LeaderboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: isFirstPlace ? 12.sp : 16.sp),
+      margin: EdgeInsets.symmetric(
+          horizontal: isFirstPlace ? 12.sp : 16.sp, vertical: 3.h),
       padding: EdgeInsets.all(12.sp),
       decoration: BoxDecoration(
         color: context.tertiaryText,

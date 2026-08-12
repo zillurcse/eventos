@@ -42,6 +42,7 @@ class FeedMapper {
     final firstAttach = attachments.isNotEmpty ? attachments.first : null;
     final attachKind = firstAttach?['kind']?.toString();
     final attachUrl = firstAttach?['url']?.toString();
+    final attachPoster = firstAttach?['poster']?.toString();
 
     final poll = json['poll'] is Map
         ? Map<String, dynamic>.from(json['poll'] as Map)
@@ -68,8 +69,9 @@ class FeedMapper {
       }
     }
 
-    final createdAt = DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-        DateTime.now();
+    final createdAt = (DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+            DateTime.now())
+        .toLocal();
 
     // Keep legacy UI type keys used by feed_post.dart / chips.
     final uiType = switch (apiType) {
@@ -87,6 +89,7 @@ class FeedMapper {
       attach: attachUrl,
       attachUrl: attachUrl,
       attachType: attachKind,
+      attachPoster: attachPoster,
       question: apiType == 'poll' ? json['body']?.toString() : null,
       type: uiType,
       isLive: false,
@@ -102,7 +105,10 @@ class FeedMapper {
       createdAtDate: createdAt,
       isLiked: TypeHelper.toBool(json['reacted']),
       comments: const [],
-      commentOpen: true,
+      commentOpen: false,
+      commentCount: TypeHelper.toInt(json['comment_count']),
+      isMine: TypeHelper.toBool(json['is_mine']),
+      reportedByMe: TypeHelper.toBool(json['reported_by_me']),
       totalVotes: poll != null ? TypeHelper.toInt(poll['total_votes']) : null,
       voteByThisUser: myVote != null,
       myVote: myVote,
@@ -114,15 +120,17 @@ class FeedMapper {
     final created =
         DateTime.tryParse(json['created_at']?.toString() ?? '') ??
             DateTime.now();
+    final parentRaw = json['parent_id'];
     return FeedCommentModel(
       id: TypeHelper.toInt(json['id']),
+      parentId: parentRaw == null ? null : TypeHelper.toInt(parentRaw),
       body: (json['body'] ?? '').toString(),
       user: FeedUserModel(
         id: 0,
         name: (json['author'] ?? '').toString(),
         profilePhotoUrl: (json['author_avatar'] ?? '').toString(),
       ),
-      diff: created,
+      diff: created.toLocal(),
     );
   }
 

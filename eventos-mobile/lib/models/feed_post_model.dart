@@ -5,7 +5,7 @@ import '../utils/helpers/type_helper.dart';
 
 class FeedPostModel {
   final int id;
-  /// EventOS post UUID — used for API mutations.
+  /// EventOS post UUID - used for API mutations.
   final String uuid;
   final String? body;
   final int userId;
@@ -13,6 +13,8 @@ class FeedPostModel {
   final String? attach;
   final String? attachUrl;
   final String? attachType;
+  /// Cover frame / custom poster for video attachments.
+  final String? attachPoster;
   final String? question;
   final String type;
   final bool isLive;
@@ -27,6 +29,12 @@ class FeedPostModel {
   final bool isLiked;
   final List<FeedCommentModel> comments;
   final bool commentOpen;
+  /// Server denormalized count - used before comments are lazily loaded.
+  final int commentCount;
+  /// True when the current participant authored this post.
+  final bool isMine;
+  /// True while this viewer has an open report (until organizer resolve/reject).
+  final bool reportedByMe;
 
   // Poll-specific
   final int? totalVotes;
@@ -43,6 +51,7 @@ class FeedPostModel {
     this.attach,
     this.attachUrl,
     this.attachType,
+    this.attachPoster,
     this.question,
     required this.type,
     required this.isLive,
@@ -57,6 +66,9 @@ class FeedPostModel {
     required this.isLiked,
     required this.comments,
     required this.commentOpen,
+    this.commentCount = 0,
+    this.isMine = false,
+    this.reportedByMe = false,
     this.totalVotes,
     this.voteByThisUser,
     this.myVote,
@@ -72,6 +84,7 @@ class FeedPostModel {
         attach: json['attach'] as String?,
         attachUrl: json['attach_url'] as String?,
         attachType: json['attach_type'] as String?,
+        attachPoster: json['attach_poster'] as String?,
         question: json['question'] as String?,
         type: json['type'] as String? ?? 'post',
         isLive: TypeHelper.toBool(json['is_live']),
@@ -94,6 +107,9 @@ class FeedPostModel {
                 Map<String, dynamic>.from(e as Map)))
             .toList(),
         commentOpen: TypeHelper.toBool(json['comment_open']),
+        commentCount: TypeHelper.toInt(json['comment_count']),
+        isMine: TypeHelper.toBool(json['is_mine']),
+        reportedByMe: TypeHelper.toBool(json['reported_by_me']),
         totalVotes: json['total_votes'] == null
             ? null
             : TypeHelper.toInt(json['total_votes']),

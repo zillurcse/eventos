@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../utils/extension/theme_ext.dart';
+import '../../utils/config/app_config.dart';
 
-/// Full-screen modal player for a regular (non-YouTube) network video.
+/// Full-screen player for a regular (non-YouTube) network video.
 class NormalVideoCard extends StatefulWidget {
   final String videoUrl;
   const NormalVideoCard({super.key, required this.videoUrl});
@@ -16,38 +18,62 @@ class NormalVideoCard extends StatefulWidget {
 class _NormalVideoCardState extends State<NormalVideoCard> {
   late final VideoPlayerController _ctrl;
   bool _initialized = false;
+  bool _failed = false;
   bool _playing = false;
+  bool _muted = false;
+  bool _showControls = true;
+  Timer? _hideTimer;
+
+  String get _resolvedUrl => AppConfig.resolveMediaUrl(widget.videoUrl);
 
   @override
   void initState() {
     super.initState();
-    _ctrl = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    _ctrl = VideoPlayerController.networkUrl(Uri.parse(_resolvedUrl));
     _ctrl
         .initialize()
         .then((_) {
-          if (mounted) {
-            setState(() => _initialized = true);
-            _ctrl.play();
-          }
+          if (!mounted) return;
+          setState(() => _initialized = true);
+          _ctrl.play();
+          _scheduleHideControls();
         })
         .catchError((_) {
-          if (mounted) setState(() => _initialized = false);
+          if (mounted) setState(() => _failed = true);
         });
     _ctrl.addListener(_onControllerUpdate);
   }
 
   void _onControllerUpdate() {
-    if (mounted) setState(() => _playing = _ctrl.value.isPlaying);
+    if (!mounted) return;
+    final playing = _ctrl.value.isPlaying;
+    if (playing != _playing) {
+      setState(() => _playing = playing);
+      if (playing) {
+        _scheduleHideControls();
+      } else {
+        _hideTimer?.cancel();
+        setState(() => _showControls = true);
+      }
+    } else {
+      setState(() {});
+    }
   }
 
-  @override
-  void dispose() {
-    _ctrl.removeListener(_onControllerUpdate);
-    _ctrl.dispose();
-    super.dispose();
+  void _scheduleHideControls() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _playing) setState(() => _showControls = false);
+    });
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls && _playing) _scheduleHideControls();
   }
 
   void _togglePlay() {
+    if (!_initialized) return;
     if (_ctrl.value.isPlaying) {
       _ctrl.pause();
     } else {
@@ -56,111 +82,156 @@ class _NormalVideoCardState extends State<NormalVideoCard> {
       }
       _ctrl.play();
     }
+    setState(() => _showControls = true);
+    _scheduleHideControls();
+  }
+
+  void _toggleMute() {
+    _muted = !_muted;
+    _ctrl.setVolume(_muted ? 0 : 1);
+    setState(() {});
+    _scheduleHideControls();
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _ctrl.removeListener(_onControllerUpdate);
+    _ctrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Close button
-          Align(
-            alignment: Alignment.topRight,
-            child: GestureDetector(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Close
+        Positioned(
+          top: 8.h,
+          right: 8.w,
+          child: Material(
+            color: Colors.black45,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
               onTap: () => Navigator.pop(context),
               child: Padding(
-                padding: EdgeInsets.only(right: 16.w),
-                child: Icon(Icons.close, color: context.tertiaryText),
+                padding: EdgeInsets.all(8.sp),
+                child: Icon(Icons.close, color: Colors.white, size: 22.sp),
               ),
             ),
           ),
-          // Drag handle
+        ),
+
+        if (_failed)
+          const Center(
+            child: Icon(Icons.error_outline, color: Colors.white54, size: 64),
+          )
+        else if (!_initialized)
+          const Center(child: CircularProgressIndicator(color: Colors.white))
+        else
           GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              margin: EdgeInsets.symmetric(vertical: 12.h),
-              height: 4.h,
-              width: 40.w,
-              decoration: BoxDecoration(
-                color: context.ghost,
-                borderRadius: BorderRadius.circular(2.r),
-              ),
-            ),
-          ),
-          // Player
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10.r),
-              child: _initialized
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AspectRatio(
-                          aspectRatio: _ctrl.value.aspectRatio,
-                          child: VideoPlayer(_ctrl),
-                        ),
-                        // Play/pause overlay
-                        GestureDetector(
-                          onTap: _togglePlay,
-                          child: AnimatedOpacity(
-                            opacity: _playing ? 0.0 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Container(
-                              width: 56.sp,
-                              height: 56.sp,
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 32.sp,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (_playing)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _togglePlay,
-                            child: const SizedBox.expand(),
-                          ),
-                        // Progress bar
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: VideoProgressIndicator(
-                            _ctrl,
-                            allowScrubbing: true,
-                            colors: VideoProgressColors(
-                              playedColor: context.primaryTheme,
-                              bufferedColor:
-                                  context.primaryTheme.withValues(alpha: 0.4),
-                              backgroundColor: context.ghost,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : AspectRatio(
-                      aspectRatio: 16 / 9,
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleControls,
+            child: Stack(
+              alignment: Alignment.center,
+              fit: StackFit.expand,
+              children: [
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: _ctrl.value.aspectRatio == 0
+                        ? 16 / 9
+                        : _ctrl.value.aspectRatio,
+                    child: VideoPlayer(_ctrl),
+                  ),
+                ),
+                AnimatedOpacity(
+                  opacity: _showControls ? 1 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: GestureDetector(
+                      onTap: _togglePlay,
                       child: Container(
-                        color: Colors.black87,
-                        child: const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                        width: 64.sp,
+                        height: 64.sp,
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 40.sp,
                         ),
                       ),
                     ),
+                  ),
+                ),
+                Positioned(
+                  left: 12.w,
+                  right: 12.w,
+                  bottom: 24.h,
+                  child: AnimatedOpacity(
+                    opacity: _showControls ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: IgnorePointer(
+                      ignoring: !_showControls,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          VideoProgressIndicator(
+                            _ctrl,
+                            allowScrubbing: true,
+                            padding: EdgeInsets.symmetric(vertical: 6.h),
+                            colors: const VideoProgressColors(
+                              playedColor: Colors.white,
+                              bufferedColor: Colors.white38,
+                              backgroundColor: Colors.white24,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                '${_fmt(_ctrl.value.position)} / ${_fmt(_ctrl.value.duration)}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: _toggleMute,
+                                child: Icon(
+                                  _muted
+                                      ? Icons.volume_off
+                                      : Icons.volume_up,
+                                  color: Colors.white,
+                                  size: 22.sp,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 24.h),
-        ],
-      ),
+      ],
     );
   }
 }

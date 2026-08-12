@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../widgets/state_handler/api_state_handler.dart';
+import '../../../widgets/loading_skeletons/room_list_skeleton.dart';
 import '../session/widgets/ad_banner.dart';
 import 'rooms_controller.dart';
 import 'widgets/rooms_list.dart';
@@ -42,12 +43,19 @@ class _RoomsViewState extends State<RoomsView> {
         () => ApiStateHandler(
           state: controller.dataStatus.value,
           onRetry: controller.fetchRooms,
-          loadedElement: const CustomScrollView(
-            slivers: [
-              AdBanner(),
-              RoomsSearchFilter(),
-              RoomsList(),
-            ],
+          skeleton: const RoomListSkeleton(),
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchRooms,
+            child: const CustomScrollView(
+              slivers: [
+                AdBanner(),
+                RoomsSearchFilter(),
+                RoomsList(),
+              ],
+            ),
           ),
         ),
       ),

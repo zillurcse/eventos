@@ -1,16 +1,17 @@
 import 'package:expouse/features/auth/auth_controller.dart';
 import 'package:expouse/utils/helpers/input_validators.dart';
+import 'package:expouse/widgets/app_webview_page.dart';
 import 'package:expouse/widgets/headers/auth_header.dart';
 import 'package:expouse/widgets/state_handler/api_state_handler.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'package:expouse/utils/bindings/auth_binding.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
-
-import 'package:expouse/utils/bindings/auth_binding.dart';
 import '../../../utils/extension/size_ext.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/custom_button.dart';
@@ -174,9 +175,17 @@ class SignUpViewState extends State<SignUpView> {
                   SizedBox(height: context.width / 10),
 
                   Center(
-                    child: CustomImage(
-                      "assets/png/logo-primary.png",
-                      height: 24.h,
+                    child: GestureDetector(
+                      onTap: () {
+                        Get.to(() => const AppWebviewPage(
+                          title: 'Expouse',
+                          url: 'https://expouse.com/',
+                        ));
+                      },
+                      child: CustomImage(
+                        "assets/png/logo-primary.png",
+                        height: 24.h,
+                      ),
                     ),
                   ),
 

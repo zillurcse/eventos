@@ -18,7 +18,7 @@ class ExhibitorService {
     return await _dio.get('public/exhibitors/$uuid');
   }
 
-  /// POST /events/{uuid}/bookmarks — toggle exhibitor bookmark.
+  /// POST /events/{uuid}/bookmarks - toggle exhibitor bookmark.
   Future<Response> toggleExhibitorBookmark(String exhibitorUuid, bool on) async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {

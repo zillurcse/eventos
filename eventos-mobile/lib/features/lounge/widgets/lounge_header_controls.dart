@@ -154,44 +154,50 @@ class LoungeHeaderControls extends StatelessWidget {
           ),
         ),
         SizedBox(width: 10.w),
-        PopupMenuButton<LoungeTableKind>(
-          onSelected: controller.setKind,
-          offset: Offset(0, 45.h),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.r),
+        Theme(
+          data: Theme.of(context).copyWith(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
           ),
-          itemBuilder: (_) => [
-            for (final kind in LoungeTableKind.values)
-              PopupMenuItem(
-                value: kind,
-                child: Obx(
-                  () => Text(
-                    _kindTitle(kind),
-                    style: context.bodyRegular?.copyWith(
-                      color: controller.selectedKind.value == kind
-                          ? context.primaryTheme
-                          : context.body,
-                      fontWeight: controller.selectedKind.value == kind
-                          ? FontWeight.w700
-                          : FontWeight.w500,
+          child: PopupMenuButton<LoungeTableKind>(
+            onSelected: controller.setKind,
+            offset: Offset(0, 50.h),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            itemBuilder: (_) => [
+              for (final kind in LoungeTableKind.values)
+                PopupMenuItem(
+                  value: kind,
+                  child: Obx(
+                    () => Text(
+                      _kindTitle(kind),
+                      style: context.bodyRegular?.copyWith(
+                        color: controller.selectedKind.value == kind
+                            ? context.primaryTheme
+                            : context.body,
+                        fontWeight: controller.selectedKind.value == kind
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
+            ],
+            child: Container(
+              height: 40.h,
+              width: 40.h,
+              decoration: BoxDecoration(
+                color: context.primaryFocused,
+                borderRadius: BorderRadius.circular(8.r),
               ),
-          ],
-          child: Container(
-            height: 40.h,
-            width: 40.w,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(color: context.stroke),
-            ),
-            child: Icon(
-              Icons.swap_vert,
-              size: 20.sp,
-              color: context.primaryTheme,
+              child: Center(
+                child: CustomImage(
+                  "assets/svg/icons/sorting.svg",
+                  color: context.primaryTheme,
+                ),
+              ),
             ),
           ),
         ),

@@ -122,6 +122,9 @@ class _NotificationsViewState extends State<NotificationsView> {
     });
 
     return RefreshIndicator(
+      elevation: 0.5,
+      color: Theme.of(context).colorScheme.primary,
+      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
       onRefresh: () => controller.fetchNotifications(refresh: true),
       child: ListView.builder(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),

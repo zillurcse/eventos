@@ -1,4 +1,3 @@
-import 'package:expouse/utils/extension/theme_ext.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -36,54 +35,39 @@ class YoutubeVideoCardState extends State<YoutubeVideoCard> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Align(
-            alignment: Alignment.topRight,
-            child: GestureDetector(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          top: 8.h,
+          right: 8.w,
+          child: Material(
+            color: Colors.black45,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
               onTap: () => Navigator.pop(context),
               child: Padding(
-                padding: EdgeInsets.only(right: 16.w),
-                child: Icon(Icons.close, color: context.tertiaryText),
+                padding: EdgeInsets.all(8.sp),
+                child: Icon(Icons.close, color: Colors.white, size: 22.sp),
               ),
             ),
           ),
-          // Drag handle — tap to close
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              margin: EdgeInsets.symmetric(vertical: 12.h),
-              height: 4.h,
-              width: 40.w,
-              decoration: BoxDecoration(
-                color: context.ghost,
-                borderRadius: BorderRadius.circular(2.r),
-              ),
+        ),
+        Center(
+          child: YoutubePlayer(
+            controller: _ytCtrl,
+            showVideoProgressIndicator: true,
+            progressIndicatorColor: Colors.white,
+            progressColors: const ProgressBarColors(
+              playedColor: Colors.white,
+              handleColor: Colors.white,
+              bufferedColor: Colors.white38,
+              backgroundColor: Colors.white24,
             ),
           ),
-          // Player — full width minus 32 px gutter
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10.r),
-              child: YoutubePlayer(
-                controller: _ytCtrl,
-                showVideoProgressIndicator: true,
-                progressColors: ProgressBarColors(
-                  playedColor: context.primaryTheme,
-                  handleColor: context.primaryTheme,
-                  bufferedColor: context.primaryTheme.withValues(alpha: 0.4),
-                  backgroundColor: context.ghost,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: 24.h),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

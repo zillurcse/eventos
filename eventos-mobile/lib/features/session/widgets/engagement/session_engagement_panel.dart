@@ -121,21 +121,16 @@ class _SessionEngagementPanelState extends State<SessionEngagementPanel> {
                       label: Text(_tabLabel(tab)),
                       selected: selected,
                       onSelected: (_) => ctrl.selectTab(tab),
-                      selectedColor:
-                          context.primaryTheme.withValues(alpha: 0.15),
+                      color: WidgetStateProperty.all(
+                        context.primaryTheme,
+                      ),
+                      checkmarkColor: context.tertiaryText,
                       labelStyle: context.bodyRegular?.copyWith(
-                        color: selected
-                            ? context.primaryTheme
-                            : context.caption,
+                        color: context.tertiaryText,
                         fontWeight:
                             selected ? FontWeight.w600 : FontWeight.w400,
                       ),
-                      side: BorderSide(
-                        color: selected
-                            ? context.primaryTheme
-                            : context.strokeLight,
-                      ),
-                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.transparent),
                     ),
                   );
                 }).toList(),
@@ -150,7 +145,7 @@ class _SessionEngagementPanelState extends State<SessionEngagementPanel> {
               borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: context.strokeLight),
             ),
-            // Only rebuild tab shell on activeTab / bootstrap loading —
+            // Only rebuild tab shell on activeTab / bootstrap loading -
             // list updates are handled inside each tab's own Obx.
             child: Obx(() {
               final tab = ctrl.activeTab.value;

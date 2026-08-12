@@ -21,9 +21,6 @@ class ExhibitorCard extends StatelessWidget {
     this.logoUrl = '',
   });
 
-  static const _placeholder =
-      "https://www.mcgill.ca/web-services/files/web-services/styles/hd/public/marco-xu-toupbco62lw-unsplash_cropped.jpg?itok=vnN8-uiS&timestamp=1708957693";
-
   @override
   Widget build(BuildContext context) {
     final subtitle = [
@@ -39,7 +36,7 @@ class ExhibitorCard extends StatelessWidget {
           children: [
             // Banner
             CustomImage(
-              bannerUrl.isNotEmpty ? bannerUrl : _placeholder,
+              bannerUrl,
               height: (context.height * .15).sp,
               width: (context.width * .75).sp,
               fit: BoxFit.cover,
@@ -52,7 +49,7 @@ class ExhibitorCard extends StatelessWidget {
               child: Row(
                 children: [
                   CustomImage(
-                    logoUrl.isNotEmpty ? logoUrl : _placeholder,
+                    logoUrl,
                     height: 48.sp,
                     width: 48.sp,
                     radius: 8.r,

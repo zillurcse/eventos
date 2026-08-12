@@ -33,15 +33,21 @@ class _SessionViewState extends State<SessionView> {
         state: controller.dataStatus.value,
         onRetry: controller.fetchSessions,
         skeleton: const SessionListSkeleton(),
-        loadedElement: CustomScrollView(
-          slivers: [
-            const AdBanner(),
-            const SearchWidget(),
-            const DaySelectorWidget(),
-            const SessionFiltersWidget(),
-            const LiveSessions(),
-            const DayWiseSession(),
-          ],
+        loadedElement: RefreshIndicator(
+          elevation: 0.5,
+          color: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          onRefresh: controller.fetchSessions,
+          child: const CustomScrollView(
+            slivers: [
+              AdBanner(),
+              SearchWidget(),
+              DaySelectorWidget(),
+              SessionFiltersWidget(),
+              LiveSessions(),
+              DayWiseSession(),
+            ],
+          ),
         ),
       ),
     );

@@ -37,6 +37,8 @@ class ChatDetailViewState extends State<ChatDetailView> {
     controller.enterRoom(
       widget.conversationId,
       partnerId: widget.partnerId,
+      partnerName: widget.partnerName,
+      partnerImageUrl: widget.partnerImageUrl,
     );
     _scrollWorker = ever(controller.messages, (_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -79,7 +79,7 @@ class ChatViewState extends State<ChatView> {
                       ),
                     ),
                   ),
-                  // Clear button — visible only when there is text
+                  // Clear button - visible only when there is text
                   Obx(() => controller.searchQuery.value.isNotEmpty
                       ? GestureDetector(
                           onTap: () {

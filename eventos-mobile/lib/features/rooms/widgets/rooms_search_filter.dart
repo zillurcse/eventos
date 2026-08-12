@@ -73,60 +73,62 @@ class RoomsSearchFilter extends StatelessWidget {
             SizedBox(width: 10.w),
             Obx(() {
               final types = controller.availableTypes;
-              return PopupMenuButton<String>(
-                onSelected: controller.setType,
-                offset: Offset(0, 45.h),
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
                 ),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'all',
-                    child: Text(
-                      'Type: All',
-                      style: context.bodyRegular?.copyWith(
-                        color: controller.selectedType.value == 'all'
-                            ? context.primaryTheme
-                            : context.body,
-                        fontWeight: controller.selectedType.value == 'all'
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
+                child: PopupMenuButton<String>(
+                  onSelected: controller.setType,
+                  offset: Offset(0, 50.h),
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
-                  for (final type in types)
+                  itemBuilder: (_) => [
                     PopupMenuItem(
-                      value: type,
+                      value: 'all',
                       child: Text(
-                        'Type: ${BreakoutRoom.typeLabels[type] ?? type}',
+                        'Type: All',
                         style: context.bodyRegular?.copyWith(
-                          color: controller.selectedType.value == type
+                          color: controller.selectedType.value == 'all'
                               ? context.primaryTheme
                               : context.body,
-                          fontWeight: controller.selectedType.value == type
+                          fontWeight: controller.selectedType.value == 'all'
                               ? FontWeight.w700
                               : FontWeight.w500,
                         ),
                       ),
                     ),
-                ],
-                child: Container(
-                  height: 40.h,
-                  width: 40.w,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8.r),
-                    border: Border.all(
-                      color: controller.selectedType.value != 'all'
-                          ? context.primaryTheme
-                          : context.stroke,
+                    for (final type in types)
+                      PopupMenuItem(
+                        value: type,
+                        child: Text(
+                          'Type: ${BreakoutRoom.typeLabels[type] ?? type}',
+                          style: context.bodyRegular?.copyWith(
+                            color: controller.selectedType.value == type
+                                ? context.primaryTheme
+                                : context.body,
+                            fontWeight: controller.selectedType.value == type
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                  child: Container(
+                    height: 40.h,
+                    width: 40.h,
+                    decoration: BoxDecoration(
+                      color: context.primaryFocused,
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
-                  ),
-                  child: Icon(
-                    Icons.swap_vert,
-                    size: 20.sp,
-                    color: context.primaryTheme,
+                    child: Center(
+                      child: CustomImage(
+                        'assets/svg/icons/sorting.svg',
+                        color: context.primaryTheme,
+                      ),
+                    ),
                   ),
                 ),
               );

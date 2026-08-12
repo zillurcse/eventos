@@ -8,7 +8,7 @@ class ProfileService {
   String get _eventUuid {
     final uuid = AppDataProvider.obj.eventUuid;
     if (uuid == null || uuid.isEmpty) {
-      throw StateError('No event context — eventUuid missing');
+      throw StateError('No event context - eventUuid missing');
     }
     return uuid;
   }

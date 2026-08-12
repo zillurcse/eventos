@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:expouse/utils/config/app_config.dart';
 import '../../../models/exhibitor_model.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/custom_image.dart';
@@ -109,9 +110,7 @@ class _ExhibitorMemberCardState extends State<ExhibitorMemberCard> {
       designation = m['designation']?.toString() ?? m['position']?.toString() ?? m['role']?.toString() ?? '';
       company = m['company']?.toString() ?? m['company_name']?.toString() ?? 'Expouse';
       final String rawImg = m['image']?.toString() ?? m['image_url']?.toString() ?? m['avatar']?.toString() ?? '';
-      imageUrl = rawImg.isEmpty
-          ? ''
-          : (rawImg.startsWith('http') ? rawImg : 'https://admin.expouse.com/storage/$rawImg');
+      imageUrl = AppConfig.resolveAssetUrl(rawImg);
     }
 
     return Container(
@@ -167,11 +166,10 @@ class _ExhibitorMemberCardState extends State<ExhibitorMemberCard> {
                             ),
                           ],
                         ),
-                        child: CustomImage(
-                          _isBookmarked ? "assets/svg/icons/bookmark_fill.svg" : "assets/svg/icons/bookmark.svg",
-                          height: 14.sp,
-                          width: 10.sp,
-                          color: _isBookmarked ? context.primaryTheme : context.primaryTheme.withValues(alpha: 0.5),
+                        child: Icon(
+                          _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: context.primaryTheme,
+                          size: 26.sp,
                         ),
                       ),
                     ),

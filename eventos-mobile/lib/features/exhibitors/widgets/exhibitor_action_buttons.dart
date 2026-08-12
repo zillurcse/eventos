@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../../../widgets/custom_image.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../bookmarks/bookmark_controller.dart';
 import '../exhibitor_controller.dart';
 
 class ExhibitorActionButtons extends StatelessWidget {
@@ -18,21 +19,26 @@ class ExhibitorActionButtons extends StatelessWidget {
         // Bookmark
         Obx(() {
           final ctrl = Get.find<ExhibitorController>();
-          final isBookmarked = ctrl.exhibitorPage.value.bookmarkedExhibitors.contains(exhibitorId);
+          final isBookmarked = () {
+            if (Get.isRegistered<BookmarkController>()) {
+              final bm = Get.find<BookmarkController>();
+              bm.bookmarkedExhibitors.length; // Touch to trigger Obx
+              return bm.isOnHashed('exhibitor', exhibitorId);
+            }
+            return ctrl.exhibitorPage.value.bookmarkedExhibitors.contains(exhibitorId);
+          }();
           return GestureDetector(
             onTap: () => ctrl.toggleBookmark(exhibitorId),
             child: Container(
               padding: EdgeInsets.all(10.sp),
               decoration: BoxDecoration(
-                color: isBookmarked ? context.primaryTheme : Colors.transparent,
                 borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: context.primaryTheme),
               ),
-              child: CustomImage(
-                isBookmarked ? "assets/svg/icons/bookmark_fill.svg" : "assets/svg/icons/bookmark.svg",
-                color: isBookmarked ? Colors.white : context.primaryTheme,
-                width: 20.sp,
-                height: 20.sp,
+              child: Icon(
+                isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                color: context.primaryTheme,
+                size: 26.sp,
               ),
             ),
           );

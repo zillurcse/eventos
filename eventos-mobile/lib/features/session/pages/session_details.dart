@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../models/session_detail_response_model.dart';
 import '../../../widgets/state_handler/api_state_handler.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/service/engagement_service.dart';
 import '../session_controller.dart';
 import '../../../widgets/loading_skeletons/session_details_skeleton.dart';
 import '../widgets/session_cover_image.dart';
@@ -28,14 +29,31 @@ class SessionDetails extends StatefulWidget {
 
 class _SessionDetailsState extends State<SessionDetails> {
   late final SessionController ctrl;
+  DateTime? _enteredAt;
 
   @override
   void initState() {
     super.initState();
     ctrl = Get.find<SessionController>();
+    _enteredAt = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ctrl.fetchSessionDetails(widget.scheduleId);
     });
+  }
+
+  @override
+  void dispose() {
+    final entered = _enteredAt;
+    final detail = ctrl.sessionDetail.value;
+    if (entered != null && detail != null && detail.uuid.isNotEmpty) {
+      EngagementService.instance.track(
+        actionType: 'session.left',
+        objectType: 'session',
+        objectUuid: detail.uuid,
+        durationMs: DateTime.now().difference(entered).inMilliseconds,
+      );
+    }
+    super.dispose();
   }
 
   @override

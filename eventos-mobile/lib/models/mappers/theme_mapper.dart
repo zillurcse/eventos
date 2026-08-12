@@ -26,7 +26,18 @@ class ThemeMapper {
         ? Map<String, dynamic>.from(data['navigation'] as Map)
         : <String, dynamic>{};
 
-    final themeColor = (branding['primary'] ??
+    // Prefer resolved mobile brand primary (platform or organizer) over web branding.
+    String? mobilePrimary;
+    final mobileBranding = data['mobile_branding'];
+    if (mobileBranding is Map) {
+      final brand = mobileBranding['brand'];
+      if (brand is Map && brand['primary_color'] != null) {
+        mobilePrimary = brand['primary_color'].toString();
+      }
+    }
+
+    final themeColor = (mobilePrimary ??
+            branding['primary'] ??
             colors['primary_button'] ??
             colors['primary'])
         ?.toString();

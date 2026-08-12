@@ -1,4 +1,5 @@
-import '../../utils/helpers/type_helper.dart';
+import 'package:expouse/utils/config/app_config.dart';
+import 'package:expouse/utils/helpers/type_helper.dart';
 import 'speaker_note_model.dart';
 import 'session_model.dart';
 
@@ -53,11 +54,8 @@ class SpeakerDetailModel {
     final String rawImage = json['image'] as String? ?? '';
     final String rawImageUrl = json['image_url'] as String? ?? '';
     final String finalRaw = rawImageUrl.isNotEmpty ? rawImageUrl : rawImage;
-    final String? imageUrl = finalRaw.isEmpty
-        ? null
-        : (finalRaw.startsWith('http')
-            ? finalRaw
-            : 'https://admin.expouse.com/storage/$finalRaw');
+    final String? imageUrl =
+        finalRaw.isEmpty ? null : AppConfig.resolveAssetUrl(finalRaw);
 
     return SpeakerDetailModel(
       id: TypeHelper.toInt(json['id']),

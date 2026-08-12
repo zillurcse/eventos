@@ -41,11 +41,19 @@ class DioConfig {
 
     _configureTls(dio!);
 
-    dio?.interceptors.add(
+        dio?.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           // Always keep event context in sync (subdomain may change after login).
           options.headers['X-Event-Subdomain'] = AppDataProvider.obj.subdomain;
+
+          // BaseOptions defaults to application/json. For FormData uploads Dio
+          // sets multipart + boundary itself - leave Content-Type alone so the
+          // boundary is not stripped (bare multipart/form-data → API 422).
+          if (options.data is FormData) {
+            options.headers.remove(Headers.contentTypeHeader);
+            options.contentType = null;
+          }
 
           const publicAuthPaths = <String>[
             'auth/login',
@@ -81,7 +89,7 @@ class DioConfig {
       ),
     );
 
-    // Request logging only in debug — never log bodies/headers (tokens/PII).
+    // Request logging only in debug - never log bodies/headers (tokens/PII).
     if (kDebugMode) {
       dio?.interceptors.add(
         LogInterceptor(

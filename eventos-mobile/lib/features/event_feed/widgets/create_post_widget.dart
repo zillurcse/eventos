@@ -14,7 +14,7 @@ import 'type_chip.dart';
 class CreatePostWidget extends StatelessWidget {
   const CreatePostWidget({super.key});
 
-  // Chip config — index maps to the PostType it opens
+  // Chip config - index maps to the PostType it opens
   static const _chips = [
     {'icon': 'assets/svg/icons/img.svg',      'type': PostTypes.image},
     {'icon': 'assets/svg/icons/video.svg',     'type': PostTypes.video},
@@ -41,7 +41,7 @@ class CreatePostWidget extends StatelessWidget {
     return SliverToBoxAdapter(
       child: Container(
         margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 12.h),
-        padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 12.h),
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8.r),
           color: context.tertiaryText,
@@ -60,16 +60,16 @@ class CreatePostWidget extends StatelessWidget {
                   CustomImage(
                     user?.profilePhotoUrl ?? '',
                     fit: BoxFit.cover,
-                    height: 34.sp,
-                    width: 34.sp,
+                    height: 38.sp,
+                    width: 38.sp,
                     radius: 8.r,
                     avatar: true,
                   ),
-                  SizedBox(width: 12.w),
+                  SizedBox(width: 8.w),
                   Expanded(
                     child: Text(
                       "Got a spark of an idea? Let the community feel your energy!",
-                      style: context.specialCaption1?.copyWith(
+                      style: context.titleRegular?.copyWith(
                         color: context.ghost,
                       ),
                       maxLines: 2,
@@ -79,7 +79,7 @@ class CreatePostWidget extends StatelessWidget {
               ),
             ),
 
-            Divider(height: 24.h),
+            Divider(height: 30.h),
 
             // ── Post-type chips ────────────────────────────────────────────
             Row(

@@ -35,18 +35,34 @@ class MoreBottomSheet extends StatelessWidget {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Padding(
-                    padding: EdgeInsets.all(8.sp),
-                    child: SvgPicture.asset(
-                      "assets/svg/icons/${tab.icon}", 
-                      height: 16.h, 
-                      width: 16.w,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      double iconSize = 20.sp;
+                      if (tab.icon == 'delegates.svg') {
+                        iconSize = 15.sp;
+                      } else if (tab.icon == 'exhibitors.svg' || tab.icon == 'badges.svg') {
+                        iconSize = 17.sp;
+                      }
+                      
+                      return SizedBox(
+                        width: 32.sp,
+                        height: 32.sp,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            "assets/svg/icons/${tab.icon}", 
+                            height: iconSize, 
+                            width: iconSize,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  SizedBox(width: 4.w),
-                  Text(
-                    tab.customName, 
-                    style: context.titleRegular,
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Text(
+                      tab.customName, 
+                      style: context.titleRegular,
+                    ),
                   ),
                 ],
               ),

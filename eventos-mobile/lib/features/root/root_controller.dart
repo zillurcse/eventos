@@ -38,6 +38,10 @@ class RootController extends GetxController {
   final RxList<WebAppTab> activeTabs = <WebAppTab>[].obs;
   final Rx<ApiState> themeStatus = ApiState.initial.obs;
 
+  /// Event brand for the shell header (from `/public/site`).
+  final eventName = ''.obs;
+  final eventLogoUrl = ''.obs;
+
   /// Tracks which tab indexes have already had their data loaded at least once.
   final Set<int> _loadedTabs = {};
 
@@ -119,6 +123,17 @@ class RootController extends GetxController {
           if (uuid != null && uuid.isNotEmpty) {
             AppDataProvider.obj.eventUuid = uuid;
           }
+          final name = event['name']?.toString() ?? '';
+          eventName.value = name;
+        } else {
+          eventName.value = '';
+        }
+
+        final branding = data['branding'];
+        if (branding is Map) {
+          eventLogoUrl.value = branding['logo_url']?.toString() ?? '';
+        } else {
+          eventLogoUrl.value = '';
         }
 
         // Reuse site payload for home welcome video (avoids duplicate GET).
@@ -131,10 +146,15 @@ class RootController extends GetxController {
           AppDataProvider.obj.cachedWelcomeVideo = null;
         }
 
+        // Dual branding: platform default or organizer override from site payload.
+        AppDataProvider.obj.applyMobileBrandingFromSite(data);
+
         final configResponse = ThemeMapper.fromSite(data);
         final theme = configResponse.theme;
 
         if (theme != null) {
+          // Color already applied via mobile branding when present; still
+          // apply theme.themeColor as fallback (ThemeMapper prefers mobile).
           if (theme.themeColor != null && theme.themeColor!.isNotEmpty) {
             updateAppColors(theme.themeColor!);
           }
@@ -154,10 +174,12 @@ class RootController extends GetxController {
       themeStatus.value = ApiState.loaded;
       // Cold-start notification taps land after the shell is ready.
       PushNotificationService.instance.consumePendingOpen();
-      // Event UUID is set — pull name / email / avatar for drawer / header.
+      // Event UUID is set - pull name / email / avatar for drawer / header.
       _hydrateEventProfile();
     } catch (e) {
       // Fallback so reception still opens if site bootstrap fails.
+      eventName.value = '';
+      eventLogoUrl.value = '';
       final fallback = ThemeMapper.fromSite({});
       activeTabs.assignAll(fallback.theme?.webAppTabs ?? []);
       if (activeTabs.isNotEmpty) {
@@ -188,7 +210,7 @@ class RootController extends GetxController {
             (raw['avatar_url'] ?? raw['profile_photo_url'])?.toString(),
       );
     } catch (_) {
-      // Non-fatal — shell still works with placeholder.
+      // Non-fatal - shell still works with placeholder.
     }
   }
 

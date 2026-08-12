@@ -77,14 +77,20 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
         state: bookmarkCtrl.dataStatus.value,
         onRetry: bookmarkCtrl.fetchBookmarks,
         skeleton: const DelegateListSkeleton(),
-        loadedElement: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildSpeakersTab(),
-            _buildSessionsTab(),
-            _buildExhibitorsTab(),
-            _buildDelegatesTab(),
-          ],
+        loadedElement: RefreshIndicator(
+          elevation: 0.5,
+          color: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          onRefresh: bookmarkCtrl.fetchBookmarks,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildSpeakersTab(),
+              _buildSessionsTab(),
+              _buildExhibitorsTab(),
+              _buildDelegatesTab(),
+            ],
+          ),
         ),
       )),
     );
@@ -162,11 +168,10 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
                             ),
                           ],
                         ),
-                        child: CustomImage(
-                          "assets/svg/icons/bookmark_fill.svg",
-                          height: 22.sp,
-                          width: 12.sp,
+                        child: Icon(
+                          Icons.bookmark,
                           color: context.primaryTheme,
+                          size: 26.sp,
                         ),
                       ),
                     ),
@@ -236,6 +241,9 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
   }
 
   Widget _buildSessionCard(SessionModel session) {
+    final timeLabel = (session.startTime.isNotEmpty && session.endTime.isNotEmpty)
+        ? '${session.startTime} – ${session.endTime}'
+        : '-';
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       decoration: BoxDecoration(
@@ -260,7 +268,7 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
               children: [
                 Expanded(
                   child: Text(
-                    "28th Oct, 2026  |  10:00 AM - 12:30 PM",
+              timeLabel,
                     style: context.bodyRegular?.copyWith(
                       color: context.caption,
                       fontWeight: FontWeight.w500,
@@ -272,18 +280,17 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
                   onTap: () {
                     bookmarkCtrl.toggleSessionBookmark(session);
                   },
-                  child: CustomImage(
-                    "assets/svg/icons/bookmark_fill.svg",
-                    height: 20.sp,
-                    width: 20.sp,
+                  child: Icon(
+                    Icons.bookmark,
                     color: context.primaryTheme,
+                    size: 26.sp,
                   ),
                 ),
                 SizedBox(width: 14.w),
                 CustomImage(
-                  "assets/svg/icons/calender_add.svg",
-                  height: 20.sp,
-                  width: 20.sp,
+                  "assets/svg/icons/note_take.svg",
+                  height: 21.sp,
+                  width: 21.sp,
                   color: context.primaryTheme,
                 ),
               ],
@@ -302,7 +309,7 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8.r),
                   child: CustomImage(
-                    "https://cdn.pixabay.com/photo/2016/11/21/06/53/beautiful-natural-image-1844362_640.jpg",
+                    session.logoUrl,
                     width: double.infinity,
                     height: 120.h,
                     fit: BoxFit.cover,
@@ -451,7 +458,9 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
             Stack(
               children: [
                 CustomImage(
-                  exhibitor.spotlightBannerUrl,
+                  exhibitor.spotlightBannerUrl.isNotEmpty
+                      ? exhibitor.spotlightBannerUrl
+                      : exhibitor.image ?? "https://learn.zoner.com/wp-content/uploads/2025/04/zoner-ai-image-creator.jpg",
                   height: 120.h,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -476,11 +485,10 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
                           ),
                         ],
                       ),
-                      child: CustomImage(
-                        "assets/svg/icons/bookmark_fill.svg",
-                        height: 22.sp,
-                        width: 12.sp,
+                      child: Icon(
+                        Icons.bookmark,
                         color: context.primaryTheme,
+                        size: 26.sp,
                       ),
                     ),
                   ),
@@ -492,7 +500,9 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
               child: Row(
                 children: [
                   CustomImage(
-                    exhibitor.logoUrl,
+                    exhibitor.logoUrl.isNotEmpty
+                        ? exhibitor.logoUrl
+                        : "https://ui-avatars.com/api/?name=${exhibitor.name}&color=5B73E8&background=FFFF&length=1",
                     height: 48.sp,
                     width: 48.sp,
                     radius: 8.r,
@@ -646,11 +656,10 @@ class _BookmarksViewState extends State<BookmarksView> with SingleTickerProvider
                 color: context.primaryFocused,
                 borderRadius: BorderRadius.circular(6.r),
               ),
-              child: CustomImage(
-                "assets/svg/icons/bookmark_fill.svg",
-                height: 22.sp,
-                width: 12.sp,
+              child: Icon(
+                Icons.bookmark,
                 color: context.primaryTheme,
+                size: 26.sp,
               ),
             ),
           ),

@@ -5,6 +5,7 @@ import '../../models/exhibitor_models.dart';
 import '../../models/mappers/exhibitor_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../../utils/service/engagement_service.dart';
 import '../bookmarks/bookmark_controller.dart';
 import 'exhibitor_service.dart';
 
@@ -92,6 +93,23 @@ class ExhibitorController extends GetxController {
         }
         exhibitorDetail.value =
             ExhibitorMapper.detailFromV1Response(Map<String, dynamic>.from(body));
+        final detail = exhibitorDetail.value;
+        if (detail != null) {
+          final isSponsor =
+              detail.exhibitorType.toLowerCase().contains('sponsor');
+          final eng = EngagementService.instance;
+          eng.track(
+            actionType: isSponsor ? 'sponsor.booth_visited' : 'booth.visited',
+            objectType: isSponsor ? 'sponsor' : 'exhibitor',
+            objectUuid: detail.slug.isNotEmpty ? detail.slug : slugOrUuid,
+            objectId: detail.id > 0 ? detail.id : null,
+            idempotencyKey: eng.onceKey(
+              isSponsor ? 'sponsor.booth_visited' : 'booth.visited',
+              detail.slug.isNotEmpty ? detail.slug : slugOrUuid,
+            ),
+            metadata: {'name': detail.name},
+          );
+        }
       },
     );
   }

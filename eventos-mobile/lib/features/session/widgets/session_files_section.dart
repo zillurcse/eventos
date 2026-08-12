@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
+import 'package:expouse/utils/config/app_config.dart';
+import 'package:expouse/utils/service/engagement_service.dart';
 import '../../../models/session_detail_response_model.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../features/briefcase/briefcase_controller.dart';
@@ -11,14 +13,21 @@ class SessionFilesSection extends StatelessWidget {
 
   const SessionFilesSection({super.key, required this.detail});
 
-  Future<void> _openFile(String? fileUrl) async {
+  Future<void> _openFile(String? fileUrl, {String? title}) async {
     if (fileUrl == null || fileUrl.isEmpty) return;
-    final url = fileUrl.startsWith('http')
-        ? fileUrl
-        : 'https://admin.expouse.com/storage/$fileUrl';
+    final url = AppConfig.resolveAssetUrl(fileUrl);
     final uri = Uri.tryParse(url);
     if (uri != null) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final eng = EngagementService.instance;
+      eng.track(
+        actionType: 'session.resource_downloaded',
+        objectType: 'document',
+        objectUuid: detail.uuid,
+        idempotencyKey:
+            eng.onceKey('session.resource_downloaded', '${detail.uuid}:$fileUrl'),
+        metadata: {'title': title, 'url': fileUrl},
+      );
     }
   }
 
@@ -124,7 +133,7 @@ class SessionFilesSection extends StatelessWidget {
                     }),
                     SizedBox(width: 8.w),
                     GestureDetector(
-                      onTap: () => _openFile(item.url),
+                      onTap: () => _openFile(item.url, title: item.name),
                       child: Container(
                         padding: EdgeInsets.all(6.sp),
                         child: Icon(

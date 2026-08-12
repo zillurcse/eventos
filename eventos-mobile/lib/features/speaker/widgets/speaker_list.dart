@@ -10,7 +10,7 @@ class SpeakerList extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<SpeakerController>();
     return Obx(() {
-      final speakers = controller.speakers;
+      final speakers = controller.filteredSpeakers;
 
       return SliverList(
         delegate: SliverChildBuilderDelegate(

@@ -1,6 +1,10 @@
 import 'package:expouse/widgets/custom_input.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/extension_navigation.dart';
+import '../../../widgets/app_webview_page.dart';
 
 import '../../../utils/extension/size_ext.dart';
 import '../../../utils/extension/theme_ext.dart';
@@ -92,6 +96,13 @@ class OtpView extends StatelessWidget {
                           style: context.titleRegular?.copyWith(
                             color: context.primaryTheme,
                           ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Get.to(() => const AppWebviewPage(
+                                title: 'Terms and Conditions',
+                                url: 'https://expouse.com/terms',
+                              ));
+                            },
                         ),
                         TextSpan(
                           text: "and ",
@@ -104,6 +115,13 @@ class OtpView extends StatelessWidget {
                           style: context.titleRegular?.copyWith(
                             color: context.primaryTheme,
                           ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Get.to(() => const AppWebviewPage(
+                                title: 'Privacy Policy',
+                                url: 'https://expouse.com/privacy',
+                              ));
+                            },
                         ),
                       ],
                     ),
@@ -179,9 +197,17 @@ class OtpView extends StatelessWidget {
                   Spacer(),
 
                   Center(
-                    child: CustomImage(
-                      "assets/png/logo-primary.png",
-                      height: 24.h,
+                    child: GestureDetector(
+                      onTap: () {
+                        Get.to(() => const AppWebviewPage(
+                          title: 'Expouse',
+                          url: 'https://expouse.com/',
+                        ));
+                      },
+                      child: CustomImage(
+                        "assets/png/logo-primary.png",
+                        height: 24.h,
+                      ),
                     ),
                   ),
 

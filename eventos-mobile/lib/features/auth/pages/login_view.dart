@@ -2,6 +2,7 @@ import 'package:expouse/utils/helpers/toast_msg.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get_core/src/get_main.dart';
+import '../../../widgets/app_webview_page.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';
@@ -168,9 +169,17 @@ class LoginViewState extends State<LoginView> {
                   Spacer(),
 
                   Center(
-                    child: CustomImage(
-                      "assets/png/logo-primary.png",
-                      height: 24.h,
+                    child: GestureDetector(
+                      onTap: () {
+                        Get.to(() => const AppWebviewPage(
+                          title: 'Expouse',
+                          url: 'https://expouse.com/',
+                        ));
+                      },
+                      child: CustomImage(
+                        "assets/png/logo-primary.png",
+                        height: 24.h,
+                      ),
                     ),
                   ),
 

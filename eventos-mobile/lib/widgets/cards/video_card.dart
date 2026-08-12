@@ -28,33 +28,36 @@ String? _ytThumbnail(String url) {
   return null;
 }
 
-/// Opens the appropriate video player modal for [videoUrl]:
-///   • YouTube URL  → [YoutubeVideoCard] in a transparent Dialog
-///   • Other URL    → [NormalVideoCard]  in a transparent Dialog
+/// Opens a full-screen dark video player for [videoUrl]:
+///   • YouTube URL  → [YoutubeVideoCard]
+///   • Other URL    → [NormalVideoCard]
 void openVideoModal(BuildContext context, String videoUrl) {
+  if (videoUrl.isEmpty) return;
+
+  final Widget player;
   if (isYoutubeUrl(videoUrl)) {
     final videoId = YoutubePlayer.convertUrlToId(videoUrl);
     if (videoId == null) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: YoutubeVideoCard(videoId: videoId),
-      ),
-    );
+    player = YoutubeVideoCard(videoId: videoId);
   } else {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: NormalVideoCard(videoUrl: videoUrl),
-      ),
-    );
+    player = NormalVideoCard(videoUrl: videoUrl);
   }
+
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      opaque: true,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 220),
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (_, __, ___) => Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(child: SizedBox.expand(child: player)),
+      ),
+      transitionsBuilder: (_, animation, __, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+    ),
+  );
 }
 
 // ── VideoCard ──────────────────────────────────────────────────────────────────
@@ -65,8 +68,8 @@ void openVideoModal(BuildContext context, String videoUrl) {
 ///   • On tap opens the matching modal player.
 ///
 /// Constructors:
-///   [VideoCard.box]    — standard box, for use in Column / ListView etc.
-///   [VideoCard.sliver] — wrapped in SliverToBoxAdapter.
+///   [VideoCard.box]    - standard box, for use in Column / ListView etc.
+///   [VideoCard.sliver] - wrapped in SliverToBoxAdapter.
 ///
 /// The [videoUrl] parameter accepts both YouTube and regular video URLs.
 /// The legacy [youtubeVideoUrl] alias is kept for backward compatibility.
@@ -74,12 +77,12 @@ class VideoCard extends StatelessWidget {
   final String? videoUrl;
   final bool _isSliver;
 
-  /// Standard Box version — use inside Column, ListView, Stack, etc.
+  /// Standard Box version - use inside Column, ListView, Stack, etc.
   const VideoCard.box({super.key, String? videoUrl, String? youtubeVideoUrl})
       : videoUrl = videoUrl ?? youtubeVideoUrl,
         _isSliver = false;
 
-  /// Sliver version — use inside CustomScrollView's slivers list.
+  /// Sliver version - use inside CustomScrollView's slivers list.
   const VideoCard.sliver({super.key, String? videoUrl, String? youtubeVideoUrl})
       : videoUrl = videoUrl ?? youtubeVideoUrl,
         _isSliver = true;

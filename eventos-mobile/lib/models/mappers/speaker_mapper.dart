@@ -3,7 +3,8 @@ import '../speaker_detail_model.dart';
 import '../speaker_item_model.dart';
 import '../speaker_page_model.dart';
 import 'session_mapper.dart';
-import '../../utils/helpers/type_helper.dart';
+import 'package:expouse/utils/config/app_config.dart';
+import 'package:expouse/utils/helpers/type_helper.dart';
 
 /// Maps EventOS `GET /api/v1/public/speakers` into existing speaker UI models.
 class SpeakerMapper {
@@ -44,9 +45,7 @@ class SpeakerMapper {
       image: () {
         final raw = (json['image_url'] ?? json['image'] ?? '').toString();
         if (raw.isEmpty) return null;
-        return raw.startsWith('http')
-            ? raw
-            : 'https://admin.expouse.com/storage/$raw';
+        return AppConfig.resolveAssetUrl(raw);
       }(),
       designation: json['designation']?.toString() ?? '',
       category: json['category']?.toString(),
@@ -65,6 +64,8 @@ class SpeakerMapper {
     required List<Map<String, dynamic>> speakers,
     String? search,
     String? sortBy,
+    List<String>? companies,
+    List<String>? titles,
   }) {
     var list = List<Map<String, dynamic>>.from(speakers);
     final q = search?.trim().toLowerCase() ?? '';
@@ -73,8 +74,26 @@ class SpeakerMapper {
         final name = (s['name'] ?? '').toString().toLowerCase();
         final des = (s['designation'] ?? '').toString().toLowerCase();
         final company = (s['company'] ?? '').toString().toLowerCase();
-        return name.contains(q) || des.contains(q) || company.contains(q);
+        final category = (s['category'] ?? '').toString().toLowerCase();
+        return name.contains(q) ||
+            des.contains(q) ||
+            company.contains(q) ||
+            category.contains(q);
       }).toList();
+    }
+
+    if (companies != null && companies.isNotEmpty) {
+      list = list
+          .where((s) => companies.contains((s['company'] ?? '').toString().trim()))
+          .toList();
+    }
+
+    if (titles != null && titles.isNotEmpty) {
+      list = list
+          .where(
+            (s) => titles.contains((s['designation'] ?? '').toString().trim()),
+          )
+          .toList();
     }
 
     if (sortBy == 'name_desc') {

@@ -8,12 +8,12 @@ class SessionService {
 
   String? get _eventUuid => AppDataProvider.obj.eventUuid;
 
-  /// GET /public/sessions — full agenda + facets for X-Event-Subdomain.
-  Future<Response> getSessions() async {
-    return await _dio.get('public/sessions');
+  /// GET /public/sessions - full agenda + facets for X-Event-Subdomain.
+  Future<Response> getSessions({Map<String, dynamic>? queryParameters}) async {
+    return await _dio.get('public/sessions', queryParameters: queryParameters);
   }
 
-  /// GET /events/{uuid}/bookmarks — saved ids by type.
+  /// GET /events/{uuid}/bookmarks - saved ids by type.
   Future<Response> getBookmarks() async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {
@@ -22,7 +22,7 @@ class SessionService {
     return await _dio.get('events/$uuid/bookmarks');
   }
 
-  /// POST /events/{uuid}/notes — create or update a session note.
+  /// POST /events/{uuid}/notes - create or update a session note.
   Future<Response> addOrUpdateSessionNote(String targetUuid, String note) async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {
@@ -38,7 +38,7 @@ class SessionService {
     );
   }
 
-  /// POST /events/{uuid}/bookmarks — toggle session bookmark.
+  /// POST /events/{uuid}/bookmarks - toggle session bookmark.
   Future<Response> toggleSessionBookmark(String sessionUuid, bool on) async {
     final uuid = _eventUuid;
     if (uuid == null || uuid.isEmpty) {

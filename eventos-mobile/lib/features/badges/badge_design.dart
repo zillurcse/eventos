@@ -364,7 +364,7 @@ BadgeAvatarFrame badgeAvatarFrame(Map<String, dynamic> box) {
 
 /// Parses CSS color strings used in badge designs (`#rgb`, `#rrggbb`,
 /// `rgb()`, `rgba()`, named colors, `transparent`, and simple
-/// `linear-gradient(...)` — gradients return the first stop color as a
+/// `linear-gradient(...)` - gradients return the first stop color as a
 /// solid fallback; use [parseCssGradient] for full gradients).
 Color? parseCssColor(String? raw) {
   if (raw == null) return null;

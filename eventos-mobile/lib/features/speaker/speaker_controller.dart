@@ -23,12 +23,86 @@ class SpeakerController extends GetxController {
   final TextEditingController searchController = TextEditingController();
   final RxnString sortType = RxnString();
 
+  // Client-side filters (mirrors delegates Advance Filter)
+  final savedOnly = false.obs;
+  final activeCompanies = <String>[].obs;
+  final activeTitles = <String>[].obs;
+
   List<Map<String, dynamic>> _allRawSpeakers = [];
   List<Map<String, dynamic>> _allRawSessions = [];
 
   List<SpeakerItemModel> get speakers => speakerPage.value.speakers;
   SpeakerAdModel? get contentAd => speakerPage.value.contentAd;
   SpeakerAdModel? get featuredAd => speakerPage.value.featuredAd;
+
+  bool get hasActiveFilters =>
+      savedOnly.value ||
+      activeCompanies.isNotEmpty ||
+      activeTitles.isNotEmpty;
+
+  List<String> get companyOptions => _uniqueTop(
+        _allRawSpeakers.map((s) => (s['company'] ?? '').toString()),
+        12,
+      );
+
+  List<String> get titleOptions => _uniqueTop(
+        _allRawSpeakers.map((s) => (s['designation'] ?? '').toString()),
+        12,
+      );
+
+  List<SpeakerItemModel> get filteredSpeakers {
+    final saved = savedOnly.value;
+
+    if (saved && Get.isRegistered<BookmarkController>()) {
+      Get.find<BookmarkController>().bookmarkedSpeakers.length;
+    }
+
+    if (!saved) return speakers;
+
+    return speakers.where((s) {
+      if (!Get.isRegistered<BookmarkController>()) return false;
+      return Get.find<BookmarkController>().isOnHashed('speaker', s.id);
+    }).toList();
+  }
+
+  static List<String> _uniqueTop(Iterable<String> values, int limit) {
+    final seen = <String, int>{};
+    for (final v in values) {
+      final t = v.trim();
+      if (t.isEmpty) continue;
+      seen[t] = (seen[t] ?? 0) + 1;
+    }
+    final entries = seen.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries.take(limit).map((e) => e.key).toList();
+  }
+
+  void toggleSavedOnly() => savedOnly.value = !savedOnly.value;
+
+  void toggleCompanyFilter(String company) {
+    if (activeCompanies.contains(company)) {
+      activeCompanies.remove(company);
+    } else {
+      activeCompanies.add(company);
+    }
+    _applyFilters();
+  }
+
+  void toggleTitleFilter(String title) {
+    if (activeTitles.contains(title)) {
+      activeTitles.remove(title);
+    } else {
+      activeTitles.add(title);
+    }
+    _applyFilters();
+  }
+
+  void clearFilters() {
+    savedOnly.value = false;
+    activeCompanies.clear();
+    activeTitles.clear();
+    _applyFilters();
+  }
 
   @override
   void onInit() {
@@ -85,6 +159,8 @@ class SpeakerController extends GetxController {
       speakers: _allRawSpeakers,
       search: searchKey.value,
       sortBy: sortType.value,
+      companies: activeCompanies.isNotEmpty ? activeCompanies.toList() : null,
+      titles: activeTitles.isNotEmpty ? activeTitles.toList() : null,
     );
     final page = SpeakerMapper.pageFromV1({'speakers': filtered});
     speakerPage.value = _withBookmarkState(page);

@@ -10,6 +10,7 @@ import '../../models/meeting_model.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../../utils/helpers/toast_msg.dart';
+import '../../utils/service/engagement_service.dart';
 import '../lounge/pages/lounge_room_view.dart';
 import 'meeting_time_utils.dart';
 import 'meetings_service.dart';
@@ -272,6 +273,17 @@ class MeetingsController extends GetxController {
       if (action == 'accept') {
         await _loadCapabilities();
       }
+      final actionType = action == 'accept'
+          ? 'meeting.accepted'
+          : action == 'reject'
+              ? 'meeting.declined'
+              : 'meeting.cancelled';
+      EngagementService.instance.track(
+        actionType: actionType,
+        objectType: 'meeting',
+        objectUuid: meeting.id,
+        idempotencyKey: '$actionType:${meeting.id}',
+      );
     } on DioException catch (e) {
       ToastMsg.showApiErrorMessage(e);
     } catch (e) {
@@ -315,6 +327,13 @@ class MeetingsController extends GetxController {
         room: (data['room'] ?? '').toString(),
         token: token,
         title: (data['title'] ?? meeting.title ?? 'Meeting').toString(),
+      );
+
+      EngagementService.instance.track(
+        actionType: 'meeting.started',
+        objectType: 'meeting',
+        objectUuid: meeting.id,
+        idempotencyKey: 'meeting.started:${meeting.id}',
       );
 
       await Get.to(
@@ -548,6 +567,13 @@ class MeetingsController extends GetxController {
           Map<String, dynamic>.from(resBody['data'] as Map),
         );
         meetings.insert(0, created);
+        EngagementService.instance.track(
+          actionType: 'meeting.requested',
+          objectType: 'meeting',
+          objectUuid: created.id,
+          idempotencyKey: 'meeting.requested:${created.id}',
+          metadata: {'invitee': partner.id},
+        );
       }
 
       final caps = capabilities.value;

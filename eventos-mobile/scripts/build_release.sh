@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Production-oriented release build with obfuscation + dart-defines.
-# Fill in values from your CI secrets / secure env — never hardcode them here.
+# Fill in values from your CI secrets / secure env - never hardcode them here.
 #
 # Usage:
 #   export API_BASE_URL=https://api.example.com/api/v1/

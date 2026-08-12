@@ -9,6 +9,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import '../../../models/session_detail_response_model.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../utils/service/engagement_service.dart';
 import '../../../widgets/cards/video_card.dart';
 import '../session_phase.dart';
 import '../session_service.dart';
@@ -517,6 +518,17 @@ Future<void> openSessionStream(SessionDetailModel detail) async {
     return;
   }
 
+  void markAttended() {
+    if (detail.uuid.isEmpty) return;
+    final eng = EngagementService.instance;
+    eng.track(
+      actionType: 'session.attended',
+      objectType: 'session',
+      objectUuid: detail.uuid,
+      idempotencyKey: eng.onceKey('session.attended', detail.uuid),
+    );
+  }
+
   String? link = detail.streamLink;
   if (phase == SessionPhase.ended) {
     link = detail.onDemandRecordingLink ?? detail.streamLink;
@@ -525,6 +537,7 @@ Future<void> openSessionStream(SessionDetailModel detail) async {
   if (link != null && link.isNotEmpty && isYoutubeUrl(link)) {
     final id = YoutubePlayer.convertUrlToId(link);
     if (id != null && Get.context != null) {
+      markAttended();
       openVideoModal(Get.context!, link);
       return;
     }
@@ -541,6 +554,7 @@ Future<void> openSessionStream(SessionDetailModel detail) async {
 
   final uri = Uri.tryParse(link);
   if (uri != null) {
+    markAttended();
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

@@ -8,6 +8,7 @@ import '../../../widgets/custom_image.dart';
 import '../pages/exhibitor_details.dart';
 import 'exhibitor_card_actions.dart';
 import '../exhibitor_controller.dart';
+import '../../bookmarks/bookmark_controller.dart';
 
 class ExhibitorItem extends StatefulWidget {
   final ExhibitorModel exhibitor;
@@ -29,15 +30,21 @@ class _ExhibitorItemState extends State<ExhibitorItem> {
 
     return Obx(() {
       final showDetail = ctrl.expandedExhibitorId.value == e.id;
-      final isBookmarked = ctrl.exhibitorPage.value.bookmarkedExhibitors.contains(e.id);
+      final isBookmarked = () {
+        if (Get.isRegistered<BookmarkController>()) {
+          final bm = Get.find<BookmarkController>();
+          bm.bookmarkedExhibitors.length; // Touch to trigger Obx
+          return bm.isOnHashed('exhibitor', e.id);
+        }
+        return ctrl.exhibitorPage.value.bookmarkedExhibitors.contains(e.id);
+      }();
 
       return GestureDetector(
         onTap: () {
           Get.to(() => ExhibitorDetails(exhibitor: e));
         },
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: 12.h),
+        child: Padding(
+          padding: EdgeInsets.only(bottom: 12.h, left: 16.w, right: 16.w),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12.r),
               child: Column(
@@ -50,7 +57,7 @@ class _ExhibitorItemState extends State<ExhibitorItem> {
                             ? e.spotlightBannerUrl
                             : e.image ?? "https://learn.zoner.com/wp-content/uploads/2025/04/zoner-ai-image-creator.jpg",
                         height: (context.height * .15).sp,
-                        width: (context.width * .75).sp,
+                        width: double.infinity,
                         fit: BoxFit.cover,
                       ),
                       Positioned(
@@ -67,11 +74,10 @@ class _ExhibitorItemState extends State<ExhibitorItem> {
                               color: context.primaryFocused,
                               borderRadius: BorderRadius.circular(8.r),
                             ),
-                            child: CustomImage(
-                              isBookmarked ? "assets/svg/icons/bookmark_fill.svg" : "assets/svg/icons/bookmark.svg",
-                              height: 20.sp,
-                              width: 14.sp,
-                              color: isBookmarked ? context.primaryTheme : context.ghost,
+                            child: Icon(
+                              isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                              color: context.primaryTheme,
+                              size: 26.sp,
                             ),
                           ),
                         ),
@@ -81,7 +87,7 @@ class _ExhibitorItemState extends State<ExhibitorItem> {
                   // Footer row
                   Container(
                     color: context.tertiaryText,
-                    width: (context.width * .75).sp,
+                    width: double.infinity,
                     padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 4.h),
                     child: Column(
                       children: [
@@ -158,7 +164,6 @@ class _ExhibitorItemState extends State<ExhibitorItem> {
               ),
             ),
           ),
-        ),
       );
     });
   }

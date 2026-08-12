@@ -60,7 +60,7 @@ class SpeakerCardActions extends StatelessWidget {
       padding: EdgeInsets.only(top: 12.h),
       child: Row(
         children: [
-          // Bookmark / loved toggle — driven by BookmarkController so the
+          // Bookmark / loved toggle - driven by BookmarkController so the
           // icon updates immediately (API speakers never ship is_loved).
           Obx(() {
             final isLoved = () {
@@ -103,45 +103,69 @@ class SpeakerCardActions extends StatelessWidget {
           SizedBox(width: 8.w),
           // Add Note
           Expanded(
-            child: GestureDetector(
-              onTap: () {
-                addNoteBottomSheet(
-                  child: AddNoteBottomSheet(
-                    noteType: 'Speaker',
-                    entityId: speakerId,
-                    entityName: speakerName,
-                    entityRole: speakerDesignation,
-                    entityImage: speakerImage,
-                    initialNoteText: initialNoteText,
-                  ),
+            child: Obx(() {
+              final hasNoteLocally = speakerId != null &&
+                  Get.find<BriefcaseController>().notes.any(
+                        (n) => n.noteType == 'Speaker' && n.entityId == speakerId,
+                      );
+              final haveNotes =
+                  speakerDetail?.haveNotes ?? speaker?.haveNotes ?? hasNoteLocally;
+
+              // Determine initialNoteText
+              String? initialNoteText;
+              if (speakerDetail != null && speakerDetail!.notes.isNotEmpty) {
+                initialNoteText = speakerDetail!.notes.first.note;
+              } else if (speaker != null && speaker!.notes.isNotEmpty) {
+                initialNoteText = speaker!.notes.first.note;
+              }
+
+              if (initialNoteText == null && speakerId != null) {
+                final match = Get.find<BriefcaseController>().notes.firstWhereOrNull(
+                  (n) => n.noteType == 'Speaker' && n.entityId == speakerId,
                 );
-              },
-              child: Container(
-                height: 42.sp,
-                decoration: BoxDecoration(
-                  color:
-                      haveNotes ? context.primaryFocused : context.tertiaryText,
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: context.primaryTheme),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CustomImage(
-                      "assets/svg/icons/add_note.svg",
-                      color: context.primaryTheme,
+                initialNoteText = match?.noteText;
+              }
+
+              return GestureDetector(
+                onTap: () {
+                  addNoteBottomSheet(
+                    child: AddNoteBottomSheet(
+                      noteType: 'Speaker',
+                      entityId: speakerId,
+                      entityName: speakerName,
+                      entityRole: speakerDesignation,
+                      entityImage: speakerImage,
+                      initialNoteText: initialNoteText,
                     ),
-                    SizedBox(width: 12.w),
-                    Text(
-                      haveNotes ? "View Note" : "Add Note",
-                      style: context.buttonMediumBold?.copyWith(
+                  );
+                },
+                child: Container(
+                  height: 42.sp,
+                  decoration: BoxDecoration(
+                    color:
+                        haveNotes ? context.primaryFocused : context.tertiaryText,
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: context.primaryTheme),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImage(
+                        "assets/svg/icons/add_note.svg",
                         color: context.primaryTheme,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 12.w),
+                      Text(
+                        haveNotes ? "View Note" : "Add Note",
+                        style: context.buttonMediumBold?.copyWith(
+                          color: context.primaryTheme,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            }),
           ),
           SizedBox(width: 8.w),
           // Chat

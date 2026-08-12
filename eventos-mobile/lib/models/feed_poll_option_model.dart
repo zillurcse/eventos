@@ -2,7 +2,7 @@ import '../utils/helpers/type_helper.dart';
 
 class FeedPollOptionModel {
   final int id;
-  /// EventOS option id (e.g. `o1`) — used for poll vote API.
+  /// EventOS option id (e.g. `o1`) - used for poll vote API.
   final String uuid;
   final String option;
   final int votes;

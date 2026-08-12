@@ -13,7 +13,7 @@ class FeedPostsList extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = Get.find<EventFeedController>();
     return Obx(() {
-      // Still loading first page — show skeletons inside the list area
+      // Still loading first page - show skeletons inside the list area
       if (ctrl.feedStatus.value == ApiState.loading && ctrl.posts.isEmpty) {
         return const SliverToBoxAdapter(
           child: SizedBox.shrink(), // skeleton is handled by ApiStateHandler

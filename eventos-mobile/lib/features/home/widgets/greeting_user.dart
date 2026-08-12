@@ -1,24 +1,67 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 
 import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/custom_image.dart';
 import '../../root/root_controller.dart';
 import '../home_controller.dart';
 
-class GreetingUser extends StatelessWidget {
+class GreetingUser extends StatefulWidget {
   const GreetingUser({super.key});
+
+  @override
+  State<GreetingUser> createState() => _GreetingUserState();
+}
+
+class _GreetingUserState extends State<GreetingUser> {
+  bool _shouldShow = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAndShowGreeting();
+  }
+
+  void _checkAndShowGreeting() {
+    final box = GetStorage();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final lastShownDate = box.read<String>('lastGreetingDate');
+
+    if (lastShownDate != today) {
+      _shouldShow = true;
+      box.write('lastGreetingDate', today);
+      _timer = Timer(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _shouldShow = false;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 20) return 'Good evening';
+    return 'Good night';
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_shouldShow) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
     final ctrl = Get.find<HomeController>();
     final rootCtrl = Get.find<RootController>();
 

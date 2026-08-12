@@ -9,12 +9,12 @@ class BookmarkService {
   String get _eventUuid {
     final uuid = AppDataProvider.obj.eventUuid;
     if (uuid == null || uuid.isEmpty) {
-      throw StateError('No event context — eventUuid missing');
+      throw StateError('No event context - eventUuid missing');
     }
     return uuid;
   }
 
-  /// GET /events/{uuid}/bookmarks — saved ids grouped by type.
+  /// GET /events/{uuid}/bookmarks - saved ids grouped by type.
   Future<Response> getBookmarks() async {
     return await _dio.get('events/$_eventUuid/bookmarks');
   }

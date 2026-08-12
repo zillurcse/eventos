@@ -31,13 +31,19 @@ class _SpeakerViewState extends State<SpeakerView> {
         state: controller.dataStatus.value,
         onRetry: controller.fetchSpeakers,
         skeleton: const SpeakerListSkeleton(),
-        loadedElement: const CustomScrollView(
-          slivers: [
-            AddBanner(),
-            SpeakerContentAdBanner(),
-            SearchFilterWidget(),
-            SpeakerList(),
-          ],
+        loadedElement: RefreshIndicator(
+          elevation: 0.5,
+          color: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          onRefresh: controller.fetchSpeakers,
+          child: const CustomScrollView(
+            slivers: [
+              AddBanner(),
+              SpeakerContentAdBanner(),
+              SearchFilterWidget(),
+              SpeakerList(),
+            ],
+          ),
         ),
       ),
     );

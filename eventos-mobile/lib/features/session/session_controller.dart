@@ -9,6 +9,7 @@ import '../../models/mappers/session_mapper.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../../utils/helpers/type_helper.dart';
+import '../../utils/service/engagement_service.dart';
 import '../bookmarks/bookmark_controller.dart';
 import 'session_phase.dart';
 import 'session_service.dart';
@@ -33,6 +34,7 @@ class SessionController extends GetxController {
   final selectedTimezone = RxnString();
   final selectedSpeakerId = RxnInt();
   final savedOnly = false.obs;
+  final viewOption = 1.obs;
 
   final RxMap<String, String> timezoneData = <String, String>{
     "event_timezone": "",
@@ -63,7 +65,7 @@ class SessionController extends GetxController {
 
     debounce(
       searchQuery,
-      (_) => _applyFilters(),
+      (_) => fetchSessions(),
       time: const Duration(milliseconds: 500),
     );
   }
@@ -181,7 +183,17 @@ class SessionController extends GetxController {
     await handleApiClient(
       onStateChanged: (state) => dataStatus(state),
       handleApiCall: () async {
-        final response = await _service.getSessions();
+        final queryParams = <String, dynamic>{};
+        if (selectedTrackId.value != null) queryParams['track_id'] = selectedTrackId.value;
+        if (selectedTag.value != null) queryParams['tag'] = selectedTag.value;
+        if (selectedTimezone.value != null) queryParams['timezone'] = selectedTimezone.value;
+        if (selectedSpeakerId.value != null) queryParams['speaker_id'] = selectedSpeakerId.value;
+        if (savedOnly.value) queryParams['saved_only'] = 1;
+        if (searchQuery.value.isNotEmpty) queryParams['search'] = searchQuery.value;
+
+        final response = await _service.getSessions(
+          queryParameters: queryParams.isNotEmpty ? queryParams : null,
+        );
         final body = response.data;
         if (body is! Map) return;
 
@@ -235,7 +247,7 @@ class SessionController extends GetxController {
         );
       bookmarkRevision.value++;
     } catch (_) {
-      // Bookmarks require auth — agenda still works without them.
+      // Bookmarks require auth - agenda still works without them.
     }
   }
 
@@ -317,31 +329,51 @@ class SessionController extends GetxController {
 
   void selectTrack(int? trackId) {
     selectedTrackId(trackId);
-    _applyFilters();
+    fetchSessions();
   }
 
   void selectTag(String? tag) {
     selectedTag(tag);
-    _applyFilters();
+    fetchSessions();
   }
 
   void selectTimezone(String? tz) {
     selectedTimezone(tz);
+    fetchSessions();
   }
 
   void selectSpeaker(int? speakerId) {
     selectedSpeakerId(speakerId);
-    _applyFilters();
+    fetchSessions();
   }
 
   void toggleSavedOnly() {
     savedOnly(!savedOnly.value);
-    _applyFilters();
+    fetchSessions();
   }
 
   void clearSearch() {
     searchController.clear();
     searchQuery("");
+  }
+
+  bool get hasActiveFilters {
+    return selectedTrackId.value != null ||
+           selectedTag.value != null ||
+           selectedTimezone.value != null ||
+           selectedSpeakerId.value != null ||
+           savedOnly.value ||
+           searchQuery.value.isNotEmpty;
+  }
+
+  void resetFilters() {
+    selectedTrackId.value = null;
+    selectedTag.value = null;
+    selectedTimezone.value = null;
+    selectedSpeakerId.value = null;
+    savedOnly.value = false;
+    clearSearch();
+    fetchSessions();
   }
 
   Future<void> fetchSessionDetails(int scheduleId) async {
@@ -386,6 +418,15 @@ class SessionController extends GetxController {
         }
         final detail = SessionMapper.detailFromV1(raw);
         sessionDetail.value = detail;
+        if (detail.uuid.isNotEmpty) {
+          final eng = EngagementService.instance;
+          eng.track(
+            actionType: 'session.viewed',
+            objectType: 'session',
+            objectUuid: detail.uuid,
+            idempotencyKey: eng.onceKey('session.viewed', detail.uuid),
+          );
+        }
         if (detail.isAllowedToRate && detail.uuid.isNotEmpty) {
           await _loadRating(detail.uuid);
         }
@@ -418,6 +459,14 @@ class SessionController extends GetxController {
     ratingSaving.value = true;
     try {
       await _service.submitSessionRating(detail.uuid, score);
+      final eng = EngagementService.instance;
+      eng.track(
+        actionType: 'session.rated',
+        objectType: 'session',
+        objectUuid: detail.uuid,
+        idempotencyKey: eng.onceKey('session.rated', detail.uuid),
+        metadata: {'score': score},
+      );
     } catch (_) {
       sessionRating.value = previous;
     } finally {
@@ -461,15 +510,16 @@ class SessionController extends GetxController {
     }
   }
 
-  Future<bool> toggleBookmark(int scheduleId) async {
-    final uuid = _uuidFor(scheduleId);
-    if (uuid == null) return false;
+  Future<bool> toggleBookmark(int scheduleId, {String? uuid}) async {
+    final resolved =
+        (uuid != null && uuid.isNotEmpty) ? uuid : _uuidFor(scheduleId);
+    if (resolved == null) return false;
 
-    final on = !_bookmarkedUuids.contains(uuid);
+    final on = !_bookmarkedUuids.contains(resolved);
     if (on) {
-      _bookmarkedUuids.add(uuid);
+      _bookmarkedUuids.add(resolved);
     } else {
-      _bookmarkedUuids.remove(uuid);
+      _bookmarkedUuids.remove(resolved);
     }
     bookmarkRevision.value++;
     _applyFilters();
@@ -480,7 +530,7 @@ class SessionController extends GetxController {
     }
 
     try {
-      await _service.toggleSessionBookmark(uuid, on);
+      await _service.toggleSessionBookmark(resolved, on);
       if (Get.isRegistered<BookmarkController>()) {
         final session = days
             .expand((d) => d.schedules)
@@ -488,7 +538,7 @@ class SessionController extends GetxController {
             .firstWhereOrNull((s) => s.id == scheduleId);
         Get.find<BookmarkController>().syncLocal(
           type: 'session',
-          uuid: uuid,
+          uuid: resolved,
           on: on,
           session: session,
         );
@@ -496,13 +546,25 @@ class SessionController extends GetxController {
       return true;
     } catch (_) {
       if (on) {
-        _bookmarkedUuids.remove(uuid);
+        _bookmarkedUuids.remove(resolved);
       } else {
-        _bookmarkedUuids.add(uuid);
+        _bookmarkedUuids.add(resolved);
       }
       bookmarkRevision.value++;
       _applyFilters();
       return false;
     }
+  }
+
+  /// Keep agenda bookmark state in sync when toggled from home/reception.
+  void syncBookmarkFromExternal(String uuid, bool on) {
+    if (uuid.isEmpty) return;
+    if (on) {
+      _bookmarkedUuids.add(uuid);
+    } else {
+      _bookmarkedUuids.remove(uuid);
+    }
+    bookmarkRevision.value++;
+    if (_allRawSessions.isNotEmpty) _applyFilters();
   }
 }

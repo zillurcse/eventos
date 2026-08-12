@@ -1,4 +1,6 @@
-import '../../utils/helpers/type_helper.dart';
+import 'package:expouse/utils/config/app_config.dart';
+import 'package:expouse/utils/helpers/type_helper.dart';
+
 
 class EventCtaModel {
   final int id;
@@ -23,9 +25,7 @@ class EventCtaModel {
 
   factory EventCtaModel.fromJson(Map<String, dynamic> json) {
     final rawImage = json['cta_image'] as String? ?? '';
-    final imageUrl = rawImage.isNotEmpty
-        ? 'https://admin.expouse.com/storage/$rawImage'
-        : '';
+    final imageUrl = AppConfig.resolveAssetUrl(rawImage);
 
     return EventCtaModel(
       id: TypeHelper.toInt(json['id']),

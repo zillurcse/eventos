@@ -36,6 +36,16 @@ class _RootViewState extends State<RootView> {
   final Map<int, Widget> _pageCache = {};
   int _tabsSignature = 0;
 
+  PageController? _pageController;
+  int _pageCount = 0;
+  int _lastIndex = 0;
+  Worker? _indexWorker;
+  bool _listenerBound = false;
+
+  /// Ignore [onPageChanged] while we drive the page from a nav tap.
+  bool _animatingFromNav = false;
+  int _navAnimToken = 0;
+
   Widget _getPageForRoute(String route, String customName) {
     switch (route) {
       case 'event.home':
@@ -86,9 +96,54 @@ class _RootViewState extends State<RootView> {
     }
   }
 
+  void _syncPageController(int count) {
+    if (_pageController != null && _pageCount == count) return;
+
+    final initial = _lastIndex.clamp(0, count > 0 ? count - 1 : 0);
+    _pageController?.dispose();
+    _pageController = PageController(initialPage: initial);
+    _pageCount = count;
+  }
+
+  void _bindIndexListener(RootController controller) {
+    if (_listenerBound) return;
+    _listenerBound = true;
+    _lastIndex = controller.selectedIndex.value;
+
+    _indexWorker = ever<int>(controller.selectedIndex, (index) {
+      _lastIndex = index;
+
+      final pc = _pageController;
+      if (pc == null || !pc.hasClients) return;
+
+      final current = pc.page?.round() ?? pc.initialPage;
+      if (current == index) return;
+
+      _animatingFromNav = true;
+      final token = ++_navAnimToken;
+      pc
+          .animateToPage(
+            index,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            if (token == _navAnimToken) _animatingFromNav = false;
+          });
+    });
+  }
+
+  @override
+  void dispose() {
+    _indexWorker?.dispose();
+    _pageController?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<RootController>();
+    _bindIndexListener(controller);
 
     return PopScope(
       canPop: false,
@@ -124,15 +179,30 @@ class _RootViewState extends State<RootView> {
                 }
 
                 _syncCacheWithTabs(controller);
-                final index = controller.selectedIndex.value;
-                _ensurePage(controller, index);
+                final tabCount = controller.activeTabs.length;
+                _syncPageController(tabCount);
 
-                return IndexedStack(
-                  index: index,
-                  children: List.generate(
-                    controller.activeTabs.length,
-                    (i) => _pageCache[i] ?? const SizedBox.shrink(),
+                return PageView.builder(
+                  controller: _pageController,
+                  itemCount: tabCount,
+                  allowImplicitScrolling: true,
+                  physics: const BouncingScrollPhysics(
+                    parent: PageScrollPhysics(),
                   ),
+                  onPageChanged: (i) {
+                    _ensurePage(controller, i);
+                    if (i > 0) _ensurePage(controller, i - 1);
+                    if (i < tabCount - 1) _ensurePage(controller, i + 1);
+
+                    if (_animatingFromNav) return;
+                    if (controller.selectedIndex.value != i) {
+                      controller.changeIndex(i);
+                    }
+                  },
+                  itemBuilder: (context, i) {
+                    _ensurePage(controller, i);
+                    return _pageCache[i] ?? const SizedBox.shrink();
+                  },
                 );
               }),
             ),
@@ -147,42 +217,65 @@ class _RootViewState extends State<RootView> {
           final tabs = controller.activeTabs;
           final showMore = tabs.length > 4;
           final bottomNavTabs = showMore ? tabs.sublist(0, 4) : tabs;
-
-          final navItems = bottomNavTabs
-              .map(
-                (tab) => (
-                  title: tab.customName,
-                  icon: 'assets/svg/icons/${tab.icon}',
-                ),
-              )
-              .toList();
-
-          if (showMore) {
-            navItems.add((title: 'More', icon: 'assets/svg/icons/more.svg'));
+          
+          final navItems = <({String title, String icon, int actualIndex, bool isMore})>[];
+          
+          for (int i = 0; i < bottomNavTabs.length; i++) {
+            navItems.add((
+              title: bottomNavTabs[i].customName,
+              icon: 'assets/svg/icons/${bottomNavTabs[i].icon}',
+              actualIndex: i,
+              isMore: false,
+            ));
           }
 
-          return Container(
-            height: 60.h,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(
-                navItems.length,
-                (index) => NavItem(
-                  index: index,
-                  title: navItems[index].title,
-                  icon: navItems[index].icon,
-                  controller: controller,
-                  isMoreTab: showMore && index == 4,
+          if (showMore) {
+            navItems.add((title: 'More', icon: 'assets/svg/icons/more.svg', actualIndex: -1, isMore: true));
+          }
+
+          return GestureDetector(
+            onHorizontalDragEnd: (details) {
+              final velocity = details.primaryVelocity ?? 0;
+              if (velocity.abs() < 100) return;
+
+              final currentIndex = controller.selectedIndex.value;
+              int newIndex = currentIndex;
+              if (velocity < 0) {
+                newIndex++; // swipe left -> next tab
+              } else if (velocity > 0) {
+                newIndex--; // swipe right -> previous tab
+              }
+
+              if (newIndex >= 0 && newIndex < controller.activeTabs.length) {
+                controller.changeIndex(newIndex);
+              }
+            },
+            child: Container(
+              height: 60.h,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(
+                  navItems.length,
+                  (index) {
+                    final item = navItems[index];
+                    return NavItem(
+                      index: item.actualIndex,
+                      title: item.title,
+                      icon: item.icon,
+                      controller: controller,
+                      isMoreTab: item.isMore,
+                    );
+                  },
                 ),
               ),
             ),

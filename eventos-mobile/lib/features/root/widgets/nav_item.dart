@@ -48,8 +48,10 @@ class NavItem extends StatelessWidget {
           }
         },
         behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 56.w,
+        child: AnimatedScale(
+          scale: isSelected ? 1.08 : 1.0,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -59,19 +61,27 @@ class NavItem extends StatelessWidget {
                 width: 18.w,
                 color: isSelected ? primaryTheme : ghost,
               ),
-              SizedBox(height: 3.h),
-              // Loading skeleton bar replaces the label while fetching
-              if (isLoading)
-                const NavSkeletonDot()
-              else
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: context.specialLabelCapital?.copyWith(
-                    color: isSelected ? primaryTheme : ghost,
-                    fontSize: 10.sp,
+              if (title.isNotEmpty) ...[
+                SizedBox(height: 3.h),
+                // Loading skeleton bar replaces the label while fetching
+                if (isLoading)
+                  const NavSkeletonDot()
+                else
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    style: (context.specialLabelCapital ?? const TextStyle()).copyWith(
+                      color: isSelected ? primaryTheme : ghost,
+                      fontSize: 12.sp,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
+              ],
             ],
           ),
         ),

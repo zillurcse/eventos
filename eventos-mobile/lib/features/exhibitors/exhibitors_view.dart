@@ -35,12 +35,18 @@ class _ExhibitorsViewState extends State<ExhibitorsView> {
           state: controller.dataStatus.value,
           onRetry: controller.fetchExhibitors,
           skeleton: const ExhibitorListSkeleton(),
-          loadedElement: const CustomScrollView(
-            slivers: [
-              ExhibitorContentAdBanner(),
-              ExhibitorSearchSortWidget(),
-              ExhibitorsList(),
-            ],
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchExhibitors,
+            child: const CustomScrollView(
+              slivers: [
+                ExhibitorContentAdBanner(),
+                ExhibitorSearchSortWidget(),
+                ExhibitorsList(),
+              ],
+            ),
           ),
         ),
       ),

@@ -35,12 +35,18 @@ class _DelegateViewState extends State<DelegateView> {
           state: controller.dataStatus.value,
           onRetry: controller.fetchDelegates,
           skeleton: const DelegateListSkeleton(),
-          loadedElement: const CustomScrollView(
-            slivers: [
-              DelegateAddBanner(),
-              DelegateSearchFilterWidget(),
-              DelegateList(),
-            ],
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchDelegates,
+            child: const CustomScrollView(
+              slivers: [
+                DelegateAddBanner(),
+                DelegateSearchFilterWidget(),
+                DelegateList(),
+              ],
+            ),
           ),
         ),
       ),

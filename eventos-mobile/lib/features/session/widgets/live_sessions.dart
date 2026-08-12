@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../widgets/cards/session_card.dart';
+import '../../../widgets/cards/session_card_option_1.dart';
+import '../../../widgets/cards/session_card_option_2.dart';
 import '../session_controller.dart';
 
 class LiveSessions extends StatelessWidget {
@@ -17,6 +19,7 @@ class LiveSessions extends StatelessWidget {
       // Touch days so Obx rebuilds when agenda refreshes / filters change.
       final _ = sessionCtrl.days.length;
       final sessions = sessionCtrl.liveSessions;
+      final currentViewOption = sessionCtrl.viewOption.value;
       if (sessions.isEmpty) {
         return const SliverToBoxAdapter(child: SizedBox.shrink());
       }
@@ -55,17 +58,10 @@ class LiveSessions extends StatelessWidget {
               if (sessions.length == 1)
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: SessionCard(
-                    session: sessions.first,
-                    isOnGoing: true,
-                    fullWidth: true,
-                    title: sessions.first.title,
-                    startTime: sessions.first.startTime,
-                    endTime: sessions.first.endTime,
-                    dayLabel: sessions.first.day.title,
-                    logoUrl: sessions.first.logoUrl,
-                    speakerImageUrls:
-                        sessions.first.speakers.map((sp) => sp.imageUrl).toList(),
+                  child: _buildCard(
+                    currentViewOption,
+                    sessions.first,
+                    true,
                   ),
                 )
               else
@@ -77,16 +73,10 @@ class LiveSessions extends StatelessWidget {
                     children: sessions.map((s) {
                       return Padding(
                         padding: EdgeInsets.only(right: 12.sp),
-                        child: SessionCard(
-                          session: s,
-                          isOnGoing: true,
-                          title: s.title,
-                          startTime: s.startTime,
-                          endTime: s.endTime,
-                          dayLabel: s.day.title,
-                          logoUrl: s.logoUrl,
-                          speakerImageUrls:
-                              s.speakers.map((sp) => sp.imageUrl).toList(),
+                        child: _buildCard(
+                          currentViewOption,
+                          s,
+                          false,
                         ),
                       );
                     }).toList(),
@@ -97,5 +87,42 @@ class LiveSessions extends StatelessWidget {
         ),
       );
     });
+  }
+
+  Widget _buildCard(int viewOption, dynamic session, bool fullWidth) {
+    if (viewOption == 1) {
+      return SessionCardOption1(
+        session: session,
+        fullWidth: fullWidth,
+        title: session.title,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        location: session.sessionPlace,
+        speakerImageUrls: session.speakers.map<String>((sp) => sp.imageUrl as String).toList(),
+      );
+    } else if (viewOption == 2) {
+      return SessionCardOption2(
+        session: session,
+        fullWidth: fullWidth,
+        title: session.title,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        dayLabel: session.day.title,
+        location: session.sessionPlace,
+        speakerImageUrls: session.speakers.map<String>((sp) => sp.imageUrl as String).toList(),
+      );
+    } else {
+      return SessionCard(
+        session: session,
+        isOnGoing: true,
+        fullWidth: fullWidth,
+        title: session.title,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        dayLabel: session.day.title,
+        logoUrl: session.logoUrl,
+        speakerImageUrls: session.speakers.map<String>((sp) => sp.imageUrl as String).toList(),
+      );
+    }
   }
 }

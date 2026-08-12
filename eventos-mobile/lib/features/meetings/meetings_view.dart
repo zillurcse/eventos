@@ -37,12 +37,18 @@ class _MeetingsViewState extends State<MeetingsView> {
           state: controller.dataStatus.value,
           onRetry: controller.fetchMeetings,
           skeleton: const _MeetingsSkeleton(),
-          loadedElement: const CustomScrollView(
-            slivers: [
-              MeetingsAdBanner(),
-              MeetingsToolbar(),
-              MeetingsList(),
-            ],
+          loadedElement: RefreshIndicator(
+            elevation: 0.5,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            onRefresh: controller.fetchMeetings,
+            child: const CustomScrollView(
+              slivers: [
+                MeetingsAdBanner(),
+                MeetingsToolbar(),
+                MeetingsList(),
+              ],
+            ),
           ),
         ),
       ),

@@ -37,13 +37,10 @@ class SessionActionButtons extends StatelessWidget {
                   color: bookmarked ? context.primaryTheme : context.strokeLight,
                 ),
               ),
-              child: CustomImage(
-                bookmarked
-                    ? "assets/svg/icons/bookmark_fill.svg"
-                    : "assets/svg/icons/bookmark.svg",
-                color: bookmarked ? context.primaryTheme : context.ghost,
-                width: 20.sp,
-                height: 20.sp,
+              child: Icon(
+                bookmarked ? Icons.bookmark : Icons.bookmark_border,
+                color: context.primaryTheme,
+                size: 26.sp,
               ),
             ),
           ),

@@ -26,10 +26,7 @@ class ReceptionMapper {
         ? Map<String, dynamic>.from(data['event'] as Map)
         : <String, dynamic>{};
 
-    final rawSessions = (data['sessions'] as List? ?? [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final rawSessions = _asMapList(data['sessions']);
     final split = _splitSessions(rawSessions);
 
     return ReceptionModel(
@@ -38,21 +35,26 @@ class ReceptionMapper {
       welcomeVideo: _welcomeFromV1(welcomeVideo),
       currentSessions: split.ongoing,
       featuredSessions: split.featured,
-      featuredSpeakers: (data['speakers'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => ReceptionSpeakerModel.fromJson(
-                Map<String, dynamic>.from(e),
-              ))
+      featuredSpeakers: _asMapList(data['speakers'])
+          .map((e) => ReceptionSpeakerModel.fromJson(e))
           .toList(),
-      featuredExhibitors: (data['exhibitors'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => _exhibitorFromV1(Map<String, dynamic>.from(e)))
+      featuredExhibitors: _asMapList(data['exhibitors'])
+          .map(_exhibitorFromV1)
           .toList(),
-      featuredSponsors: (data['sponsors'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => _exhibitorFromV1(Map<String, dynamic>.from(e)))
+      featuredSponsors: _asMapList(data['sponsors'])
+          .map(_exhibitorFromV1)
           .toList(),
     );
+  }
+
+  /// Accept a JSON list of objects; ignore corrupted PHP Incomplete_Class maps.
+  static List<Map<String, dynamic>> _asMapList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((m) => !m.containsKey('__PHP_Incomplete_Class_Name'))
+        .toList();
   }
 
   static ReceptionEventModel _eventFromAbout(
@@ -151,14 +153,16 @@ class ReceptionMapper {
     return out;
   }
 
+  /// Collects active ad images from `ads.strip` / `ads.sidebar`.
+  /// Only images with `is_active != false` are included (matches web AdSidebar).
   static AdsModel _adsFromV1(dynamic raw) {
     if (raw is! Map) return const AdsModel();
     final map = Map<String, dynamic>.from(raw);
-    final images = <BannerModel>[];
     var index = 0;
 
-    void collect(dynamic list) {
-      if (list is! List) return;
+    List<BannerModel> collect(dynamic list) {
+      final images = <BannerModel>[];
+      if (list is! List) return images;
       for (final ad in list) {
         if (ad is! Map) continue;
         final adMap = Map<String, dynamic>.from(ad);
@@ -176,6 +180,11 @@ class ReceptionMapper {
             );
           } else if (img is Map) {
             final m = Map<String, dynamic>.from(img);
+            // Default active when flag is omitted (web: `is_active ?? true`).
+            final active = m.containsKey('is_active')
+                ? TypeHelper.toBool(m['is_active'])
+                : true;
+            if (!active) continue;
             final url =
                 (m['image_url'] ?? m['url'] ?? m['image'] ?? '').toString();
             if (url.isEmpty) continue;
@@ -183,18 +192,22 @@ class ReceptionMapper {
               BannerModel(
                 id: index,
                 title: (m['title'] ?? adMap['title'] ?? '').toString(),
-                url: (m['link'] ?? m['url'] ?? '').toString(),
+                url: (m['redirect_url'] ?? m['link'] ?? m['url'] ?? '')
+                    .toString(),
                 imageUrl: url,
+                status: true,
               ),
             );
           }
         }
       }
+      return images;
     }
 
-    collect(map['strip']);
-    collect(map['sidebar']);
-    return AdsModel(images: images);
+    return AdsModel(
+      sidebar: collect(map['sidebar']),
+      strip: collect(map['strip']),
+    );
   }
 
   static WelcomeVideoModel _welcomeFromV1(Map<String, dynamic>? video) {
@@ -233,19 +246,11 @@ class ReceptionMapper {
           end != null &&
           !now.isBefore(start.toLocal()) &&
           !now.isAfter(end.toLocal());
-      if (isNow) {
-        ongoing.add(model);
-      } else {
-        featured.add(model);
-      }
+      // Ongoing = live now; featured = organizer flag (independent, like web).
+      if (isNow) ongoing.add(model);
+      if (TypeHelper.toBool(json['is_featured'])) featured.add(model);
     }
 
-    if (featured.isEmpty && ongoing.isEmpty) {
-      return (ongoing: ongoing, featured: raw.map(_sessionFromV1).toList());
-    }
-    if (featured.isEmpty) {
-      return (ongoing: ongoing, featured: ongoing);
-    }
     return (ongoing: ongoing, featured: featured);
   }
 

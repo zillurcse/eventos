@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
 import '../../models/ads_model.dart';
@@ -14,6 +16,7 @@ import '../../models/welcome_video_model.dart';
 import '../../utils/enum/enums.dart';
 import '../../utils/helpers/app_data_provider.dart';
 import '../../utils/helpers/helper_functions.dart';
+import '../../utils/service/engagement_service.dart';
 import '../leaderboard/leaderboard_service.dart';
 import 'home_service.dart';
 
@@ -107,6 +110,7 @@ class HomeController extends GetxController {
         } else {
           await _safeFetchLeaderboard();
         }
+        unawaited(EngagementService.instance.flushQueue());
       },
     );
   }
@@ -138,7 +142,7 @@ class HomeController extends GetxController {
         }).toList(),
       );
     } catch (_) {
-      // Gamification requires auth — home still renders without it.
+      // Gamification requires auth - home still renders without it.
       _leaderboard.clear();
     }
   }

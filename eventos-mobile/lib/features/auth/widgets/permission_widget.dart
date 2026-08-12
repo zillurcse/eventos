@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:flutter/gestures.dart';
+import '../../../widgets/app_webview_page.dart';
 import '../../../utils/extension/theme_ext.dart';
 
 class PermissionWidget extends StatelessWidget {
@@ -42,6 +44,13 @@ class PermissionWidget extends StatelessWidget {
                   style: context.titleRegular?.copyWith(
                     color: context.primaryTheme,
                   ),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () {
+                      Get.to(() => const AppWebviewPage(
+                        title: 'Terms and Conditions',
+                        url: 'https://expouse.com/terms',
+                      ));
+                    },
                 ),
                 TextSpan(
                   text: "and ",
@@ -52,6 +61,13 @@ class PermissionWidget extends StatelessWidget {
                   style: context.titleRegular?.copyWith(
                     color: context.primaryTheme,
                   ),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () {
+                      Get.to(() => const AppWebviewPage(
+                        title: 'Privacy Policy',
+                        url: 'https://expouse.com/privacy',
+                      ));
+                    },
                 ),
               ],
             ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:expouse/utils/config/app_config.dart';
 
 import '../../models/briefcase_item_model.dart';
 import '../../utils/enum/enums.dart';
@@ -40,9 +41,7 @@ class _BriefcaseViewState extends State<BriefcaseView>
 
   Future<void> _openFile(String fileUrl) async {
     if (fileUrl.isEmpty) return;
-    final url = fileUrl.startsWith('http')
-        ? fileUrl
-        : 'https://admin.expouse.com/storage/$fileUrl';
+    final url = AppConfig.resolveAssetUrl(fileUrl);
     final uri = Uri.tryParse(url);
     if (uri != null) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -100,13 +99,19 @@ class _BriefcaseViewState extends State<BriefcaseView>
         return _buildEmptyState("No saved files in briefcase yet");
       }
 
-      return ListView.builder(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        itemCount: files.length,
-        itemBuilder: (context, index) {
-          final file = files[index];
-          return _buildFileCard(file);
-        },
+      return RefreshIndicator(
+        elevation: 0.5,
+        color: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        onRefresh: briefcaseCtrl.fetchAllBriefcaseItems,
+        child: ListView.builder(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          itemCount: files.length,
+          itemBuilder: (context, index) {
+            final file = files[index];
+            return _buildFileCard(file);
+          },
+        ),
       );
     });
   }
@@ -234,13 +239,19 @@ class _BriefcaseViewState extends State<BriefcaseView>
           Expanded(
             child: filteredNotes.isEmpty
                 ? _buildEmptyState("No notes under $activeFilter yet")
-                : ListView.builder(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                    itemCount: filteredNotes.length,
-                    itemBuilder: (context, index) {
-                      final note = filteredNotes[index];
-                      return _buildNoteCard(note);
-                    },
+                : RefreshIndicator(
+                    elevation: 0.5,
+                    color: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    onRefresh: briefcaseCtrl.fetchAllBriefcaseItems,
+                    child: ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      itemCount: filteredNotes.length,
+                      itemBuilder: (context, index) {
+                        final note = filteredNotes[index];
+                        return _buildNoteCard(note);
+                      },
+                    ),
                   ),
           ),
         ],

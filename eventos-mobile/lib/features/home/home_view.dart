@@ -34,27 +34,33 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    // Obx only tracks dataStatus — section widgets own their own Obx scopes.
+    // Obx only tracks dataStatus - section widgets own their own Obx scopes.
     return Obx(
       () => ApiStateHandler(
         state: controller.dataStatus.value,
         onRetry: controller.fetchHomeData,
         skeleton: const AppSkeleton(),
-        loadedElement: CustomScrollView(
-          controller: scrollController,
-          slivers: const [
-            GreetingUser(),
-            EventInfo(),
-            _HomeWelcomeVideo(),
-            OngoingSessions(),
-            FeaturedSessions(),
-            FeaturedSpeakers(),
-            AddCard(),
-            FeaturedExhibitor(),
-            FeaturedSponsor(),
-            Leaderboard(),
-            EventCtaCard(),
-          ],
+        loadedElement: RefreshIndicator(
+          elevation: 0.5,
+          color: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          onRefresh: controller.fetchHomeData,
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: const [
+              GreetingUser(),
+              EventInfo(),
+              _HomeWelcomeVideo(),
+              OngoingSessions(),
+              FeaturedSessions(),
+              FeaturedSpeakers(),
+              AddCard(),
+              FeaturedExhibitor(),
+              FeaturedSponsor(),
+              Leaderboard(),
+              EventCtaCard(),
+            ],
+          ),
         ),
       ),
     );

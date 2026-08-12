@@ -12,7 +12,7 @@ import '../lounge_controller.dart';
 import 'lounge_seat_helper.dart';
 import 'lounge_seat_unit.dart';
 
-/// Cozy Lounge card — chair seats around a centerpiece + Select a seat CTA.
+/// Cozy Lounge card - chair seats around a centerpiece + Select a seat CTA.
 class LoungeCozyCard extends StatelessWidget {
   final LoungeTable table;
 
@@ -221,7 +221,7 @@ class LoungeCozyCard extends StatelessWidget {
       );
     }
 
-    // Larger tables — two rows
+    // Larger tables - two rows
     final topN = (table.capacity / 2).ceil();
     return Column(
       children: [

@@ -12,6 +12,7 @@ import '../../utils/enum/enums.dart';
 import '../../utils/helpers/helper_functions.dart';
 import '../../utils/helpers/local_key.dart';
 import '../../utils/helpers/toast_msg.dart';
+import '../../utils/service/engagement_service.dart';
 import 'lounge_service.dart';
 import 'pages/lounge_room_view.dart';
 
@@ -173,9 +174,25 @@ class LoungeController extends GetxController {
       }
 
       activeTableId.value = table.id;
+      final joinedAt = DateTime.now();
+      EngagementService.instance.track(
+        actionType: 'lounge.joined',
+        objectType: 'lounge',
+        objectUuid: table.id,
+        metadata: {
+          'table_name': table.name,
+          if (seat != null) 'seat': seat,
+        },
+      );
       await Get.to(
         () => LoungeRoomView(config: config),
         transition: Transition.fadeIn,
+      );
+      EngagementService.instance.track(
+        actionType: 'lounge.left',
+        objectType: 'lounge',
+        objectUuid: table.id,
+        durationMs: DateTime.now().difference(joinedAt).inMilliseconds,
       );
       activeTableId.value = '';
       await fetchTables(silent: true);

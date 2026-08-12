@@ -22,7 +22,7 @@ class RootHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rootCtrl = Get.find<RootController>();
-    // Do NOT Get.find<ChatController>() here — that eagerly starts Pusher +
+    // Do NOT Get.find<ChatController>() here - that eagerly starts Pusher +
     // room polling for every shell paint. Resolve only when chat is enabled.
 
     final rawUser = GetStorage().read(LocalKeyHelper.userInfo);
@@ -52,10 +52,9 @@ class RootHeader extends StatelessWidget {
                     height: 14.sp,
                   ),
                 ),
-                Obx(() => (rootCtrl.themeModules.contains('event_logo') ||
-                        rootCtrl.themeModules.contains('logo'))
-                    ? CustomImage('assets/svg/img/logo.svg', height: 26.h)
-                    : const SizedBox.shrink()),
+                Expanded(
+                  child: Obx(() => _buildEventBrand(context, rootCtrl)),
+                ),
                 GestureDetector(
                   onTap: () {
                     Get.to(()=> ProfileView());
@@ -79,10 +78,39 @@ class RootHeader extends StatelessWidget {
               children: [
                 Expanded(
                   child: Obx(
-                    () => Text(
-                      rootCtrl.headerTitle.value,
-                      style: context.titleLarge?.copyWith(
-                        color: context.tertiaryText,
+                    () => AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        final offset = Tween<Offset>(
+                          begin: const Offset(0, 0.25),
+                          end: Offset.zero,
+                        ).animate(animation);
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: offset,
+                            child: child,
+                          ),
+                        );
+                      },
+                      layoutBuilder: (currentChild, previousChildren) {
+                        return Stack(
+                          alignment: Alignment.centerLeft,
+                          children: <Widget>[
+                            ...previousChildren,
+                            if (currentChild != null) currentChild,
+                          ],
+                        );
+                      },
+                      child: Text(
+                        rootCtrl.headerTitle.value,
+                        key: ValueKey(rootCtrl.headerTitle.value),
+                        textAlign: TextAlign.left,
+                        style: context.titleLarge?.copyWith(
+                          color: context.tertiaryText,
+                        ),
                       ),
                     ),
                   ),
@@ -182,6 +210,82 @@ class RootHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Center brand: event logo + name (parity with web EventHeader modules).
+  Widget _buildEventBrand(BuildContext context, RootController rootCtrl) {
+    final modules = rootCtrl.themeModules;
+    final showLogo =
+        modules.contains('event_logo') || modules.contains('logo');
+    final titleModuleOn =
+        modules.contains('event_title') || modules.contains('title');
+    if (!showLogo && !titleModuleOn) return const SizedBox.shrink();
+
+    final logoUrl = rootCtrl.eventLogoUrl.value.trim();
+    final name = rootCtrl.eventName.value.trim();
+    // Show the name whenever the title module is on, or alongside the logo
+    // so the Expouse wordmark is replaced by the event name.
+    final showTitle = titleModuleOn || (showLogo && name.isNotEmpty);
+    final displayName =
+        name.length > 19 ? '${name.substring(0, 19)}…' : name;
+    final initialsSource = name.isNotEmpty ? name : 'EV';
+    final initials = initialsSource
+        .substring(0, initialsSource.length.clamp(0, 3))
+        .toUpperCase();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        if (showLogo) ...[
+          if (logoUrl.isNotEmpty)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 26.h, maxWidth: 110.w),
+              child: CustomImage(
+                logoUrl,
+                height: 26.h,
+                fit: BoxFit.contain,
+                radius: 6.r,
+              ),
+            )
+          else if (!showTitle || name.isEmpty)
+            CustomImage('assets/svg/img/logo.svg', height: 26.h)
+          else
+            Container(
+              height: 26.h,
+              width: 26.h,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6.r),
+              ),
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: context.tertiaryText,
+                  fontSize: 9.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          if (showTitle && name.isNotEmpty) SizedBox(width: 8.w),
+        ],
+        if (showTitle && name.isNotEmpty)
+          Flexible(
+            child: Text(
+              displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: context.titleRegular?.copyWith(
+                color: context.tertiaryText,
+                fontWeight: FontWeight.w700,
+                fontSize: 13.sp,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

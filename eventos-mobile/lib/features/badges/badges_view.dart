@@ -8,10 +8,11 @@ import '../../../models/participant_badge_model.dart';
 import '../../../utils/enum/enums.dart';
 import '../../../utils/extension/theme_ext.dart';
 import '../../../widgets/state_handler/api_state_handler.dart';
+import '../../../widgets/loading_skeletons/badge_list_skeleton.dart';
 import 'badges_controller.dart';
 import 'widgets/badge_render.dart';
 
-/// My Badges — the attendee's own pass(es) for this event.
+/// My Badges - the attendee's own pass(es) for this event.
 ///
 /// Matches `eventos-event/app/pages/badges.vue`: one card per participation,
 /// design rendered with merged data, Show QR overlay, and front/back flip.
@@ -49,6 +50,7 @@ class _BadgesViewState extends State<BadgesView> {
             () => ApiStateHandler(
               state: controller.dataStatus.value,
               onRetry: controller.fetchBadges,
+              skeleton: const BadgeListSkeleton(),
               loadedElement: controller.badges.isEmpty
                   ? _EmptyState(
                       message:
@@ -235,7 +237,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-/// Full-screen bright QR for gate scanning — opaque white, large code.
+/// Full-screen bright QR for gate scanning - opaque white, large code.
 class _QrOverlay extends StatefulWidget {
   final ParticipantBadge badge;
   final VoidCallback onClose;

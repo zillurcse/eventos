@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/extension_navigation.dart';
 
 import '../../../utils/extension/size_ext.dart';
 import '../../../utils/extension/theme_ext.dart';
+import '../../../widgets/app_webview_page.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_image.dart';
 import '../../../widgets/custom_input.dart';
@@ -52,9 +55,17 @@ class SetPasswordView extends StatelessWidget {
                   Spacer(),
 
                   Center(
-                    child: CustomImage(
-                      "assets/png/logo-primary.png",
-                      height: 24.h,
+                    child: GestureDetector(
+                      onTap: () {
+                        Get.to(() => const AppWebviewPage(
+                          title: 'Expouse',
+                          url: 'https://expouse.com/',
+                        ));
+                      },
+                      child: CustomImage(
+                        "assets/png/logo-primary.png",
+                        height: 24.h,
+                      ),
                     ),
                   ),
 

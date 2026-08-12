@@ -108,6 +108,17 @@ class ToastMsg {
   static String? _safeServerMessage(DioException exception) {
     final data = exception.response?.data;
     if (data is Map) {
+      final errors = data['errors'];
+      if (errors is Map) {
+        for (final value in errors.values) {
+          if (value is List && value.isNotEmpty) {
+            final first = value.first;
+            if (first is String && first.isNotEmpty && first.length <= 200) {
+              return first;
+            }
+          }
+        }
+      }
       final msg = data['message'];
       if (msg is String && msg.isNotEmpty && msg.length <= 200) {
         return msg;
